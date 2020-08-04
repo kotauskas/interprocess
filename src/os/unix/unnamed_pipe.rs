@@ -1,0 +1,119 @@
+use std::{
+    os::unix::io::{
+        AsRawFd, IntoRawFd, FromRawFd,
+    },
+    io::{self, Read, Write},
+    mem,
+    fmt::{self, Formatter, Debug},
+};
+use libc::c_int;
+use crate::{
+    unnamed_pipe::{
+        UnnamedPipeReader as PubReader,
+        UnnamedPipeWriter as PubWriter,
+    },
+    Sealed,
+};
+use super::FdOps;
+
+#[inline]
+pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
+    let (success, fds) = unsafe {
+        let mut fds: [c_int; 2] = [0; 2];
+        let result = libc::pipe(fds.as_mut_ptr());
+        (result == 0, fds)
+    };
+    if success {
+        unsafe {
+            // SAFETY: we just created both of those file descriptors, which means that neither of
+            // them can be in use elsewhere.
+            let reader = PubReader {
+                inner: UnnamedPipeReader::from_raw_fd(fds[0]),
+            };
+            let writer = PubWriter {
+                inner: UnnamedPipeWriter::from_raw_fd(fds[1]),
+            };
+            Ok((writer, reader))
+        }
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+pub(crate) struct UnnamedPipeReader (FdOps);
+// Please, for the love of Unix gods, don't ever try to implement this for &UnnamedPipeReader,
+// reading a pipe concurrently is UB and UnnamedPipeReader is Send and Sync. If you do, the
+// universe will collapse immediately.
+impl Read for UnnamedPipeReader {
+    #[inline(always)]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.0.read(buf)
+    }
+}
+impl Sealed for UnnamedPipeReader {}
+impl AsRawFd for UnnamedPipeReader {
+    #[inline(always)]
+    fn as_raw_fd(&self) -> c_int {
+        self.0.as_raw_fd()
+    }
+}
+impl IntoRawFd for UnnamedPipeReader {
+    #[inline]
+    fn into_raw_fd(self) -> c_int {
+        let fd = self.as_raw_fd();
+        mem::forget(self);
+        fd
+    }
+}
+impl FromRawFd for UnnamedPipeReader {
+    #[inline(always)]
+    unsafe fn from_raw_fd(fd: c_int) -> Self {
+        Self (FdOps::from_raw_fd(fd))
+    }
+}
+impl Debug for UnnamedPipeReader {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("UnnamedPipeReader")
+            .field("file_descriptor", &self.as_raw_fd())
+            .finish()
+    }
+}
+
+pub(crate) struct UnnamedPipeWriter (FdOps);
+impl Write for UnnamedPipeWriter {
+    #[inline(always)]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+impl Sealed for UnnamedPipeWriter {}
+impl AsRawFd for UnnamedPipeWriter {
+    #[inline(always)]
+    fn as_raw_fd(&self) -> c_int {
+        self.0.as_raw_fd()
+    }
+}
+impl IntoRawFd for UnnamedPipeWriter {
+    #[inline(always)]
+    fn into_raw_fd(self) -> c_int {
+        self.0.into_raw_fd()
+    }
+}
+impl FromRawFd for UnnamedPipeWriter {
+    #[inline(always)]
+    unsafe fn from_raw_fd(fd: c_int) -> Self {
+        Self(FdOps(fd))
+    }
+}
+impl Debug for UnnamedPipeWriter {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_struct("UnnamedPipeWriter")
+            .field("file_descriptor", &self.as_raw_fd())
+            .finish()
+    }
+}

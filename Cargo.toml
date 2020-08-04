@@ -1,0 +1,28 @@
+[package]
+name = "interprocess"
+version = "0.1.0"
+authors = ["Kotauskas <v.toncharov@gmail.com>"]
+edition = "2018"
+license = "MIT"
+
+description = "Interprocess communication toolkit"
+categories = ["os", "os::unix_apis", "os::windows_apis"]
+keywords = ["ipc", "shared_memory", "pipe", "mailslot", "unix_domain_socket"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = {version = "0.2", optional = true}
+
+[target.'cfg(windows)'.dependencies]
+winapi = {version = "0.3.9", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
+[target.'cfg(unix)'.dependencies]
+libc = {version = "0.2", features = ["extra_traits"]}
+spin = "0.5"
+cfg-if = "0.1"
+intmap = "0.7"
+lazy_static = "1.4"
+
+[features]
+default = []
+tokio_integration = ["tokio"]
