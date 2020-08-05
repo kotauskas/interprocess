@@ -588,21 +588,21 @@ impl SignalHandler {
     ///
     /// [`Default`]: #variant.Default.html " "
     #[inline(always)]
-    pub const fn is_default(self) -> bool {
+    pub fn is_default(self) -> bool {
         matches!(self, Self::Default)
     }
     /// Returns `true` for the [`Ignore`] variant, `false` otherwise.
     ///
     /// [`Ignore`]: #variant.Ignore.html " "
     #[inline(always)]
-    pub const fn is_ignore(self) -> bool {
+    pub fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
     /// Returns `true` for the [`Hook`] variant, `false` otherwise.
     ///
     /// [`Hook`]: #variant.Hook.html " "
     #[inline(always)]
-    pub const fn is_hook(self) -> bool {
+    pub fn is_hook(self) -> bool {
         matches!(self, Self::Hook(..))
     }
     /// Creates a handler which calls the specified function.
@@ -612,7 +612,7 @@ impl SignalHandler {
     ///
     /// [module-level section on signal-safe system calls]: index.html#signal-safe-system-calls " "
     #[inline(always)]
-    pub unsafe fn from_fn(function: fn()) -> Self {
+    pub const unsafe fn from_fn(function: fn()) -> Self {
         Self::Hook(SignalHook::from_fn(function))
     }
 }

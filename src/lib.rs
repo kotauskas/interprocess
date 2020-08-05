@@ -7,7 +7,8 @@
 //! - **Unix domain sockets** — Unix-specific socket type which is extremely similar to normal network sockets but uses filesystem paths instead, with the optional Linux feature allowing them to use a spearate namespace akin to Windows named pipes
 //! - **Windows named pipes** — Windows-specific named pipe interface closely resembling Unix domain sockets
 //! - **Local sockets** — platform independent interface utilizing named pipes on Windows and Unix domain sockets on Unix
-//! - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
+// - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
+// TODO mailslots
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 // TODO shared memory
 //! - **Signals** — Unix-specific signals, used to receive critical messages from the OS and other programs, as well as sending those messages
