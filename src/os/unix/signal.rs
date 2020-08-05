@@ -612,7 +612,7 @@ impl SignalHandler {
     ///
     /// [module-level section on signal-safe system calls]: index.html#signal-safe-system-calls " "
     #[inline(always)]
-    pub const unsafe fn from_fn(function: fn()) -> Self {
+    pub unsafe fn from_fn(function: fn()) -> Self {
         Self::Hook(SignalHook::from_fn(function))
     }
 }
