@@ -16,7 +16,7 @@ use libc::{
     pid_t, uid_t, gid_t,
     AF_UNIX,
     SOCK_STREAM, SOCK_DGRAM,
-    SOL_SOCKET,
+    SOL_SOCKET, SO_PASSCRED,
     SCM_RIGHTS, SCM_CREDENTIALS,
     MSG_TRUNC, MSG_CTRUNC, MSG_PEEK,
     sockaddr_un,
@@ -268,12 +268,20 @@ impl UdStreamListener {
                 // but you can cast any narrow pointer to any other narrow pointer
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1 {
-                // FIXME the standard library uses 128 here without an option to change this
-                // number, why? If std has solid reasons to do this, remove this notice and
-                // document the method's behavior on this matter explicitly; otherwise, add
-                // an option to change this value.
-                libc::listen(socket, 128) != 1
+            ) != -1
+            // FIXME the standard library uses 128 here without an option to change this
+            // number, why? If std has solid reasons to do this, remove this notice and
+            // document the method's behavior on this matter explicitly; otherwise, add
+            // an option to change this value.
+            && libc::listen(socket, 128) != -1 {
+                let passcred: c_int = 1;
+                libc::setsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_PASSCRED,
+                    &passcred as *const _ as *const _,
+                    mem::size_of_val(&passcred) as u32,
+                ) != -1
             } else {
                 false
             }
@@ -513,12 +521,23 @@ impl UdStream {
             }
         };
         let success = unsafe {
-            libc::connect(
+            if libc::connect(
                 socket,
                 // Same as in UdSocketListener::bind()
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1
+            ) != -1 {
+                let passcred: c_int = 1;
+                libc::setsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_PASSCRED,
+                    &passcred as *const _ as *const _,
+                    mem::size_of_val(&passcred) as u32,
+                ) != -1
+            } else {
+                false
+            }
         };
         if success {
             Ok(unsafe {
@@ -783,15 +802,24 @@ impl UdSocket {
             }
         };
         let success = unsafe {
-            // If binding didn't fail, start listening and return true if it succeeded and false if
-            // it failed; if binding failed, short-circuit to returning false
-            libc::bind(
+            if libc::bind(
                 socket,
                 // Double cast because you cannot cast a reference to a pointer of arbitrary type
                 // but you can cast any narrow pointer to any other narrow pointer
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1
+            ) != -1 {
+                let passcred: c_int = 1;
+                libc::setsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_PASSCRED,
+                    &passcred as *const _ as *const _,
+                    mem::size_of_val(&passcred) as u32,
+                ) != -1
+            } else {
+                false
+            }
         };
         if success {
             Ok(
@@ -841,12 +869,23 @@ impl UdSocket {
             }
         };
         let success = unsafe {
-            libc::connect(
+            if libc::connect(
                 socket,
                 // Same as in UdSocketListener::bind()
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1
+            ) != -1 {
+                let passcred: c_int = 1;
+                libc::setsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_PASSCRED,
+                    &passcred as *const _ as *const _,
+                    mem::size_of_val(&passcred) as u32,
+                ) != -1
+            } else {
+                false
+            }
         };
         if success {
             Ok(unsafe {

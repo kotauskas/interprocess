@@ -154,6 +154,7 @@ use std::{
 };
 use spin::RwLock;
 use intmap::IntMap;
+use thiserror::Error;
 use cfg_if::cfg_if;
 use lazy_static::lazy_static;
 cfg_if! {
@@ -241,10 +242,47 @@ lazy_static! {
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
 #[inline]
-pub fn set_handler(signal_type: SignalType, handler: SignalHandler) {
+pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
     HandlerOptions::for_signal(signal_type)
         .set_new_handler(handler)
         .set()
+}
+/// Installs the specified handler for the specified unsafe signal, using the default values for the flags.
+///
+/// See [`HandlerOptions`] builder if you'd like to customize the flags.
+///
+/// # Safety
+/// See the [`set_unsafe`] safety notes.
+///
+/// # Example
+/// ```no_run
+/// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
+///
+/// let handler = unsafe {
+///     // Since signal handlers are restricted to a specific set of system calls, creating a
+///     // handler from an arbitrary function is unsafe because it might perform a system call
+///     // outside the list, and there's no real way to know that at compile time with the
+///     // current version of Rust. Since we're only using the write() system call here, this
+///     // is safe.
+///     SignalHandler::from_fn(|| {
+///         println!("Oh no, the motherboard broke!");
+///         std::process::abort();
+///     })
+/// };
+///
+/// unsafe {
+///     // Install our handler for the MemoryBusError signal type.
+///     signal::set_unsafe_handler(SignalType::MemoryBusError, handler);
+/// }
+/// ```
+///
+/// [`HandlerOptions`]: struct.HandlerOptions.html " "
+/// [`set_unsafe`]: struct.HandlerOptions.html#method.set_unsafe " "
+#[inline]
+pub unsafe fn set_unsafe_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
+    HandlerOptions::for_signal(signal_type)
+        .set_new_handler(handler)
+        .set_unsafe()
 }
 /// Installs the specified handler for the specified real-time signal, using the default values for the flags.
 ///
@@ -271,7 +309,7 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) {
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
 #[inline]
-pub fn set_rthandler(rtsignal: u32, handler: SignalHandler) {
+pub fn set_rthandler(rtsignal: u32, handler: SignalHandler) -> Result<(), SetHandlerError> {
     HandlerOptions::for_rtsignal(rtsignal)
         .set_new_handler(handler)
         .set()
@@ -429,7 +467,33 @@ impl HandlerOptions {
         self
     }
     /// Installs the signal handler.
-    pub fn set(self) {
+    #[inline]
+    pub fn set(self) -> Result<(), SetHandlerError> {
+        if let Ok(val) = SignalType::try_from(self.signal) {
+            if val.is_unsafe() {
+                return Err(SetHandlerError::UnsafeSignal);
+            }
+        }
+        unsafe {self.set_unsafe()}
+    }
+    
+    /// Installs the signal handler, even if the signal being handled is unsafe.
+    ///
+    /// # Safety
+    /// The handler and all code that may or may not execute afterwards must be prepared for the aftermath of what might've caused the signal. [`SegmentationFault`], for example, might be caused by hitting a stack protector as a response to a thread's stack overflow — in such a case, continuing the program might result in undefined behavior. The Rust runtime actually sets its own handler for `SegmentationFault` signals which converts those signals to proper shutdowns, i.e. ignoring it essentially disables stack protectors, which is unsound.
+    ///
+    /// [`SegmentationFault`]: enum.SignalType.html#variant.SegmentationFault " "
+    pub unsafe fn set_unsafe(self) -> Result<(), SetHandlerError> {
+        if let Ok(val) = SignalType::try_from(self.signal) {
+            if val.is_unblockable() {
+                return Err(SetHandlerError::UnblockableSignal(val));
+            }
+        } else if !is_valid_rtsignal(self.signal as u32) {
+            return Err(SetHandlerError::RealTimeSignalOutOfBounds {
+                attempted: self.signal as u32,
+                max: NUM_REALTIME_SIGNALS,
+            });
+        }
         let handlers = HANDLERS.upgradeable_read();
         let new_flags = self.flags_as_i32();
         let mut need_to_upgrade_handle = false;
@@ -470,8 +534,8 @@ impl HandlerOptions {
                     self.signal,
                     hook_val,
                     new_flags,
-                )
-            }.expect("unexpected signal handler installation failure")
+                )?
+            }
         }
         if need_to_upgrade_handle {
             let mut handlers = handlers.upgrade();
@@ -482,6 +546,7 @@ impl HandlerOptions {
                 new_flags,
             ));
         }
+        Ok(())
     }
 
     #[inline]
@@ -514,6 +579,28 @@ impl HandlerOptions {
         }
         flags
     }
+}
+
+#[derive(Debug, Error)]
+pub enum SetHandlerError {
+    /// An unsafe signal was attempted to be handled using `set` instead of `unsafe_set`.
+    #[error("an unsafe signal was attempted to be handled using `set` instead of `unsafe_set`")]
+    UnsafeSignal,
+    /// The signal which was attempted to be handled is not allowed to be handled by the POSIX specification. This can either be [`ForceSuspend`] or [`Kill`].
+    ///
+    /// [`Kill`]: enum.SignalType.html#variant.Kill " "
+    /// [`ForceSuspend`]: enum.SignalType.html#variant.ForceSuspend " "
+    #[error("the signal {:?} cannot be handled", .0)]
+    UnblockableSignal (SignalType),
+    /// The specified real-time signal is not available on this OS.
+    #[error("the real-time signal number {} is not available ({} is the highest possible)", .attempted, .max)]
+    RealTimeSignalOutOfBounds {
+        attempted: u32,
+        max: u32,
+    },
+    /// An unexpected OS error ocurred during signal handler setup.
+    #[error("{}", .0)]
+    UnexpectedSystemCallFailure (#[from] io::Error),
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
@@ -797,6 +884,7 @@ pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> 
 ///
 /// [`i32`]: https://doc.rust-lang.org/std/primitive.i32.html " "
 /// [`u32`]: https://doc.rust-lang.org/std/primitive.u32.html " "
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(i32)]
 #[non_exhaustive]
 pub enum SignalType {
@@ -964,6 +1052,30 @@ pub enum SignalType {
     ///
     /// [`setrlimit`]: https://www.man7.org/linux/man-pages/man2/setrlimit.2.html " "
     FileSizeLimitExceeded = SIGXFSZ,
+}
+impl SignalType {
+    /// Returns `true` if the value is a special signal which cannot be blocked or handled ([`Kill`] or [`ForceSuspend`]), `false` otherwise.
+    ///
+    /// [`Kill`]: #variant.Kill " "
+    /// [`ForceSuspend`]: #variant.ForceSuspend " "
+    #[inline]
+    pub fn is_unblockable(self) -> bool {
+        match self {
+              Self::Kill
+            | Self::ForceSuspend
+            => true,
+            _ => false,
+        }
+    }
+    /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
+    pub fn is_unsafe(self) -> bool {
+        match self {
+            Self::SegmentationFault
+          | Self::MemoryBusError
+          => true,
+          _ => false,
+      }
+    }
 }
 impl From<SignalType> for i32 {
     fn from(op: SignalType) -> Self {

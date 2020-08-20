@@ -21,8 +21,7 @@
 //!
 //! [MIT license]: https://choosealicense.com/licenses/mit/ " "
 
-// If the trait itself was pub(crate), it wouldn't work as a supertrait on public traits. We use a
-// private module instead to make it impossible to name the trait from outside the crate.
+#![allow(unused_unsafe)]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
 #[cfg(not(any(
@@ -124,6 +123,8 @@ pub(crate) mod private {
             }
         };
     }
+    // If the trait itself was pub(crate), it wouldn't work as a supertrait on public traits. We use a
+    // private module instead to make it impossible to name the trait from outside the crate.
     pub trait Sealed {}
 }
 
