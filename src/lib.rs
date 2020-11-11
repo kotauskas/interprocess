@@ -7,19 +7,20 @@
 //! - **Unix domain sockets** — Unix-specific socket type which is extremely similar to normal network sockets but uses filesystem paths instead, with the optional Linux feature allowing them to use a spearate namespace akin to Windows named pipes
 //! - **Windows named pipes** — Windows-specific named pipe interface closely resembling Unix domain sockets
 //! - **Local sockets** — platform independent interface utilizing named pipes on Windows and Unix domain sockets on Unix
-// - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
-// TODO mailslots
-// - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
-// TODO shared memory
 //! - **Signals** — Unix-specific signals, used to receive critical messages from the OS and other programs, as well as sending those messages
 //!
 //! ## Planned
 //! - **Tokio integration** — usage of `spawn_blocking` for the purposes of creating async versions of blocking pipe APIs
 //!
 //! # License
-//! This crate, along with all community contributions made to it, is distributed under the terms of the [MIT license].
+//! This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].
 //!
 //! [MIT license]: https://choosealicense.com/licenses/mit/ " "
+//! [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/ " "
+// TODO mailslots
+// TODO shared memory
+// - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
+// - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
 #![allow(unused_unsafe)]
 
