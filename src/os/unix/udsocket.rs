@@ -271,9 +271,10 @@ impl UdStreamListener {
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         let path = path.to_socket_path()?; // Shadow original by conversion
         let (addr, addrlen) = unsafe {
-            let mut addr = zeroed();
-            let len = path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, len)
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as u16;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            (addr, mem::size_of::<sockaddr_un>())
         };
         let socket = {
             let (success, fd) = unsafe {
@@ -535,9 +536,10 @@ impl UdStream {
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         let path = path.to_socket_path()?; // Shadow original by conversion
         let (addr, addrlen) = unsafe {
-            let mut addr = zeroed();
-            let len = path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, len)
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as u16;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            (addr, mem::size_of::<sockaddr_un>())
         };
         let socket = {
             let (success, fd) = unsafe {
@@ -762,7 +764,8 @@ impl Write for UdStream {
     }
     #[inline(always)]
     fn flush(&mut self) -> io::Result<()> {
-        self.fd.flush()
+        // You cannot flush a socket
+        Ok(())
     }
 }
 impl Debug for UdStream {
@@ -819,9 +822,10 @@ impl UdSocket {
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         let path = path.to_socket_path()?; // Shadow original by conversion
         let (addr, addrlen) = unsafe {
-            let mut addr = zeroed();
-            let len = path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, len)
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as u16;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            (addr, mem::size_of::<sockaddr_un>())
         };
         let socket = {
             let (success, fd) = unsafe {
@@ -886,9 +890,10 @@ impl UdSocket {
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         let path = path.to_socket_path()?; // Shadow original by conversion
         let (addr, addrlen) = unsafe {
-            let mut addr = zeroed();
-            let len = path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, len)
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as u16;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            (addr, mem::size_of::<sockaddr_un>())
         };
         let socket = {
             let (success, fd) = unsafe {
@@ -1489,7 +1494,7 @@ impl<'a> UdSocketPath<'a> {
     /// Returns `addr_len` to pass to `bind`/`connect`.
     #[inline]
     #[cfg(unix)]
-    fn write_self_to_sockaddr_un(&self, addr: &mut sockaddr_un) -> io::Result<usize> {
+    fn write_self_to_sockaddr_un(&self, addr: &mut sockaddr_un) -> io::Result<()> {
         let is_namespaced;
         let len_of_self = self.as_cstr().to_bytes_with_nul().len();
         match self {
@@ -1535,8 +1540,7 @@ impl<'a> UdSocketPath<'a> {
                 len_of_self,
             );
         }
-        Ok(if is_namespaced { len_of_self + 1 } else { len_of_self }
-        + mem::size_of_val(&addr.sun_family))
+        Ok(())
     }
 }
 impl UdSocketPath<'static> {
