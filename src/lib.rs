@@ -22,6 +22,8 @@
 // - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
+#![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
+
 #![allow(unused_unsafe)]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
@@ -162,7 +164,6 @@ pub mod os;
 ///
 /// ## Platform support
 /// The trait is implemented for:
-/// - Local sockets (module `interprocess::local_socket`)
 /// - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
 /// - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
 ///     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.

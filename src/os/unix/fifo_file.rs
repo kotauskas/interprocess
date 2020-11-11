@@ -16,9 +16,15 @@ use std::{
     path::Path,
     io,
     ffi::CString,
-    os::unix::ffi::OsStrExt,
 };
+#[cfg(unix)]
 use libc::mode_t;
+#[cfg(not(unix))]
+#[doc(hidden)]
+#[allow(non_camel_case_types)]
+pub type mode_t = u32;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 
 /// Creates a FIFO file at the specified path with the specified permissions.
 ///

@@ -30,22 +30,30 @@ pub mod signal;
     target_os = "dragonfly",
     target_os = "macos",
     target_os = "ios",
+
+    doc,
 ))]
 pub mod udsocket;
 
+#[cfg(unix)]
 pub(crate) mod unnamed_pipe;
+#[cfg(unix)]
 pub(crate) mod local_socket;
 
+#[cfg(unix)]
 use libc::{
     c_int, size_t,
 };
+#[cfg(unix)]
 use std::{
     io,
     os::unix::io::{AsRawFd, IntoRawFd, FromRawFd},
     mem,
 };
 
+#[cfg(unix)]
 pub(crate) struct FdOps (pub(crate) c_int);
+#[cfg(unix)]
 impl FdOps {
     #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
@@ -101,12 +109,14 @@ impl FdOps {
         }
     }
 }
+#[cfg(unix)]
 impl AsRawFd for FdOps {
     #[inline(always)]
     fn as_raw_fd(&self) -> c_int {
         self.0
     }
 }
+#[cfg(unix)]
 impl IntoRawFd for FdOps {
     #[inline(always)]
     fn into_raw_fd(self) -> c_int {
@@ -115,12 +125,14 @@ impl IntoRawFd for FdOps {
         fd
     }
 }
+#[cfg(unix)]
 impl FromRawFd for FdOps {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(fd)
     }
 }
+#[cfg(unix)]
 impl Drop for FdOps {
     #[inline]
     fn drop(&mut self) {

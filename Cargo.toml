@@ -14,9 +14,6 @@ keywords = ["ipc", "shared_memory", "pipe", "mailslot", "unix_domain_socket"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-#tokio = {version = "0.2", optional = true}
-
 [target.'cfg(windows)'.dependencies]
 winapi = {version = "0.3.9", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
 [target.'cfg(unix)'.dependencies]
@@ -29,4 +26,7 @@ thiserror = "1.0"
 
 [features]
 default = []
-#tokio_integration = ["tokio"]
+doc_cfg = []
+
+[package.metadata.docs.rs]
+features = ["doc_cfg"]

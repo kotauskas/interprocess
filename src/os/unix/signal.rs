@@ -135,6 +135,7 @@
 //!
 //! [`SignalType`]: enum.SignalType.html " "
 
+#[cfg(unix)]
 use libc::{
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL, SIGSEGV, SIGPIPE, SIGALRM, SIGTERM,
     SIGUSR1, SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGBUS, SIGPROF,
@@ -143,6 +144,21 @@ use libc::{
     SA_NOCLDSTOP, SA_NODEFER, SA_RESETHAND, SA_RESTART,
     sigaction,
 };
+macro_rules! fake_consts {
+    ($($name:ident = $val:expr),+ $(,)?) => (
+        $(
+            #[cfg(not(unix))]
+            const $name : i32 = $val;
+        )+
+    );
+}
+fake_consts! {
+    SIGHUP = 0, SIGINT = 1, SIGQUIT = 2, SIGILL = 3, SIGABRT = 4, SIGFPE = 5, SIGKILL = 6,
+    SIGSEGV = 7, SIGPIPE = 8, SIGALRM = 9, SIGTERM = 10, SIGUSR1 = 11, SIGUSR2 = 12, SIGCHLD = 13,
+    SIGCONT = 14, SIGSTOP = 15, SIGTSTP = 16, SIGTTIN = 17, SIGTTOU = 18, SIGBUS = 19,
+    SIGPROF = 20, SIGPOLL = 21, SIGSYS = 22, SIGTRAP = 23, SIGURG = 24, SIGVTALRM = 25,
+    SIGXCPU = 26, SIGXFSZ = 27,
+}
 use std::{
     io::{self, prelude::*},
     fmt::{self, Formatter, Display},
@@ -152,11 +168,17 @@ use std::{
     panic, process, thread,
     any::Any,
 };
+#[cfg(unix)]
 use spin::RwLock;
+#[cfg(unix)]
 use intmap::IntMap;
+#[cfg(unix)]
 use thiserror::Error;
+#[cfg(unix)]
 use cfg_if::cfg_if;
+#[cfg(unix)]
 use lazy_static::lazy_static;
+#[cfg(unix)]
 cfg_if! {
     if #[cfg(any(
         target_os = "linux",
@@ -188,6 +210,10 @@ cfg_if! {
         const SIGRTMAX: i32 = 0;
     }
 }
+#[cfg(unix)]
+const _NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
+#[cfg(not(unix))]
+const _NUM_REALTIME_SIGNALS: u32 = 0;
 
 /// Whether real-time signals are supported at all.
 ///
@@ -204,7 +230,7 @@ pub const REALTIME_SIGNALS_SUPPORTED: bool = NUM_REALTIME_SIGNALS != 0;
 /// - **Linux** and **NetBSD**: 31
 /// - **FreeBSD**: 62
 /// - **Redox**: 5 (does not conform with POSIX)
-pub const NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
+pub const NUM_REALTIME_SIGNALS: u32 = _NUM_REALTIME_SIGNALS;
 /// Returns `true` if the specified signal is a valid real-time signal value, `false` otherwise.
 #[inline(always)]
 pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
@@ -213,6 +239,7 @@ pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
 
 /// The first field is the current method of handling a specific signal, the second one is the flags which were set for it.
 type HandlerAndFlags = (SignalHandler, i32);
+#[cfg(unix)]
 lazy_static! {
     static ref HANDLERS: RwLock<IntMap<HandlerAndFlags>> = RwLock::new(IntMap::new());
 }
@@ -581,26 +608,43 @@ impl HandlerOptions {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
+#[cfg_attr(unix, derive(Error))]
 pub enum SetHandlerError {
     /// An unsafe signal was attempted to be handled using `set` instead of `unsafe_set`.
-    #[error("an unsafe signal was attempted to be handled using `set` instead of `unsafe_set`")]
+    #[cfg_attr(
+        unix,
+        error("an unsafe signal was attempted to be handled using `set` instead of `unsafe_set`"),
+    )]
     UnsafeSignal,
     /// The signal which was attempted to be handled is not allowed to be handled by the POSIX specification. This can either be [`ForceSuspend`] or [`Kill`].
     ///
     /// [`Kill`]: enum.SignalType.html#variant.Kill " "
     /// [`ForceSuspend`]: enum.SignalType.html#variant.ForceSuspend " "
-    #[error("the signal {:?} cannot be handled", .0)]
+    #[cfg_attr(
+        unix,
+        error("the signal {:?} cannot be handled", .0),
+    )]
     UnblockableSignal (SignalType),
     /// The specified real-time signal is not available on this OS.
-    #[error("the real-time signal number {} is not available ({} is the highest possible)", .attempted, .max)]
+    #[cfg_attr(
+        unix,
+        error(
+            "the real-time signal number {} is not available ({} is the highest possible)",
+            .attempted,
+            .max,
+        ),
+    )]
     RealTimeSignalOutOfBounds {
         attempted: u32,
         max: u32,
     },
     /// An unexpected OS error ocurred during signal handler setup.
-    #[error("{}", .0)]
-    UnexpectedSystemCallFailure (#[from] io::Error),
+    #[cfg_attr(
+        unix,
+        error("{}", .0),
+    )]
+    UnexpectedSystemCallFailure (#[cfg_attr(unix, from)] io::Error),
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
@@ -631,7 +675,6 @@ extern fn signal_receiver(signum: i32) {
         Ok(..) => {},
         Err(panic_payload) => handle_panic_from_signal_receiver(panic_payload),
     }
-    // TODO implement signal receiver
 }
 
 fn handle_panic_from_signal_receiver(panic_payload: Box<dyn Any + Send>) -> ! {
