@@ -924,16 +924,14 @@ where Stream: PipeStream {
     }
 }
 
-/// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, meaning that the meaning of the values is the same for the client and server, that is, [`Inbound`] always means client → server, for example.
+/// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server — [`ClientToServer`] always means client → server, for example.
 ///
-/// [`Inbound`]: enum.PipeDirection.html#variant.Inbound " "
+/// [`ClientToServer`]: enum.PipeDirection.html#variant.ClientToServer " "
 // I had to type out both the link to the page and the name of the variant since the link can be clicked from module-level documentation so please don't touch it.
 #[repr(u32)]
 // We depend on the fact that DWORD always maps to u32, which, thankfully, will always stay true
 // since the public WinAPI is supposed to be ABI-compatible. Just keep in mind that the
-// #[repr(u32)] means that we can transmute this enumeration to the Windows DWORD type. The
-// numeric values for the enum members are taken directly from the Microsoft Docs, I
-// doublechecked, I promise, it's all correct and sound and safe and fine and awesome!
+// #[repr(u32)] means that we can transmute this enumeration to the Windows DWORD type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PipeDirection {
     /// Represents a server ← client data flow: clients write data, the server reads it.
@@ -1016,19 +1014,22 @@ impl From<PipeDirection> for DWORD {
         unsafe {mem::transmute(op)}
     }
 }
-/// Describes the role of a named pipe stream. In constrast to [`PipeDirection`], the meaning of values here is relative: for example, [`Reader`] means [`Inbound`] if you're creating a server and [`Outbound`] if you're creating a client.
+/// Describes the role of a named pipe stream. In constrast to [`PipeDirection`], the meaning of values here is relative — for example, [`Reader`] means [`ServerToClient`] if you're creating a server and [`ClientToServer`] if you're creating a client.
 ///
-/// This enumeration is also not layout-compatible with the `PIPE_ACCESS_*` constants, in contrast to `PipeDirection`.
+/// This enumeration is also not layout-compatible with the `PIPE_ACCESS_*` constants, in contrast to [`PipeDirection`].
 ///
 /// [`PipeDirection`]: enum.PipeDirection.html " "
 /// [`Reader`]: #variant.Reader " "
-/// [`Inbound`]: enum.PipeDirection.html#variant.Inbound " "
-/// [`Outbound`]: enum.PipeDirection.html#variant.Outbound " "
+/// [`ServerToClient`]: enum.PipeDirection.html#variant.ServerToClient " "
+/// [`ClientToServer`]: enum.PipeDirection.html#variant.ClientToServer " "
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum PipeStreamRole {
+    /// The stream only reads data.
     Reader,
+    /// The stream only writes data.
     Writer,
+    /// The stream both reads and writes data.
     ReaderAndWriter,
 }
 impl PipeStreamRole {
