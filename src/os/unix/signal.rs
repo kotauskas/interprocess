@@ -1110,7 +1110,7 @@ impl SignalType {
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
     #[inline]
     pub const fn is_unsafe(self) -> bool {
-        matches!(self, Self::SegmentationFault | Self::MemoryBusError);
+        matches!(self, Self::SegmentationFault | Self::MemoryBusError)
     }
 }
 impl From<SignalType> for i32 {
@@ -1161,7 +1161,7 @@ impl TryFrom<i32> for SignalType {
             SIGVTALRM => Ok(Self::UserModeProfilerClock          ),
             SIGXCPU   => Ok(Self::CpuTimeLimitExceeded           ),
             SIGXFSZ   => Ok(Self::FileSizeLimitExceeded          ),
-            _ => Err( UnknownSignalError {value} )
+            _ => Err( UnknownSignalError {value} ),
         }
     }
 }
