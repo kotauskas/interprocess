@@ -387,7 +387,7 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
 ///                                 // Interrupted error type. There normally isn't a reason to
 ///                                 // do this, but for the sake of the example, let's assume
 ///                                 // that there is.
-///     .set() // Finalize the builder by installing the handler.
+///     .set(); // Finalize the builder by installing the handler.
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct HandlerOptions {

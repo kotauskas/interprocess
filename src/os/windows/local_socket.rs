@@ -4,6 +4,7 @@ use std::{
     ffi::{OsStr, OsString, c_void},
     //path::{Path, PathBuf},
     borrow::Cow,
+    os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle},
 };
 use crate::local_socket::{
     NameTypeSupport,
