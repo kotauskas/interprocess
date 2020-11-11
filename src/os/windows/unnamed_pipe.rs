@@ -33,6 +33,9 @@ pub struct SECURITY_ATTRIBUTES {}
 #[cfg(not(windows))]
 #[doc(hidden)]
 pub type LPVOID = *mut ();
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub const NULL: LPVOID = 0 as _;
 use crate::{
     unnamed_pipe::{
         UnnamedPipeReader as PubReader,
