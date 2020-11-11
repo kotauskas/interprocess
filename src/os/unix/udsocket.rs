@@ -2023,9 +2023,7 @@ impl<'b> From<Vec<AncillaryData<'b>>> for EncodedAncillaryData<'static> {
 impl<'b: 'c, 'c> From<&'c [AncillaryData<'b>]> for EncodedAncillaryData<'static> {
     #[inline(always)]
     fn from(op: &'c [AncillaryData<'b>]) -> Self {
-        Self::from_iter(
-            op.iter().map(AncillaryData::clone_ref)
-        )
+        op.iter().map(AncillaryData::clone_ref).collect::<Self>()
     }
 }
 impl<'a> AsRef<[u8]> for EncodedAncillaryData<'a> {

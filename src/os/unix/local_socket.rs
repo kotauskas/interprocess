@@ -125,9 +125,9 @@ impl FromRawFd for LocalSocketStream {
 }
 
 #[inline]
-fn local_socket_name_to_ud_socket_path<'a>(name: LocalSocketName<'a>) -> io::Result<UdSocketPath<'a>> {
+fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<UdSocketPath<'_>> {
     #[inline]
-    fn cow_osstr_to_cstr<'a>(osstr: Cow<'a, OsStr>) -> io::Result<Cow<'a, CStr>> {
+    fn cow_osstr_to_cstr(osstr: Cow<'_, OsStr>) -> io::Result<Cow<'_, CStr>> {
         match osstr {
             Cow::Borrowed(val) => {
                 if val.as_bytes().last() == Some(&0) {
