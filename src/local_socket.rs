@@ -442,7 +442,6 @@ impl ToLocalSocketName<'static> for CString {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::local_socket::{LocalSocketListener, LocalSocketStream};
