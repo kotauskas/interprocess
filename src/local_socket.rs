@@ -445,13 +445,20 @@ impl ToLocalSocketName<'static> for CString {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::local_socket::{LocalSocketListener, LocalSocketStream};
     #[test]
-    fn test_() {
-        use std::io::{self, prelude::*};
+    fn basic() {
+        use std::{
+            io::{self, prelude::*, BufReader},
+            sync::{Arc, Barrier},
+        };
 
-        std::thread::spawn(|| {
+        // We're using a barrier here to avoid the client attempting to connect
+        // before the server creates the socket
+        let barrier = Arc::new(Barrier::new(2));
+        let server_barrier = Arc::clone(&barrier);
+        
+        std::thread::spawn(move || {
             fn handle_error(
                 connection: io::Result<LocalSocketStream>,
             ) -> Option<LocalSocketStream> {
@@ -464,19 +471,25 @@ mod test {
             }
 
             let listener = LocalSocketListener::bind("/tmp/example.sock").unwrap();
-            for mut connection in listener.incoming().filter_map(handle_error) {
-                connection.write_all(b"Hello from server!").unwrap();
+            server_barrier.wait();
+            for mut conn in listener.incoming().filter_map(handle_error) {
+                println!("Incoming connection!");
+                conn.write_all(b"Hello from server!\n").unwrap();
+                // Add buffering to the connection to read a line.
+                let mut conn = BufReader::new(conn);
                 let mut buffer = String::new();
-                connection.read_to_string(&mut buffer).unwrap();
+                conn.read_line(&mut buffer).unwrap();
                 println!("Client answered: {}", buffer);
             }
         });
 
-        let h2 = std::thread::spawn(|| {
+        barrier.wait();
+        let h2 = std::thread::spawn(move || {
             let mut conn = LocalSocketStream::connect("/tmp/example.sock").unwrap();
-            conn.write_all(b"Hello from client!").unwrap();
+            conn.write_all(b"Hello from client!\n").unwrap();
+            let mut conn = BufReader::new(conn);
             let mut buffer = String::new();
-            conn.read_to_string(&mut buffer).unwrap();
+            conn.read_line(&mut buffer).unwrap();
             println!("Server answered: {}", buffer);
         });
         h2.join().unwrap();
