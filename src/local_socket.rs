@@ -326,12 +326,12 @@ impl NameTypeSupport {
 
     /// Returns `true` if, according to `self`, filesystem-based local sockets are supported; `false` otherwise.
     #[inline(always)]
-    pub fn paths_supported(self) -> bool {
+    pub const fn paths_supported(self) -> bool {
         matches!(self, Self::OnlyPaths | Self::Both)
     }
     /// Returns `true` if, according to `self`, namespaced local socket names are supported; `false` otherwise.
     #[inline(always)]
-    pub fn namespace_supported(self) -> bool {
+    pub const fn namespace_supported(self) -> bool {
         matches!(self, Self::OnlyNamespaced | Self::Both)
     }
 }

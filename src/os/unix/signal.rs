@@ -1104,22 +1104,13 @@ impl SignalType {
     /// [`Kill`]: #variant.Kill " "
     /// [`ForceSuspend`]: #variant.ForceSuspend " "
     #[inline]
-    pub fn is_unblockable(self) -> bool {
-        match self {
-              Self::Kill
-            | Self::ForceSuspend
-            => true,
-            _ => false,
-        }
+    pub const fn is_unblockable(self) -> bool {
+        matches!(self, Self::Kill | Self::ForceSuspend)
     }
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
-    pub fn is_unsafe(self) -> bool {
-        match self {
-            Self::SegmentationFault
-          | Self::MemoryBusError
-          => true,
-          _ => false,
-      }
+    #[inline]
+    pub const fn is_unsafe(self) -> bool {
+        matches!(self, Self::SegmentationFault | Self::MemoryBusError);
     }
 }
 impl From<SignalType> for i32 {
