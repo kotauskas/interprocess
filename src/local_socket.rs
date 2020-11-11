@@ -441,3 +441,44 @@ impl ToLocalSocketName<'static> for CString {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::local_socket::{LocalSocketListener, LocalSocketStream};
+    #[test]
+    fn test_() {
+        use std::io::{self, prelude::*};
+
+        std::thread::spawn(|| {
+            fn handle_error(
+                connection: io::Result<LocalSocketStream>,
+            ) -> Option<LocalSocketStream> {
+                match connection {
+                    Ok(val) => Some(val),
+                    Err(error) => {
+                        panic!("Incoming connection failed: {}", error);
+                    }
+                }
+            }
+
+            let listener = LocalSocketListener::bind("/tmp/example.sock").unwrap();
+            for mut connection in listener.incoming().filter_map(handle_error) {
+                connection.write_all(b"Hello from server!").unwrap();
+                let mut buffer = String::new();
+                connection.read_to_string(&mut buffer).unwrap();
+                println!("Client answered: {}", buffer);
+            }
+        });
+
+        let h2 = std::thread::spawn(|| {
+            let mut conn = LocalSocketStream::connect("/tmp/example.sock").unwrap();
+            conn.write_all(b"Hello from client!").unwrap();
+            let mut buffer = String::new();
+            conn.read_to_string(&mut buffer).unwrap();
+            println!("Server answered: {}", buffer);
+        });
+        h2.join().unwrap();
+    }
+}

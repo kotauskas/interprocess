@@ -7,12 +7,14 @@
 // TODO add examples
 
 use std::{
-    os::windows::io::{FromRawHandle, AsRawHandle, IntoRawHandle},
     mem::{self, zeroed, size_of},
     io::{self, Read, Write},
     num::NonZeroUsize,
     fmt::{self, Formatter, Debug},
 };
+#[cfg(windows)]
+use std::os::windows::io::{FromRawHandle, AsRawHandle, IntoRawHandle};
+#[cfg(windows)]
 use winapi::{
     shared::{
         ntdef::{HANDLE, NULL},
@@ -24,6 +26,13 @@ use winapi::{
         namedpipeapi::CreatePipe,
     },
 };
+#[cfg(not(windows))]
+#[doc(hidden)]
+#[allow(non_camel_case_types)]
+pub struct SECURITY_ATTRIBUTES {}
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub type LPVOID = *mut ();
 use crate::{
     unnamed_pipe::{
         UnnamedPipeReader as PubReader,
@@ -162,12 +171,14 @@ impl Read for UnnamedPipeReader {
         self.0.read(buf)
     }
 }
+#[cfg(windows)]
 impl AsRawHandle for UnnamedPipeReader {
     #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
+#[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeReader {
     #[inline]
     fn into_raw_handle(self) -> HANDLE {
@@ -176,6 +187,7 @@ impl IntoRawHandle for UnnamedPipeReader {
         handle
     }
 }
+#[cfg(windows)]
 impl FromRawHandle for UnnamedPipeReader {
     #[inline(always)]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
@@ -202,12 +214,14 @@ impl Write for UnnamedPipeWriter {
         self.0.flush()
     }
 }
+#[cfg(windows)]
 impl AsRawHandle for UnnamedPipeWriter {
     #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
+#[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeWriter {
     #[inline]
     fn into_raw_handle(self) -> HANDLE {
@@ -216,6 +230,7 @@ impl IntoRawHandle for UnnamedPipeWriter {
         handle
     }
 }
+#[cfg(windows)]
 impl FromRawHandle for UnnamedPipeWriter {
     #[inline(always)]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {

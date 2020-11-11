@@ -14,10 +14,6 @@
 
 use std::{
     io::{self, Read, Write},
-    os::windows::{
-        io::{AsRawHandle, IntoRawHandle, FromRawHandle},
-        ffi::OsStrExt,
-    },
     ffi::{OsStr, OsString},
     mem::{self, zeroed},
     convert::{TryFrom, TryInto},
@@ -31,6 +27,15 @@ use std::{
     },
     fmt::{self, Formatter, Debug},
 };
+#[cfg(windows)]
+use std::os::windows::{
+    io::{AsRawHandle, IntoRawHandle, FromRawHandle},
+    ffi::OsStrExt,
+};
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub trait AsRawHandle {}
+#[cfg(windows)]
 use winapi::{
     shared::minwindef::DWORD,
     um::{
@@ -46,6 +51,23 @@ use winapi::{
         fileapi::{CreateFileW, OPEN_EXISTING},
     },
 };
+#[cfg(not(windows))]
+macro_rules! fake_consts {
+    ($($name:ident = $val:expr),+ $(,)?) => (
+        $(
+            #[cfg(not(windows))]
+            const $name : u32 = $val;
+        )+
+    );
+}
+#[cfg(not(windows))]
+fake_consts! {
+    PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
+    PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
+}
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub type DWORD = u32;
 use crate::{
     Sealed,
     ReliableReadMsg, PartialMsgWriteError,
@@ -158,9 +180,11 @@ where Stream: PipeStream {
 mod pipe_listener_debug_impl {
     use super::{
         fmt, Formatter, Debug,
-        AtomicBool, Ordering, RwLock, Arc, AsRawHandle,
+        AtomicBool, Ordering, RwLock, Arc,
         PipeOps, PipeStream, PipeListener,
     };
+    #[cfg(windows)]
+    use super::AsRawHandle;
     /// Shim used to improve pipe instance formatting
     struct Instance<'a> {
         instance: &'a (PipeOps, AtomicBool),
@@ -208,6 +232,7 @@ mod pipe_listener_debug_impl {
 
 use seal::*;
 mod seal {
+    #[cfg(windows)]
     use winapi::{
         shared::{
             minwindef::DWORD,
@@ -224,8 +249,9 @@ mod seal {
         sync::atomic::AtomicBool,
         io,
         mem::zeroed,
-        os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle},
     };
+    #[cfg(windows)]
+    use std::os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle};
     use super::super::FileHandleOps;
 
     pub trait NamedPipeStreamInternals: From<std::sync::Arc<(super::PipeOps, AtomicBool)>> {}
@@ -357,12 +383,14 @@ mod seal {
             }
         }
     }
+    #[cfg(windows)]
     impl AsRawHandle for PipeOps {
         #[inline(always)]
         fn as_raw_handle(&self) -> HANDLE {
             self .0 .0 // I hate this nested tuple syntax.
         }
     }
+    #[cfg(windows)]
     impl IntoRawHandle for PipeOps {
         #[inline(always)]
         fn into_raw_handle(self) -> HANDLE {
@@ -371,6 +399,7 @@ mod seal {
             handle
         }
     }
+    #[cfg(windows)]
     impl FromRawHandle for PipeOps {
         unsafe fn from_raw_handle(handle: HANDLE) -> Self {
             Self (FileHandleOps::from_raw_handle(handle))
@@ -637,12 +666,14 @@ macro_rules! create_stream_type {
                 Self {instance}
             }
         }
+        #[cfg(windows)]
         impl AsRawHandle for $ty {
             #[inline(always)]
             fn as_raw_handle(&self) -> HANDLE {
                 self.instance.0.as_raw_handle()
             }
         }
+        #[cfg(windows)]
         impl IntoRawHandle for $ty {
             #[inline(always)]
             fn into_raw_handle(self) -> HANDLE {
@@ -650,6 +681,7 @@ macro_rules! create_stream_type {
                 handle
             }
         }
+        #[cfg(windows)]
         impl FromRawHandle for $ty {
             #[inline(always)]
             unsafe fn from_raw_handle(handle: HANDLE) -> Self {

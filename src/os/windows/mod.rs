@@ -4,8 +4,10 @@ pub mod named_pipe;
 pub mod unnamed_pipe;
 // TODO mailslots
 //pub mod mailslot;
+#[cfg(windows)]
 pub(crate) mod local_socket;
 
+#[cfg(windows)]
 use winapi::{
     shared::{
         ntdef::HANDLE,
@@ -17,11 +19,18 @@ use winapi::{
         fileapi::{ReadFile, WriteFile, FlushFileBuffers},
     },
 };
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub type HANDLE = *mut ();
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub trait AsRawHandle {}
 use std::{
-    os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle},
     io,
     mem::{self, zeroed},
 };
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -134,12 +143,14 @@ impl Drop for FileHandleOps {
         } != 0);
     }
 }
+#[cfg(windows)]
 impl AsRawHandle for FileHandleOps {
     #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
+#[cfg(windows)]
 impl IntoRawHandle for FileHandleOps {
     #[inline(always)]
     fn into_raw_handle(self) -> HANDLE {
@@ -148,6 +159,7 @@ impl IntoRawHandle for FileHandleOps {
         handle
     }
 }
+#[cfg(windows)]
 impl FromRawHandle for FileHandleOps {
     #[inline(always)]
     unsafe fn from_raw_handle(op: HANDLE) -> Self {

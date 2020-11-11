@@ -144,6 +144,7 @@ use libc::{
     SA_NOCLDSTOP, SA_NODEFER, SA_RESETHAND, SA_RESTART,
     sigaction,
 };
+#[cfg(not(unix))]
 macro_rules! fake_consts {
     ($($name:ident = $val:expr),+ $(,)?) => (
         $(
@@ -152,6 +153,7 @@ macro_rules! fake_consts {
         )+
     );
 }
+#[cfg(not(unix))]
 fake_consts! {
     SIGHUP = 0, SIGINT = 1, SIGQUIT = 2, SIGILL = 3, SIGABRT = 4, SIGFPE = 5, SIGKILL = 6,
     SIGSEGV = 7, SIGPIPE = 8, SIGALRM = 9, SIGTERM = 10, SIGUSR1 = 11, SIGUSR2 = 12, SIGCHLD = 13,
