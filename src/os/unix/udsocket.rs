@@ -2011,8 +2011,7 @@ impl From<Vec<u8>> for EncodedAncillaryData<'static> {
 }
 impl<'b> FromIterator<AncillaryData<'b>> for EncodedAncillaryData<'static> {
     #[inline(always)]
-    fn from_iter<I>(iter: I) -> Self
-    where I: IntoIterator<Item = AncillaryData<'b>> {
+    fn from_iter<I: IntoIterator<Item = AncillaryData<'b>>>(iter: I) -> Self {
         AncillaryData::encode(iter)
     }
 }

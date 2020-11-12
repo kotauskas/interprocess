@@ -86,8 +86,7 @@ fn convert_path(osstr: &OsStr) -> Vec<u16> {
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 ///
 /// [`PipeListenerOptions`]: struct.PipeListenerOptions.html " "
-pub struct PipeListener<Stream>
-where Stream: PipeStream {
+pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     instances: RwLock<Vec<Arc<(PipeOps, AtomicBool)>>>,
     _phantom: PhantomData<fn() -> Stream>,
@@ -99,20 +98,17 @@ where Stream: PipeStream {
 /// [`PipeListener`]: struct.PipeListener.html " "
 /// [`accept`]: struct.PipeListener.html#method.accept " "
 /// [`incoming`]: struct.PipeListener.html#method.incoming " "
-pub struct Incoming<'a, Stream>
-where Stream: PipeStream {
+pub struct Incoming<'a, Stream: PipeStream> {
     listener: &'a PipeListener<Stream>,
 }
-impl<'a, Stream> Iterator for Incoming<'a, Stream>
-where Stream: PipeStream {
+impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
     type Item = io::Result<Stream>;
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
 }
-impl<'a, Stream> IntoIterator for &'a PipeListener<Stream>
-where Stream: PipeStream {
+impl<'a, Stream: PipeStream> IntoIterator for &'a PipeListener<Stream> {
     type IntoIter = Incoming<'a, Stream>;
     type Item = <Incoming<'a, Stream> as Iterator>::Item;
     #[inline(always)]
@@ -120,8 +116,7 @@ where Stream: PipeStream {
         self.incoming()
     }
 }
-impl<Stream> PipeListener<Stream>
-where Stream: PipeStream {
+impl<Stream: PipeStream> PipeListener<Stream> {
     /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
     ///
     /// See `incoming` for an iterator version of this.
@@ -214,8 +209,7 @@ mod pipe_listener_debug_impl {
             list_builder.finish()
         }
     }
-    impl<Stream> Debug for PipeListener<Stream>
-    where Stream: PipeStream {
+    impl<Stream: PipeStream> Debug for PipeListener<Stream> {
         #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeListener")
@@ -524,8 +518,10 @@ impl<'a> PipeListenerOptions<'a> {
         self
     }
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
-    fn create_instance<Stream>(&self, first: bool) -> io::Result<(PipeOps, AtomicBool)>
-    where Stream: PipeStream {
+    fn create_instance<Stream: PipeStream>(
+        &self,
+        first: bool,
+    ) -> io::Result<(PipeOps, AtomicBool)> {
         let path = convert_path(&self.name);
         let (handle, success) = unsafe {
             let handle = CreateNamedPipeW(
@@ -564,8 +560,7 @@ impl<'a> PipeListenerOptions<'a> {
     ///
     /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
     #[inline]
-    pub fn create<Stream>(&self) -> io::Result<PipeListener<Stream>>
-    where Stream: PipeStream {
+    pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
         // We need this ugliness because the compiler does not understand that
         // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
         // replace the name field with Cow::Owned and just copy all other elements over thanks
@@ -908,8 +903,10 @@ impl PipeStream for DuplexMsgPipeStream {
 /// Connects to the specified named pipe, returning a named pipe stream of the stream type provided via generic parameters.
 ///
 /// Since named pipes can work across multiple machines, an optional hostname can be supplied. Leave it at `None` if you're using named pipes on the local machine exclusively, which is most likely the case.
-pub fn connect<Stream>(pipe_name: impl AsRef<OsStr>, hostname: Option<impl AsRef<OsStr>>) -> io::Result<Stream>
-where Stream: PipeStream {
+pub fn connect<Stream: PipeStream>(
+    pipe_name: impl AsRef<OsStr>,
+    hostname: Option<impl AsRef<OsStr>>,
+) -> io::Result<Stream> {
     let mut path = {
         let mut path = OsString::from(r"\\.");
         if let Some(host) = hostname {
