@@ -191,7 +191,7 @@ mod pipe_listener_debug_impl {
     }
     impl<'a> Debug for Instance<'a> {
         #[inline]
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeInstance")
                 .field("handle", &self.instance.0.as_raw_handle())
                 .field("connected", &self.instance.1.load(Ordering::Relaxed))
@@ -204,7 +204,7 @@ mod pipe_listener_debug_impl {
     }
     impl<'a> Debug for Instances<'a> {
         #[inline]
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             let mut list_builder = f.debug_list();
             for instance in self.instances.read()
                 .expect("unexpected lock poisoning")
@@ -217,7 +217,7 @@ mod pipe_listener_debug_impl {
     impl<Stream> Debug for PipeListener<Stream>
     where Stream: PipeStream {
         #[inline]
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeListener")
                 .field("config", &self.config)
                 .field("instances", &Instances {instances: &self.instances})
@@ -695,7 +695,7 @@ macro_rules! create_stream_type {
         }
         impl Debug for $ty {
             #[inline]
-            fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                 f.debug_struct(stringify!($ty))
                     .field("handle", &self.as_raw_handle())
                     .finish()

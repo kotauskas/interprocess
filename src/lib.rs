@@ -24,6 +24,8 @@
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 
+#![deny(rust_2018_idioms)]
+#![warn(missing_docs)]
 #![allow(unused_unsafe)]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
@@ -184,7 +186,7 @@ pub trait ReliableReadMsg: Sealed {
 pub struct PartialMsgWriteError;
 impl Display for PartialMsgWriteError {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("message write operation wrote less than the size of the message")
     }
 }

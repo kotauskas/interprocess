@@ -48,7 +48,7 @@ impl Read for UnnamedPipeReader {
 }
 impl fmt::Debug for UnnamedPipeReader {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
 }
@@ -83,7 +83,7 @@ impl Write for UnnamedPipeWriter {
 }
 impl fmt::Debug for UnnamedPipeWriter {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
 }

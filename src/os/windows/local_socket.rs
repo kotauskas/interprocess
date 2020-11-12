@@ -41,7 +41,7 @@ impl LocalSocketListener {
 }
 impl Debug for LocalSocketListener {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("LocalSocketListener")
     }
 }

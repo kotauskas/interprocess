@@ -1178,12 +1178,12 @@ pub struct UnknownSignalError {
 }
 impl Display for UnknownSignalError {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "unknown signal value {}", self.value)
     }
 }
 impl fmt::Binary for UnknownSignalError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "unknown signal value {:b}", self.value)
     }
 }

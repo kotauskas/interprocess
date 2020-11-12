@@ -397,7 +397,7 @@ impl UdStreamListener {
     }
 }
 impl Debug for UdStreamListener {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdStreamListener")
             .field("file_descriptor", &self.as_raw_fd())
             .finish()
@@ -770,7 +770,7 @@ impl Write for UdStream {
 }
 impl Debug for UdStream {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdStream")
             .field("file_descriptor", &self.as_raw_fd())
             .finish()
@@ -1230,7 +1230,7 @@ impl UdSocket {
 }
 impl Debug for UdSocket {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdSocket")
             .field("file_descriptor", &self.as_raw_fd())
             .finish()

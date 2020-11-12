@@ -186,7 +186,7 @@ impl Write for LocalSocketStream {
 }
 impl Debug for LocalSocketStream {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }
 }

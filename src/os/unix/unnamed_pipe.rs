@@ -73,7 +73,7 @@ impl FromRawFd for UnnamedPipeReader {
 }
 impl Debug for UnnamedPipeReader {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
             .field("file_descriptor", &self.as_raw_fd())
             .finish()
@@ -111,7 +111,7 @@ impl FromRawFd for UnnamedPipeWriter {
 }
 impl Debug for UnnamedPipeWriter {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
             .field("file_descriptor", &self.as_raw_fd())
             .finish()
