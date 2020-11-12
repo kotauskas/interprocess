@@ -1,5 +1,5 @@
 use futures::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{BufReader, AsyncBufReadExt, AsyncWriteExt},
     stream::TryStreamExt,
 };
 use interprocess::nonblocking::local_socket::*;
@@ -11,10 +11,11 @@ async fn main() {
         .unwrap();
     listener
         .incoming()
-        .try_for_each(|mut stream| async move {
-            stream.write_all(b"Hello from server!").await.unwrap();
+        .try_for_each(|mut conn| async move {
+            conn.write_all(b"Hello from server!\n").await.unwrap();
+            let mut conn = BufReader::new(conn);
             let mut buffer = String::new();
-            stream.read_to_string(&mut buffer).await.unwrap();
+            conn.read_line(&mut buffer).await.unwrap();
             println!("Client answered: {}", buffer);
             Ok(())
         })
