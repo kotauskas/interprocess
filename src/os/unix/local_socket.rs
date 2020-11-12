@@ -37,7 +37,7 @@ impl LocalSocketListener {
 }
 impl Debug for LocalSocketListener {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSocketListener")
             .field("file_descriptor", &self.inner.as_raw_fd())
             .finish()
@@ -99,7 +99,7 @@ impl Write for LocalSocketStream {
 }
 impl Debug for LocalSocketStream {
     #[inline]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSocketStream")
             .field("file_descriptor", &self.inner.as_raw_fd())
             .finish()

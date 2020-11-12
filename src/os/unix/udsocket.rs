@@ -714,7 +714,7 @@ impl UdStream {
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData>();
+        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
         let abuf: &[u8] = abuf_value.as_ref();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
         let mut hdr = unsafe {zeroed::<msghdr>()};
