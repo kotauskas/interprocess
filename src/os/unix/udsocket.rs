@@ -601,7 +601,7 @@ impl UdStream {
     /// [`recv_ancillary_vectored`]: #method.recv_ancillary_vectored " "
     // TODO use readv
     #[inline(always)]
-    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut]) -> io::Result<usize> {
+    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut abuf = AncillaryDataBuf::Owned(Vec::new());
         self.recv_ancillary_vectored(bufs, &mut abuf)
             .map(|x| x.0)
@@ -631,7 +631,7 @@ impl UdStream {
     #[inline]
     pub fn recv_ancillary_vectored<'a: 'b, 'b> (
             &self,
-            bufs: &[IoSliceMut],
+            bufs: &[IoSliceMut<'_>],
             abuf: &'b mut AncillaryDataBuf<'a>,
         ) -> io::Result<(usize, usize)> {
         let abuf: &mut [u8] = abuf.as_mut();
@@ -681,7 +681,7 @@ impl UdStream {
     /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
     // TODO use writev
     #[inline(always)]
-    pub fn send_vectored(&self, bufs: &[IoSlice]) -> io::Result<usize> {
+    pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
     }
@@ -711,7 +711,7 @@ impl UdStream {
     #[inline]
     pub fn send_ancillary_vectored<'a> (
         &self,
-        bufs: &[IoSlice],
+        bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
         let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData>();
@@ -746,7 +746,7 @@ impl Read for UdStream {
         self.fd.read(buf)
     }
     #[inline]
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut]) -> io::Result<usize> {
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut abuf = AncillaryDataBuf::Owned(Vec::new());
         self.recv_ancillary_vectored(bufs, &mut abuf)
             .map(|x| x.0)
@@ -758,7 +758,7 @@ impl Write for UdStream {
         self.fd.write(buf)
     }
     #[inline]
-    fn write_vectored(&mut self, bufs: &[IoSlice]) -> io::Result<usize> {
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
     }
@@ -957,7 +957,7 @@ impl UdSocket {
     /// [`recv_ancillary_vectored`]: #method.recv_ancillary_vectored " "
     // TODO use readv
     #[inline(always)]
-    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut]) -> io::Result<(usize, bool)> {
+    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<(usize, bool)> {
         self.recv_ancillary_vectored(bufs, &mut AncillaryDataBuf::Owned(Vec::new()))
             .map(|x| (x.0, x.1))
     }
@@ -993,7 +993,7 @@ impl UdSocket {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     pub fn recv_ancillary_vectored<'a: 'b, 'b>(
         &self,
-        bufs: &mut [IoSliceMut],
+        bufs: &mut [IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
     ) -> io::Result<(usize, bool, usize, bool)> {
         let abuf: &mut [u8] = abuf.as_mut();
@@ -1049,7 +1049,7 @@ impl UdSocket {
     #[inline(always)]
     pub fn recv_from_vectored<'a: 'b, 'b>(
         &self,
-        bufs: &mut [IoSliceMut],
+        bufs: &mut [IoSliceMut<'_>],
         addr_buf: &'b mut UdSocketPath<'a>,
     ) -> io::Result<(usize, bool)> {
         self.recv_from_ancillary_vectored(bufs, &mut AncillaryDataBuf::Owned(Vec::new()), addr_buf)
@@ -1086,7 +1086,7 @@ impl UdSocket {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     pub fn recv_from_ancillary_vectored<'a: 'b, 'b, 'c: 'd, 'd> (
         &self,
-        bufs: &mut [IoSliceMut],
+        bufs: &mut [IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
         addr_buf: &'d mut UdSocketPath<'c>,
     ) -> io::Result<(usize, bool, usize, bool)> {
@@ -1171,7 +1171,7 @@ impl UdSocket {
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
     #[inline(always)]
-    pub fn send_vectored(&self, bufs: &[IoSlice]) -> io::Result<usize> {
+    pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
     }
@@ -1199,10 +1199,10 @@ impl UdSocket {
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     pub fn send_ancillary_vectored<'a>(
         &self,
-        bufs: &[IoSlice],
+        bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData>();
+        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
         let abuf: &[u8] = abuf_value.as_ref();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
         let mut hdr = unsafe {zeroed::<msghdr>()};
