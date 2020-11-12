@@ -29,10 +29,10 @@ impmod!{local_socket,
 /// # Example
 /// ```no_run
 /// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-/// use std::io::{self, prelude::*};
+/// use std::io::{self, prelude::*, BufReader};
 ///
-/// fn handle_error(connection: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
-///     match connection {
+/// fn handle_error(conn: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
+///     match conn {
 ///         Ok(val) => Some(val),
 ///         Err(error) => {
 ///             eprintln!("Incoming connection failed: {}", error);
@@ -42,10 +42,11 @@ impmod!{local_socket,
 /// }
 ///
 /// let listener = LocalSocketListener::bind("/tmp/example.sock")?;
-/// for mut connection in listener.incoming().filter_map(handle_error) {
-///     connection.write_all(b"Hello from server!")?;
+/// for mut conn in listener.incoming().filter_map(handle_error) {
+///     conn.write_all(b"Hello from server!\n")?;
+///     let mut conn = BufReader::new(conn);
 ///     let mut buffer = String::new();
-///     connection.read_to_string(&mut buffer);
+///     conn.read_line(&mut buffer);
 ///     println!("Client answered: {}", buffer);
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -71,27 +72,7 @@ impl LocalSocketListener {
     /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
     ///
     /// # Example
-    /// ```no_run
-    /// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-    /// use std::io::{self, prelude::*};
-    ///
-    /// fn handle_error(connection: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
-    ///     match connection {
-    ///         Ok(val) => Some(val),
-    ///         Err(error) => {
-    ///             eprintln!("Incoming connection failed: {}", error);
-    ///             None
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// let listener = LocalSocketListener::bind("/tmp/example.sock")?;
-    /// // Thanks to incoming(), you get a simple self-documenting infinite server loop
-    /// for mut connection in listener.incoming().filter_map(handle_error) {
-    ///     eprintln!("New client!");
-    /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
+    /// See the struct-level documentation for a full example which already uses this method.
     #[inline(always)]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
@@ -99,7 +80,7 @@ impl LocalSocketListener {
 }
 impl Debug for LocalSocketListener {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }
 }
@@ -138,13 +119,14 @@ impl FusedIterator for Incoming<'_> {}
 /// # Example
 /// ```no_run
 /// use interprocess::local_socket::LocalSocketStream;
-/// use std::io::prelude::*;
+/// use std::io::{prelude::*, BufReader};
 ///
 /// // Replace the path as necessary on Windows.
 /// let mut conn = LocalSocketStream::connect("/tmp/example.sock")?;
-/// conn.write_all(b"Hello from client!")?;
+/// conn.write_all(b"Hello from client!\n")?;
+/// let mut conn = BufReader::new(conn);
 /// let mut buffer = String::new();
-/// conn.read_to_string(&mut buffer)?;
+/// conn.read_line(&mut buffer)?;
 /// println!("Server answered: {}", buffer);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
