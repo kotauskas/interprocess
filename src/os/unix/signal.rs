@@ -610,6 +610,7 @@ impl HandlerOptions {
     }
 }
 
+/// The error produced when setting a signal handler fails.
 #[derive(Debug)]
 #[cfg_attr(unix, derive(Error))]
 pub enum SetHandlerError {
@@ -638,7 +639,9 @@ pub enum SetHandlerError {
         ),
     )]
     RealTimeSignalOutOfBounds {
+        /// The realtime signal which was attempted to be used.
         attempted: u32,
+        /// The highest available realtime signal number.
         max: u32,
     },
     /// An unexpected OS error ocurred during signal handler setup.
