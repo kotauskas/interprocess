@@ -131,6 +131,8 @@ pub(crate) mod private {
     pub trait Sealed {}
 }
 
+#[cfg(feature = "nonblocking")]
+pub mod nonblocking;
 pub mod local_socket;
 pub mod unnamed_pipe;
 //pub mod shared_memory;
