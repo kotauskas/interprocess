@@ -15,14 +15,14 @@ keywords = ["ipc", "shared_memory", "pipe", "mailslot", "unix_domain_socket"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-blocking = {version = "1.0.2", optional = true}
-futures = {version = "0.3.8", optional = true}
+blocking = {version = "1.0", optional = true}
+futures = {version = "0.3", optional = true}
 
 [dev_dependencies]
-tokio = {version = "0.3.3", features = ["rt", "macros", "rt-multi-thread"]}
+tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"]}
 
 [target.'cfg(windows)'.dependencies]
-winapi = {version = "0.3.9", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
+winapi = {version = "0.3", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
 [target.'cfg(unix)'.dependencies]
 libc = {version = "0.2", features = ["extra_traits"]}
 spin = "0.5"
