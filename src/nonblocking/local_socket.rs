@@ -6,7 +6,7 @@
 
 use blocking::{unblock, Unblock};
 use futures::{
-    stream::{unfold, Stream},
+    stream::{Stream, FusedStream},
     AsyncRead, AsyncWrite,
 };
 use std::{
@@ -66,26 +66,80 @@ impl LocalSocketListener {
             inner: Unblock::new(unblock(move || s.accept()).await?),
         })
     }
-    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    /// Creates an infinite asynchronous stream which calls `accept()` with each iteration. Used together with [`for_each`]/[`try_for_each`] stream adaptors to conveniently create a main loop for a socket server.
+    ///
+    /// # Example
+    /// See struct-level documentation for a complete example which already uses this method.
+    ///
+    /// [`for_each`]: https://docs.rs/futures/*/futures/stream/trait.StreamExt.html#method.for_each " "
+    /// [`try_for_each`]: https://docs.rs/futures/*/futures/stream/trait.TryStreamExt.html#method.try_for_each " "
     #[inline]
-    pub fn incoming(&self) -> impl Stream<Item = std::io::Result<LocalSocketStream>> {
-        // TODO (?) : effectively `clone`s the Arc twice for every Item.
-        //      This could be fixed by copying the code from the `accept` function
-        //      or creating an alernative `accept` function that takes `self`
-        let s = self.inner.clone();
-        unfold((), move |()| {
-            let s = Arc::clone(&s);
-            async move {
-                Some((
-                    unblock(move || s.accept())
-                        .await
-                        .map(|x| LocalSocketStream {
-                            inner: Unblock::new(x),
-                        }),
-                    (),
-                ))
-            }
-        })
+    pub fn incoming(&self) -> Incoming {
+        Incoming {
+            inner: Unblock::new(
+                SyncArcIncoming {
+                    inner: Arc::clone(&self.inner),
+                }
+            )
+        }
+    }
+}
+
+/// An infinite asynchronous stream over incoming client connections of a [`LocalSocketListener`].
+///
+/// This stream is created by the [`incoming`] method on [`LocalSocketListener`] — see its documentation for more.
+///
+/// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
+/// [`incoming`]: struct.LocalSocketListener.html#method.incoming " "
+#[derive(Debug)]
+pub struct Incoming {
+    inner: Unblock<SyncArcIncoming>,
+}
+impl Stream for Incoming {
+    type Item = Result<LocalSocketStream, io::Error>;
+    #[inline]
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let poll = <Unblock<_> as Stream>::poll_next(
+            Pin::new(&mut self.inner),
+            ctx,
+        );
+        match poll {
+            Poll::Ready(val) => {
+                let val = val.map(|val| {
+                    match val {
+                        Ok(inner) => Ok(
+                            LocalSocketStream {
+                                inner: Unblock::new(inner),
+                            }
+                        ),
+                        Err(error) => Err(error),
+                    }
+                });
+                Poll::Ready(val)
+            },
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+impl FusedStream for Incoming {
+    #[inline(always)]
+    fn is_terminated(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+struct SyncArcIncoming {
+    inner: Arc<sync::LocalSocketListener>,
+}
+impl Iterator for SyncArcIncoming {
+    type Item = Result<sync::LocalSocketStream, io::Error>;
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.inner.accept())
     }
 }
 
@@ -108,6 +162,7 @@ impl LocalSocketListener {
 /// ```
 ///
 /// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
+#[derive(Debug)]
 pub struct LocalSocketStream {
     inner: Unblock<sync::LocalSocketStream>,
 }
