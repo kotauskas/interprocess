@@ -525,9 +525,12 @@ impl HandlerOptions {
     /// Installs the signal handler, even if the signal being handled is unsafe.
     ///
     /// # Safety
-    /// The handler and all code that may or may not execute afterwards must be prepared for the aftermath of what might've caused the signal. [`SegmentationFault`], for example, might be caused by hitting a stack protector as a response to a thread's stack overflow — in such a case, continuing the program might result in undefined behavior. The Rust runtime actually sets its own handler for `SegmentationFault` signals which converts those signals to proper shutdowns, i.e. ignoring it essentially disables stack protectors, which is unsound.
+    /// The handler and all code that may or may not execute afterwards must be prepared for the aftermath of what might've caused the signal.
+    ///
+    /// [`SegmentationFault`] or [`BusError`] are most likely caused by undefined behavior invoked from Rust (the former is caused by dereferencing invalid memory, the latter is caused by dereferencing an incorrectly aligned pointer on ISAs like ARM which do not tolerate misaligned pointers), which means that the program is unsound and the only meaningful thing to do is to capture as much information as possible in a safe way — preferably using OS services to create a dump, rather than trying to read the program's global state, which might be irreversibly corrupted — and write the crash dump to some on-disk location.
     ///
     /// [`SegmentationFault`]: enum.SignalType.html#variant.SegmentationFault " "
+    /// [`BusError`]: enum.SignalType.html#variant.BusError " "
     pub unsafe fn set_unsafe(self) -> Result<(), SetHandlerError> {
         if let Ok(val) = SignalType::try_from(self.signal) {
             if val.is_unblockable() {
