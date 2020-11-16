@@ -1,6 +1,6 @@
 [package]
 name = "interprocess"
-version = "0.2.0"
+version = "1.0.0"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -9,8 +9,8 @@ documentation = "https://docs.rs/interprocess"
 repository = "https://github.com/kotauskas/interprocess"
 
 description = "Interprocess communication toolkit"
-categories = ["os", "os::unix-apis", "os::windows-apis"]
-keywords = ["ipc", "shared_memory", "pipe", "mailslot", "unix_domain_socket"]
+categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
+keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
