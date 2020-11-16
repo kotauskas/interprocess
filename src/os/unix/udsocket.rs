@@ -135,6 +135,8 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = _MAX_UDSOCKET_PATH_LEN;
 /// # Examples
 /// Basic server:
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
 /// use std::io::{self, prelude::*};
 ///
@@ -158,11 +160,14 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = _MAX_UDSOCKET_PATH_LEN;
 ///     connection.read_to_string(&mut input_string);
 ///     println!("Client answered: {}", input_string);
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// Sending and receiving ancillary data:
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::{
 ///     unnamed_pipe::{pipe, UnnamedPipeReader},
 ///     os::unix::udsocket::{UdStreamListener, UdStream, AncillaryData, AncillaryDataBuf},
@@ -247,8 +252,8 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = _MAX_UDSOCKET_PATH_LEN;
 ///         println!(      "\tGID: {}", credentials.2);
 ///     }
 /// }
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 pub struct UdStreamListener {
     fd: FdOps,
@@ -332,6 +337,8 @@ impl UdStreamListener {
     ///
     /// # Example
     /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdStreamListener;
     ///
     /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
@@ -345,7 +352,8 @@ impl UdStreamListener {
     ///         },
     ///     }
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
+    /// # Ok(()) }
     /// ```
     ///
     /// # System calls
@@ -379,6 +387,8 @@ impl UdStreamListener {
     ///
     /// # Example
     /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdStreamListener;
     ///
     /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
@@ -389,7 +399,8 @@ impl UdStreamListener {
     ///     }) {
     ///     eprintln!("New client!");
     /// }
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
+    /// # Ok(()) }
     /// ```
     #[inline(always)]
     pub fn incoming(&self) -> Incoming<'_> {
@@ -430,6 +441,8 @@ impl FromRawFd for UdStreamListener {
 /// # Examples
 /// Basic example:
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::UdStream;
 /// use std::io::prelude::*;
 ///
@@ -438,11 +451,14 @@ impl FromRawFd for UdStreamListener {
 /// let mut string_buffer = String::new();
 /// conn.read_to_string(&mut string_buffer);
 /// println!("Server answered: {}", string_buffer);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// Receiving and sending ancillary data:
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStream, AncillaryData, AncillaryDataBuf};
 /// use std::{
 ///     io::{self, prelude::*},
@@ -507,7 +523,8 @@ impl FromRawFd for UdStreamListener {
 ///     println!(      "\tUID: {}", credentials.1);
 ///     println!(      "\tGID: {}", credentials.2);
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// [`UdStreamListener`]: struct.UdStreamListener.html " "
@@ -519,11 +536,14 @@ impl UdStream {
     ///
     /// # Example
     /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdStream;
     ///
     /// let conn = UdStream::connect("/tmp/example.sock")?;
     /// // Handle the connection to the server
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
+    /// # Ok(()) }
     /// ```
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     ///
@@ -873,11 +893,14 @@ impl UdSocket {
     ///
     /// # Example
     /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdSocket;
     ///
     /// let conn = UdSocket::connect("/tmp/example.sock")?;
     /// // Handle the connection to the server
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # }
+    /// # Ok(()) }
     /// ```
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     ///
@@ -1548,6 +1571,8 @@ impl UdSocketPath<'static> {
     ///
     /// # Example
     /// ```
+    /// # fn main() {
+    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::{UdSocketPath, MAX_UDSOCKET_PATH_LEN};
     /// use std::borrow::Cow;
     ///
@@ -1562,6 +1587,7 @@ impl UdSocketPath<'static> {
     ///     UdSocketPath::Namespaced(..) => unreachable!(),
     ///     UdSocketPath::Unnamed => unreachable!(),
     /// }
+    /// # } }
     /// ```
     ///
     /// [`recv_from`]: struct.UdSocket.html#method.recv_from " "
@@ -1605,6 +1631,8 @@ impl UdSocketPath<'static> {
 /// # Example
 /// The following example uses the `UdStreamListener::bind` method, but `UdStream::connect` and `UdSocket::bind`/`UdSocket::connect` accept the same argument types too.
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStreamListener, UdSocketPath};
 /// use std::{ffi::{CStr, CString}, path::{Path, PathBuf}, borrow::Cow};
 ///
@@ -1636,7 +1664,8 @@ impl UdSocketPath<'static> {
 /// let cstr = CStr::from_bytes_with_nul("/tmp/example4b.sock\0".as_bytes())?;
 /// let path_to_socket = UdSocketPath::File(Cow::Borrowed(cstr));
 /// let listener = UdStreamListener::bind(path_to_socket);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// [`UdSocketPath`]: enum.UdSocketPath.html " "
@@ -1953,7 +1982,9 @@ impl<'a> AncillaryData<'a> {
                 AncillaryData::FileDescriptors(fds) => {
                     cmsg_type_bytes = SCM_RIGHTS.to_ne_bytes();
                     cmsg_len += fds.len() * 4;
-                    #[cfg(target_pointer_width = "64")]
+                    // #[cfg(target_pointer_width = "64")]
+                    // this was here, I don't even remember why, but that
+                    // wouldn't compile on a 32-bit machine
                     let cmsg_len_bytes = cmsg_len.to_ne_bytes();
                     buffer.extend_from_slice(&cmsg_len_bytes);
                     buffer.extend_from_slice(&cmsg_level_bytes);
@@ -1966,7 +1997,7 @@ impl<'a> AncillaryData<'a> {
                 AncillaryData::Credentials {pid, uid, gid} => {
                     cmsg_type_bytes = SCM_RIGHTS.to_ne_bytes();
                     cmsg_len += mem::size_of::<ucred>();
-                    #[cfg(target_pointer_width = "64")]
+                    // #[cfg(target_pointer_width = "64")]
                     let cmsg_len_bytes = cmsg_len.to_ne_bytes();
                     let pid_bytes = pid.to_ne_bytes();
                     let uid_bytes = uid.to_ne_bytes();

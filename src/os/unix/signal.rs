@@ -252,6 +252,8 @@ lazy_static! {
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -266,7 +268,9 @@ lazy_static! {
 /// };
 ///
 /// // Install our handler for the KeyboardInterrupt signal type.
-/// signal::set_handler(SignalType::KeyboardInterrupt, handler);
+/// signal::set_handler(SignalType::KeyboardInterrupt, handler)?;
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
@@ -285,6 +289,8 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -301,8 +307,10 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 ///
 /// unsafe {
 ///     // Install our handler for the MemoryBusError signal type.
-///     signal::set_unsafe_handler(SignalType::MemoryBusError, handler);
+///     signal::set_unsafe_handler(SignalType::MemoryBusError, handler)?;
 /// }
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
@@ -319,6 +327,8 @@ pub unsafe fn set_unsafe_handler(signal_type: SignalType, handler: SignalHandler
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -333,7 +343,9 @@ pub unsafe fn set_unsafe_handler(signal_type: SignalType, handler: SignalHandler
 /// };
 ///
 /// // Install our handler for the real-time signal 0.
-/// signal::set_rthandler(0, handler);
+/// signal::set_rthandler(0, handler)?;
+/// # }
+/// # Ok(()) }
 /// ```
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
@@ -366,6 +378,8 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -387,7 +401,9 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
 ///                                 // Interrupted error type. There normally isn't a reason to
 ///                                 // do this, but for the sake of the example, let's assume
 ///                                 // that there is.
-///     .set(); // Finalize the builder by installing the handler.
+///     .set()?; // Finalize the builder by installing the handler.
+/// # }
+/// # Ok(()) }
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct HandlerOptions {
@@ -798,12 +814,15 @@ impl From<SignalHook> for fn() {
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
 /// // Send a Termination signal to the calling process.
 /// signal::send(SignalType::Termination, process::id())?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 #[inline]
 pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
@@ -829,12 +848,15 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
 /// // Send a real-timne signal 0 to the calling process.
 /// signal::send_rt(0, process::id())?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 #[inline]
 pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
@@ -864,12 +886,15 @@ pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Resul
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
 /// // Send a Termination signal to the process group of the calling process.
 /// signal::send_to_group(SignalType::Termination, 0_u32)?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
     #[allow(clippy::neg_multiply)] // "it's more readable to just negate"? how about no
@@ -892,12 +917,15 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
 ///
 /// # Example
 /// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
 /// // Send a real-timne signal 0 to the process group of the calling process.
 /// signal::send_rt(0_u32, 0_u32)?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # }
+/// # Ok(()) }
 /// ```
 #[inline]
 pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
