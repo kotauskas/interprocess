@@ -1571,7 +1571,6 @@ impl UdSocketPath<'static> {
     ///
     /// # Example
     /// ```
-    /// # fn main() {
     /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::{UdSocketPath, MAX_UDSOCKET_PATH_LEN};
     /// use std::borrow::Cow;
@@ -1587,7 +1586,7 @@ impl UdSocketPath<'static> {
     ///     UdSocketPath::Namespaced(..) => unreachable!(),
     ///     UdSocketPath::Unnamed => unreachable!(),
     /// }
-    /// # } }
+    /// # }
     /// ```
     ///
     /// [`recv_from`]: struct.UdSocket.html#method.recv_from " "
