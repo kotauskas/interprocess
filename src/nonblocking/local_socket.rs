@@ -26,6 +26,8 @@ use crate::local_socket::{self as sync, ToLocalSocketName};
 /// };
 /// use interprocess::nonblocking::local_socket::*;
 ///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<std::error::Error>> {
 /// let listener = LocalSocketListener::bind("/tmp/example.sock")
 ///     .await?;
 /// listener
@@ -39,7 +41,7 @@ use crate::local_socket::{self as sync, ToLocalSocketName};
 ///         Ok(())
 ///     })
 ///     .await?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 #[derive(Debug)]
 pub struct LocalSocketListener {
@@ -150,6 +152,8 @@ impl Iterator for SyncArcIncoming {
 /// use futures::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
 /// use interprocess::nonblocking::local_socket::*;
 ///
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<std::error::Error>> {
 /// // Replace the path as necessary on Windows.
 /// let mut conn = LocalSocketStream::connect("/tmp/example.sock")
 ///     .await?;
@@ -158,7 +162,7 @@ impl Iterator for SyncArcIncoming {
 /// let mut buffer = String::new();
 /// conn.read_line(&mut buffer).await?;
 /// println!("Server answered: {}", buffer);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 ///
 /// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
