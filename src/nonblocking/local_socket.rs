@@ -7,12 +7,10 @@
 use blocking::{unblock, Unblock};
 use futures::{
     stream::{Stream, FusedStream},
+    task::{Context, Poll},
     AsyncRead, AsyncWrite,
 };
-use std::{
-    io,
-    sync::Arc,
-};
+use std::{io, pin::Pin, sync::Arc};
 
 use crate::local_socket::{self as sync, ToLocalSocketName};
 
@@ -181,8 +179,6 @@ impl LocalSocketStream {
     }
 }
 
-use futures::task::{Context, Poll};
-use std::pin::Pin;
 impl AsyncRead for LocalSocketStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -211,5 +207,61 @@ impl AsyncWrite for LocalSocketStream {
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), futures::io::Error>> {
         AsyncWrite::poll_close(Pin::new(&mut self.inner), cx)
+    }
+}
+
+#[cfg(feature = "tokio03")]
+mod tokio_compat {
+    use super::LocalSocketStream;
+
+    use crate::local_socket as sync;
+    use blocking::Unblock;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+    use tokio_util::compat::Compat;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+    pub struct LocalSocketStreamTokio {
+        inner: Compat<Unblock<sync::LocalSocketStream>>,
+    }
+
+    impl LocalSocketStream {
+        /// Convert to an object that implements traits from tokio
+        pub fn tokio_compat(self) -> LocalSocketStreamTokio {
+            LocalSocketStreamTokio {
+                inner: self.inner.compat(),
+            }
+        }
+    }
+    impl AsyncRead for LocalSocketStreamTokio {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<Result<(), std::io::Error>> {
+            AsyncRead::poll_read(Pin::new(&mut self.inner), cx, buf)
+        }
+    }
+    impl AsyncWrite for LocalSocketStreamTokio {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<Result<usize, std::io::Error>> {
+            AsyncWrite::poll_write(Pin::new(&mut self.inner), cx, buf)
+        }
+        fn poll_flush(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<Result<(), std::io::Error>> {
+            AsyncWrite::poll_flush(Pin::new(&mut self.inner), cx)
+        }
+        fn poll_shutdown(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<Result<(), std::io::Error>> {
+            AsyncWrite::poll_shutdown(Pin::new(&mut self.inner), cx)
+        }
     }
 }

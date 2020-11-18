@@ -17,6 +17,8 @@ keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 [dependencies]
 blocking = {version = "1.0", optional = true}
 futures = {version = "0.3", optional = true}
+tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"], optional = true}
+tokio-util = {version = "0.5", features = ["compat"], optional = true}
 
 [dev_dependencies]
 tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"]}
@@ -34,6 +36,7 @@ thiserror = "1.0"
 [features]
 default = ["nonblocking"]
 nonblocking = ["blocking", "futures"]
+tokio03 = ["tokio", "tokio-util"]
 doc_cfg = []
 
 [package.metadata.docs.rs]
