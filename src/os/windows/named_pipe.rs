@@ -726,22 +726,22 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Message stream reader]: ../../../trait.MsgRead.html
+[Message stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
 "
     MsgWriterPipeStream, GENERIC_WRITE, doc: "
 [Message stream writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Message stream writer]: ../../../trait.MsgWrite.html
+[Message stream writer]: https://doc.rust-lang.org/std/io/trait.Write.html
 "
     DuplexMsgPipeStream, GENERIC_READ | GENERIC_WRITE, doc: "
 Message stream [reader] and [writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[reader]: ../../../trait.MsgRead.html
-[writer]: ../../../trait.MsgWrite.html
+[reader]: https://doc.rust-lang.org/std/io/trait.Read.html
+[writer]: https://doc.rust-lang.org/std/io/trait.Write.html
 "
 }
 
