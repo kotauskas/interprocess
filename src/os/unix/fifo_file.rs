@@ -17,8 +17,8 @@ use std::{
     io,
     ffi::CString,
 };
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
+
+use super::imports::*;
 
 /// Creates a FIFO file at the specified path with the specified permissions.
 ///

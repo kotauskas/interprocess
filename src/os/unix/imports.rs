@@ -1,5 +1,6 @@
 use cfg_if::cfg_if;
 
+#[allow(unused_macros)]
 macro_rules! fake_signals {
     ($($name:ident = $val:expr),+ $(,)?) => (
         $(
@@ -55,6 +56,11 @@ cfg_if! {
         fake_signals!(SIGPOLL = 999); // Assign an arbitrary number to get doctests to compile.
 
         pub(super) use super::FdOps;
+
+        pub (super) use std::os::unix::{
+            io::{AsRawFd, IntoRawFd, FromRawFd},
+            ffi::{OsStrExt, OsStringExt},
+        };
     } else {
         fake_signals! {
             SIGHUP  = 0 , SIGCONT   = 14,

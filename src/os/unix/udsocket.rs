@@ -25,11 +25,6 @@ use std::{
     convert::TryFrom,
     borrow::Cow,
 };
-#[cfg(unix)]
-use std::os::unix::{
-    io::{AsRawFd, IntoRawFd, FromRawFd},
-    ffi::{OsStrExt, OsStringExt},
-};
 
 use super::imports::*;
 
