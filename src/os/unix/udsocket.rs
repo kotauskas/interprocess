@@ -11,36 +11,8 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
-#[cfg(unix)]
-use libc::{
-    c_int,
-    pid_t, uid_t, gid_t,
-    AF_UNIX,
-    SOCK_STREAM, SOCK_DGRAM,
-    SOL_SOCKET, SO_PASSCRED,
-    SCM_RIGHTS, SCM_CREDENTIALS,
-    MSG_TRUNC, MSG_CTRUNC, MSG_PEEK,
-    sockaddr_un,
-    msghdr, cmsghdr,
-    ucred,
-};
-#[cfg(not(unix))]
-#[doc(hidden)]
-#[allow(non_camel_case_types)]
-pub type c_int = i32;
-#[cfg(not(unix))]
-#[doc(hidden)]
-#[allow(non_camel_case_types)]
-pub type pid_t = i32;
-#[cfg(not(unix))]
-#[doc(hidden)]
-#[allow(non_camel_case_types)]
-pub type uid_t = i32;
-#[cfg(not(unix))]
-#[doc(hidden)]
-#[allow(non_camel_case_types)]
-pub type gid_t = i32;
-#[cfg(unix)]
+#![cfg_attr(not(unix), allow(unused_imports))]
+
 use cfg_if::cfg_if;
 use std::{
     io::{self, Read, Write, IoSlice, IoSliceMut},
@@ -58,10 +30,9 @@ use std::os::unix::{
     io::{AsRawFd, IntoRawFd, FromRawFd},
     ffi::{OsStrExt, OsStringExt},
 };
-#[cfg(unix)]
-use super::FdOps;
-#[cfg(not(unix))]
-type FdOps = ();
+
+use super::imports::*;
+
 #[cfg(unix)]
 use crate::{ReliableReadMsg, Sealed};
 
@@ -90,11 +61,12 @@ cfg_if! {
     ))] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 104;
     } else {
-        compile_error("Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket.rs for your platform if you with to enable Unix domain socket support for it")
+        compile_error("\
+Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket.rs for your platform \
+if you with to enable Unix domain socket support for it"
+        )
     }
 }
-#[cfg(not(unix))]
-const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 
 /// The maximum path length for Unix domain sockets. [`UdStreamListener::bind`] panics if the specified path exceeds this value.
 ///
@@ -1343,6 +1315,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn as_cstr(&'a self) -> &'a CStr {
         match self {
             Self::File(cow) => &*cow,
+            #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => &*cow,
             Self::Unnamed => unsafe {CStr::from_bytes_with_nul_unchecked(&[0])},
         }
@@ -1352,7 +1325,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn into_cstring(self) -> CString {
         match self {
             Self::File(cow) => cow.into_owned(),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => cow.into_owned(),
             Self::Unnamed => CString::new(Vec::new())
                 .unwrap_or_else(|_| unsafe {std::hint::unreachable_unchecked()})
@@ -1375,7 +1348,7 @@ impl<'a> UdSocketPath<'a> {
                     },
                 }
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => {
                 match cow {
                     Cow::Owned(..) => false,
@@ -1410,26 +1383,27 @@ impl<'a> UdSocketPath<'a> {
     /// Returns a mutable reference to the underlying `CString` if it's available as owned, otherwise returns `None`.
     #[inline]
     pub fn try_get_cstring_mut(&mut self) -> Option<&mut CString> {
-        match self {
-            Self::File(cow)
-          | Self::Namespaced(cow)
-          => match cow {
-                Cow::Owned(cstring) => Some(cstring),
-                Cow::Borrowed(..) => None,
-            },
-            Self::Unnamed => None,
+        let cow = match self {
+            Self::File(cow) => cow,
+            #[cfg(any(doc, target_os = "linux"))]
+            Self::Namespaced(cow) => cow,
+            Self::Unnamed => return None,
+        };
+        match cow {
+            Cow::Owned(cstring) => Some(cstring),
+            Cow::Borrowed(..) => None,
         }
     }
 
     /// Returns `true` if the path to the socket is stored as an owned `CString`, i.e. if `into_cstring` doesn't require cloning the path; `false` otherwise.
     #[inline]
     pub fn is_owned(&self) -> bool {
-        match self {
-            Self::File(cow)
-          | Self::Namespaced(cow)
-          => matches!(cow, Cow::Owned(..)),
-            Self::Unnamed => false,
-        }
+        let cow = match self {
+            Self::File(cow) => cow,
+            Self::Namespaced(cow) => cow,
+            Self::Unnamed => return false,
+        };
+        matches!(cow, Cow::Owned(..))
     }
 
     #[inline]
@@ -1582,7 +1556,6 @@ impl UdSocketPath<'static> {
     ///     => assert_eq!(cstring.into_bytes_with_nul().capacity(), MAX_UDSOCKET_PATH_LEN),
     ///         Cow::Borrowed(..) => unreachable!(),
     ///     }
-    ///     #[cfg(target_os = "linux")]
     ///     UdSocketPath::Namespaced(..) => unreachable!(),
     ///     UdSocketPath::Unnamed => unreachable!(),
     /// }
@@ -1639,13 +1612,11 @@ impl UdSocketPath<'static> {
 /// let listener = UdStreamListener::bind("/tmp/example1.sock")?;
 /// // If we're on Linux, we can also use the abstract socket namespace which exists separately from
 /// // the filesystem thanks to the special @ sign syntax which works with all string types
-/// #[cfg(target_os = "linux")]
 /// let listener_namespaced = UdStreamListener::bind("@namespaced_socket_1")?;
 ///
 /// // 2. Use an owned string
 /// let listener = UdStreamListener::bind("/tmp/example2.sock".to_string())?;
 /// // Same story with the namespaced socket here
-/// #[cfg(target_os = "linux")]
 /// let listener_namespaced = UdStreamListener::bind("@namespaced_socket_2")?;
 ///
 /// // 3. Use a path slice or an owned path
@@ -1697,7 +1668,7 @@ impl<'a> ToUdSocketPath<'a> for &'a CStr {
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         // 0x40 is the ASCII code for @, and since UTF-8 is ASCII-compatible, it would work too
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.to_bytes().first() == Some(&0x40) {
             let without_at_sign = &self.to_bytes_with_nul()[1..];
             let without_at_sign = unsafe {
@@ -1724,7 +1695,7 @@ impl ToUdSocketPath<'static> for CString {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.as_bytes().first() == Some(&0x40) {
             let without_at_sign = {
                 let mut without_at_sign = self.into_bytes();
@@ -1754,7 +1725,7 @@ impl<'a> ToUdSocketPath<'a> for &'a OsStr {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.as_bytes().first() == Some(&0x40) {
             if self.as_bytes().last() != Some(&0) {
                 let mut owned = self.to_owned().into_vec();
@@ -1794,7 +1765,7 @@ impl ToUdSocketPath<'static> for OsString {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.as_os_str().as_bytes().first() == Some(&0x40) {
             let mut without_at_sign = self.into_vec();
             without_at_sign.remove(0);
@@ -1853,7 +1824,7 @@ impl<'a> ToUdSocketPath<'a> for &'a str {
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         // Use chars().next() instead of raw indexing to account for UTF-8 with BOM
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.starts_with('@') {
             if !self.ends_with('\0') {
                 let mut owned = self.to_owned();
@@ -1893,7 +1864,7 @@ impl ToUdSocketPath<'static> for String {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(doc, target_os = "linux"))]
         if self.starts_with('@') {
             let mut without_at_sign = self;
             without_at_sign.remove(0);

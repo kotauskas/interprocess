@@ -130,37 +130,13 @@
 //! - `wait`
 //! - `waitpid`
 //! - `write`
-//! 
+//!
 //! Many safe Rust types can trigger signal-unsafe system calls not on this list, for example, `Vec`, `Box` and `Rc`/`Arc` perform memory allocations, while `Mutex`/`RwLock` perform `pthread` calls. For this reason, creating a signal hook is an unsafe operation.
 //!
 //! [`SignalType`]: enum.SignalType.html " "
 
-#[cfg(unix)]
-use libc::{
-    SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL, SIGSEGV, SIGPIPE, SIGALRM, SIGTERM,
-    SIGUSR1, SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGBUS, SIGPROF,
-    SIGPOLL, SIGSYS, SIGTRAP, SIGURG, SIGVTALRM, SIGXCPU, SIGXFSZ,
-    SIG_DFL,
-    SA_NOCLDSTOP, SA_NODEFER, SA_RESETHAND, SA_RESTART,
-    sigaction,
-};
-#[cfg(not(unix))]
-macro_rules! fake_consts {
-    ($($name:ident = $val:expr),+ $(,)?) => (
-        $(
-            #[cfg(not(unix))]
-            const $name : i32 = $val;
-        )+
-    );
-}
-#[cfg(not(unix))]
-fake_consts! {
-    SIGHUP = 0, SIGINT = 1, SIGQUIT = 2, SIGILL = 3, SIGABRT = 4, SIGFPE = 5, SIGKILL = 6,
-    SIGSEGV = 7, SIGPIPE = 8, SIGALRM = 9, SIGTERM = 10, SIGUSR1 = 11, SIGUSR2 = 12, SIGCHLD = 13,
-    SIGCONT = 14, SIGSTOP = 15, SIGTSTP = 16, SIGTTIN = 17, SIGTTOU = 18, SIGBUS = 19,
-    SIGPROF = 20, SIGPOLL = 21, SIGSYS = 22, SIGTRAP = 23, SIGURG = 24, SIGVTALRM = 25,
-    SIGXCPU = 26, SIGXFSZ = 27,
-}
+#![cfg_attr(not(unix), allow(unused_imports))]
+
 use std::{
     io::{self, prelude::*},
     fmt::{self, Formatter, Display},
@@ -170,16 +146,14 @@ use std::{
     panic, process, thread,
     any::Any,
 };
-#[cfg(unix)]
 use spin::RwLock;
-#[cfg(unix)]
 use intmap::IntMap;
-#[cfg(unix)]
 use thiserror::Error;
-#[cfg(unix)]
 use cfg_if::cfg_if;
-#[cfg(unix)]
 use lazy_static::lazy_static;
+
+use super::imports::*;
+
 #[cfg(unix)]
 cfg_if! {
     if #[cfg(any(
@@ -198,24 +172,12 @@ cfg_if! {
     } else if #[cfg(target_os = "redox")] {
         const SIGRTMIN: i32 = 27;
         const SIGRTMAX: i32 = 31;
-    } else if #[cfg(any(
-        target_os = "openbsd",
-        target_os = "dragonfly",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "solaris",
-        target_os = "illumos",
-        target_os = "hermit",
-    ))] {
+    } else {
         const SIGRT: Option<[i32; 2]> = None;
         const SIGRTMIN: i32 = 1; // min is smaller than max so that the sloppy calculation works
         const SIGRTMAX: i32 = 0;
     }
 }
-#[cfg(unix)]
-const _NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
-#[cfg(not(unix))]
-const _NUM_REALTIME_SIGNALS: u32 = 0;
 
 /// Whether real-time signals are supported at all.
 ///
@@ -232,7 +194,7 @@ pub const REALTIME_SIGNALS_SUPPORTED: bool = NUM_REALTIME_SIGNALS != 0;
 /// - **Linux** and **NetBSD**: 31
 /// - **FreeBSD**: 62
 /// - **Redox**: 5 (does not conform with POSIX)
-pub const NUM_REALTIME_SIGNALS: u32 = _NUM_REALTIME_SIGNALS;
+pub const NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
 /// Returns `true` if the specified signal is a valid real-time signal value, `false` otherwise.
 #[inline(always)]
 pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
@@ -1075,7 +1037,28 @@ pub enum SignalType {
     ///
     /// *Default handler: process termination.*
     // TODO more on this
-    PollNotification = SIGPOLL,
+    #[cfg(any(
+        doc,
+        target_os = "linux",
+        target_os = "emscripten",
+        target_os = "android",
+        target_os = "haiku",
+        target_os = "fuchsia",
+        target_os = "solaris",
+        target_os = "illumos",
+    ))]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(
+        any(
+            target_os = "linux",
+            target_os = "emscripten",
+            target_os = "android",
+            target_os = "haiku",
+            target_os = "fuchsia",
+            target_os = "solaris",
+            target_os = "illumos",
+        )
+    )))]
+    PollNotification = libc::SIGPOLL,
     /// `SIGBUS` — [bus error]. This signal is issued by the OS when a process does one of the following:
     /// - **Tries to access an invalid physical address**. Normally, this should never happen — attempts to access invalid *virtual* memory are handled as [segmentation faults], and invalid phyiscal addresses are typically not present in the address space of a program in user-mode.
     /// - **Performs an incorrectly aligned memory access**. In Rust, this can only happen if unsafe code is misused to construct an incorrectly aligned pointer to a type which requires alignment which is more strict than simple one byte alignment. This is a direct sign of memory unsafety being invoked.
