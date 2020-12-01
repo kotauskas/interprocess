@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use cfg_if::cfg_if;
 
 #[allow(unused_macros)]
@@ -20,7 +22,7 @@ cfg_if! {
             SIGABRT, SIGTTOU  ,
             SIGFPE , SIGBUS   ,
             SIGKILL, SIGPROF  ,
-            SIGSEGV, SIGPOLL  ,
+            SIGSEGV, // no SIGPOLL because it doesn't exist on Apple platforms
             SIGPIPE, SIGSYS   ,
             SIGALRM, SIGTRAP  ,
             SIGTERM, SIGURG   ,
@@ -38,7 +40,7 @@ cfg_if! {
             SOL_SOCKET,
             SO_PASSCRED,
             SCM_RIGHTS, SCM_CREDENTIALS,
-            MSG_TRUNC, MSG_CTRUNC, MSG_PEEK,
+            MSG_TRUNC, MSG_CTRUNC,
             sockaddr_un,
             msghdr, cmsghdr,
             ucred,

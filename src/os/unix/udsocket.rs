@@ -11,7 +11,7 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
-#![cfg_attr(not(unix), allow(unused_imports))]
+#![cfg_attr(any(not(unix), doc), allow(unused_imports))]
 
 use cfg_if::cfg_if;
 use std::{
@@ -28,7 +28,6 @@ use std::{
 
 use super::imports::*;
 
-#[cfg(unix)]
 use crate::{ReliableReadMsg, Sealed};
 
 #[cfg(unix)]
@@ -1120,7 +1119,8 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `recv`
-    #[cfg(target_os = "linux")]
+    #[cfg(any(doc, target_os = "linux"))]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
     pub fn peek_msg_size(&self) -> io::Result<usize> {
         let mut buffer = [0_u8; 0];
         let (success, size) = unsafe {
@@ -1128,7 +1128,7 @@ impl UdSocket {
                 self.as_raw_fd(),
                 buffer.as_mut_ptr() as *mut _,
                 buffer.len(),
-                MSG_TRUNC | MSG_PEEK,
+                MSG_TRUNC | libc::MSG_PEEK,
             );
             (size != -1, mem::transmute::<isize, usize>(size))
         };
@@ -1395,6 +1395,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn is_owned(&self) -> bool {
         let cow = match self {
             Self::File(cow) => cow,
+            #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => cow,
             Self::Unnamed => return false,
         };
@@ -1421,10 +1422,15 @@ impl<'a> UdSocketPath<'a> {
                     CString::new(Vec::new())
                         .unwrap_or_else(|_| std::process::abort()),
                 );
+                #[cfg(any(doc, target_os = "linux"))]
                 let (namespaced, src_ptr, path_length) = if addr.sun_path[0] == 0 {
                     (true, addr.sun_path.as_ptr().offset(1) as *const u8, sun_path_length - 1)
                 } else {
                     (false, addr.sun_path.as_ptr() as *const u8, sun_path_length)
+                };
+                #[cfg(not(any(doc, target_os = "linux")))]
+                let (src_ptr, path_length) = {
+                    (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
                 // Fill the space for the name and the nul terminator with nuls
                 vec.resize(path_length, 0);
@@ -1441,13 +1447,16 @@ impl<'a> UdSocketPath<'a> {
                 // Handle the error anyway — better be safe than sorry
                 let new_cstring = match CString::new(vec) {
                     Ok(cstring) => cstring,
-                    Err(..) => panic!("unrecoverable memory safety violation threat"),
+                    Err(..) => std::process::abort(),
                 };
+                #[cfg(any(doc, target_os = "linux"))]
                 let path_to_write = if namespaced {
                     UdSocketPath::Namespaced(Cow::Owned(new_cstring))
                 } else {
                     UdSocketPath::File(Cow::Owned(new_cstring))
                 };
+                #[cfg(not(any(doc, target_os = "linux")))]
+                let path_to_write = UdSocketPath::File(Cow::Owned(new_cstring));
                 let old_val = mem::replace(self, path_to_write);
                 // Deallocate the empty CString we wrote in the beginning
                 mem::drop(old_val);
@@ -1837,7 +1846,7 @@ impl<'a> ToUdSocketPath<'a> for &'a str {
             }
         }
         if !self.ends_with('\0') {
-            Ok(UdSocketPath::Namespaced(
+            Ok(UdSocketPath::File(
                 Cow::Owned(CString::new(self.to_owned())?),
             ))
         } else {
