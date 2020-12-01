@@ -1036,7 +1036,7 @@ impl TryFrom<DWORD> for PipeDirection {
     /// Returns `Err` if the value is not a valid pipe direction constant.
     #[inline]
     fn try_from(op: DWORD) -> Result<Self, ()> {
-        assert!(op >= 1 && op <= 3);
+        assert!((1..=3).contains(&op));
         // See the comment block above for why this is safe.
         unsafe {mem::transmute(op)}
     }
