@@ -532,7 +532,16 @@ impl HandlerOptions {
             need_to_upgrade_handle = true;
             !self.handler.unwrap_or_default().is_default()
         };
-
+        if need_to_upgrade_handle {
+            let mut handlers = handlers.upgrade();
+            let signal_u64 = self.signal as u64;
+            handlers.remove(signal_u64);
+            handlers.insert(signal_u64, (
+                self.handler.unwrap_or_default(),
+                new_flags,
+            ));
+        }
+        drop(handlers);
         if need_to_install_hook {
             let hook_val = match self.handler.unwrap_or_default() {
                 SignalHandler::Default => SIG_DFL,
@@ -546,15 +555,6 @@ impl HandlerOptions {
                     new_flags,
                 )?
             }
-        }
-        if need_to_upgrade_handle {
-            let mut handlers = handlers.upgrade();
-            let signal_u64 = self.signal as u64;
-            handlers.remove(signal_u64);
-            handlers.insert(signal_u64, (
-                self.handler.unwrap_or_default(),
-                new_flags,
-            ));
         }
         Ok(())
     }
@@ -634,7 +634,7 @@ pub enum SetHandlerError {
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
-extern fn signal_receiver(signum: i32) {
+extern "C" fn signal_receiver(signum: i32) {
     let catched = panic::catch_unwind(|| {
         let handler_and_flags = {
             let handlers = HANDLERS.read();
@@ -657,36 +657,8 @@ extern fn signal_receiver(signum: i32) {
             handlers.insert(signum as u64, handler_and_flags);
         }
     });
-    match catched {
-        Ok(..) => {},
-        Err(panic_payload) => handle_panic_from_signal_receiver(panic_payload),
-    }
-}
-
-fn handle_panic_from_signal_receiver(panic_payload: Box<dyn Any + Send>) -> ! {
-    let panic_message = if let Some(msg) = panic_payload.downcast_ref::<&'static str>() {
-        msg
-    } else if let Some(msg) = panic_payload.downcast_ref::<String>() {
-        &msg
-    } else { "Box<dyn Any>" };
-    let main_message = if let Some(name) = thread::current().name() {
-        format!("thread {} panicked at '{}'", name, panic_message)
-    } else {
-        // TODO implement thread ID display when it gets stabilized (tracked in #67939)
-        format!("unnamed thread panicked at '{}'", panic_message)
-    };
-    
-    // We don't care abount success, since we're aborting anyway
-    let mut stderr = io::stderr();
-    let _ = writeln!(stderr,
-        "{}", main_message,
-    );
-    let _ = writeln!(stderr,
-        "note: backtrace and panic location information are not available because the panic was \
-        intercepted in a signal handler",
-    );
-    
-    process::abort()
+    // The panic hook already ran, so we only have to abort the process
+    catched.unwrap_or_else(|_| process::abort());
 }
 
 /// A signal handling method.
@@ -704,21 +676,21 @@ impl SignalHandler {
     ///
     /// [`Default`]: #variant.Default.html " "
     #[inline(always)]
-    pub fn is_default(self) -> bool {
+    pub const fn is_default(self) -> bool {
         matches!(self, Self::Default)
     }
     /// Returns `true` for the [`Ignore`] variant, `false` otherwise.
     ///
     /// [`Ignore`]: #variant.Ignore.html " "
     #[inline(always)]
-    pub fn is_ignore(self) -> bool {
+    pub const fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
     /// Returns `true` for the [`Hook`] variant, `false` otherwise.
     ///
     /// [`Hook`]: #variant.Hook.html " "
     #[inline(always)]
-    pub fn is_hook(self) -> bool {
+    pub const fn is_hook(self) -> bool {
         matches!(self, Self::Hook(..))
     }
     /// Creates a handler which calls the specified function.
@@ -1127,59 +1099,72 @@ impl SignalType {
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
     #[inline]
     pub const fn is_unsafe(self) -> bool {
-        matches!(self, Self::SegmentationFault | Self::MemoryBusError)
+        matches!(self, Self::SegmentationFault | Self::MemoryBusError | Self::IllegalInstruction)
     }
 }
 impl From<SignalType> for i32 {
+    #[inline]
     fn from(op: SignalType) -> Self {
-        unsafe {
-            // SAFETY: SignalType is repr(i32)
-            mem::transmute::<SignalType, i32>(op)
-        }
+        op as i32
     }
 }
 impl From<SignalType> for u32 {
+    #[inline]
     fn from(op: SignalType) -> Self {
-        unsafe {
-            // SAFETY: as above
-            mem::transmute::<SignalType, u32>(op)
-        }
+        op as u32
     }
 }
 impl TryFrom<i32> for SignalType {
     type Error = UnknownSignalError;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            SIGHUP    => Ok(Self::Hangup                         ),
-            SIGINT    => Ok(Self::KeyboardInterrupt              ),
-            SIGQUIT   => Ok(Self::QuitAndDump                    ),
-            SIGILL    => Ok(Self::IllegalInstruction             ),
-            SIGABRT   => Ok(Self::Abort                          ),
-            SIGFPE    => Ok(Self::MathException                  ),
-            SIGKILL   => Ok(Self::Kill                           ),
-            SIGSEGV   => Ok(Self::SegmentationFault              ),
-            SIGPIPE   => Ok(Self::BrokenPipe                     ),
-            SIGALRM   => Ok(Self::AlarmClock                     ),
-            SIGTERM   => Ok(Self::Termination                    ),
-            SIGUSR1   => Ok(Self::UserSignal1                    ),
-            SIGUSR2   => Ok(Self::UserSignal2                    ),
-            SIGCHLD   => Ok(Self::ChildProcessEvent              ),
-            SIGCONT   => Ok(Self::Continue                       ),
-            SIGSTOP   => Ok(Self::ForceSuspend                   ),
-            SIGTSTP   => Ok(Self::Suspend                        ),
-            SIGTTIN   => Ok(Self::TerminalInputWhileInBackground ),
-            SIGTTOU   => Ok(Self::TerminalOutputWhileInBackground),
-            SIGBUS    => Ok(Self::MemoryBusError                 ),
-            SIGPROF   => Ok(Self::ProfilerClock                  ),
-            SIGPOLL   => Ok(Self::PollNotification               ),
-            SIGSYS    => Ok(Self::InvalidSystemCall              ),
-            SIGTRAP   => Ok(Self::Breakpoint                     ),
-            SIGURG    => Ok(Self::OutOfBandDataAvailable         ),
-            SIGVTALRM => Ok(Self::UserModeProfilerClock          ),
-            SIGXCPU   => Ok(Self::CpuTimeLimitExceeded           ),
-            SIGXFSZ   => Ok(Self::FileSizeLimitExceeded          ),
+            SIGHUP        => Ok(Self::Hangup                         ),
+            SIGINT        => Ok(Self::KeyboardInterrupt              ),
+            SIGQUIT       => Ok(Self::QuitAndDump                    ),
+            SIGILL        => Ok(Self::IllegalInstruction             ),
+            SIGABRT       => Ok(Self::Abort                          ),
+            SIGFPE        => Ok(Self::MathException                  ),
+            SIGKILL       => Ok(Self::Kill                           ),
+            SIGSEGV       => Ok(Self::SegmentationFault              ),
+            SIGPIPE       => Ok(Self::BrokenPipe                     ),
+            SIGALRM       => Ok(Self::AlarmClock                     ),
+            SIGTERM       => Ok(Self::Termination                    ),
+            SIGUSR1       => Ok(Self::UserSignal1                    ),
+            SIGUSR2       => Ok(Self::UserSignal2                    ),
+            SIGCHLD       => Ok(Self::ChildProcessEvent              ),
+            SIGCONT       => Ok(Self::Continue                       ),
+            SIGSTOP       => Ok(Self::ForceSuspend                   ),
+            SIGTSTP       => Ok(Self::Suspend                        ),
+            SIGTTIN       => Ok(Self::TerminalInputWhileInBackground ),
+            SIGTTOU       => Ok(Self::TerminalOutputWhileInBackground),
+            SIGBUS        => Ok(Self::MemoryBusError                 ),
+            SIGPROF       => Ok(Self::ProfilerClock                  ),
+            #[cfg(any(
+                doc,
+                target_os = "linux",
+                target_os = "emscripten",
+                target_os = "android",
+                target_os = "haiku",
+                target_os = "fuchsia",
+                target_os = "solaris",
+                target_os = "illumos",
+            ))]
+            libc::SIGPOLL => Ok(Self::PollNotification      ),
+            SIGSYS        => Ok(Self::InvalidSystemCall     ),
+            SIGTRAP       => Ok(Self::Breakpoint            ),
+            SIGURG        => Ok(Self::OutOfBandDataAvailable),
+            SIGVTALRM     => Ok(Self::UserModeProfilerClock ),
+            SIGXCPU       => Ok(Self::CpuTimeLimitExceeded  ),
+            SIGXFSZ       => Ok(Self::FileSizeLimitExceeded ),
             _ => Err( UnknownSignalError {value} ),
         }
+    }
+}
+impl TryFrom<u32> for SignalType {
+    type Error = UnknownSignalError;
+    #[inline]
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        (value as u32).try_into()
     }
 }
 
