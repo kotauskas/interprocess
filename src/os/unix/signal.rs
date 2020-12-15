@@ -138,13 +138,13 @@
 #![cfg_attr(not(unix), allow(unused_imports))]
 
 use std::{
-    io::{self, prelude::*},
+    io,
+    panic,
+    process,
     fmt::{self, Formatter, Display},
     error::Error,
-    convert::TryFrom,
-    mem::{self, zeroed},
-    panic, process, thread,
-    any::Any,
+    convert::{TryFrom, TryInto},
+    mem::zeroed,
 };
 use spin::RwLock;
 use intmap::IntMap;
