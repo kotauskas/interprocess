@@ -22,14 +22,13 @@ intmap = "0.7"
 lazy_static = "1.4"
 blocking = {version = "1.0", optional = true}
 futures = {version = "0.3", optional = true}
+cfg-if = "0.1"
 
 [dev_dependencies]
 tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"]}
 
 [target.'cfg(windows)'.dependencies]
 winapi = {version = "0.3", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
-[target.'cfg(unix)'.dependencies]
-cfg-if = "0.1"
 
 [features]
 default = ["nonblocking"]

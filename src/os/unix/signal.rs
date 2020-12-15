@@ -154,7 +154,6 @@ use lazy_static::lazy_static;
 
 use super::imports::*;
 
-#[cfg(unix)]
 cfg_if! {
     if #[cfg(any(
         target_os = "linux",
@@ -1011,26 +1010,18 @@ pub enum SignalType {
     // TODO more on this
     #[cfg(any(
         doc,
-        target_os = "linux",
-        target_os = "emscripten",
-        target_os = "android",
-        target_os = "haiku",
-        target_os = "fuchsia",
-        target_os = "solaris",
-        target_os = "illumos",
+        not(any(
+            target_os = "macos",
+            target_os = "ios",
+        )),
     ))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(
-        any(
-            target_os = "linux",
-            target_os = "emscripten",
-            target_os = "android",
-            target_os = "haiku",
-            target_os = "fuchsia",
-            target_os = "solaris",
-            target_os = "illumos",
-        )
+        not(any(
+            target_os = "macos",
+            target_os = "ios",
+        )),
     )))]
-    PollNotification = libc::SIGPOLL,
+    PollNotification = SIGPOLL,
     /// `SIGBUS` — [bus error]. This signal is issued by the OS when a process does one of the following:
     /// - **Tries to access an invalid physical address**. Normally, this should never happen — attempts to access invalid *virtual* memory are handled as [segmentation faults], and invalid phyiscal addresses are typically not present in the address space of a program in user-mode.
     /// - **Performs an incorrectly aligned memory access**. In Rust, this can only happen if unsafe code is misused to construct an incorrectly aligned pointer to a type which requires alignment which is more strict than simple one byte alignment. This is a direct sign of memory unsafety being invoked.

@@ -7,7 +7,7 @@ macro_rules! fake_signals {
     ($($name:ident = $val:expr),+ $(,)?) => (
         $(
             #[cfg(not(unix))]
-            const $name : i32 = $val;
+            pub(super) const $name : i32 = $val;
         )+
     );
 }
@@ -45,6 +45,8 @@ cfg_if! {
             msghdr, cmsghdr,
             ucred,
         };
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        use libc::SIGPOLL;
 
         #[cfg(not(any(
             target_os = "linux",
@@ -98,6 +100,6 @@ cfg_if! {
 
         pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 
-        type FdOps = ();
+        pub(super) type FdOps = ();
     }
 }
