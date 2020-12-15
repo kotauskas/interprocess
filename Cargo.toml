@@ -15,6 +15,11 @@ keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+libc = {version = "0.2", features = ["extra_traits"]}
+thiserror = "1.0"
+spin = "0.5"
+intmap = "0.7"
+lazy_static = "1.4"
 blocking = {version = "1.0", optional = true}
 futures = {version = "0.3", optional = true}
 
@@ -24,12 +29,7 @@ tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"]}
 [target.'cfg(windows)'.dependencies]
 winapi = {version = "0.3", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
 [target.'cfg(unix)'.dependencies]
-libc = {version = "0.2", features = ["extra_traits"]}
-spin = "0.5"
 cfg-if = "0.1"
-intmap = "0.7"
-lazy_static = "1.4"
-thiserror = "1.0"
 
 [features]
 default = ["nonblocking"]

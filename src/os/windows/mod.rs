@@ -2,6 +2,7 @@
 
 pub mod named_pipe;
 pub mod unnamed_pipe;
+pub mod signal;
 // TODO mailslots
 //pub mod mailslot;
 #[cfg(windows)]
