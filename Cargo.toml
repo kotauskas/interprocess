@@ -1,6 +1,6 @@
 [package]
 name = "interprocess"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
