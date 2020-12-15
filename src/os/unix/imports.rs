@@ -7,7 +7,7 @@ macro_rules! fake_signals {
     ($($name:ident = $val:expr),+ $(,)?) => (
         $(
             #[cfg(not(unix))]
-            const $name : i32 = $val;
+            pub(super) const $name : i32 = $val;
         )+
     );
 }

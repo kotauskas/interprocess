@@ -40,7 +40,7 @@ const SIG_DFL: sighandler_t = 0;
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(windows)] {
-/// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
+/// use interprocess::os::windows::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
 ///     // Since signal handlers are restricted to a specific set of C functions, creating a
@@ -79,8 +79,8 @@ pub fn set_handler(
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
-/// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
+/// # #[cfg(windows)] {
+/// use interprocess::os::windows::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
 ///     // Since signal handlers are restricted to a specific set of C functions, creating a
@@ -89,14 +89,14 @@ pub fn set_handler(
 ///     // current version of Rust. Since we're only using the write() system call here, this
 ///     // is safe.
 ///     SignalHandler::from_fn(|| {
-///         println!("Oh no, the motherboard broke!");
+///         println!("Oh no, we're running on an i386!");
 ///         std::process::abort();
 ///     })
 /// };
 ///
 /// unsafe {
-///     // Install our handler for the MemoryBusError signal type.
-///     signal::set_unsafe_handler(SignalType::MemoryBusError, handler)?;
+///     // Install our handler for the IllegalInstruction signal type.
+///     signal::set_unsafe_handler(SignalType::IllegalInstruction, handler)?;
 /// }
 /// # }
 /// # Ok(()) }
