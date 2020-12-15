@@ -27,7 +27,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 use thiserror::Error;
-use spin::RwLock;
+use spinning::{RwLock, RwLockUpgradableReadGuard};
 use intmap::IntMap;
 use lazy_static::lazy_static;
 
@@ -109,10 +109,10 @@ pub unsafe fn set_unsafe_handler(
     handler: SignalHandler,
 ) -> Result<(), SetHandlerError> {
     let signal_type = signal_type as u64;
-    let handlers = HANDLERS.upgradeable_read();
+    let handlers = HANDLERS.upgradable_read();
     let new_signal = handlers.get(signal_type).is_none();
     if new_signal {
-        let mut handlers = handlers.upgrade();
+        let mut handlers = RwLockUpgradableReadGuard::upgrade(handlers);
         handlers.remove(signal_type);
         handlers.insert(signal_type, handler);
         drop(handlers);

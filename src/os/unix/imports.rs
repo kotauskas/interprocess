@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(dead_code, unused_imports)]
 
 use cfg_if::cfg_if;
 
@@ -7,7 +7,7 @@ macro_rules! fake_signals {
     ($($name:ident = $val:expr),+ $(,)?) => (
         $(
             #[cfg(not(unix))]
-            pub(super) const $name : i32 = $val;
+            const $name : i32 = $val;
         )+
     );
 }
@@ -38,26 +38,21 @@ cfg_if! {
             AF_UNIX,
             SOCK_STREAM, SOCK_DGRAM,
             SOL_SOCKET,
-            SO_PASSCRED,
-            SCM_RIGHTS, SCM_CREDENTIALS,
+            SCM_RIGHTS,
             MSG_TRUNC, MSG_CTRUNC,
             sockaddr_un,
             msghdr, cmsghdr,
-            ucred,
         };
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-        use libc::SIGPOLL;
+        pub(super) use libc::{
+            SIGPOLL,
+            SO_PASSCRED,
+            SCM_CREDENTIALS,
+            ucred,
+        };
 
-        #[cfg(not(any(
-            target_os = "linux",
-            target_os = "emscripten",
-            target_os = "android",
-            target_os = "haiku",
-            target_os = "fuchsia",
-            target_os = "solaris",
-            target_os = "illumos",
-        )))]
-        fake_signals!(SIGPOLL = 999); // Assign an arbitrary number to get doctests to compile.
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        pub(super) const SIGPOLL: i32 = 999;
 
         pub(super) use super::FdOps;
 

@@ -146,7 +146,7 @@ use std::{
     convert::{TryFrom, TryInto},
     mem::zeroed,
 };
-use spin::RwLock;
+use spinning::{RwLock, RwLockUpgradableReadGuard};
 use intmap::IntMap;
 use thiserror::Error;
 use cfg_if::cfg_if;
@@ -172,7 +172,6 @@ cfg_if! {
         const SIGRTMIN: i32 = 27;
         const SIGRTMAX: i32 = 31;
     } else {
-        const SIGRT: Option<[i32; 2]> = None;
         const SIGRTMIN: i32 = 1; // min is smaller than max so that the sloppy calculation works
         const SIGRTMAX: i32 = 0;
     }
@@ -196,6 +195,7 @@ pub const REALTIME_SIGNALS_SUPPORTED: bool = NUM_REALTIME_SIGNALS != 0;
 pub const NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
 /// Returns `true` if the specified signal is a valid real-time signal value, `false` otherwise.
 #[inline(always)]
+#[allow(clippy::absurd_extreme_comparisons)] // For systems where there are no realtime signals
 pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
     rtsignal < NUM_REALTIME_SIGNALS
 }
@@ -503,7 +503,7 @@ impl HandlerOptions {
                 max: NUM_REALTIME_SIGNALS,
             });
         }
-        let handlers = HANDLERS.upgradeable_read();
+        let handlers = HANDLERS.upgradable_read();
         let new_flags = self.flags_as_i32();
         let mut need_to_upgrade_handle = false;
         let need_to_install_hook = if let Some(
@@ -532,15 +532,16 @@ impl HandlerOptions {
             !self.handler.unwrap_or_default().is_default()
         };
         if need_to_upgrade_handle {
-            let mut handlers = handlers.upgrade();
+            let mut handlers = RwLockUpgradableReadGuard::upgrade(handlers);
             let signal_u64 = self.signal as u64;
             handlers.remove(signal_u64);
             handlers.insert(signal_u64, (
                 self.handler.unwrap_or_default(),
                 new_flags,
             ));
+        } else {
+            drop(handlers);
         }
-        drop(handlers);
         if need_to_install_hook {
             let hook_val = match self.handler.unwrap_or_default() {
                 SignalHandler::Default => SIG_DFL,
