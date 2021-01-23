@@ -1,3 +1,5 @@
+use io::ErrorKind;
+
 use super::named_pipe::{
     DuplexBytePipeStream as PipeStream, PipeListener as GenericPipeListener, PipeListenerOptions,
     PipeMode,
@@ -30,7 +32,10 @@ impl LocalSocketListener {
     #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
-        Ok(LocalSocketStream { inner })
+        Ok(LocalSocketStream {
+            inner,
+            server_or_client: ServerOrClient::Server,
+        })
     }
 }
 impl Debug for LocalSocketListener {
@@ -42,12 +47,35 @@ impl Debug for LocalSocketListener {
 
 pub struct LocalSocketStream {
     inner: PipeStream,
+    server_or_client: ServerOrClient,
+}
+#[repr(u8)]
+enum ServerOrClient {
+    Server,
+    Client,
+    Nah,
 }
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let inner = PipeStream::connect(name.inner())?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            server_or_client: ServerOrClient::Client,
+        })
+    }
+    #[inline]
+    pub fn get_peer_pid(&self) -> io::Result<u32> {
+        match self.server_or_client {
+            ServerOrClient::Server => self.inner.get_client_process_id(),
+            ServerOrClient::Client => self.inner.get_server_process_id(),
+            ServerOrClient::Nah => Err(io::Error::new(
+                ErrorKind::Other,
+                "\
+cannot query peer PID for a local socket stream created using FromRawHandle since there is no way \
+to tell if the stream belongs to the client or server",
+            )),
+        }
     }
 }
 impl Read for LocalSocketStream {
@@ -99,6 +127,7 @@ impl FromRawHandle for LocalSocketStream {
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
         Self {
             inner: PipeStream::from_raw_handle(handle),
+            server_or_client: ServerOrClient::Nah,
         }
     }
 }

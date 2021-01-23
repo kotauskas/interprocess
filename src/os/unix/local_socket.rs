@@ -66,6 +66,9 @@ impl LocalSocketStream {
         let inner = UdStream::connect(path)?;
         Ok(Self { inner })
     }
+    pub fn get_peer_pid(&self) -> io::Result<u32> {
+        self.inner.get_peer_credentials().map(|ucred| ucred.pid)
+    }
 }
 impl Read for LocalSocketStream {
     #[inline]

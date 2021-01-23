@@ -147,6 +147,17 @@ impl LocalSocketStream {
             inner: LocalSocketStreamImpl::connect(name)?,
         })
     }
+    /// Retrieves the identifier of the process on the opposite end of the local socket connection.
+    ///
+    /// # Platform-specific behavior
+    /// ## Windows
+    /// Will always return an error for streams created using [`FromRawHandle`].
+    ///
+    /// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html " "
+    #[inline]
+    pub fn get_peer_pid(&self) -> io::Result<u32> {
+        self.inner.get_peer_pid()
+    }
 }
 impl Read for LocalSocketStream {
     #[inline]

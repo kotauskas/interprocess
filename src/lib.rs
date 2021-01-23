@@ -76,7 +76,43 @@ pub(crate) mod private {
             use $crate::os::windows::$osmod::{$($orig $(as $into)?,)*};
         };
     }
-    macro_rules! impl_handle_manip {
+    macro_rules! impl_as_raw_handle {
+        ($ty:ident) => {
+            #[cfg(windows)]
+            impl ::std::os::windows::io::AsRawHandle for $ty {
+                #[inline]
+                fn as_raw_handle(&self) -> *mut ::std::ffi::c_void {
+                    ::std::os::windows::io::AsRawHandle::as_raw_handle(&self.inner)
+                }
+            }
+            #[cfg(unix)]
+            impl ::std::os::unix::io::AsRawFd for $ty {
+                #[inline]
+                fn as_raw_fd(&self) -> ::libc::c_int {
+                    ::std::os::unix::io::AsRawFd::as_raw_fd(&self.inner)
+                }
+            }
+        };
+    }
+    macro_rules! impl_into_raw_handle {
+        ($ty:ident) => {
+            #[cfg(windows)]
+            impl ::std::os::windows::io::IntoRawHandle for $ty {
+                #[inline]
+                fn into_raw_handle(self) -> *mut ::std::ffi::c_void {
+                    ::std::os::windows::io::IntoRawHandle::into_raw_handle(self.inner)
+                }
+            }
+            #[cfg(unix)]
+            impl ::std::os::unix::io::IntoRawFd for $ty {
+                #[inline]
+                fn into_raw_fd(self) -> ::libc::c_int {
+                    ::std::os::unix::io::IntoRawFd::into_raw_fd(self.inner)
+                }
+            }
+        };
+    }
+    macro_rules! impl_from_raw_handle {
         ($ty:ident) => {
             #[cfg(windows)]
             impl ::std::os::windows::io::FromRawHandle for $ty {
@@ -85,20 +121,6 @@ pub(crate) mod private {
                     Self {
                         inner: ::std::os::windows::io::FromRawHandle::from_raw_handle(handle),
                     }
-                }
-            }
-            #[cfg(windows)]
-            impl ::std::os::windows::io::AsRawHandle for $ty {
-                #[inline]
-                fn as_raw_handle(&self) -> *mut ::std::ffi::c_void {
-                    ::std::os::windows::io::AsRawHandle::as_raw_handle(&self.inner)
-                }
-            }
-            #[cfg(windows)]
-            impl ::std::os::windows::io::IntoRawHandle for $ty {
-                #[inline]
-                fn into_raw_handle(self) -> *mut ::std::ffi::c_void {
-                    ::std::os::windows::io::IntoRawHandle::into_raw_handle(self.inner)
                 }
             }
             #[cfg(unix)]
@@ -110,20 +132,13 @@ pub(crate) mod private {
                     }
                 }
             }
-            #[cfg(unix)]
-            impl ::std::os::unix::io::AsRawFd for $ty {
-                #[inline]
-                fn as_raw_fd(&self) -> ::libc::c_int {
-                    ::std::os::unix::io::AsRawFd::as_raw_fd(&self.inner)
-                }
-            }
-            #[cfg(unix)]
-            impl ::std::os::unix::io::IntoRawFd for $ty {
-                #[inline]
-                fn into_raw_fd(self) -> ::libc::c_int {
-                    ::std::os::unix::io::IntoRawFd::into_raw_fd(self.inner)
-                }
-            }
+        };
+    }
+    macro_rules! impl_handle_manip {
+        ($ty:ident) => {
+            impl_as_raw_handle!($ty);
+            impl_into_raw_handle!($ty);
+            impl_from_raw_handle!($ty);
         };
     }
     // If the trait itself was pub(crate), it wouldn't work as a supertrait on public traits. We use a
