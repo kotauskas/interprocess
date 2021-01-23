@@ -193,7 +193,7 @@ pub const REALTIME_SIGNALS_SUPPORTED: bool = NUM_REALTIME_SIGNALS != 0;
 /// - **Redox**: 5 (does not conform with POSIX)
 pub const NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
 /// Returns `true` if the specified signal is a valid real-time signal value, `false` otherwise.
-#[inline(always)]
+#[inline]
 #[allow(clippy::absurd_extreme_comparisons)] // For systems where there are no realtime signals
 pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
     rtsignal < NUM_REALTIME_SIGNALS
@@ -400,7 +400,7 @@ pub struct HandlerOptions {
 }
 impl HandlerOptions {
     /// Creates a builder for a handler for the specified signal.
-    #[inline(always)]
+    #[inline]
     pub fn for_signal(signal: SignalType) -> Self {
         Self {
             signal: signal.into(),
@@ -433,7 +433,7 @@ impl HandlerOptions {
         }
     }
     /// Sets the handler for the signal to the specified value. If `None`, the old value is used.
-    #[inline(always)]
+    #[inline]
     pub fn set_new_handler(mut self, handler: impl Into<Option<SignalHandler>>) -> Self {
         self.handler = handler.into();
         self
@@ -441,7 +441,7 @@ impl HandlerOptions {
     /// Sets the [`ignore_child_stop_events`] flag to the specified value.
     ///
     /// [`ignore_child_stop_events`]: #structfield.ignore_child_stop_events " "
-    #[inline(always)]
+    #[inline]
     pub fn ignore_child_stop_events(mut self, ignore: impl Into<bool>) -> Self {
         self.ignore_child_stop_events = ignore.into();
         self
@@ -449,7 +449,7 @@ impl HandlerOptions {
     /// Sets the [`recursive_handler`] flag to the specified value.
     ///
     /// [`recursive_handler`]: #structfield.recursive_handler " "
-    #[inline(always)]
+    #[inline]
     pub fn recursive_handler(mut self, recursive: impl Into<bool>) -> Self {
         self.recursive_handler = recursive.into();
         self
@@ -457,7 +457,7 @@ impl HandlerOptions {
     /// Sets the [`system_call_restart`] flag to the specified value.
     ///
     /// [`system_call_restart`]: #structfield.system_call_restart " "
-    #[inline(always)]
+    #[inline]
     pub fn system_call_restart(mut self, restart: impl Into<bool>) -> Self {
         self.system_call_restart = restart.into();
         self
@@ -465,7 +465,7 @@ impl HandlerOptions {
     /// Sets the [`auto_reset_handler`] flag to the specified value.
     ///
     /// [`auto_reset_handler`]: #structfield.auto_reset_handler " "
-    #[inline(always)]
+    #[inline]
     pub fn auto_reset_handler(mut self, reset: impl Into<bool>) -> Self {
         self.auto_reset_handler = reset.into();
         self
@@ -662,21 +662,21 @@ impl SignalHandler {
     /// Returns `true` for the [`Default`] variant, `false` otherwise.
     ///
     /// [`Default`]: #variant.Default.html " "
-    #[inline(always)]
+    #[inline]
     pub const fn is_default(self) -> bool {
         matches!(self, Self::Default)
     }
     /// Returns `true` for the [`Ignore`] variant, `false` otherwise.
     ///
     /// [`Ignore`]: #variant.Ignore.html " "
-    #[inline(always)]
+    #[inline]
     pub const fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
     /// Returns `true` for the [`Hook`] variant, `false` otherwise.
     ///
     /// [`Hook`]: #variant.Hook.html " "
-    #[inline(always)]
+    #[inline]
     pub const fn is_hook(self) -> bool {
         matches!(self, Self::Hook(..))
     }
@@ -686,7 +686,7 @@ impl SignalHandler {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline(always)]
+    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self::Hook(SignalHook::from_fn(function))
     }
@@ -695,13 +695,13 @@ impl Default for SignalHandler {
     /// Returns [`SignalHandler::Default`].
     ///
     /// [`SignalHandler::Default`]: #variant.Default " "
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::Default
     }
 }
 impl From<SignalHook> for SignalHandler {
-    #[inline(always)]
+    #[inline]
     fn from(op: SignalHook) -> Self {
         Self::Hook(op)
     }
@@ -717,18 +717,18 @@ impl SignalHook {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline(always)]
+    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline(always)]
+    #[inline]
     pub fn inner(self) -> fn() {
         self.0
     }
 }
 impl From<SignalHook> for fn() {
-    #[inline(always)]
+    #[inline]
     fn from(op: SignalHook) -> Self {
         op.0
     }

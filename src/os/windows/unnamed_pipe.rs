@@ -58,7 +58,7 @@ pub struct UnnamedPipeCreationOptions {
 }
 impl UnnamedPipeCreationOptions {
     /// Starts with the default parameters for the pipe. Identical to `Default::default()`.
-    #[inline(always)]
+    #[inline]
     pub const fn new() -> Self {
         Self {
             inheritable: true,
@@ -146,7 +146,7 @@ impl UnnamedPipeCreationOptions {
     }
 }
 impl Default for UnnamedPipeCreationOptions {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -155,21 +155,21 @@ impl Default for UnnamedPipeCreationOptions {
 // yet.
 unsafe impl Send for UnnamedPipeCreationOptions {}
 
-#[inline(always)]
+#[inline]
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     unsafe { UnnamedPipeCreationOptions::default().build() }
 }
 
 pub(crate) struct UnnamedPipeReader(FileHandleOps);
 impl Read for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
 }
 #[cfg(windows)]
 impl AsRawHandle for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
@@ -185,7 +185,7 @@ impl IntoRawHandle for UnnamedPipeReader {
 }
 #[cfg(windows)]
 impl FromRawHandle for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         Self(FileHandleOps::from_raw_handle(handle))
     }
@@ -201,18 +201,18 @@ impl Debug for UnnamedPipeReader {
 
 pub(crate) struct UnnamedPipeWriter(FileHandleOps);
 impl Write for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.0.flush()
     }
 }
 #[cfg(windows)]
 impl AsRawHandle for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
@@ -228,7 +228,7 @@ impl IntoRawHandle for UnnamedPipeWriter {
 }
 #[cfg(windows)]
 impl FromRawHandle for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         Self(FileHandleOps(handle))
     }

@@ -112,7 +112,7 @@ impl Stream for Incoming {
     }
 }
 impl FusedStream for Incoming {
-    #[inline(always)]
+    #[inline]
     fn is_terminated(&self) -> bool {
         false
     }
@@ -124,7 +124,7 @@ struct SyncArcIncoming {
 }
 impl Iterator for SyncArcIncoming {
     type Item = Result<sync::LocalSocketStream, io::Error>;
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.inner.accept())
     }

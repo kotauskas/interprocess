@@ -231,7 +231,7 @@ impl Default for SignalHandler {
     /// Returns [`SignalHandler::Default`].
     ///
     /// [`SignalHandler::Default`]: #variant.Default " "
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::Default
     }
@@ -248,18 +248,18 @@ impl SignalHook {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe functions] for more.
     ///
     /// [module-level section on signal-safe functions]: index.html#signal-safe-functions " "
-    #[inline(always)]
+    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline(always)]
+    #[inline]
     pub fn inner(self) -> fn() {
         self.0
     }
 }
 impl From<SignalHook> for fn() {
-    #[inline(always)]
+    #[inline]
     fn from(op: SignalHook) -> Self {
         op.0
     }
@@ -276,18 +276,18 @@ impl NoReturnSignalHook {
     /// Same as for the normal [`SignalHook`].
     ///
     /// [`SignalHook`]: struct.SignalHook.html " "
-    #[inline(always)]
+    #[inline]
     pub unsafe fn from_fn(function: fn() -> !) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline(always)]
+    #[inline]
     pub fn inner(self) -> fn() -> ! {
         self.0
     }
 }
 impl From<NoReturnSignalHook> for fn() -> ! {
-    #[inline(always)]
+    #[inline]
     fn from(op: NoReturnSignalHook) -> Self {
         op.0
     }

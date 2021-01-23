@@ -80,7 +80,7 @@ pub(crate) mod private {
         ($ty:ident) => {
             #[cfg(windows)]
             impl ::std::os::windows::io::FromRawHandle for $ty {
-                #[inline(always)]
+                #[inline]
                 unsafe fn from_raw_handle(handle: *mut ::std::ffi::c_void) -> Self {
                     Self {
                         inner: ::std::os::windows::io::FromRawHandle::from_raw_handle(handle),
@@ -89,21 +89,21 @@ pub(crate) mod private {
             }
             #[cfg(windows)]
             impl ::std::os::windows::io::AsRawHandle for $ty {
-                #[inline(always)]
+                #[inline]
                 fn as_raw_handle(&self) -> *mut ::std::ffi::c_void {
                     ::std::os::windows::io::AsRawHandle::as_raw_handle(&self.inner)
                 }
             }
             #[cfg(windows)]
             impl ::std::os::windows::io::IntoRawHandle for $ty {
-                #[inline(always)]
+                #[inline]
                 fn into_raw_handle(self) -> *mut ::std::ffi::c_void {
                     ::std::os::windows::io::IntoRawHandle::into_raw_handle(self.inner)
                 }
             }
             #[cfg(unix)]
             impl ::std::os::unix::io::FromRawFd for $ty {
-                #[inline(always)]
+                #[inline]
                 unsafe fn from_raw_fd(fd: ::libc::c_int) -> Self {
                     Self {
                         inner: ::std::os::unix::io::FromRawFd::from_raw_fd(fd),
@@ -112,14 +112,14 @@ pub(crate) mod private {
             }
             #[cfg(unix)]
             impl ::std::os::unix::io::AsRawFd for $ty {
-                #[inline(always)]
+                #[inline]
                 fn as_raw_fd(&self) -> ::libc::c_int {
                     ::std::os::unix::io::AsRawFd::as_raw_fd(&self.inner)
                 }
             }
             #[cfg(unix)]
             impl ::std::os::unix::io::IntoRawFd for $ty {
-                #[inline(always)]
+                #[inline]
                 fn into_raw_fd(self) -> ::libc::c_int {
                     ::std::os::unix::io::IntoRawFd::into_raw_fd(self.inner)
                 }

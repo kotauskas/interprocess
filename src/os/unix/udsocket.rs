@@ -397,7 +397,7 @@ impl UdStreamListener {
     /// # }
     /// # Ok(()) }
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
@@ -411,21 +411,21 @@ impl Debug for UdStreamListener {
 }
 #[cfg(unix)]
 impl AsRawFd for UdStreamListener {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 #[cfg(unix)]
 impl IntoRawFd for UdStreamListener {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 #[cfg(unix)]
 impl FromRawFd for UdStreamListener {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps(fd) }
     }
@@ -595,7 +595,7 @@ impl UdStream {
     ///
     /// [`recv_vectored`]: #method.recv_vectored " "
     // TODO use read
-    #[inline(always)]
+    #[inline]
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.fd.read(buf)
     }
@@ -608,7 +608,7 @@ impl UdStream {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`recv_ancillary_vectored`]: #method.recv_ancillary_vectored " "
     // TODO use readv
-    #[inline(always)]
+    #[inline]
     pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut abuf = AncillaryDataBuf::Owned(Vec::new());
         self.recv_ancillary_vectored(bufs, &mut abuf).map(|x| x.0)
@@ -619,7 +619,7 @@ impl UdStream {
     ///
     /// # System calls
     /// - `recvmsg`
-    #[inline(always)]
+    #[inline]
     pub fn recv_ancillary<'a: 'b, 'b>(
         &self,
         buf: &mut [u8],
@@ -678,7 +678,7 @@ impl UdStream {
     ///
     /// [`send_vectored`]: #method.send_vectored " "
     // TODO use write
-    #[inline(always)]
+    #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.fd.write(buf)
     }
@@ -691,7 +691,7 @@ impl UdStream {
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
     // TODO use writev
-    #[inline(always)]
+    #[inline]
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
@@ -702,7 +702,7 @@ impl UdStream {
     ///
     /// # System calls
     /// - `sendmsg`
-    #[inline(always)]
+    #[inline]
     pub fn send_ancillary<'a>(
         &self,
         buf: &[u8],
@@ -768,7 +768,7 @@ impl UdStream {
     }
 }
 impl Read for UdStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.fd.read(buf)
     }
@@ -779,7 +779,7 @@ impl Read for UdStream {
     }
 }
 impl Write for UdStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.fd.write(buf)
     }
@@ -788,7 +788,7 @@ impl Write for UdStream {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         // You cannot flush a socket
         Ok(())
@@ -804,21 +804,21 @@ impl Debug for UdStream {
 }
 #[cfg(unix)]
 impl AsRawFd for UdStream {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 #[cfg(unix)]
 impl IntoRawFd for UdStream {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 #[cfg(unix)]
 impl FromRawFd for UdStream {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps(fd) }
     }
@@ -957,7 +957,7 @@ impl UdSocket {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`recv_vectored`]: #method.recv_vectored " "
     // TODO use read
-    #[inline(always)]
+    #[inline]
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<(usize, bool)> {
         self.recv_vectored(&mut [IoSliceMut::new(buf)])
     }
@@ -971,7 +971,7 @@ impl UdSocket {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`recv_ancillary_vectored`]: #method.recv_ancillary_vectored " "
     // TODO use readv
-    #[inline(always)]
+    #[inline]
     pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<(usize, bool)> {
         self.recv_ancillary_vectored(bufs, &mut AncillaryDataBuf::Owned(Vec::new()))
             .map(|x| (x.0, x.1))
@@ -987,7 +987,7 @@ impl UdSocket {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    #[inline(always)]
+    #[inline]
     pub fn recv_ancillary<'a: 'b, 'b>(
         &self,
         buf: &mut [u8],
@@ -1053,7 +1053,7 @@ impl UdSocket {
     ///
     /// [`recv_from_vectored`]: #method.recv_from_vectored " "
     // TODO use recvfrom
-    #[inline(always)]
+    #[inline]
     pub fn recv_from<'a: 'b, 'b>(
         &self,
         buf: &mut [u8],
@@ -1068,7 +1068,7 @@ impl UdSocket {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    #[inline(always)]
+    #[inline]
     pub fn recv_from_vectored<'a: 'b, 'b>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
@@ -1086,7 +1086,7 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `recvmsg`
-    #[inline(always)]
+    #[inline]
     pub fn recv_from_ancillary<'a: 'b, 'b, 'c: 'd, 'd>(
         &self,
         buf: &mut [u8],
@@ -1187,7 +1187,7 @@ impl UdSocket {
     ///     - Future versions of `interprocess` may use `write` instead; for now, this method is a wrapper around [`send_vectored`].
     ///
     /// [`send_vectored`]: #method.send_vectored " "
-    #[inline(always)]
+    #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.send_vectored(&[IoSlice::new(buf)])
     }
@@ -1200,7 +1200,7 @@ impl UdSocket {
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
-    #[inline(always)]
+    #[inline]
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.send_ancillary_vectored(bufs, iter::empty())
             .map(|x| x.0)
@@ -1211,7 +1211,7 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `sendmsg`
-    #[inline(always)]
+    #[inline]
     pub fn send_ancillary<'a>(
         &self,
         buf: &[u8],
@@ -1308,21 +1308,21 @@ impl ReliableReadMsg for UdSocket {
 impl Sealed for UdSocket {}
 #[cfg(unix)]
 impl AsRawFd for UdSocket {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 #[cfg(unix)]
 impl IntoRawFd for UdSocket {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 #[cfg(unix)]
 impl FromRawFd for UdSocket {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps(fd) }
     }
@@ -1702,7 +1702,7 @@ pub trait ToUdSocketPath<'a> {
 }
 impl<'a> ToUdSocketPath<'a> for UdSocketPath<'a> {
     /// Accepts explicit `UdSocketPath`s in the `bind` constructor.
-    #[inline(always)]
+    #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         Ok(self)
     }
@@ -1953,7 +1953,7 @@ impl<'a> AncillaryData<'a> {
     }
 
     /// Calculates the size of an `AncillaryData::FileDescriptors` element with the specified amount of file descriptors when packed into the Unix ancillary data format. Useful for allocating a buffer when you expect to receive a specific amount of file descriptors.
-    #[inline(always)]
+    #[inline]
     pub const fn encoded_size_of_file_descriptors(num_descriptors: usize) -> usize {
         #[cfg(not(doc))]
         {
@@ -2059,37 +2059,37 @@ impl AncillaryData<'static> {
 #[derive(Clone, Debug)]
 struct EncodedAncillaryData<'a>(pub Cow<'a, [u8]>);
 impl<'a> From<&'a [u8]> for EncodedAncillaryData<'a> {
-    #[inline(always)]
+    #[inline]
     fn from(op: &'a [u8]) -> Self {
         Self(Cow::Borrowed(op))
     }
 }
 impl From<Vec<u8>> for EncodedAncillaryData<'static> {
-    #[inline(always)]
+    #[inline]
     fn from(op: Vec<u8>) -> Self {
         Self(Cow::Owned(op))
     }
 }
 impl<'b> FromIterator<AncillaryData<'b>> for EncodedAncillaryData<'static> {
-    #[inline(always)]
+    #[inline]
     fn from_iter<I: IntoIterator<Item = AncillaryData<'b>>>(iter: I) -> Self {
         AncillaryData::encode(iter)
     }
 }
 impl<'b> From<Vec<AncillaryData<'b>>> for EncodedAncillaryData<'static> {
-    #[inline(always)]
+    #[inline]
     fn from(op: Vec<AncillaryData<'b>>) -> Self {
         Self::from_iter(op)
     }
 }
 impl<'b: 'c, 'c> From<&'c [AncillaryData<'b>]> for EncodedAncillaryData<'static> {
-    #[inline(always)]
+    #[inline]
     fn from(op: &'c [AncillaryData<'b>]) -> Self {
         op.iter().map(AncillaryData::clone_ref).collect::<Self>()
     }
 }
 impl<'a> AsRef<[u8]> for EncodedAncillaryData<'a> {
-    #[inline(always)]
+    #[inline]
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -2114,14 +2114,14 @@ pub enum AncillaryDataBuf<'a> {
 }
 impl<'a> AncillaryDataBuf<'a> {
     /// Creates an owned ancillary data buffer with the specified capacity.
-    #[inline(always)]
+    #[inline]
     pub fn owned_with_capacity(capacity: usize) -> Self {
         Self::Owned(Vec::with_capacity(capacity))
     }
     /// Creates a decoder which decodes the ancillary data buffer into a friendly representation of its contents.
     ///
     /// All invalid ancillary data blocks are skipped — if there was garbage data in the buffer to begin with, the resulting buffer will either be empty or contain invalid credentials/file descriptors. This should normally never happen if the data is actually received from a Unix domain socket.
-    #[inline(always)]
+    #[inline]
     pub fn decode(&'a self) -> AncillaryDataDecoder<'a> {
         AncillaryDataDecoder {
             buffer: self.as_ref(),
@@ -2130,13 +2130,13 @@ impl<'a> AncillaryDataBuf<'a> {
     }
 }
 impl<'a> From<&'a mut [u8]> for AncillaryDataBuf<'a> {
-    #[inline(always)]
+    #[inline]
     fn from(op: &'a mut [u8]) -> Self {
         Self::Borrowed(op)
     }
 }
 impl From<Vec<u8>> for AncillaryDataBuf<'static> {
-    #[inline(always)]
+    #[inline]
     fn from(op: Vec<u8>) -> Self {
         Self::Owned(op)
     }
@@ -2181,7 +2181,7 @@ pub struct AncillaryDataDecoder<'a> {
     i: usize,
 }
 impl<'a> From<&'a AncillaryDataBuf<'a>> for AncillaryDataDecoder<'a> {
-    #[inline(always)]
+    #[inline]
     fn from(buffer: &'a AncillaryDataBuf<'a>) -> Self {
         buffer.decode()
     }
@@ -2189,11 +2189,11 @@ impl<'a> From<&'a AncillaryDataBuf<'a>> for AncillaryDataDecoder<'a> {
 impl<'a> Iterator for AncillaryDataDecoder<'a> {
     type Item = AncillaryData<'static>;
     fn next(&mut self) -> Option<Self::Item> {
-        #[inline(always)]
+        #[inline]
         fn u32_from_slice(bytes: &[u8]) -> u32 {
             u32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
         }
-        #[inline(always)]
+        #[inline]
         fn u64_from_slice(bytes: &[u8]) -> u64 {
             u64::from_ne_bytes([
                 bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
@@ -2295,18 +2295,18 @@ pub struct Incoming<'a> {
 }
 impl<'a> Iterator for Incoming<'a> {
     type Item = io::Result<UdStream>;
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
-    #[inline(always)]
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::MAX, None)
     }
 }
 impl FusedIterator for Incoming<'_> {}
 impl<'a> From<&'a UdStreamListener> for Incoming<'a> {
-    #[inline(always)]
+    #[inline]
     fn from(listener: &'a UdStreamListener) -> Self {
         Self { listener }
     }

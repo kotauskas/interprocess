@@ -103,14 +103,14 @@ impl FdOps {
 }
 #[cfg(unix)]
 impl AsRawFd for FdOps {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0
     }
 }
 #[cfg(unix)]
 impl IntoRawFd for FdOps {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> c_int {
         let fd = self.as_raw_fd();
         mem::forget(self);
@@ -119,7 +119,7 @@ impl IntoRawFd for FdOps {
 }
 #[cfg(unix)]
 impl FromRawFd for FdOps {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(fd)
     }

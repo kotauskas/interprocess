@@ -27,7 +27,7 @@ impl LocalSocketListener {
             .create()?;
         Ok(Self { inner })
     }
-    #[inline(always)]
+    #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
         Ok(LocalSocketStream { inner })
@@ -51,25 +51,25 @@ impl LocalSocketStream {
     }
 }
 impl Read for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         self.inner.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
@@ -83,19 +83,19 @@ impl Debug for LocalSocketStream {
     }
 }
 impl AsRawHandle for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn as_raw_handle(&self) -> *mut c_void {
         self.inner.as_raw_handle()
     }
 }
 impl IntoRawHandle for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn into_raw_handle(self) -> *mut c_void {
         self.inner.into_raw_handle()
     }
 }
 impl FromRawHandle for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
         Self {
             inner: PipeStream::from_raw_handle(handle),
@@ -105,15 +105,15 @@ impl FromRawHandle for LocalSocketStream {
 
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
 
-#[inline(always)]
+#[inline]
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }
-#[inline(always)]
+#[inline]
 pub fn to_local_socket_name_osstr(osstr: &OsStr) -> LocalSocketName<'_> {
     LocalSocketName::from_raw_parts(Cow::Borrowed(osstr), true)
 }
-#[inline(always)]
+#[inline]
 pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'static> {
     LocalSocketName::from_raw_parts(Cow::Owned(osstring), true)
 }

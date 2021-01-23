@@ -21,7 +21,7 @@ impl LocalSocketListener {
         let inner = UdStreamListener::bind(path)?;
         Ok(Self { inner })
     }
-    #[inline(always)]
+    #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
         Ok(LocalSocketStream { inner })
@@ -36,19 +36,19 @@ impl Debug for LocalSocketListener {
     }
 }
 impl AsRawFd for LocalSocketListener {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> i32 {
         self.inner.as_raw_fd()
     }
 }
 impl IntoRawFd for LocalSocketListener {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> i32 {
         self.inner.into_raw_fd()
     }
 }
 impl FromRawFd for LocalSocketListener {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: i32) -> Self {
         Self {
             inner: UdStreamListener::from_raw_fd(fd),
@@ -68,25 +68,25 @@ impl LocalSocketStream {
     }
 }
 impl Read for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         self.inner.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
@@ -100,19 +100,19 @@ impl Debug for LocalSocketStream {
     }
 }
 impl AsRawFd for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> i32 {
         self.inner.as_raw_fd()
     }
 }
 impl IntoRawFd for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> i32 {
         self.inner.into_raw_fd()
     }
 }
 impl FromRawFd for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: i32) -> Self {
         Self {
             inner: UdStream::from_raw_fd(fd),
@@ -150,7 +150,7 @@ fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<
     )?))
 }
 
-#[inline(always)]
+#[inline]
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }

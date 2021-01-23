@@ -56,7 +56,7 @@ pub struct LocalSocketListener {
 }
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
-    #[inline(always)]
+    #[inline]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         Ok(Self {
             inner: LocalSocketListenerImpl::bind(name)?,
@@ -67,7 +67,7 @@ impl LocalSocketListener {
     /// See [`incoming`] for a convenient way to create a main loop for a server.
     ///
     /// [`incoming`]: #method.incoming " "
-    #[inline(always)]
+    #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         Ok(LocalSocketStream {
             inner: self.inner.accept()?,
@@ -77,13 +77,13 @@ impl LocalSocketListener {
     ///
     /// # Example
     /// See the struct-level documentation for a full example which already uses this method.
-    #[inline(always)]
+    #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
 }
 impl Debug for LocalSocketListener {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }
@@ -100,18 +100,18 @@ pub struct Incoming<'a> {
     listener: &'a LocalSocketListener,
 }
 impl<'a> From<&'a LocalSocketListener> for Incoming<'a> {
-    #[inline(always)]
+    #[inline]
     fn from(listener: &'a LocalSocketListener) -> Self {
         Self { listener }
     }
 }
 impl Iterator for Incoming<'_> {
     type Item = io::Result<LocalSocketStream>;
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
-    #[inline(always)]
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::MAX, None)
     }
@@ -141,7 +141,7 @@ pub struct LocalSocketStream {
 }
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
-    #[inline(always)]
+    #[inline]
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         Ok(Self {
             inner: LocalSocketStreamImpl::connect(name)?,
@@ -149,31 +149,31 @@ impl LocalSocketStream {
     }
 }
 impl Read for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         self.inner.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
 }
 impl Debug for LocalSocketStream {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }
@@ -222,12 +222,12 @@ impl<'a> LocalSocketName<'a> {
             || (NameTypeSupport::ALWAYS_AVAILABLE.paths_supported() && self.is_path())
     }
     /// Returns `true` if the value is a namespaced name, `false` otherwise.
-    #[inline(always)]
+    #[inline]
     pub const fn is_namespaced(&self) -> bool {
         self.namespaced
     }
     /// Returns `true` if the value is a filesystem path, `false` otherwise.
-    #[inline(always)]
+    #[inline]
     pub const fn is_path(&self) -> bool {
         !self.namespaced
     }
@@ -236,7 +236,7 @@ impl<'a> LocalSocketName<'a> {
     /// If you need the value as an owned `OsString` instead, see [`into_inner`].
     ///
     /// [`into_inner`]: #method.into_inner " "
-    #[inline(always)]
+    #[inline]
     pub fn inner(&'a self) -> &'a OsStr {
         &self.inner
     }
@@ -245,7 +245,7 @@ impl<'a> LocalSocketName<'a> {
     /// If you need the value as a borrowed `OsStr` instead, see [`inner`].
     ///
     /// [`inner`]: #method.inner " "
-    #[inline(always)]
+    #[inline]
     pub fn into_inner(self) -> OsString {
         self.inner.into_owned()
     }
@@ -256,7 +256,7 @@ impl<'a> LocalSocketName<'a> {
     /// [`inner`]: #method.inner " "
     /// [`into_inner`]: #method.into_inner " "
     /// [`into_inner_cow`]: #method.into_inner_cow " "
-    #[inline(always)]
+    #[inline]
     pub const fn inner_cow(&'a self) -> &'a Cow<'a, OsStr> {
         &self.inner
     }
@@ -267,11 +267,11 @@ impl<'a> LocalSocketName<'a> {
     /// [`inner`]: #method.inner " "
     /// [`into_inner`]: #method.into_inner " "
     /// [`inner_cow`]: #method.inner_cow " "
-    #[inline(always)]
+    #[inline]
     pub fn into_inner_cow(self) -> Cow<'a, OsStr> {
         self.inner
     }
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn from_raw_parts(inner: Cow<'a, OsStr>, namespaced: bool) -> Self {
         Self { inner, namespaced }
     }
@@ -307,18 +307,18 @@ impl NameTypeSupport {
     /// On most platforms, the value is known at compile time, i.e. the support for one of the types wasn't introduced in an update to the OS or isn't known to be supported at all. **Currently, this includes all supported OSes.** For compatibility with OSes which might add the functionality in the future starting with a specific version, this function isn't a `const fn` — see [`ALWAYS_AVAILABLE`] if you need a constant expression.
     ///
     /// [`ALWAYS_AVAILABLE`]: #associatedconstant.ALWAYS_AVAILABLE " "
-    #[inline(always)]
+    #[inline]
     pub fn query() -> Self {
         name_type_support_query_impl()
     }
 
     /// Returns `true` if, according to `self`, filesystem-based local sockets are supported; `false` otherwise.
-    #[inline(always)]
+    #[inline]
     pub const fn paths_supported(self) -> bool {
         matches!(self, Self::OnlyPaths | Self::Both)
     }
     /// Returns `true` if, according to `self`, namespaced local socket names are supported; `false` otherwise.
-    #[inline(always)]
+    #[inline]
     pub const fn namespace_supported(self) -> bool {
         matches!(self, Self::OnlyNamespaced | Self::Both)
     }
@@ -368,7 +368,7 @@ pub trait ToLocalSocketName<'a> {
 }
 // TODO document inpls for symmetry with ud-sockets
 impl<'a> ToLocalSocketName<'a> for &'a Path {
-    #[inline(always)]
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         Ok(LocalSocketName::from_raw_parts(
             Cow::Borrowed(self.as_os_str()),
@@ -377,7 +377,7 @@ impl<'a> ToLocalSocketName<'a> for &'a Path {
     }
 }
 impl ToLocalSocketName<'static> for PathBuf {
-    #[inline(always)]
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         Ok(LocalSocketName::from_raw_parts(
             Cow::Owned(self.into_os_string()),
@@ -386,13 +386,13 @@ impl ToLocalSocketName<'static> for PathBuf {
     }
 }
 impl<'a> ToLocalSocketName<'a> for &'a OsStr {
-    #[inline(always)]
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         Ok(to_local_socket_name_osstr(self))
     }
 }
 impl ToLocalSocketName<'static> for OsString {
-    #[inline(always)]
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         Ok(to_local_socket_name_osstring(self))
     }

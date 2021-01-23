@@ -17,7 +17,7 @@ use std::{
 /// Creates a new pipe with the default creation settings and returns the handles to its writing end and reading end.
 ///
 /// The platform-specific builders in the `os` module of the crate might be more helpful if a configuration process for the pipe is needed.
-#[inline(always)]
+#[inline]
 pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
     pipe_impl()
 }
@@ -41,13 +41,13 @@ pub struct UnnamedPipeReader {
     pub(crate) inner: UnnamedPipeReaderImpl,
 }
 impl Read for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
 }
 impl fmt::Debug for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
@@ -72,17 +72,17 @@ pub struct UnnamedPipeWriter {
     pub(crate) inner: UnnamedPipeWriterImpl,
 }
 impl Write for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         self.inner.write(data)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
 }
 impl fmt::Debug for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }

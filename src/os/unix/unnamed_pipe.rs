@@ -40,14 +40,14 @@ pub(crate) struct UnnamedPipeReader(FdOps);
 // reading a pipe concurrently is UB and UnnamedPipeReader is Send and Sync. If you do, the
 // universe will collapse immediately.
 impl Read for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
 }
 impl Sealed for UnnamedPipeReader {}
 impl AsRawFd for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0.as_raw_fd()
     }
@@ -61,7 +61,7 @@ impl IntoRawFd for UnnamedPipeReader {
     }
 }
 impl FromRawFd for UnnamedPipeReader {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(FdOps::from_raw_fd(fd))
     }
@@ -77,7 +77,7 @@ impl Debug for UnnamedPipeReader {
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Write for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
@@ -87,19 +87,19 @@ impl Write for UnnamedPipeWriter {
 }
 impl Sealed for UnnamedPipeWriter {}
 impl AsRawFd for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0.as_raw_fd()
     }
 }
 impl IntoRawFd for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     fn into_raw_fd(self) -> c_int {
         self.0.into_raw_fd()
     }
 }
 impl FromRawFd for UnnamedPipeWriter {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(FdOps(fd))
     }

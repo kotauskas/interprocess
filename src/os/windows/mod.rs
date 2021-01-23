@@ -137,14 +137,14 @@ impl Drop for FileHandleOps {
 }
 #[cfg(windows)]
 impl AsRawHandle for FileHandleOps {
-    #[inline(always)]
+    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for FileHandleOps {
-    #[inline(always)]
+    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         let handle = self.0;
         mem::forget(self);
@@ -153,7 +153,7 @@ impl IntoRawHandle for FileHandleOps {
 }
 #[cfg(windows)]
 impl FromRawHandle for FileHandleOps {
-    #[inline(always)]
+    #[inline]
     unsafe fn from_raw_handle(op: HANDLE) -> Self {
         Self(op)
     }
