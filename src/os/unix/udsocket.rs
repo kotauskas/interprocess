@@ -114,6 +114,27 @@ unsafe fn enable_passcred(socket: i32) -> bool {
         true
     } // Cannot have passcred on macOS and iOS.
 }
+#[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+unsafe fn get_peer_ucred(socket: i32) -> Option<ucred> {
+    // SAFETY: it's safe for the ucred structure to be zero-initialized, since
+    // it only contains integers
+    let mut cred: ucred = mem::zeroed();
+    let mut cred_len = mem::size_of::<ucred>() as _;
+    let success = libc::getsockopt(
+        socket,
+        SOL_SOCKET,
+        SO_PEERCRED,
+        &mut cred as *mut _ as *mut _,
+        &mut cred_len as *mut _ as *mut _,
+    ) != -1;
+    if success {
+        Some(cred)
+    } else {
+        // The outer function is supposed to query errno because separation of
+        // concerns is a good thing
+        None
+    }
+}
 
 /// A Unix domain byte stream socket server, listening for connections.
 ///
@@ -735,6 +756,16 @@ impl UdStream {
             Err(io::Error::last_os_error())
         }
     }
+
+    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
+    )]
+    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+        unsafe { get_peer_ucred(self.fd.0).ok_or_else(io::Error::last_os_error) }
+    }
 }
 impl Read for UdStream {
     #[inline(always)]
@@ -1231,6 +1262,15 @@ impl UdSocket {
         } else {
             Err(io::Error::last_os_error())
         }
+    }
+    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
+    )]
+    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+        unsafe { get_peer_ucred(self.fd.0).ok_or_else(io::Error::last_os_error) }
     }
 }
 impl Debug for UdSocket {
