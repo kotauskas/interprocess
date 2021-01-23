@@ -98,7 +98,7 @@ pub struct Incoming<'a, Stream: PipeStream> {
 }
 impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
     type Item = io::Result<Stream>;
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
@@ -106,7 +106,7 @@ impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
 impl<'a, Stream: PipeStream> IntoIterator for &'a PipeListener<Stream> {
     type IntoIter = Incoming<'a, Stream>;
     type Item = <Incoming<'a, Stream> as Iterator>::Item;
-    #[inline(always)]
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.incoming()
     }
@@ -122,7 +122,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         Ok(Stream::from(instance))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
-    #[inline(always)]
+    #[inline]
     pub fn incoming(&self) -> Incoming<'_, Stream> {
         Incoming { listener: self }
     }
@@ -231,6 +231,10 @@ mod seal {
         um::{
             fileapi::ReadFile,
             namedpipeapi::{ConnectNamedPipe, DisconnectNamedPipe, PeekNamedPipe},
+            winbase::{
+                GetNamedPipeClientProcessId, GetNamedPipeClientSessionId,
+                GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
+            },
             winnt::HANDLE,
         },
     };
@@ -308,19 +312,56 @@ mod seal {
             }
         }
         /// Reads bytes from the named pipe. Mirrors `std::io::Read`.
-        #[inline(always)]
+        #[inline]
         pub(crate) fn read_bytes(&self, buf: &mut [u8]) -> io::Result<usize> {
             self.0.read(buf)
         }
         /// Writes data to the named pipe. There is no way to check/ensure that the message boundaries will be preserved which is why there's only one function to do this.
-        #[inline(always)]
+        #[inline]
         pub(crate) fn write(&self, buf: &[u8]) -> io::Result<usize> {
             self.0.write(buf)
         }
         /// Blocks until the client has fully read the buffer.
-        #[inline(always)]
+        #[inline]
         pub(crate) fn flush(&self) -> io::Result<()> {
             self.0.flush()
+        }
+
+        pub(crate) fn get_client_process_id(&self) -> io::Result<u32> {
+            let mut id: u32 = 0;
+            let success = unsafe { GetNamedPipeClientProcessId(self.0 .0, &mut id as *mut _) != 0 };
+            if success {
+                Ok(id)
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+        pub(crate) fn get_client_session_id(&self) -> io::Result<u32> {
+            let mut id: u32 = 0;
+            let success = unsafe { GetNamedPipeClientSessionId(self.0 .0, &mut id as *mut _) != 0 };
+            if success {
+                Ok(id)
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+        pub(crate) fn get_server_process_id(&self) -> io::Result<u32> {
+            let mut id: u32 = 0;
+            let success = unsafe { GetNamedPipeServerProcessId(self.0 .0, &mut id as *mut _) != 0 };
+            if success {
+                Ok(id)
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
+        pub(crate) fn get_server_session_id(&self) -> io::Result<u32> {
+            let mut id: u32 = 0;
+            let success = unsafe { GetNamedPipeServerSessionId(self.0 .0, &mut id as *mut _) != 0 };
+            if success {
+                Ok(id)
+            } else {
+                Err(io::Error::last_os_error())
+            }
         }
 
         /// Blocks until connected. If connected, does not do anything.
@@ -338,7 +379,7 @@ mod seal {
             }
         }
         /// Flushes and disconnects, obviously.
-        #[inline(always)]
+        #[inline]
         pub(crate) fn flush_and_disconnect(&self) -> io::Result<()> {
             self.flush()?;
             self.disconnect()?;
@@ -357,14 +398,14 @@ mod seal {
     }
     #[cfg(windows)]
     impl AsRawHandle for PipeOps {
-        #[inline(always)]
+        #[inline]
         fn as_raw_handle(&self) -> HANDLE {
             self.0 .0 // I hate this nested tuple syntax.
         }
     }
     #[cfg(windows)]
     impl IntoRawHandle for PipeOps {
-        #[inline(always)]
+        #[inline]
         fn into_raw_handle(self) -> HANDLE {
             let handle = self.as_raw_handle();
             std::mem::forget(self);
@@ -410,7 +451,7 @@ pub struct PipeListenerOptions<'a> {
 }
 impl<'a> PipeListenerOptions<'a> {
     /// Creates a new builder with default options.
-    #[inline(always)]
+    #[inline]
     pub fn new() -> Self {
         Self {
             name: Cow::Borrowed(OsStr::new("")),
@@ -608,8 +649,28 @@ macro_rules! create_stream_type {
                     Err(io::Error::last_os_error())
                 }
             }
+            /// Retrieves the process identifier of the client side of the named pipe connection.
+            #[inline]
+            pub fn get_client_process_id(&self) -> io::Result<u32> {
+                self.instance.0.get_client_process_id()
+            }
+            /// Retrieves the session identifier of the client side of the named pipe connection.
+            #[inline]
+            pub fn get_client_session_id(&self) -> io::Result<u32> {
+                self.instance.0.get_client_session_id()
+            }
+            /// Retrieves the process identifier of the server side of the named pipe connection.
+            #[inline]
+            pub fn get_server_process_id(&self) -> io::Result<u32> {
+                self.instance.0.get_server_process_id()
+            }
+            /// Retrieves the session identifier of the server side of the named pipe connection.
+            #[inline]
+            pub fn get_server_session_id(&self) -> io::Result<u32> {
+                self.instance.0.get_server_session_id()
+            }
             /// Disconnects the named pipe stream without flushing buffers, causing all data in those buffers to be lost. This is much faster than simply dropping the stream, since the `Drop` implementation flushes first. Only makes sense for server-side pipes and will panic in debug builds if called on a client stream.
-            #[inline(always)]
+            #[inline]
             pub fn disconnect_without_flushing(self) -> io::Result<()> {
                 self.instance.0.disconnect()?;
                 // We keep the atomic store anyway since checking whether we're a client or a server and avoiding an atomic write is potentially slower than that write.
@@ -621,7 +682,7 @@ macro_rules! create_stream_type {
         impl Sealed for $ty {}
         impl NamedPipeStreamInternals for $ty {}
         impl Drop for $ty {
-            #[inline(always)]
+            #[inline]
             fn drop(&mut self) {
                 // We can and should ignore the result because we can't handle it from a Drop
                 // implementation and we can't/shouldn't handle it either
@@ -630,22 +691,23 @@ macro_rules! create_stream_type {
                 self.instance.1.store(false, Ordering::Release);
             }
         }
+        #[doc(hidden)]
         impl From<Arc<(PipeOps, AtomicBool)>> for $ty {
-            #[inline(always)]
+            #[inline]
             fn from(instance: Arc<(PipeOps, AtomicBool)>) -> Self {
                 Self {instance}
             }
         }
         #[cfg(windows)]
         impl AsRawHandle for $ty {
-            #[inline(always)]
+            #[inline]
             fn as_raw_handle(&self) -> HANDLE {
                 self.instance.0.as_raw_handle()
             }
         }
         #[cfg(windows)]
         impl IntoRawHandle for $ty {
-            #[inline(always)]
+            #[inline]
             fn into_raw_handle(self) -> HANDLE {
                 let handle = self.instance.0.as_raw_handle();
                 handle
@@ -653,7 +715,7 @@ macro_rules! create_stream_type {
         }
         #[cfg(windows)]
         impl FromRawHandle for $ty {
-            #[inline(always)]
+            #[inline]
             unsafe fn from_raw_handle(handle: HANDLE) -> Self {
                 Self {
                     instance: Arc::new((
@@ -681,7 +743,7 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [Byte stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
 "
-    ByteWriterPipeStream, GENERIC_WRITE,doc: "
+    ByteWriterPipeStream, GENERIC_WRITE, doc: "
 [Byte stream writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
@@ -721,14 +783,14 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 }
 
 impl Read for ByteReaderPipeStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 
 impl Write for ByteWriterPipeStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.instance.0.write(buf)
     }
@@ -738,34 +800,34 @@ impl Write for ByteWriterPipeStream {
 }
 
 impl Read for DuplexBytePipeStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl Write for DuplexBytePipeStream {
-    #[inline(always)]
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.instance.0.write(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
 }
 
 impl Read for MsgReaderPipeStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl ReliableReadMsg for MsgReaderPipeStream {
-    #[inline(always)]
+    #[inline]
     fn read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
         self.instance.0.read_msg(buf)
     }
-    #[inline(always)]
+    #[inline]
     fn try_read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>> {
         self.instance.0.try_read_msg(buf)
     }
@@ -780,20 +842,20 @@ impl Write for MsgWriterPipeStream {
             Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
 }
 
 impl Read for DuplexMsgPipeStream {
-    #[inline(always)]
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl ReliableReadMsg for DuplexMsgPipeStream {
-    #[inline(always)]
+    #[inline]
     fn read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
         self.instance.0.read_msg(buf)
     }
@@ -810,7 +872,7 @@ impl Write for DuplexMsgPipeStream {
             Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
-    #[inline(always)]
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
@@ -1009,7 +1071,7 @@ impl TryFrom<DWORD> for PipeDirection {
     }
 }
 impl From<PipeDirection> for DWORD {
-    #[inline(always)]
+    #[inline]
     fn from(op: PipeDirection) -> Self {
         unsafe { mem::transmute(op) }
     }
@@ -1102,7 +1164,7 @@ pub enum PipeMode {
 }
 impl PipeMode {
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending on the value.
-    #[inline(always)]
+    #[inline]
     pub fn to_pipe_type(self) -> DWORD {
         unsafe { mem::transmute(self) } // We already store PIPE_TYPE_*
     }
