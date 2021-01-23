@@ -1,22 +1,14 @@
+use super::udsocket::{UdSocketPath, UdStream, UdStreamListener};
+use crate::local_socket::{LocalSocketName, NameTypeSupport, ToLocalSocketName};
 use std::{
-    io::{self, IoSlice, IoSliceMut, prelude::*},
-    fmt::{self, Formatter, Debug},
-    ffi::{OsStr, OsString, CStr, CString},
     borrow::Cow,
+    ffi::{CStr, CString, OsStr, OsString},
+    fmt::{self, Debug, Formatter},
+    io::{self, prelude::*, IoSlice, IoSliceMut},
     os::unix::{
-        io::{AsRawFd, IntoRawFd, FromRawFd},
         ffi::{OsStrExt, OsStringExt},
+        io::{AsRawFd, FromRawFd, IntoRawFd},
     },
-};
-use crate::local_socket::{
-    NameTypeSupport,
-    LocalSocketName,
-    ToLocalSocketName,
-};
-use super::udsocket::{
-    UdStreamListener,
-    UdSocketPath,
-    UdStream,
 };
 
 pub(crate) struct LocalSocketListener {
@@ -27,12 +19,12 @@ impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
         let inner = UdStreamListener::bind(path)?;
-        Ok(Self {inner})
+        Ok(Self { inner })
     }
     #[inline(always)]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
-        Ok(LocalSocketStream {inner})
+        Ok(LocalSocketStream { inner })
     }
 }
 impl Debug for LocalSocketListener {
@@ -58,7 +50,9 @@ impl IntoRawFd for LocalSocketListener {
 impl FromRawFd for LocalSocketListener {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: i32) -> Self {
-        Self {inner: UdStreamListener::from_raw_fd(fd)}
+        Self {
+            inner: UdStreamListener::from_raw_fd(fd),
+        }
     }
 }
 
@@ -70,7 +64,7 @@ impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
         let inner = UdStream::connect(path)?;
-        Ok(Self {inner})
+        Ok(Self { inner })
     }
 }
 impl Read for LocalSocketStream {
@@ -120,7 +114,9 @@ impl IntoRawFd for LocalSocketStream {
 impl FromRawFd for LocalSocketStream {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: i32) -> Self {
-        Self {inner: UdStream::from_raw_fd(fd)}
+        Self {
+            inner: UdStream::from_raw_fd(fd),
+        }
     }
 }
 
@@ -133,31 +129,25 @@ fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<
                 if val.as_bytes().last() == Some(&0) {
                     Ok(Cow::Borrowed(
                         CStr::from_bytes_with_nul(val.as_bytes())
-                            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?
+                            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?,
                     ))
                 } else {
                     let owned = val.to_os_string();
-                    Ok(Cow::Owned(
-                        CString::new(owned.into_vec())?
-                    ))
+                    Ok(Cow::Owned(CString::new(owned.into_vec())?))
                 }
-            },
-            Cow::Owned(val) => {
-                Ok(Cow::Owned(
-                    CString::new(val.into_vec())?
-                ))
-            },
+            }
+            Cow::Owned(val) => Ok(Cow::Owned(CString::new(val.into_vec())?)),
         }
     }
     #[cfg(target_os = "linux")]
     if name.is_namespaced() {
-        return Ok(UdSocketPath::Namespaced(
-            cow_osstr_to_cstr(name.into_inner_cow())?
-        ));
+        return Ok(UdSocketPath::Namespaced(cow_osstr_to_cstr(
+            name.into_inner_cow(),
+        )?));
     }
-    Ok(UdSocketPath::File(
-        cow_osstr_to_cstr(name.into_inner_cow())?
-    ))
+    Ok(UdSocketPath::File(cow_osstr_to_cstr(
+        name.into_inner_cow(),
+    )?))
 }
 
 #[inline(always)]

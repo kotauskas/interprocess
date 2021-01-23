@@ -1,8 +1,8 @@
 //! Windows-specific functionality for various interprocess communication primitives, as well as Windows-specific ones.
 
 pub mod named_pipe;
-pub mod unnamed_pipe;
 pub mod signal;
+pub mod unnamed_pipe;
 // TODO mailslots
 //pub mod mailslot;
 #[cfg(windows)]
@@ -10,14 +10,11 @@ pub(crate) mod local_socket;
 
 #[cfg(windows)]
 use winapi::{
-    shared::{
-        ntdef::HANDLE,
-        minwindef::DWORD,
-    },
+    shared::{minwindef::DWORD, ntdef::HANDLE},
     um::{
+        fileapi::{FlushFileBuffers, ReadFile, WriteFile},
         handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
         processthreadsapi::GetCurrentProcess,
-        fileapi::{ReadFile, WriteFile, FlushFileBuffers},
     },
 };
 #[cfg(not(windows))]
@@ -26,12 +23,12 @@ pub type HANDLE = *mut ();
 #[cfg(not(windows))]
 #[doc(hidden)]
 pub trait AsRawHandle {}
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
 use std::{
     io,
     mem::{self, zeroed},
 };
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -74,7 +71,7 @@ impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
 #[repr(transparent)]
 #[derive(Debug)]
-pub(crate) struct FileHandleOps (pub(crate) HANDLE);
+pub(crate) struct FileHandleOps(pub(crate) HANDLE);
 impl FileHandleOps {
     #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
@@ -124,11 +121,7 @@ impl FileHandleOps {
     }
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
-        let success = unsafe {
-            FlushFileBuffers(
-                self.0,
-            ) != 0
-        };
+        let success = unsafe { FlushFileBuffers(self.0) != 0 };
         if success {
             Ok(())
         } else {
@@ -139,9 +132,7 @@ impl FileHandleOps {
 impl Drop for FileHandleOps {
     #[inline]
     fn drop(&mut self) {
-        debug_assert!(unsafe {
-            CloseHandle(self.0)
-        } != 0);
+        debug_assert!(unsafe { CloseHandle(self.0) } != 0);
     }
 }
 #[cfg(windows)]

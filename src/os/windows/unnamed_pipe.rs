@@ -6,24 +6,22 @@
 
 // TODO add examples
 
-use std::{
-    mem::{self, zeroed, size_of},
-    io::{self, Read, Write},
-    num::NonZeroUsize,
-    fmt::{self, Formatter, Debug},
-};
 #[cfg(windows)]
-use std::os::windows::io::{FromRawHandle, AsRawHandle, IntoRawHandle};
+use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+use std::{
+    fmt::{self, Debug, Formatter},
+    io::{self, Read, Write},
+    mem::{self, size_of, zeroed},
+    num::NonZeroUsize,
+};
 #[cfg(windows)]
 use winapi::{
     shared::{
-        ntdef::{HANDLE, NULL},
         minwindef::LPVOID,
+        ntdef::{HANDLE, NULL},
     },
     um::{
-        minwinbase::SECURITY_ATTRIBUTES,
-        handleapi::INVALID_HANDLE_VALUE,
-        namedpipeapi::CreatePipe,
+        handleapi::INVALID_HANDLE_VALUE, minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreatePipe,
     },
 };
 #[cfg(not(windows))]
@@ -36,13 +34,8 @@ pub type LPVOID = *mut ();
 #[cfg(not(windows))]
 #[doc(hidden)]
 pub const NULL: LPVOID = 0 as _;
-use crate::{
-    unnamed_pipe::{
-        UnnamedPipeReader as PubReader,
-        UnnamedPipeWriter as PubWriter,
-    },
-};
 use super::FileHandleOps;
+use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///
@@ -111,7 +104,7 @@ impl UnnamedPipeCreationOptions {
     #[inline]
     pub fn extract_security_attributes(self) -> SECURITY_ATTRIBUTES {
         // Safe because WinAPI parameter structs are typically rejected if a required field is zero
-        let mut security_attributes = unsafe {zeroed::<SECURITY_ATTRIBUTES>()};
+        let mut security_attributes = unsafe { zeroed::<SECURITY_ATTRIBUTES>() };
         security_attributes.nLength = size_of::<SECURITY_ATTRIBUTES>() as u32;
         security_attributes.lpSecurityDescriptor = self.security_descriptor;
         security_attributes.bInheritHandle = self.inheritable as i32;
@@ -164,10 +157,10 @@ unsafe impl Send for UnnamedPipeCreationOptions {}
 
 #[inline(always)]
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
-    unsafe {UnnamedPipeCreationOptions::default().build()}
+    unsafe { UnnamedPipeCreationOptions::default().build() }
 }
 
-pub(crate) struct UnnamedPipeReader (FileHandleOps);
+pub(crate) struct UnnamedPipeReader(FileHandleOps);
 impl Read for UnnamedPipeReader {
     #[inline(always)]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -206,7 +199,7 @@ impl Debug for UnnamedPipeReader {
     }
 }
 
-pub(crate) struct UnnamedPipeWriter (FileHandleOps);
+pub(crate) struct UnnamedPipeWriter(FileHandleOps);
 impl Write for UnnamedPipeWriter {
     #[inline(always)]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

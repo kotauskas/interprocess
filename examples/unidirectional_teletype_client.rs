@@ -1,5 +1,5 @@
-use std::io;
 use interprocess::local_socket::LocalSocketStream;
+use std::io;
 
 fn main() {
     let mut stream = LocalSocketStream::connect("/tmp/teletype.sock").expect("failed to connect");

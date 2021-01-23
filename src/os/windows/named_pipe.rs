@@ -12,25 +12,24 @@
 
 // TODO improve docs, add examples
 
-use std::{
-    io::{self, Read, Write},
-    ffi::{OsStr, OsString},
-    mem::{self, zeroed},
-    convert::{TryFrom, TryInto},
-    num::{NonZeroU8, NonZeroU32},
-    marker::PhantomData,
-    borrow::Cow,
-    sync::{
-        atomic::{Ordering, AtomicBool},
-        Arc,
-        RwLock,
-    },
-    fmt::{self, Formatter, Debug},
-};
 #[cfg(windows)]
 use std::os::windows::{
-    io::{AsRawHandle, IntoRawHandle, FromRawHandle},
     ffi::OsStrExt,
+    io::{AsRawHandle, FromRawHandle, IntoRawHandle},
+};
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    ffi::{OsStr, OsString},
+    fmt::{self, Debug, Formatter},
+    io::{self, Read, Write},
+    marker::PhantomData,
+    mem::{self, zeroed},
+    num::{NonZeroU32, NonZeroU8},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLock,
+    },
 };
 #[cfg(not(windows))]
 #[doc(hidden)]
@@ -39,16 +38,15 @@ pub trait AsRawHandle {}
 use winapi::{
     shared::minwindef::DWORD,
     um::{
-        winnt::{HANDLE, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+        fileapi::{CreateFileW, OPEN_EXISTING},
+        handleapi::INVALID_HANDLE_VALUE,
         namedpipeapi::CreateNamedPipeW,
         winbase::{
-            PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, PIPE_ACCESS_DUPLEX,
-            PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
-            PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE,
-            FILE_FLAG_FIRST_PIPE_INSTANCE,
+            FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
+            PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE, PIPE_TYPE_BYTE,
+            PIPE_TYPE_MESSAGE,
         },
-        handleapi::INVALID_HANDLE_VALUE,
-        fileapi::{CreateFileW, OPEN_EXISTING},
+        winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE, HANDLE},
     },
 };
 #[cfg(not(windows))]
@@ -68,10 +66,7 @@ fake_consts! {
 #[cfg(not(windows))]
 #[doc(hidden)]
 pub type DWORD = u32;
-use crate::{
-    Sealed,
-    ReliableReadMsg, PartialMsgWriteError,
-};
+use crate::{PartialMsgWriteError, ReliableReadMsg, Sealed};
 
 fn convert_path(osstr: &OsStr) -> Vec<u16> {
     let mut path = OsString::from(r"\\.\pipe\");
@@ -129,20 +124,18 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
     #[inline(always)]
     pub fn incoming(&self) -> Incoming<'_, Stream> {
-        Incoming {listener: self}
+        Incoming { listener: self }
     }
 
     /// Returns a pipe instance either by using an existing one or returning a newly created instance using `add_instance`.
     fn alloc_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
-        let instances = self.instances.read()
-            .expect("unexpected lock poison");
+        let instances = self.instances.read().expect("unexpected lock poison");
         for inst in instances.iter() {
             // Try to ownership for the instance by doing a combined compare+exchange, just
             // like a mutex does.
-            let cmpxchg_result = inst.1.compare_exchange(
-                false, true,
-                Ordering::AcqRel, Ordering::Relaxed,
-            );
+            let cmpxchg_result =
+                inst.1
+                    .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed);
             if cmpxchg_result.is_ok() {
                 // If the compare+exchange returned Ok, then we successfully took ownership of the
                 // pipe instance and we can return it right away.
@@ -155,31 +148,25 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         // available, which is why we need a new one.
         let new_inst = self.add_instance()?;
         mem::drop(instances); // Get rid of the old lock to lock again with write access.
-        let mut instances = self.instances.write()
-            .expect("unexpected lock poison");
+        let mut instances = self.instances.write().expect("unexpected lock poison");
         instances.push(Arc::clone(&new_inst));
         Ok(new_inst)
     }
     /// Increases instance count by 1 and returns the created instance.
     #[inline]
     fn add_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
-        let new_instance = Arc::new(
-            self.config.create_instance::<Stream>(false)?
-        );
-        let mut instances = self.instances.write()
-            .expect("unexpected lock poison");
+        let new_instance = Arc::new(self.config.create_instance::<Stream>(false)?);
+        let mut instances = self.instances.write().expect("unexpected lock poison");
         instances.push(Arc::clone(&new_instance));
         Ok(new_instance)
     }
 }
 mod pipe_listener_debug_impl {
-    use super::{
-        fmt, Formatter, Debug,
-        AtomicBool, Ordering, RwLock, Arc,
-        PipeOps, PipeStream, PipeListener,
-    };
     #[cfg(windows)]
     use super::AsRawHandle;
+    use super::{
+        fmt, Arc, AtomicBool, Debug, Formatter, Ordering, PipeListener, PipeOps, PipeStream, RwLock,
+    };
     /// Shim used to improve pipe instance formatting
     struct Instance<'a> {
         instance: &'a (PipeOps, AtomicBool),
@@ -201,10 +188,13 @@ mod pipe_listener_debug_impl {
         #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             let mut list_builder = f.debug_list();
-            for instance in self.instances.read()
+            for instance in self
+                .instances
+                .read()
                 .expect("unexpected lock poisoning")
-                .iter() {
-                list_builder.entry(&Instance {instance});
+                .iter()
+            {
+                list_builder.entry(&Instance { instance });
             }
             list_builder.finish()
         }
@@ -214,7 +204,12 @@ mod pipe_listener_debug_impl {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeListener")
                 .field("config", &self.config)
-                .field("instances", &Instances {instances: &self.instances})
+                .field(
+                    "instances",
+                    &Instances {
+                        instances: &self.instances,
+                    },
+                )
                 .finish()
         }
     }
@@ -226,27 +221,19 @@ mod pipe_listener_debug_impl {
 
 use seal::*;
 mod seal {
+    use super::super::FileHandleOps;
+    #[cfg(windows)]
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+    use std::{io, mem::zeroed, sync::atomic::AtomicBool};
     #[cfg(windows)]
     use winapi::{
-        shared::{
-            minwindef::DWORD,
-            winerror::ERROR_PIPE_CONNECTED,
-        },
+        shared::{minwindef::DWORD, winerror::ERROR_PIPE_CONNECTED},
         um::{
-            winnt::HANDLE,
             fileapi::ReadFile,
-            namedpipeapi::{PeekNamedPipe, ConnectNamedPipe, DisconnectNamedPipe},
+            namedpipeapi::{ConnectNamedPipe, DisconnectNamedPipe, PeekNamedPipe},
+            winnt::HANDLE,
         },
-
     };
-    use std::{
-        sync::atomic::AtomicBool,
-        io,
-        mem::zeroed,
-    };
-    #[cfg(windows)]
-    use std::os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle};
-    use super::super::FileHandleOps;
 
     pub trait NamedPipeStreamInternals: From<std::sync::Arc<(super::PipeOps, AtomicBool)>> {}
 
@@ -338,12 +325,7 @@ mod seal {
 
         /// Blocks until connected. If connected, does not do anything.
         pub(crate) fn connect(&self) -> io::Result<()> {
-            let success = unsafe {
-                ConnectNamedPipe(
-                    self.as_raw_handle(),
-                    zeroed(),
-                ) != 0
-            };
+            let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), zeroed()) != 0 };
             if success {
                 Ok(())
             } else {
@@ -365,11 +347,7 @@ mod seal {
         /// Disconnects without flushing. Drops all data which has been sent but not yet received on the other side, if any.
         #[inline]
         pub(crate) fn disconnect(&self) -> io::Result<()> {
-            let success = unsafe {
-                DisconnectNamedPipe(
-                    self.as_raw_handle(),
-                ) != 0
-            };
+            let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
             if success {
                 Ok(())
             } else {
@@ -381,7 +359,7 @@ mod seal {
     impl AsRawHandle for PipeOps {
         #[inline(always)]
         fn as_raw_handle(&self) -> HANDLE {
-            self .0 .0 // I hate this nested tuple syntax.
+            self.0 .0 // I hate this nested tuple syntax.
         }
     }
     #[cfg(windows)]
@@ -396,7 +374,7 @@ mod seal {
     #[cfg(windows)]
     impl FromRawHandle for PipeOps {
         unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-            Self (FileHandleOps::from_raw_handle(handle))
+            Self(FileHandleOps::from_raw_handle(handle))
         }
     }
     // SAFETY: we don't expose reading/writing for immutable references of PipeInstance
@@ -442,7 +420,7 @@ impl<'a> PipeListenerOptions<'a> {
             accept_remote: false,
             input_buffer_size_hint: 512,
             output_buffer_size_hint: 512,
-            wait_timeout: unsafe {NonZeroU32::new_unchecked(50)},
+            wait_timeout: unsafe { NonZeroU32::new_unchecked(50) },
         }
     }
     /// Sets the [`name`] parameter to the specified value.
@@ -533,9 +511,7 @@ impl<'a> PipeListenerOptions<'a> {
                     }
                     flags
                 },
-                self.mode.to_pipe_type()
-              | Stream::READ_MODE.map_or(0, |x| x.to_readmode()),
-                
+                self.mode.to_pipe_type() | Stream::READ_MODE.map_or(0, |x| x.to_readmode()),
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
                     x.get() as DWORD
@@ -551,7 +527,10 @@ impl<'a> PipeListenerOptions<'a> {
         };
         if success {
             // SAFETY: we just created this handle
-            Ok((unsafe {PipeOps::from_raw_handle(handle)}, AtomicBool::new(false)))
+            Ok((
+                unsafe { PipeOps::from_raw_handle(handle) },
+                AtomicBool::new(false),
+            ))
         } else {
             Err(io::Error::last_os_error())
         }
@@ -579,13 +558,9 @@ impl<'a> PipeListenerOptions<'a> {
         Ok(PipeListener {
             config: owned_config,
             instances: RwLock::new({
-                let capacity = self.instance_limit
-                    .map_or(8, |x| x.get())
-                    as usize;
+                let capacity = self.instance_limit.map_or(8, |x| x.get()) as usize;
                 let mut vec = Vec::with_capacity(capacity);
-                vec.push(
-                    Arc::new(self.create_instance::<Stream>(true)?)
-                );
+                vec.push(Arc::new(self.create_instance::<Stream>(true)?));
                 vec
             }),
             _phantom: PhantomData,
@@ -698,7 +673,7 @@ macro_rules! create_stream_type {
         }
     )+);
 }
-create_stream_type!{
+create_stream_type! {
     ByteReaderPipeStream, GENERIC_READ, doc: "
 [Byte stream reader] for a named pipe.
 
@@ -802,9 +777,7 @@ impl Write for MsgWriterPipeStream {
         if self.instance.0.write(buf)? == buf.len() {
             Ok(buf.len())
         } else {
-            Err(
-                io::Error::new(io::ErrorKind::Other, PartialMsgWriteError)
-            )
+            Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
     #[inline(always)]
@@ -834,9 +807,7 @@ impl Write for DuplexMsgPipeStream {
         if self.instance.0.write(buf)? == buf.len() {
             Ok(buf.len())
         } else {
-            Err(
-                io::Error::new(io::ErrorKind::Other, PartialMsgWriteError)
-            )
+            Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
     #[inline(always)]
@@ -853,9 +824,7 @@ impl Write for DuplexMsgPipeStream {
 /// The distinction between datagram-oriented connections and byte streams exists for symmetry with the standard library, where UDP and TCP sockets are represented by different types. The idea behind this is that by separating the two semantic types of sockets into two types, the distinction between those semantics can be enforced at compile time instead of using runtime errors to signal that, for example, a datagram read operation is attempted on a byte stream.
 ///
 /// The fact that named pipes can have different data flow directions further increases the amount of various stream types. By restricting the implemented stream traits at compile time, named pipe streams can be used correctly in generic contexts unaware of named pipes without extra runtime checking for the correct pipe direction.
-pub trait PipeStream:
-      AsRawHandle
-    + NamedPipeStreamInternals {
+pub trait PipeStream: AsRawHandle + NamedPipeStreamInternals {
     /// The data stream flow direction for the pipe. See the [`PipeStreamRole`] enumeration for more on what this means.
     ///
     /// [`PipeStreamRole`]: enum.PipeStreamRole.html " "
@@ -870,34 +839,34 @@ pub trait PipeStream:
     const READ_MODE: Option<PipeMode>;
 }
 impl PipeStream for ByteReaderPipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::Reader;
+    const ROLE: PipeStreamRole = PipeStreamRole::Reader;
     const WRITE_MODE: Option<PipeMode> = None;
-    const READ_MODE : Option<PipeMode> = Some(PipeMode::Bytes);
+    const READ_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
 }
 impl PipeStream for ByteWriterPipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::Writer;
+    const ROLE: PipeStreamRole = PipeStreamRole::Writer;
     const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-    const READ_MODE : Option<PipeMode> = None;
+    const READ_MODE: Option<PipeMode> = None;
 }
 impl PipeStream for DuplexBytePipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::ReaderAndWriter;
+    const ROLE: PipeStreamRole = PipeStreamRole::ReaderAndWriter;
     const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-    const READ_MODE : Option<PipeMode> = Some(PipeMode::Bytes);
+    const READ_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
 }
 impl PipeStream for MsgReaderPipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::Reader;
+    const ROLE: PipeStreamRole = PipeStreamRole::Reader;
     const WRITE_MODE: Option<PipeMode> = None;
-    const READ_MODE : Option<PipeMode> = Some(PipeMode::Messages);
+    const READ_MODE: Option<PipeMode> = Some(PipeMode::Messages);
 }
 impl PipeStream for MsgWriterPipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::Writer;
+    const ROLE: PipeStreamRole = PipeStreamRole::Writer;
     const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Messages);
-    const READ_MODE : Option<PipeMode> = None;
+    const READ_MODE: Option<PipeMode> = None;
 }
 impl PipeStream for DuplexMsgPipeStream {
-    const ROLE      : PipeStreamRole   = PipeStreamRole::ReaderAndWriter;
+    const ROLE: PipeStreamRole = PipeStreamRole::ReaderAndWriter;
     const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Messages);
-    const READ_MODE : Option<PipeMode> = Some(PipeMode::Messages);
+    const READ_MODE: Option<PipeMode> = Some(PipeMode::Messages);
 }
 
 /// Connects to the specified named pipe, returning a named pipe stream of the stream type provided via generic parameters.
@@ -942,12 +911,10 @@ pub fn connect<Stream: PipeStream>(
         (handle != INVALID_HANDLE_VALUE, handle)
     };
     if success {
-        Ok(
-            Stream::from(Arc::from((
-                unsafe {PipeOps::from_raw_handle(handle)}, // SAFETY: we just created this handle
-                AtomicBool::new(true),
-            )))
-        )
+        Ok(Stream::from(Arc::from((
+            unsafe { PipeOps::from_raw_handle(handle) }, // SAFETY: we just created this handle
+            AtomicBool::new(true),
+        ))))
     } else {
         Err(io::Error::last_os_error())
     }
@@ -1038,13 +1005,13 @@ impl TryFrom<DWORD> for PipeDirection {
     fn try_from(op: DWORD) -> Result<Self, ()> {
         assert!((1..=3).contains(&op));
         // See the comment block above for why this is safe.
-        unsafe {mem::transmute(op)}
+        unsafe { mem::transmute(op) }
     }
 }
 impl From<PipeDirection> for DWORD {
     #[inline(always)]
     fn from(op: PipeDirection) -> Self {
-        unsafe {mem::transmute(op)}
+        unsafe { mem::transmute(op) }
     }
 }
 /// Describes the role of a named pipe stream. In constrast to [`PipeDirection`], the meaning of values here is relative — for example, [`Reader`] means [`ServerToClient`] if you're creating a server and [`ClientToServer`] if you're creating a client.
@@ -1137,13 +1104,13 @@ impl PipeMode {
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending on the value.
     #[inline(always)]
     pub fn to_pipe_type(self) -> DWORD {
-        unsafe {mem::transmute(self)} // We already store PIPE_TYPE_*
+        unsafe { mem::transmute(self) } // We already store PIPE_TYPE_*
     }
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE` depending on the value.
     #[inline]
     pub fn to_readmode(self) -> DWORD {
         match self {
-            Self::Bytes    => PIPE_READMODE_BYTE,
+            Self::Bytes => PIPE_READMODE_BYTE,
             Self::Messages => PIPE_READMODE_MESSAGE,
         }
     }
@@ -1158,9 +1125,8 @@ impl TryFrom<DWORD> for PipeMode {
     fn try_from(op: DWORD) -> Result<Self, ()> {
         // It's nicer to only match than to check and transmute
         match op {
-            PIPE_TYPE_BYTE    => Ok(Self::Bytes),
-            PIPE_READMODE_MESSAGE
-          | PIPE_TYPE_MESSAGE => Ok(Self::Messages),
+            PIPE_TYPE_BYTE => Ok(Self::Bytes),
+            PIPE_READMODE_MESSAGE | PIPE_TYPE_MESSAGE => Ok(Self::Messages),
             _ => Err(()),
         }
     }

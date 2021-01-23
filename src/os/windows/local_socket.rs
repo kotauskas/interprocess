@@ -1,21 +1,15 @@
+use super::named_pipe::{
+    DuplexBytePipeStream as PipeStream, PipeListener as GenericPipeListener, PipeListenerOptions,
+    PipeMode,
+};
+use crate::local_socket::{LocalSocketName, NameTypeSupport, ToLocalSocketName};
 use std::{
-    io::{self, IoSlice, IoSliceMut, prelude::*},
-    fmt::{self, Formatter, Debug},
-    ffi::{OsStr, OsString, c_void},
     //path::{Path, PathBuf},
     borrow::Cow,
-    os::windows::io::{AsRawHandle, IntoRawHandle, FromRawHandle},
-};
-use crate::local_socket::{
-    NameTypeSupport,
-    LocalSocketName,
-    ToLocalSocketName,
-};
-use super::named_pipe::{
-    PipeListener as GenericPipeListener,
-    DuplexBytePipeStream as PipeStream,
-    PipeListenerOptions,
-    PipeMode,
+    ffi::{c_void, OsStr, OsString},
+    fmt::{self, Debug, Formatter},
+    io::{self, prelude::*, IoSlice, IoSliceMut},
+    os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
 };
 
 type PipeListener = GenericPipeListener<PipeStream>;
@@ -31,12 +25,12 @@ impl LocalSocketListener {
             .name(name.into_inner())
             .mode(PipeMode::Bytes)
             .create()?;
-        Ok(Self {inner})
+        Ok(Self { inner })
     }
     #[inline(always)]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
-        Ok(LocalSocketStream {inner})
+        Ok(LocalSocketStream { inner })
     }
 }
 impl Debug for LocalSocketListener {
@@ -53,7 +47,7 @@ impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let inner = PipeStream::connect(name.inner())?;
-        Ok(Self {inner})
+        Ok(Self { inner })
     }
 }
 impl Read for LocalSocketStream {
@@ -103,7 +97,9 @@ impl IntoRawHandle for LocalSocketStream {
 impl FromRawHandle for LocalSocketStream {
     #[inline(always)]
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
-        Self {inner: PipeStream::from_raw_handle(handle)}
+        Self {
+            inner: PipeStream::from_raw_handle(handle),
+        }
     }
 }
 

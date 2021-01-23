@@ -1,4 +1,4 @@
-use futures::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
+use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::nonblocking::local_socket::*;
 
 #[tokio::main]

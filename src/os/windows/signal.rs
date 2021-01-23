@@ -13,23 +13,17 @@
 
 // TODO unfinished
 
-use libc::{
-    SIGINT,  SIGFPE,
-    SIGILL,  SIGSEGV,
-    SIGABRT, SIGTERM,
-    sighandler_t,
-};
-use std::{
-    panic,
-    process,
-    error::Error,
-    fmt::{self, Formatter},
-    convert::{TryFrom, TryInto},
-};
-use thiserror::Error;
-use spinning::{RwLock, RwLockUpgradableReadGuard};
 use intmap::IntMap;
 use lazy_static::lazy_static;
+use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
+use spinning::{RwLock, RwLockUpgradableReadGuard};
+use std::{
+    convert::{TryFrom, TryInto},
+    error::Error,
+    fmt::{self, Formatter},
+    panic, process,
+};
+use thiserror::Error;
 
 // FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
 const SIG_DFL: sighandler_t = 0;
@@ -59,15 +53,12 @@ const SIG_DFL: sighandler_t = 0;
 /// # Ok(()) }
 /// ```
 #[inline]
-pub fn set_handler(
-    signal_type: SignalType,
-    handler: SignalHandler,
-) -> Result<(), SetHandlerError> {
+pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
     if signal_type.is_unsafe() {
         return Err(SetHandlerError::UnsafeSignal);
     }
 
-    unsafe {set_unsafe_handler(signal_type, handler)}
+    unsafe { set_unsafe_handler(signal_type, handler) }
 }
 /// Installs the specified handler for the specified unsafe signal.
 ///
@@ -123,10 +114,8 @@ pub unsafe fn set_unsafe_handler(
         };
         unsafe {
             // SAFETY: we're using a correct value for the hook
-            install_hook(
-                signal_type as i32,
-                hook_val,
-            ).map_err(|_| SetHandlerError::UnexpectedLibcCallFailure)?
+            install_hook(signal_type as i32, hook_val)
+                .map_err(|_| SetHandlerError::UnexpectedLibcCallFailure)?
         }
     }
     Ok(())
@@ -137,13 +126,12 @@ lazy_static! {
 }
 
 unsafe fn install_hook(signum: i32, hook: usize) -> Result<(), ()> {
-    let success = {
-        libc::signal(
-            signum,
-            hook,
-        ) != libc::SIG_ERR as _
-    };
-    if success {Ok(())} else {Err(())}
+    let success = { libc::signal(signum, hook) != libc::SIG_ERR as _ };
+    if success {
+        Ok(())
+    } else {
+        Err(())
+    }
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
@@ -151,12 +139,13 @@ extern "C" fn signal_receiver(signum: i32) {
     let catched = panic::catch_unwind(|| {
         let handler = {
             let handlers = HANDLERS.read();
-            let val = handlers.get(signum as u64)
+            let val = handlers
+                .get(signum as u64)
                 .expect("unregistered signal passed by the OS to the shared receiver");
             *val
         };
         match handler {
-            SignalHandler::Ignore => {},
+            SignalHandler::Ignore => {}
             SignalHandler::Hook(hook) => hook.inner()(),
             SignalHandler::NoReturnHook(hook) => hook.inner()(),
             SignalHandler::Default => unreachable!(
@@ -172,8 +161,10 @@ extern "C" fn signal_receiver(signum: i32) {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 pub enum SetHandlerError {
     /// An unsafe signal was attempted to be handled using `set_handler` instead of `set_unsafe_handler`.
-    #[error("\
-an unsafe signal was attempted to be handled using `set_handler` instead of `set_unsafe_handler`")]
+    #[error(
+        "\
+an unsafe signal was attempted to be handled using `set_handler` instead of `set_unsafe_handler`"
+    )]
     UnsafeSignal,
     /// the C library call unexpectedly failed without error information.
     #[error("the C library call unexpectedly failed without error information")]
@@ -249,7 +240,7 @@ impl Default for SignalHandler {
 /// A function which can be used as a signal handler.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct SignalHook (fn());
+pub struct SignalHook(fn());
 impl SignalHook {
     /// Creates a hook which calls the specified function.
     ///
@@ -259,7 +250,7 @@ impl SignalHook {
     /// [module-level section on signal-safe functions]: index.html#signal-safe-functions " "
     #[inline(always)]
     pub unsafe fn from_fn(function: fn()) -> Self {
-        Self (function)
+        Self(function)
     }
     /// Returns the wrapped function.
     #[inline(always)]
@@ -277,7 +268,7 @@ impl From<SignalHook> for fn() {
 /// A function which can be used as a signal handler, but one which also never returns.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct NoReturnSignalHook (fn() -> !);
+pub struct NoReturnSignalHook(fn() -> !);
 impl NoReturnSignalHook {
     /// Creates a hook which calls the specified function.
     ///
@@ -287,7 +278,7 @@ impl NoReturnSignalHook {
     /// [`SignalHook`]: struct.SignalHook.html " "
     #[inline(always)]
     pub unsafe fn from_fn(function: fn() -> !) -> Self {
-        Self (function)
+        Self(function)
     }
     /// Returns the wrapped function.
     #[inline(always)]
@@ -351,7 +342,10 @@ impl SignalType {
     /// Returns `true` if the value is a signal which requires its custom handler functions to never return, `false` otherwise.
     #[inline]
     pub const fn requires_diverging_hook(self) -> bool {
-        matches!(self, Self::SegmentationFault | Self::IllegalInstruction | Self::MathException)
+        matches!(
+            self,
+            Self::SegmentationFault | Self::IllegalInstruction | Self::MathException
+        )
     }
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
     #[inline]
@@ -375,13 +369,13 @@ impl TryFrom<i32> for SignalType {
     type Error = UnknownSignalError;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            SIGINT    => Ok(Self::KeyboardInterrupt ),
-            SIGILL    => Ok(Self::IllegalInstruction),
-            SIGABRT   => Ok(Self::Abort             ),
-            SIGFPE    => Ok(Self::MathException     ),
-            SIGSEGV   => Ok(Self::SegmentationFault ),
-            SIGTERM   => Ok(Self::Termination       ),
-            _ => Err( UnknownSignalError {value} ),
+            SIGINT => Ok(Self::KeyboardInterrupt),
+            SIGILL => Ok(Self::IllegalInstruction),
+            SIGABRT => Ok(Self::Abort),
+            SIGFPE => Ok(Self::MathException),
+            SIGSEGV => Ok(Self::SegmentationFault),
+            SIGTERM => Ok(Self::Termination),
+            _ => Err(UnknownSignalError { value }),
         }
     }
 }

@@ -6,13 +6,10 @@
 
 use blocking::{unblock, Unblock};
 use futures::{
-    stream::{Stream, FusedStream},
+    stream::{FusedStream, Stream},
     AsyncRead, AsyncWrite,
 };
-use std::{
-    io,
-    sync::Arc,
-};
+use std::{io, sync::Arc};
 
 use crate::local_socket::{self as sync, ToLocalSocketName};
 
@@ -78,11 +75,9 @@ impl LocalSocketListener {
     #[inline]
     pub fn incoming(&self) -> Incoming {
         Incoming {
-            inner: Unblock::new(
-                SyncArcIncoming {
-                    inner: Arc::clone(&self.inner),
-                }
-            )
+            inner: Unblock::new(SyncArcIncoming {
+                inner: Arc::clone(&self.inner),
+            }),
         }
     }
 }
@@ -100,28 +95,18 @@ pub struct Incoming {
 impl Stream for Incoming {
     type Item = Result<LocalSocketStream, io::Error>;
     #[inline]
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        let poll = <Unblock<_> as Stream>::poll_next(
-            Pin::new(&mut self.inner),
-            ctx,
-        );
+    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let poll = <Unblock<_> as Stream>::poll_next(Pin::new(&mut self.inner), ctx);
         match poll {
             Poll::Ready(val) => {
-                let val = val.map(|val| {
-                    match val {
-                        Ok(inner) => Ok(
-                            LocalSocketStream {
-                                inner: Unblock::new(inner),
-                            }
-                        ),
-                        Err(error) => Err(error),
-                    }
+                let val = val.map(|val| match val {
+                    Ok(inner) => Ok(LocalSocketStream {
+                        inner: Unblock::new(inner),
+                    }),
+                    Err(error) => Err(error),
                 });
                 Poll::Ready(val)
-            },
+            }
             Poll::Pending => Poll::Pending,
         }
     }

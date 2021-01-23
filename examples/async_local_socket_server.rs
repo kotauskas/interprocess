@@ -1,5 +1,5 @@
 use futures::{
-    io::{BufReader, AsyncBufReadExt, AsyncWriteExt},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     stream::TryStreamExt,
 };
 use interprocess::nonblocking::local_socket::*;

@@ -1,7 +1,7 @@
 use interprocess::local_socket::LocalSocketStream;
 use std::{
-    io::{prelude::*, BufReader},
     error::Error,
+    io::{prelude::*, BufReader},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {

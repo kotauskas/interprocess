@@ -4,7 +4,7 @@
 //!
 //! Another way to use unnamed pipes is to use a named pipe and/or a Unix domain socket to establish an unnamed pipe connection. It just so happens that this crate supports all three.
 
-impmod!{unnamed_pipe,
+impmod! {unnamed_pipe,
     UnnamedPipeReader as UnnamedPipeReaderImpl,
     UnnamedPipeWriter as UnnamedPipeWriterImpl,
     pipe as pipe_impl,

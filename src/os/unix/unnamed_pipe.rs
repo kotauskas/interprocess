@@ -1,20 +1,15 @@
-use std::{
-    os::unix::io::{
-        AsRawFd, IntoRawFd, FromRawFd,
-    },
-    io::{self, Read, Write},
-    mem,
-    fmt::{self, Formatter, Debug},
-};
-use libc::c_int;
+use super::FdOps;
 use crate::{
-    unnamed_pipe::{
-        UnnamedPipeReader as PubReader,
-        UnnamedPipeWriter as PubWriter,
-    },
+    unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter},
     Sealed,
 };
-use super::FdOps;
+use libc::c_int;
+use std::{
+    fmt::{self, Debug, Formatter},
+    io::{self, Read, Write},
+    mem,
+    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
+};
 
 #[inline]
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
@@ -40,7 +35,7 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     }
 }
 
-pub(crate) struct UnnamedPipeReader (FdOps);
+pub(crate) struct UnnamedPipeReader(FdOps);
 // Please, for the love of Unix gods, don't ever try to implement this for &UnnamedPipeReader,
 // reading a pipe concurrently is UB and UnnamedPipeReader is Send and Sync. If you do, the
 // universe will collapse immediately.
@@ -68,7 +63,7 @@ impl IntoRawFd for UnnamedPipeReader {
 impl FromRawFd for UnnamedPipeReader {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self (FdOps::from_raw_fd(fd))
+        Self(FdOps::from_raw_fd(fd))
     }
 }
 impl Debug for UnnamedPipeReader {
@@ -80,7 +75,7 @@ impl Debug for UnnamedPipeReader {
     }
 }
 
-pub(crate) struct UnnamedPipeWriter (FdOps);
+pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Write for UnnamedPipeWriter {
     #[inline(always)]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

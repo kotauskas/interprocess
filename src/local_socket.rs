@@ -6,16 +6,16 @@
 //! There's one more problem regarding platform differences: since only Linux supports putting Ud-sockets in a separate namespace which is isolated from the filesystem, the `LocalSocketName`/`LocalSocketNameBuf` types are used to identify local sockets rather than `OsStr`/`OsString`: on Unix platforms other than Linux, which includes macOS, all flavors of BSD and possibly other Unix-like systems, the only way to name a Ud-socket is to use a filesystem path. As such, those platforms don't have the namespaced socket creation method available. Complicatng matters further, Windows does not support named pipes in the normal filesystem, meaning that namespaced local sockets are the only functional method on Windows. As a way to solve this issue, `LocalSocketName`/`LocalSocketNameBuf` only provide creation in a platform-specific way, meaning that crate users are required to use conditional compilation to decide on the name for the socket names.
 
 use std::{
-    io::{self, IoSlice, IoSliceMut, prelude::*},
-    fmt::{self, Formatter, Debug},
-    iter::FusedIterator,
     borrow::Cow,
-    ffi::{OsStr, OsString, CStr, CString},
+    ffi::{CStr, CString, OsStr, OsString},
+    fmt::{self, Debug, Formatter},
+    io::{self, prelude::*, IoSlice, IoSliceMut},
+    iter::FusedIterator,
     path::{Path, PathBuf},
     str,
 };
 
-impmod!{local_socket,
+impmod! {local_socket,
     name_type_support_query as name_type_support_query_impl,
     NAME_TYPE_ALWAYS_SUPPORTED as NAME_TYPE_ALWAYS_SUPPORTED_REAL,
     to_local_socket_name_osstr,
@@ -58,7 +58,9 @@ impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     #[inline(always)]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self {inner: LocalSocketListenerImpl::bind(name)?})
+        Ok(Self {
+            inner: LocalSocketListenerImpl::bind(name)?,
+        })
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///
@@ -67,7 +69,9 @@ impl LocalSocketListener {
     /// [`incoming`]: #method.incoming " "
     #[inline(always)]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
-        Ok(LocalSocketStream {inner: self.inner.accept()?})
+        Ok(LocalSocketStream {
+            inner: self.inner.accept()?,
+        })
     }
     /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
     ///
@@ -98,7 +102,7 @@ pub struct Incoming<'a> {
 impl<'a> From<&'a LocalSocketListener> for Incoming<'a> {
     #[inline(always)]
     fn from(listener: &'a LocalSocketListener) -> Self {
-        Self {listener}
+        Self { listener }
     }
 }
 impl Iterator for Incoming<'_> {
@@ -139,7 +143,9 @@ impl LocalSocketStream {
     /// Connects to a remote local socket server.
     #[inline(always)]
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self {inner: LocalSocketStreamImpl::connect(name)?})
+        Ok(Self {
+            inner: LocalSocketStreamImpl::connect(name)?,
+        })
     }
 }
 impl Read for LocalSocketStream {
@@ -202,8 +208,8 @@ impl<'a> LocalSocketName<'a> {
     /// [`is_always_supported`]: #method.is_always_supported " "
     #[inline]
     pub fn is_supported(&self) -> bool {
-           (NameTypeSupport::query().namespace_supported() && self.is_namespaced())
-        || (NameTypeSupport::query().paths_supported() && !self.is_path())
+        (NameTypeSupport::query().namespace_supported() && self.is_namespaced())
+            || (NameTypeSupport::query().paths_supported() && !self.is_path())
     }
     /// Returns `true` if the type of the name is supported by the OS, `false` otherwise.
     ///
@@ -212,8 +218,8 @@ impl<'a> LocalSocketName<'a> {
     /// [`is_supported`]: #method.is_supported " "
     #[inline]
     pub fn is_always_supported(&self) -> bool {
-           (NameTypeSupport::ALWAYS_AVAILABLE.namespace_supported() && self.is_namespaced())
-        || (NameTypeSupport::ALWAYS_AVAILABLE.paths_supported() && self.is_path())
+        (NameTypeSupport::ALWAYS_AVAILABLE.namespace_supported() && self.is_namespaced())
+            || (NameTypeSupport::ALWAYS_AVAILABLE.paths_supported() && self.is_path())
     }
     /// Returns `true` if the value is a namespaced name, `false` otherwise.
     #[inline(always)]
@@ -267,7 +273,7 @@ impl<'a> LocalSocketName<'a> {
     }
     #[inline(always)]
     pub(crate) const fn from_raw_parts(inner: Cow<'a, OsStr>, namespaced: bool) -> Self {
-        Self {inner, namespaced}
+        Self { inner, namespaced }
     }
 }
 
@@ -364,23 +370,19 @@ pub trait ToLocalSocketName<'a> {
 impl<'a> ToLocalSocketName<'a> for &'a Path {
     #[inline(always)]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(
-            LocalSocketName::from_raw_parts(
-                Cow::Borrowed(self.as_os_str()),
-                false,
-            )
-        )
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Borrowed(self.as_os_str()),
+            false,
+        ))
     }
 }
 impl ToLocalSocketName<'static> for PathBuf {
     #[inline(always)]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        Ok(
-            LocalSocketName::from_raw_parts(
-                Cow::Owned(self.into_os_string()),
-                false,
-            )
-        )
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Owned(self.into_os_string()),
+            false,
+        ))
     }
 }
 impl<'a> ToLocalSocketName<'a> for &'a OsStr {
@@ -438,7 +440,7 @@ mod test {
         // before the server creates the socket
         let barrier = Arc::new(Barrier::new(2));
         let server_barrier = Arc::clone(&barrier);
-        
+
         std::thread::spawn(move || {
             fn handle_error(
                 connection: io::Result<LocalSocketStream>,

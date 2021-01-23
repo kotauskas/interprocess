@@ -137,20 +137,19 @@
 
 #![cfg_attr(not(unix), allow(unused_imports))]
 
-use std::{
-    io,
-    panic,
-    process,
-    fmt::{self, Formatter, Display},
-    error::Error,
-    convert::{TryFrom, TryInto},
-    mem::zeroed,
-};
-use spinning::{RwLock, RwLockUpgradableReadGuard};
-use intmap::IntMap;
-use thiserror::Error;
 use cfg_if::cfg_if;
+use intmap::IntMap;
 use lazy_static::lazy_static;
+use spinning::{RwLock, RwLockUpgradableReadGuard};
+use std::{
+    convert::{TryFrom, TryInto},
+    error::Error,
+    fmt::{self, Display, Formatter},
+    io,
+    mem::zeroed,
+    panic, process,
+};
+use thiserror::Error;
 
 use super::imports::*;
 
@@ -277,7 +276,10 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
 /// [`set_unsafe`]: struct.HandlerOptions.html#method.set_unsafe " "
 #[inline]
-pub unsafe fn set_unsafe_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
+pub unsafe fn set_unsafe_handler(
+    signal_type: SignalType,
+    handler: SignalHandler,
+) -> Result<(), SetHandlerError> {
     HandlerOptions::for_signal(signal_type)
         .set_new_handler(handler)
         .set_unsafe()
@@ -322,11 +324,7 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
         let [mut old_handler, mut new_handler] = [zeroed::<sigaction>(); 2];
         new_handler.sa_sigaction = hook as usize;
         new_handler.sa_flags = flags;
-        libc::sigaction(
-            signum,
-            &new_handler as *const _,
-            &mut old_handler as *mut _,
-        ) != -1
+        libc::sigaction(signum, &new_handler as *const _, &mut old_handler as *mut _) != -1
     };
     if success {
         Ok(())
@@ -480,9 +478,9 @@ impl HandlerOptions {
                 return Err(SetHandlerError::UnsafeSignal);
             }
         }
-        unsafe {self.set_unsafe()}
+        unsafe { self.set_unsafe() }
     }
-    
+
     /// Installs the signal handler, even if the signal being handled is unsafe.
     ///
     /// # Safety
@@ -506,39 +504,31 @@ impl HandlerOptions {
         let handlers = HANDLERS.upgradable_read();
         let new_flags = self.flags_as_i32();
         let mut need_to_upgrade_handle = false;
-        let need_to_install_hook = if let Some(
-            (existing_handler, existing_flags)
-        ) = handlers.get(self.signal as u64) {
-            // This signal's handler was set before — check if we need to install new flags or if
-            // one is default and another isn't, which would mean that either that no hook was
-            // installed and we have to install one or there was one installed but we need to
-            // install the default hook explicitly.
-            let new_handler = self.handler.unwrap_or_default();
-            if new_handler != *existing_handler || new_flags != *existing_flags {
-                need_to_upgrade_handle = true;
-                true
+        let need_to_install_hook =
+            if let Some((existing_handler, existing_flags)) = handlers.get(self.signal as u64) {
+                // This signal's handler was set before — check if we need to install new flags or if
+                // one is default and another isn't, which would mean that either that no hook was
+                // installed and we have to install one or there was one installed but we need to
+                // install the default hook explicitly.
+                let new_handler = self.handler.unwrap_or_default();
+                if new_handler != *existing_handler || new_flags != *existing_flags {
+                    need_to_upgrade_handle = true;
+                    true
+                } else {
+                    let one_handler_is_default_and_another_isnt = (new_handler.is_default()
+                        && !existing_handler.is_default())
+                        || (!new_handler.is_default() && existing_handler.is_default());
+                    *existing_flags != new_flags || one_handler_is_default_and_another_isnt
+                }
             } else {
-                let one_handler_is_default_and_another_isnt = (
-                    new_handler.is_default() && !existing_handler.is_default()
-                ) || (
-                    !new_handler.is_default() && existing_handler.is_default()
-                );
-                   *existing_flags != new_flags
-                || one_handler_is_default_and_another_isnt
-            }
-            
-        } else {
-            need_to_upgrade_handle = true;
-            !self.handler.unwrap_or_default().is_default()
-        };
+                need_to_upgrade_handle = true;
+                !self.handler.unwrap_or_default().is_default()
+            };
         if need_to_upgrade_handle {
             let mut handlers = RwLockUpgradableReadGuard::upgrade(handlers);
             let signal_u64 = self.signal as u64;
             handlers.remove(signal_u64);
-            handlers.insert(signal_u64, (
-                self.handler.unwrap_or_default(),
-                new_flags,
-            ));
+            handlers.insert(signal_u64, (self.handler.unwrap_or_default(), new_flags));
         } else {
             drop(handlers);
         }
@@ -549,11 +539,7 @@ impl HandlerOptions {
             };
             unsafe {
                 // SAFETY: we're using a correct value for the hook
-                install_hook(
-                    self.signal,
-                    hook_val,
-                    new_flags,
-                )?
+                install_hook(self.signal, hook_val, new_flags)?
             }
         }
         Ok(())
@@ -598,7 +584,7 @@ pub enum SetHandlerError {
     /// An unsafe signal was attempted to be handled using `set` instead of `set_unsafe`.
     #[cfg_attr(
         unix,
-        error("an unsafe signal was attempted to be handled using `set` instead of `set_unsafe`"),
+        error("an unsafe signal was attempted to be handled using `set` instead of `set_unsafe`")
     )]
     UnsafeSignal,
     /// The signal which was attempted to be handled is not allowed to be handled by the POSIX specification. This can either be [`ForceSuspend`] or [`Kill`].
@@ -609,7 +595,7 @@ pub enum SetHandlerError {
         unix,
         error("the signal {:?} cannot be handled", .0),
     )]
-    UnblockableSignal (SignalType),
+    UnblockableSignal(SignalType),
     /// The specified real-time signal is not available on this OS.
     #[cfg_attr(
         unix,
@@ -630,7 +616,7 @@ pub enum SetHandlerError {
         unix,
         error("{}", .0),
     )]
-    UnexpectedSystemCallFailure (#[cfg_attr(unix, from)] io::Error),
+    UnexpectedSystemCallFailure(#[cfg_attr(unix, from)] io::Error),
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
@@ -638,12 +624,13 @@ extern "C" fn signal_receiver(signum: i32) {
     let catched = panic::catch_unwind(|| {
         let handler_and_flags = {
             let handlers = HANDLERS.read();
-            let val = handlers.get(signum as u64)
+            let val = handlers
+                .get(signum as u64)
                 .expect("unregistered signal passed by the OS to the shared receiver");
             *val
         };
         match handler_and_flags.0 {
-            SignalHandler::Ignore => {},
+            SignalHandler::Ignore => {}
             SignalHandler::Hook(hook) => hook.inner()(),
             SignalHandler::Default => unreachable!(
                 "signal receiver was unregistered but has been called by the OS anyway"
@@ -722,7 +709,7 @@ impl From<SignalHook> for SignalHandler {
 /// A function which can be used as a signal handler.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct SignalHook (fn());
+pub struct SignalHook(fn());
 impl SignalHook {
     /// Creates a hook which calls the specified function.
     ///
@@ -732,7 +719,7 @@ impl SignalHook {
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
     #[inline(always)]
     pub unsafe fn from_fn(function: fn()) -> Self {
-        Self (function)
+        Self(function)
     }
     /// Returns the wrapped function.
     #[inline(always)]
@@ -763,18 +750,13 @@ impl From<SignalHook> for fn() {
 /// ```
 #[inline]
 pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
-    let pid = i32::try_from(pid.into())
-        .unwrap_or_else(|_| panic!("process identifier out of range"));
+    let pid =
+        i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
     debug_assert_ne!(
         pid, 0,
         "to send the signal to the process group of the calling process, use send_to_group instead"
     );
-    let success = unsafe {
-        libc::kill(
-            signal.into().map_or(0, Into::into),
-            pid,
-        ) != -1
-    };
+    let success = unsafe { libc::kill(signal.into().map_or(0, Into::into), pid) != -1 };
     if success {
         Ok(())
     } else {
@@ -797,8 +779,8 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
 /// ```
 #[inline]
 pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
-    let pid = i32::try_from(pid.into())
-        .unwrap_or_else(|_| panic!("process identifier out of range"));
+    let pid =
+        i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
     debug_assert_ne!(
         pid, 0,
         "to send the signal to the process group of the calling process, use send_to_group instead"
@@ -807,12 +789,7 @@ pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Resul
         assert!(is_valid_rtsignal(val), "invalid real-time signal");
         val
     }) as i32;
-    let success = unsafe {
-        libc::kill(
-            signal,
-            pid,
-        ) != -1
-    };
+    let success = unsafe { libc::kill(signal, pid) != -1 };
     if success {
         Ok(())
     } else {
@@ -838,12 +815,7 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
     let pid = i32::try_from(pid.into())
         .unwrap_or_else(|_| panic!("process group identifier out of range"))
         * -1;
-    let success = unsafe {
-        libc::kill(
-            signal.into().map_or(0, Into::into),
-            pid,
-        ) != -1
-    };
+    let success = unsafe { libc::kill(signal.into().map_or(0, Into::into), pid) != -1 };
     if success {
         Ok(())
     } else {
@@ -878,12 +850,7 @@ pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> 
         assert!(is_valid_rtsignal(val), "invalid real-time signal");
         val
     }) as i32;
-    let success = unsafe {
-        libc::kill(
-            signal,
-            pid,
-        ) != -1
-    };
+    let success = unsafe { libc::kill(signal, pid) != -1 };
     if success {
         Ok(())
     } else {
@@ -1009,19 +976,11 @@ pub enum SignalType {
     ///
     /// *Default handler: process termination.*
     // TODO more on this
-    #[cfg(any(
-        doc,
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    ))]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    )))]
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(not(any(target_os = "macos", target_os = "ios",)),))
+    )]
     PollNotification = SIGPOLL,
     /// `SIGBUS` — [bus error]. This signal is issued by the OS when a process does one of the following:
     /// - **Tries to access an invalid physical address**. Normally, this should never happen — attempts to access invalid *virtual* memory are handled as [segmentation faults], and invalid phyiscal addresses are typically not present in the address space of a program in user-mode.
@@ -1091,7 +1050,10 @@ impl SignalType {
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
     #[inline]
     pub const fn is_unsafe(self) -> bool {
-        matches!(self, Self::SegmentationFault | Self::MemoryBusError | Self::IllegalInstruction)
+        matches!(
+            self,
+            Self::SegmentationFault | Self::MemoryBusError | Self::IllegalInstruction
+        )
     }
 }
 impl From<SignalType> for i32 {
@@ -1110,27 +1072,27 @@ impl TryFrom<i32> for SignalType {
     type Error = UnknownSignalError;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            SIGHUP        => Ok(Self::Hangup                         ),
-            SIGINT        => Ok(Self::KeyboardInterrupt              ),
-            SIGQUIT       => Ok(Self::QuitAndDump                    ),
-            SIGILL        => Ok(Self::IllegalInstruction             ),
-            SIGABRT       => Ok(Self::Abort                          ),
-            SIGFPE        => Ok(Self::MathException                  ),
-            SIGKILL       => Ok(Self::Kill                           ),
-            SIGSEGV       => Ok(Self::SegmentationFault              ),
-            SIGPIPE       => Ok(Self::BrokenPipe                     ),
-            SIGALRM       => Ok(Self::AlarmClock                     ),
-            SIGTERM       => Ok(Self::Termination                    ),
-            SIGUSR1       => Ok(Self::UserSignal1                    ),
-            SIGUSR2       => Ok(Self::UserSignal2                    ),
-            SIGCHLD       => Ok(Self::ChildProcessEvent              ),
-            SIGCONT       => Ok(Self::Continue                       ),
-            SIGSTOP       => Ok(Self::ForceSuspend                   ),
-            SIGTSTP       => Ok(Self::Suspend                        ),
-            SIGTTIN       => Ok(Self::TerminalInputWhileInBackground ),
-            SIGTTOU       => Ok(Self::TerminalOutputWhileInBackground),
-            SIGBUS        => Ok(Self::MemoryBusError                 ),
-            SIGPROF       => Ok(Self::ProfilerClock                  ),
+            SIGHUP => Ok(Self::Hangup),
+            SIGINT => Ok(Self::KeyboardInterrupt),
+            SIGQUIT => Ok(Self::QuitAndDump),
+            SIGILL => Ok(Self::IllegalInstruction),
+            SIGABRT => Ok(Self::Abort),
+            SIGFPE => Ok(Self::MathException),
+            SIGKILL => Ok(Self::Kill),
+            SIGSEGV => Ok(Self::SegmentationFault),
+            SIGPIPE => Ok(Self::BrokenPipe),
+            SIGALRM => Ok(Self::AlarmClock),
+            SIGTERM => Ok(Self::Termination),
+            SIGUSR1 => Ok(Self::UserSignal1),
+            SIGUSR2 => Ok(Self::UserSignal2),
+            SIGCHLD => Ok(Self::ChildProcessEvent),
+            SIGCONT => Ok(Self::Continue),
+            SIGSTOP => Ok(Self::ForceSuspend),
+            SIGTSTP => Ok(Self::Suspend),
+            SIGTTIN => Ok(Self::TerminalInputWhileInBackground),
+            SIGTTOU => Ok(Self::TerminalOutputWhileInBackground),
+            SIGBUS => Ok(Self::MemoryBusError),
+            SIGPROF => Ok(Self::ProfilerClock),
             #[cfg(any(
                 doc,
                 target_os = "linux",
@@ -1141,14 +1103,14 @@ impl TryFrom<i32> for SignalType {
                 target_os = "solaris",
                 target_os = "illumos",
             ))]
-            libc::SIGPOLL => Ok(Self::PollNotification      ),
-            SIGSYS        => Ok(Self::InvalidSystemCall     ),
-            SIGTRAP       => Ok(Self::Breakpoint            ),
-            SIGURG        => Ok(Self::OutOfBandDataAvailable),
-            SIGVTALRM     => Ok(Self::UserModeProfilerClock ),
-            SIGXCPU       => Ok(Self::CpuTimeLimitExceeded  ),
-            SIGXFSZ       => Ok(Self::FileSizeLimitExceeded ),
-            _ => Err( UnknownSignalError {value} ),
+            libc::SIGPOLL => Ok(Self::PollNotification),
+            SIGSYS => Ok(Self::InvalidSystemCall),
+            SIGTRAP => Ok(Self::Breakpoint),
+            SIGURG => Ok(Self::OutOfBandDataAvailable),
+            SIGVTALRM => Ok(Self::UserModeProfilerClock),
+            SIGXCPU => Ok(Self::CpuTimeLimitExceeded),
+            SIGXFSZ => Ok(Self::FileSizeLimitExceeded),
+            _ => Err(UnknownSignalError { value }),
         }
     }
 }

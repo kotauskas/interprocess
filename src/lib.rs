@@ -20,7 +20,6 @@
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
-
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![allow(unused_unsafe)]
@@ -58,17 +57,15 @@
 )))]
 compile_error!("Your target operating system is not supported by interprocess — check if yours is in the list of supported systems, and if not, please open an issue on the GitHub repository if you think that it should be included");
 
-#[cfg(not(any(
-    target_pointer_width = "32", target_pointer_width = "64"
-)))]
+#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
 compile_error!("Platforms with exotic pointer widths (neither 32-bit nor 64-bit) are not supported by interprocess — if you think that your specific case needs to be accounted for, please open an issue on the GitHub repository");
 
-use std::{
-    io,
-    fmt::{self, Formatter, Display},
-    error::Error,
-};
 pub(crate) use private::Sealed;
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    io,
+};
 #[macro_use]
 pub(crate) mod private {
     macro_rules! impmod {
@@ -85,7 +82,9 @@ pub(crate) mod private {
             impl ::std::os::windows::io::FromRawHandle for $ty {
                 #[inline(always)]
                 unsafe fn from_raw_handle(handle: *mut ::std::ffi::c_void) -> Self {
-                    Self {inner: ::std::os::windows::io::FromRawHandle::from_raw_handle(handle)}
+                    Self {
+                        inner: ::std::os::windows::io::FromRawHandle::from_raw_handle(handle),
+                    }
                 }
             }
             #[cfg(windows)]
@@ -106,7 +105,9 @@ pub(crate) mod private {
             impl ::std::os::unix::io::FromRawFd for $ty {
                 #[inline(always)]
                 unsafe fn from_raw_fd(fd: ::libc::c_int) -> Self {
-                    Self {inner: ::std::os::unix::io::FromRawFd::from_raw_fd(fd)}
+                    Self {
+                        inner: ::std::os::unix::io::FromRawFd::from_raw_fd(fd),
+                    }
                 }
             }
             #[cfg(unix)]
@@ -130,9 +131,9 @@ pub(crate) mod private {
     pub trait Sealed {}
 }
 
+pub mod local_socket;
 #[cfg(feature = "nonblocking")]
 pub mod nonblocking;
-pub mod local_socket;
 pub mod unnamed_pipe;
 //pub mod shared_memory;
 

@@ -39,34 +39,28 @@ mod imports;
 pub mod udsocket;
 
 #[cfg(unix)]
-pub(crate) mod unnamed_pipe;
-#[cfg(unix)]
 pub(crate) mod local_socket;
+#[cfg(unix)]
+pub(crate) mod unnamed_pipe;
 
 #[cfg(unix)]
-use libc::{
-    c_int, size_t,
-};
+use libc::{c_int, size_t};
 #[cfg(unix)]
 use std::{
-    io,
-    os::unix::io::{AsRawFd, IntoRawFd, FromRawFd},
-    mem,
+    io, mem,
+    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
 #[cfg(unix)]
-pub(crate) struct FdOps (pub(crate) c_int);
+pub(crate) struct FdOps(pub(crate) c_int);
 #[cfg(unix)]
 impl FdOps {
     #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let (success, num_bytes_read) = unsafe {
             let length_to_read = buf.len() as size_t;
-            let size_or_err = libc::read(
-                self.as_raw_fd(),
-                buf.as_mut_ptr() as *mut _,
-                length_to_read,
-            );
+            let size_or_err =
+                libc::read(self.as_raw_fd(), buf.as_mut_ptr() as *mut _, length_to_read);
             if size_or_err >= 0 {
                 (true, size_or_err as usize)
             } else {
@@ -83,11 +77,8 @@ impl FdOps {
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let (success, num_bytes_written) = unsafe {
             let length_to_write = buf.len() as size_t;
-            let size_or_err = libc::write(
-                self.as_raw_fd(),
-                buf.as_ptr() as *const _,
-                length_to_write,
-            );
+            let size_or_err =
+                libc::write(self.as_raw_fd(), buf.as_ptr() as *const _, length_to_write);
             if size_or_err >= 0 {
                 (true, size_or_err as usize)
             } else {
@@ -102,9 +93,7 @@ impl FdOps {
     }
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
-        let success = unsafe {
-            libc::fsync(self.as_raw_fd()) >= 0
-        };
+        let success = unsafe { libc::fsync(self.as_raw_fd()) >= 0 };
         if success {
             Ok(())
         } else {

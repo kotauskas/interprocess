@@ -15,15 +15,15 @@
 
 use cfg_if::cfg_if;
 use std::{
-    io::{self, Read, Write, IoSlice, IoSliceMut},
-    fmt::{self, Formatter, Debug},
-    iter::{self, FromIterator, FusedIterator},
-    path::{Path, PathBuf},
-    mem::{self, zeroed},
-    ffi::{CStr, CString, OsStr, OsString, NulError},
-    ptr,
-    convert::{TryFrom, TryInto},
     borrow::Cow,
+    convert::{TryFrom, TryInto},
+    ffi::{CStr, CString, NulError, OsStr, OsString},
+    fmt::{self, Debug, Formatter},
+    io::{self, IoSlice, IoSliceMut, Read, Write},
+    iter::{self, FromIterator, FusedIterator},
+    mem::{self, zeroed},
+    path::{Path, PathBuf},
+    ptr,
 };
 
 use super::imports::*;
@@ -58,7 +58,7 @@ cfg_if! {
     } else {
         compile_error("\
 Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket.rs for your platform \
-if you with to enable Unix domain socket support for it"
+if you wish to enable Unix domain socket support for it"
         )
     }
 }
@@ -110,7 +110,9 @@ unsafe fn enable_passcred(socket: i32) -> bool {
         ) != -1
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    {true} // Cannot have passcred on macOS and iOS.
+    {
+        true
+    } // Cannot have passcred on macOS and iOS.
 }
 
 /// A Unix domain byte stream socket server, listening for connections.
@@ -209,7 +211,7 @@ unsafe fn enable_passcred(socket: i32) -> bool {
 ///     );
 ///     
 ///     println!("Client answered: {}", String::from_utf8_lossy(&recv_buffer));
-/// 
+///
 ///     // Decode the received ancillary data.
 ///     let (mut file_descriptors, mut cred) = (None, None);
 ///     for element in ancillary_buffer.decode() {
@@ -271,9 +273,10 @@ impl UdStreamListener {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
                 (result != -1, result)
             };
-            if success { fd }
-            else {
-                return Err(io::Error::last_os_error())
+            if success {
+                fd
+            } else {
+                return Err(io::Error::last_os_error());
             }
         };
         let success = unsafe {
@@ -290,18 +293,19 @@ impl UdStreamListener {
             // number, why? If std has solid reasons to do this, remove this notice and
             // document the method's behavior on this matter explicitly; otherwise, add
             // an option to change this value.
-            && libc::listen(socket, 128) != -1 {
+            && libc::listen(socket, 128) != -1
+            {
                 enable_passcred(socket)
-            } else {false}
+            } else {
+                false
+            }
         };
         if success {
-            Ok(
-                unsafe {
-                    // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-                    // not to be used elsewhere
-                    Self::from_raw_fd(socket)
-                }
-            )
+            Ok(unsafe {
+                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+                // not to be used elsewhere
+                Self::from_raw_fd(socket)
+            })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -339,21 +343,15 @@ impl UdStreamListener {
     #[inline]
     pub fn accept(&self) -> io::Result<UdStream> {
         let (success, fd) = unsafe {
-            let result = libc::accept(
-                self.as_raw_fd(),
-                zeroed(),
-                zeroed(),
-            );
+            let result = libc::accept(self.as_raw_fd(), zeroed(), zeroed());
             (result != -1, result)
         };
         if success {
-            Ok(
-                unsafe {
-                    // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-                    // not to be used elsewhere
-                    UdStream::from_raw_fd(fd)
-                }
-            )
+            Ok(unsafe {
+                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+                // not to be used elsewhere
+                UdStream::from_raw_fd(fd)
+            })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -408,7 +406,7 @@ impl IntoRawFd for UdStreamListener {
 impl FromRawFd for UdStreamListener {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self {fd: FdOps(fd)}
+        Self { fd: FdOps(fd) }
     }
 }
 
@@ -542,9 +540,10 @@ impl UdStream {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
                 (result != -1, result)
             };
-            if success { fd }
-            else {
-                return Err(io::Error::last_os_error())
+            if success {
+                fd
+            } else {
+                return Err(io::Error::last_os_error());
             }
         };
         let success = unsafe {
@@ -553,14 +552,15 @@ impl UdStream {
                 // Same as in UdSocketListener::bind()
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1 {
+            ) != -1
+            {
                 enable_passcred(socket)
-            } else {false}
+            } else {
+                false
+            }
         };
         if success {
-            Ok(unsafe {
-                Self::from_raw_fd(socket)
-            })
+            Ok(unsafe { Self::from_raw_fd(socket) })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -590,8 +590,7 @@ impl UdStream {
     #[inline(always)]
     pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut abuf = AncillaryDataBuf::Owned(Vec::new());
-        self.recv_ancillary_vectored(bufs, &mut abuf)
-            .map(|x| x.0)
+        self.recv_ancillary_vectored(bufs, &mut abuf).map(|x| x.0)
     }
     /// Receives both bytes and ancillary data from the socket stream.
     ///
@@ -617,45 +616,34 @@ impl UdStream {
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[inline]
     #[allow(clippy::useless_conversion)]
-    pub fn recv_ancillary_vectored<'a: 'b, 'b> (
-            &self,
-            bufs: &[IoSliceMut<'_>],
-            abuf: &'b mut AncillaryDataBuf<'a>,
-        ) -> io::Result<(usize, usize)> {
+    pub fn recv_ancillary_vectored<'a: 'b, 'b>(
+        &self,
+        bufs: &[IoSliceMut<'_>],
+        abuf: &'b mut AncillaryDataBuf<'a>,
+    ) -> io::Result<(usize, usize)> {
         let abuf: &mut [u8] = abuf.as_mut();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe {zeroed::<msghdr>()};
+        let mut hdr = unsafe { zeroed::<msghdr>() };
         hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = bufs.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "receive buffer array length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_iovlen = bufs.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receive buffer array length overflowed `socklen_t`",
+            )
+        })?;
         hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = abuf.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "ancillary data receive buffer length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_controllen = abuf.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ancillary data receive buffer length overflowed `socklen_t`",
+            )
+        })?;
         let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(
-                self.as_raw_fd(),
-                &mut hdr as *mut _,
-                0,
-            );
+            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, mem::transmute::<isize, usize>(result))
         };
         if success {
-            Ok((
-                bytes_read,
-                hdr.msg_controllen as _,
-            ))
+            Ok((bytes_read, hdr.msg_controllen as _))
         } else {
             Err(io::Error::last_os_error())
         }
@@ -694,7 +682,7 @@ impl UdStream {
     /// # System calls
     /// - `sendmsg`
     #[inline(always)]
-    pub fn send_ancillary<'a> (
+    pub fn send_ancillary<'a>(
         &self,
         buf: &[u8],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
@@ -712,46 +700,37 @@ impl UdStream {
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[inline]
     #[allow(clippy::useless_conversion)]
-    pub fn send_ancillary_vectored<'a> (
+    pub fn send_ancillary_vectored<'a>(
         &self,
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
+        let abuf_value = ancillary_data
+            .into_iter()
+            .collect::<EncodedAncillaryData<'_>>();
         let abuf: &[u8] = abuf_value.as_ref();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe {zeroed::<msghdr>()};
+        let mut hdr = unsafe { zeroed::<msghdr>() };
         hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = bufs.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "send buffer array length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_iovlen = bufs.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "send buffer array length overflowed `socklen_t`",
+            )
+        })?;
         hdr.msg_control = abuf.as_ptr() as *mut _;
-        hdr.msg_controllen = abuf.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "ancillary data send buffer length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_controllen = abuf.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ancillary data send buffer length overflowed `socklen_t`",
+            )
+        })?;
         let (success, bytes_written) = unsafe {
-            let result = libc::sendmsg(
-                self.as_raw_fd(),
-                &hdr as *const _,
-                0,
-            );
+            let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, mem::transmute::<isize, usize>(result))
         };
         if success {
-            Ok((
-                bytes_written,
-                hdr.msg_controllen as _,
-            ))
+            Ok((bytes_written, hdr.msg_controllen as _))
         } else {
             Err(io::Error::last_os_error())
         }
@@ -765,8 +744,7 @@ impl Read for UdStream {
     #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let mut abuf = AncillaryDataBuf::Owned(Vec::new());
-        self.recv_ancillary_vectored(bufs, &mut abuf)
-            .map(|x| x.0)
+        self.recv_ancillary_vectored(bufs, &mut abuf).map(|x| x.0)
     }
 }
 impl Write for UdStream {
@@ -811,13 +789,13 @@ impl IntoRawFd for UdStream {
 impl FromRawFd for UdStream {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self {fd: FdOps(fd)}
+        Self { fd: FdOps(fd) }
     }
 }
 
 /// A datagram socket in the Unix domain.
 ///
-/// All such sockets have the `SOCK_DGRAM` socket type; in other words, this is the Unix domain version of a UCP socket.
+/// All such sockets have the `SOCK_DGRAM` socket type; in other words, this is the Unix domain version of a UDP socket.
 pub struct UdSocket {
     fd: FdOps,
 }
@@ -849,9 +827,10 @@ impl UdSocket {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
                 (result != -1, result)
             };
-            if success { fd }
-            else {
-                return Err(io::Error::last_os_error())
+            if success {
+                fd
+            } else {
+                return Err(io::Error::last_os_error());
             }
         };
         let success = unsafe {
@@ -861,18 +840,19 @@ impl UdSocket {
                 // but you can cast any narrow pointer to any other narrow pointer
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1 {
+            ) != -1
+            {
                 enable_passcred(socket)
-            } else {false}
+            } else {
+                false
+            }
         };
         if success {
-            Ok(
-                unsafe {
-                    // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-                    // not to be used elsewhere
-                    Self::from_raw_fd(socket)
-                }
-            )
+            Ok(unsafe {
+                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+                // not to be used elsewhere
+                Self::from_raw_fd(socket)
+            })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -911,9 +891,10 @@ impl UdSocket {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
                 (result != -1, result)
             };
-            if success { fd }
-            else {
-                return Err(io::Error::last_os_error())
+            if success {
+                fd
+            } else {
+                return Err(io::Error::last_os_error());
             }
         };
         let success = unsafe {
@@ -922,14 +903,15 @@ impl UdSocket {
                 // Same as in UdSocketListener::bind()
                 &addr as *const _ as *const _,
                 addrlen as u32,
-            ) != -1 {
+            ) != -1
+            {
                 enable_passcred(socket)
-            } else {false}
+            } else {
+                false
+            }
         };
         if success {
-            Ok(unsafe {
-                Self::from_raw_fd(socket)
-            })
+            Ok(unsafe { Self::from_raw_fd(socket) })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -1001,31 +983,23 @@ impl UdSocket {
     ) -> io::Result<(usize, bool, usize, bool)> {
         let abuf: &mut [u8] = abuf.as_mut();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe {zeroed::<msghdr>()};
+        let mut hdr = unsafe { zeroed::<msghdr>() };
         hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = bufs.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "receive buffer array length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_iovlen = bufs.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receive buffer array length overflowed `socklen_t`",
+            )
+        })?;
         hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = abuf.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "ancillary data receive buffer length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_controllen = abuf.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ancillary data receive buffer length overflowed `socklen_t`",
+            )
+        })?;
         let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(
-                self.as_raw_fd(),
-                &mut hdr as *mut _,
-                0,
-            );
+            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, mem::transmute::<isize, usize>(result))
         };
         if success {
@@ -1102,7 +1076,7 @@ impl UdSocket {
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[allow(clippy::useless_conversion)]
-    pub fn recv_from_ancillary_vectored<'a: 'b, 'b, 'c: 'd, 'd> (
+    pub fn recv_from_ancillary_vectored<'a: 'b, 'b, 'c: 'd, 'd>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
@@ -1110,36 +1084,28 @@ impl UdSocket {
     ) -> io::Result<(usize, bool, usize, bool)> {
         let abuf: &mut [u8] = abuf.as_mut();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe {zeroed::<msghdr>()};
+        let mut hdr = unsafe { zeroed::<msghdr>() };
         // Same goes for sockaddr_un
-        let mut addr_buf_staging = unsafe {zeroed()};
+        let mut addr_buf_staging = unsafe { zeroed() };
         // It's a void* so the doublecast is mandatory
         hdr.msg_name = &mut addr_buf_staging as *mut _ as *mut _;
         hdr.msg_namelen = mem::size_of_val(&addr_buf_staging) as u32;
         hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = bufs.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "receive buffer array length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_iovlen = bufs.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "receive buffer array length overflowed `socklen_t`",
+            )
+        })?;
         hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = abuf.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "ancillary data receive buffer length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_controllen = abuf.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ancillary data receive buffer length overflowed `socklen_t`",
+            )
+        })?;
         let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(
-                self.as_raw_fd(),
-                &mut hdr as *mut _,
-                0,
-            );
+            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, mem::transmute::<isize, usize>(result))
         };
         let path_length = hdr.msg_namelen as usize;
@@ -1236,41 +1202,32 @@ impl UdSocket {
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
+        let abuf_value = ancillary_data
+            .into_iter()
+            .collect::<EncodedAncillaryData<'_>>();
         let abuf: &[u8] = abuf_value.as_ref();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe {zeroed::<msghdr>()};
+        let mut hdr = unsafe { zeroed::<msghdr>() };
         hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = bufs.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "send buffer array length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_iovlen = bufs.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "send buffer array length overflowed `socklen_t`",
+            )
+        })?;
         hdr.msg_control = abuf.as_ptr() as *mut _;
-        hdr.msg_controllen = abuf.len()
-            .try_into()
-            .map_err(|_|
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "ancillary data send buffer length overflowed `socklen_t`",
-                )
-            )?;
+        hdr.msg_controllen = abuf.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ancillary data send buffer length overflowed `socklen_t`",
+            )
+        })?;
         let (success, bytes_written) = unsafe {
-            let result = libc::sendmsg(
-                self.as_raw_fd(),
-                &hdr as *const _,
-                0,
-            );
+            let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, mem::transmute::<isize, usize>(result))
         };
         if success {
-            Ok((
-                bytes_written,
-                hdr.msg_controllen as _,
-            ))
+            Ok((bytes_written, hdr.msg_controllen as _))
         } else {
             Err(io::Error::last_os_error())
         }
@@ -1291,14 +1248,10 @@ impl ReliableReadMsg for UdSocket {
         let msg_size = self.peek_msg_size()?;
         if msg_size > buf.len() {
             let mut new_buffer = Vec::with_capacity(msg_size);
-            self.recv(&mut new_buffer)
-                    .map(|x| x.0)?;
-            Ok( Err(new_buffer) )
+            self.recv(&mut new_buffer).map(|x| x.0)?;
+            Ok(Err(new_buffer))
         } else {
-            Ok(Ok(
-                self.recv(buf)
-                    .map(|x| x.0)?
-            ))
+            Ok(Ok(self.recv(buf).map(|x| x.0)?))
         }
     }
     #[inline]
@@ -1307,10 +1260,7 @@ impl ReliableReadMsg for UdSocket {
         if msg_size > buf.len() {
             Ok(Err(msg_size))
         } else {
-            Ok(Ok(
-                self.recv(buf)
-                    .map(|x| x.0)?
-            ))
+            Ok(Ok(self.recv(buf).map(|x| x.0)?))
         }
     }
 }
@@ -1334,7 +1284,7 @@ impl IntoRawFd for UdSocket {
 impl FromRawFd for UdSocket {
     #[inline(always)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self {fd: FdOps(fd)}
+        Self { fd: FdOps(fd) }
     }
 }
 
@@ -1370,7 +1320,7 @@ impl<'a> UdSocketPath<'a> {
             Self::File(cow) => &*cow,
             #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => &*cow,
-            Self::Unnamed => unsafe {CStr::from_bytes_with_nul_unchecked(&[0])},
+            Self::Unnamed => unsafe { CStr::from_bytes_with_nul_unchecked(&[0]) },
         }
     }
     /// Returns the path as a `CString`. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
@@ -1381,7 +1331,7 @@ impl<'a> UdSocketPath<'a> {
             #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => cow.into_owned(),
             Self::Unnamed => CString::new(Vec::new())
-                .unwrap_or_else(|_| unsafe {std::hint::unreachable_unchecked()})
+                .unwrap_or_else(|_| unsafe { std::hint::unreachable_unchecked() }),
         }
     }
 
@@ -1392,34 +1342,28 @@ impl<'a> UdSocketPath<'a> {
     #[inline]
     pub fn make_owned(&mut self) -> bool {
         match self {
-            Self::File(cow) => {
-                match cow {
-                    Cow::Owned(..) => false,
-                    Cow::Borrowed(slice) => {
-                        *self = Self::File(Cow::Owned(slice.to_owned()));
-                        true
-                    },
+            Self::File(cow) => match cow {
+                Cow::Owned(..) => false,
+                Cow::Borrowed(slice) => {
+                    *self = Self::File(Cow::Owned(slice.to_owned()));
+                    true
                 }
             },
             #[cfg(any(doc, target_os = "linux"))]
-            Self::Namespaced(cow) => {
-                match cow {
-                    Cow::Owned(..) => false,
-                    Cow::Borrowed(slice) => {
-                        *self = Self::Namespaced(Cow::Owned(slice.to_owned()));
-                        true
-                    },
+            Self::Namespaced(cow) => match cow {
+                Cow::Owned(..) => false,
+                Cow::Borrowed(slice) => {
+                    *self = Self::Namespaced(Cow::Owned(slice.to_owned()));
+                    true
                 }
             },
             Self::Unnamed => {
-                *self = Self::File(
-                    Cow::Owned(
-                        CString::new(Vec::new())
-                            .expect("unexpected unrecoverable CString creation error")
-                    )
-                );
+                *self = Self::File(Cow::Owned(
+                    CString::new(Vec::new())
+                        .expect("unexpected unrecoverable CString creation error"),
+                ));
                 true
-            },
+            }
         }
     }
 
@@ -1427,11 +1371,10 @@ impl<'a> UdSocketPath<'a> {
     #[inline]
     pub fn get_cstring_mut(&mut self) -> &mut CString {
         self.make_owned();
-        self.try_get_cstring_mut()
-            .unwrap_or_else(|| unsafe {
-                // SAFETY: the call to make_owned ensured that there is a CString
-                std::hint::unreachable_unchecked()
-            })
+        self.try_get_cstring_mut().unwrap_or_else(|| unsafe {
+            // SAFETY: the call to make_owned ensured that there is a CString
+            std::hint::unreachable_unchecked()
+        })
     }
     /// Returns a mutable reference to the underlying `CString` if it's available as owned, otherwise returns `None`.
     #[inline]
@@ -1477,29 +1420,26 @@ impl<'a> UdSocketPath<'a> {
                 // Write an empty CString to avoid a double-free if a panic happens here, and if it fails, just crash
                 ptr::write::<CString>(
                     cstring as *mut _,
-                    CString::new(Vec::new())
-                        .unwrap_or_else(|_| std::process::abort()),
+                    CString::new(Vec::new()).unwrap_or_else(|_| std::process::abort()),
                 );
                 #[cfg(any(doc, target_os = "linux"))]
                 let (namespaced, src_ptr, path_length) = if addr.sun_path[0] == 0 {
-                    (true, addr.sun_path.as_ptr().offset(1) as *const u8, sun_path_length - 1)
+                    (
+                        true,
+                        addr.sun_path.as_ptr().offset(1) as *const u8,
+                        sun_path_length - 1,
+                    )
                 } else {
                     (false, addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
                 #[cfg(not(any(doc, target_os = "linux")))]
-                let (src_ptr, path_length) = {
-                    (addr.sun_path.as_ptr() as *const u8, sun_path_length)
-                };
+                let (src_ptr, path_length) =
+                    { (addr.sun_path.as_ptr() as *const u8, sun_path_length) };
                 // Fill the space for the name and the nul terminator with nuls
                 vec.resize(path_length, 0);
-                ptr::copy_nonoverlapping(
-                    src_ptr,
-                    vec.as_mut_ptr(),
-                    path_length,
-                );
+                ptr::copy_nonoverlapping(src_ptr, vec.as_mut_ptr(), path_length);
                 // If the system added a nul byte as part of the length, remove the one we added ourselves.
-                if vec.last() == Some(&0)
-                && vec[vec.len() - 2] == 0 {
+                if vec.last() == Some(&0) && vec[vec.len() - 2] == 0 {
                     vec.pop();
                 }
                 // Handle the error anyway — better be safe than sorry
@@ -1523,16 +1463,16 @@ impl<'a> UdSocketPath<'a> {
             #[allow(unused_variables)]
             let (cstring, namespaced) = unsafe {
                 let (namespaced, src_ptr, path_length) = if addr.sun_path[0] == 0 {
-                    (true, addr.sun_path.as_ptr().offset(1) as *const u8, sun_path_length - 1)
+                    (
+                        true,
+                        addr.sun_path.as_ptr().offset(1) as *const u8,
+                        sun_path_length - 1,
+                    )
                 } else {
                     (false, addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
                 let mut vec = vec![0; path_length];
-                ptr::copy_nonoverlapping(
-                    src_ptr,
-                    vec.as_mut_ptr(),
-                    path_length,
-                );
+                ptr::copy_nonoverlapping(src_ptr, vec.as_mut_ptr(), path_length);
                 // If the system added a nul byte as part of the length, remove it.
                 if vec.last() == Some(&0) {
                     vec.pop();
@@ -1564,32 +1504,34 @@ impl<'a> UdSocketPath<'a> {
             UdSocketPath::File(..) => {
                 is_namespaced = false;
                 if len_of_self > MAX_UDSOCKET_PATH_LEN {
-                    return Err(
-                        io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            format!("socket path should not be longer than {} bytes", MAX_UDSOCKET_PATH_LEN),
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!(
+                            "socket path should not be longer than {} bytes",
+                            MAX_UDSOCKET_PATH_LEN
                         ),
-                    );
+                    ));
                 }
-            },
+            }
             #[cfg(target_os = "linux")]
             UdSocketPath::Namespaced(..) => {
                 is_namespaced = true;
                 if len_of_self > (MAX_UDSOCKET_PATH_LEN - 1) {
-                    return Err(
-                        io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            format!("namespaced socket name should not be longer than {} bytes", MAX_UDSOCKET_PATH_LEN - 1),
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!(
+                            "namespaced socket name should not be longer than {} bytes",
+                            MAX_UDSOCKET_PATH_LEN - 1
                         ),
-                    );
+                    ));
                 }
-            },
-            UdSocketPath::Unnamed => return Err(
-                io::Error::new(
+            }
+            UdSocketPath::Unnamed => {
+                return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "must provide a proper name for the socket"
-                ),
-            )
+                    "must provide a proper name for the socket",
+                ))
+            }
         }
 
         unsafe {
@@ -1635,9 +1577,8 @@ impl UdSocketPath<'static> {
     #[inline]
     pub fn buffer() -> Self {
         Self::File(Cow::Owned(
-            CString::new(
-                vec![0x2F; MAX_UDSOCKET_PATH_LEN - 1]
-            ).expect("unexpected nul in newly created Vec, possible heap corruption")
+            CString::new(vec![0x2F; MAX_UDSOCKET_PATH_LEN - 1])
+                .expect("unexpected nul in newly created Vec, possible heap corruption"),
         ))
     }
 
@@ -1722,7 +1663,9 @@ pub trait ToUdSocketPath<'a> {
 impl<'a> ToUdSocketPath<'a> for UdSocketPath<'a> {
     /// Accepts explicit `UdSocketPath`s in the `bind` constructor.
     #[inline(always)]
-    fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> { Ok(self) }
+    fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
+        Ok(self)
+    }
 }
 impl<'a> ToUdSocketPath<'a> for &'a CStr {
     /// Converts a borrowed [`CStr`] to a borrowed `UdSocketPath` with the same lifetime. On platforms which don't support [namespaced socket paths], the variant is always [`File`]; on Linux, which supports namespaced sockets, an extra check for the `@` character is performed. See the trait-level documentation for more.
@@ -1742,14 +1685,9 @@ impl<'a> ToUdSocketPath<'a> for &'a CStr {
                 CStr::from_bytes_with_nul_unchecked(without_at_sign)
             };
             // Use early return to simplify the conditional inclusion for the @ syntax check.
-            return Ok(UdSocketPath::Namespaced(
-                Cow::Borrowed(without_at_sign),
-            ));
+            return Ok(UdSocketPath::Namespaced(Cow::Borrowed(without_at_sign)));
         }
-        Ok(UdSocketPath::File(
-            Cow::Borrowed(self),
-        ))
-
+        Ok(UdSocketPath::File(Cow::Borrowed(self)))
     }
 }
 impl ToUdSocketPath<'static> for CString {
@@ -1771,13 +1709,9 @@ impl ToUdSocketPath<'static> for CString {
                 }
             };
             // As in the CStr impl, we're using an early return to simplify conditional compilation
-            return Ok(UdSocketPath::Namespaced(
-                Cow::Owned(without_at_sign),
-            ));
+            return Ok(UdSocketPath::Namespaced(Cow::Owned(without_at_sign)));
         }
-        Ok(UdSocketPath::File(
-            Cow::Owned(self),
-        ))
+        Ok(UdSocketPath::File(Cow::Owned(self)))
     }
 }
 impl<'a> ToUdSocketPath<'a> for &'a OsStr {
@@ -1795,28 +1729,22 @@ impl<'a> ToUdSocketPath<'a> for &'a OsStr {
             if self.as_bytes().last() != Some(&0) {
                 let mut owned = self.to_owned().into_vec();
                 owned.remove(0);
-                return Ok(UdSocketPath::Namespaced(
-                    Cow::Owned(CString::new(owned)?),
-                ));
+                return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(owned)?)));
             } else {
                 let without_at_sign = self.as_bytes().split_at(1).0;
                 let cstr = CStr::from_bytes_with_nul(without_at_sign)
                     .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
-                return Ok(UdSocketPath::Namespaced(
-                    Cow::Borrowed(cstr),
-                ));
+                return Ok(UdSocketPath::Namespaced(Cow::Borrowed(cstr)));
             }
         }
         if self.as_bytes().last() != Some(&0) {
-            Ok(UdSocketPath::File(
-                Cow::Owned(CString::new(self.to_owned().into_vec())?),
-            ))
+            Ok(UdSocketPath::File(Cow::Owned(CString::new(
+                self.to_owned().into_vec(),
+            )?)))
         } else {
             let cstr = CStr::from_bytes_with_nul(self.as_bytes())
                 .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
-            Ok(UdSocketPath::File(
-                Cow::Borrowed(cstr),
-            ))
+            Ok(UdSocketPath::File(Cow::Borrowed(cstr)))
         }
     }
 }
@@ -1834,13 +1762,13 @@ impl ToUdSocketPath<'static> for OsString {
         if self.as_os_str().as_bytes().first() == Some(&0x40) {
             let mut without_at_sign = self.into_vec();
             without_at_sign.remove(0);
-            return Ok(UdSocketPath::Namespaced(
-                Cow::Owned(CString::new(without_at_sign)?)
-            ));
+            return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(
+                without_at_sign,
+            )?)));
         }
-        Ok(UdSocketPath::File(
-            Cow::Owned(CString::new(self.into_vec())?)
-        ))
+        Ok(UdSocketPath::File(Cow::Owned(CString::new(
+            self.into_vec(),
+        )?)))
     }
 }
 impl<'a> ToUdSocketPath<'a> for &'a Path {
@@ -1855,11 +1783,11 @@ impl<'a> ToUdSocketPath<'a> for &'a Path {
         if self.as_os_str().as_bytes().last() != Some(&0) {
             let osstring = self.to_owned().into_os_string().into_vec();
             let cstring = CString::new(osstring)?;
-            Ok(UdSocketPath::File( Cow::Owned(cstring) ))
+            Ok(UdSocketPath::File(Cow::Owned(cstring)))
         } else {
             let cstr = CStr::from_bytes_with_nul(self.as_os_str().as_bytes())
-                    .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
-            Ok(UdSocketPath::File( Cow::Borrowed(cstr) ))
+                .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
+            Ok(UdSocketPath::File(Cow::Borrowed(cstr)))
         }
     }
 }
@@ -1872,10 +1800,8 @@ impl ToUdSocketPath<'static> for PathBuf {
     /// [`UdSocketPath::File`]: struct.UdSocketPath.html#file " "
     #[inline]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        let cstring = CString::new(
-            self.into_os_string().into_vec(),
-        )?;
-        Ok(UdSocketPath::File( Cow::Owned(cstring) ))
+        let cstring = CString::new(self.into_os_string().into_vec())?;
+        Ok(UdSocketPath::File(Cow::Owned(cstring)))
     }
 }
 impl<'a> ToUdSocketPath<'a> for &'a str {
@@ -1894,28 +1820,22 @@ impl<'a> ToUdSocketPath<'a> for &'a str {
             if !self.ends_with('\0') {
                 let mut owned = self.to_owned();
                 owned.remove(0);
-                return Ok(UdSocketPath::Namespaced(
-                    Cow::Owned(CString::new(owned)?),
-                ));
+                return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(owned)?)));
             } else {
                 let without_at_sign = self.split_at(1).0;
                 let cstr = CStr::from_bytes_with_nul(without_at_sign.as_bytes())
                     .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
-                return Ok(UdSocketPath::Namespaced(
-                    Cow::Borrowed(cstr),
-                ));
+                return Ok(UdSocketPath::Namespaced(Cow::Borrowed(cstr)));
             }
         }
         if !self.ends_with('\0') {
-            Ok(UdSocketPath::File(
-                Cow::Owned(CString::new(self.to_owned())?),
-            ))
+            Ok(UdSocketPath::File(Cow::Owned(CString::new(
+                self.to_owned(),
+            )?)))
         } else {
             let cstr = CStr::from_bytes_with_nul(self.as_bytes())
                 .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
-            Ok(UdSocketPath::File(
-                Cow::Borrowed(cstr),
-            ))
+            Ok(UdSocketPath::File(Cow::Borrowed(cstr)))
         }
     }
 }
@@ -1933,13 +1853,13 @@ impl ToUdSocketPath<'static> for String {
         if self.starts_with('@') {
             let mut without_at_sign = self;
             without_at_sign.remove(0);
-            return Ok(UdSocketPath::Namespaced(
-                Cow::Owned(CString::new(without_at_sign.into_bytes())?)
-            ));
+            return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(
+                without_at_sign.into_bytes(),
+            )?)));
         }
-        Ok(UdSocketPath::File(Cow::Owned(
-            CString::new(self.into_bytes())?)
-        ))
+        Ok(UdSocketPath::File(Cow::Owned(CString::new(
+            self.into_bytes(),
+        )?)))
     }
 }
 
@@ -1953,19 +1873,11 @@ pub enum AncillaryData<'a> {
     /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser — for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
     ///
     /// [`credentials`]: #method.credentials " "
-    #[cfg(any(
-        doc,
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    ))]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    )))]
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(not(any(target_os = "macos", target_os = "ios",)),))
+    )]
     Credentials {
         /// The process identificator (PID) for the process.
         pid: pid_t,
@@ -2004,7 +1916,9 @@ impl<'a> AncillaryData<'a> {
     #[inline(always)]
     pub const fn encoded_size_of_file_descriptors(num_descriptors: usize) -> usize {
         #[cfg(not(doc))]
-        {mem::size_of::<cmsghdr>() + num_descriptors * 4}
+        {
+            mem::size_of::<cmsghdr>() + num_descriptors * 4
+        }
         #[cfg(doc)]
         0
     }
@@ -2013,21 +1927,9 @@ impl<'a> AncillaryData<'a> {
     #[inline]
     pub fn clone_ref(&'a self) -> Self {
         match *self {
-            Self::FileDescriptors(ref fds) => {
-                Self::FileDescriptors(Cow::Borrowed(&fds))
-            },
-            #[cfg(any(
-                doc,
-                not(any(
-                    target_os = "macos",
-                    target_os = "ios",
-                )),
-            ))]
-            Self::Credentials {
-                pid, uid, gid,
-            } => Self::Credentials {
-                pid, uid, gid,
-            },
+            Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(&fds)),
+            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+            Self::Credentials { pid, uid, gid } => Self::Credentials { pid, uid, gid },
         }
     }
 
@@ -2036,25 +1938,21 @@ impl<'a> AncillaryData<'a> {
     pub fn encoded_size(&self) -> usize {
         match self {
             Self::FileDescriptors(fds) => Self::encoded_size_of_file_descriptors(fds.len()),
-            #[cfg(any(
-                doc,
-                not(any(
-                    target_os = "macos",
-                    target_os = "ios",
-                )),
-            ))]
-            Self::Credentials {..} => Self::ENCODED_SIZE_OF_CREDENTIALS,
+            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+            Self::Credentials { .. } => Self::ENCODED_SIZE_OF_CREDENTIALS,
         }
     }
 
     /// Encodes the ancillary data into `EncodedAncillaryData` which is ready to be sent via a Unix domain socket.
     fn encode(op: impl IntoIterator<Item = Self>) -> EncodedAncillaryData<'static> {
         let items = op.into_iter();
-        let mut buffer = Vec::with_capacity( {
-            let size_hint = items.size_hint();
-            size_hint.1.unwrap_or(size_hint.0)
-        // If we assume that all ancillary data elements are credentials, we're more than fine.
-        } * Self::ENCODED_SIZE_OF_CREDENTIALS);
+        let mut buffer = Vec::with_capacity(
+            {
+                let size_hint = items.size_hint();
+                size_hint.1.unwrap_or(size_hint.0)
+                // If we assume that all ancillary data elements are credentials, we're more than fine.
+            } * Self::ENCODED_SIZE_OF_CREDENTIALS,
+        );
         for i in items {
             let mut cmsg_len = mem::size_of::<cmsghdr>();
             let cmsg_level_bytes = SOL_SOCKET.to_ne_bytes();
@@ -2075,15 +1973,9 @@ impl<'a> AncillaryData<'a> {
                         let desc_bytes = i.to_ne_bytes();
                         buffer.extend_from_slice(&desc_bytes);
                     }
-                },
-                #[cfg(any(
-                    doc,
-                    not(any(
-                        target_os = "macos",
-                        target_os = "ios",
-                    )),
-                ))]
-                AncillaryData::Credentials {pid, uid, gid} => {
+                }
+                #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+                AncillaryData::Credentials { pid, uid, gid } => {
                     cmsg_type_bytes = SCM_RIGHTS.to_ne_bytes();
                     cmsg_len += mem::size_of::<ucred>();
                     // #[cfg(target_pointer_width = "64")]
@@ -2097,7 +1989,7 @@ impl<'a> AncillaryData<'a> {
                     buffer.extend_from_slice(&pid_bytes);
                     buffer.extend_from_slice(&uid_bytes);
                     buffer.extend_from_slice(&gid_bytes);
-                },
+                }
             }
         }
         EncodedAncillaryData(Cow::Owned(buffer))
@@ -2107,25 +1999,17 @@ impl AncillaryData<'static> {
     /// Fetches the credentials of the process from the system and returns a value which can be safely sent to another process without the system complaining about an unauthorized attempt to impersonate another process/user/group.
     ///
     /// If you want to send credentials to another process, this is usually the function you need to obtain the desired ancillary payload.
-    #[cfg(any(
-        doc,
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    ))]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(
-        not(any(
-            target_os = "macos",
-            target_os = "ios",
-        )),
-    )))]
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(not(any(target_os = "macos", target_os = "ios",)),))
+    )]
     #[inline]
     pub fn credentials() -> Self {
         Self::Credentials {
-            pid: unsafe {libc::getpid()},
-            uid: unsafe {libc::getuid()},
-            gid: unsafe {libc::getgid()},
+            pid: unsafe { libc::getpid() },
+            uid: unsafe { libc::getuid() },
+            gid: unsafe { libc::getgid() },
         }
     }
 }
@@ -2133,14 +2017,18 @@ impl AncillaryData<'static> {
 /// A buffer used for sending ancillary data into Unix domain sockets.
 #[repr(transparent)]
 #[derive(Clone, Debug)]
-struct EncodedAncillaryData<'a> (pub Cow<'a, [u8]>);
+struct EncodedAncillaryData<'a>(pub Cow<'a, [u8]>);
 impl<'a> From<&'a [u8]> for EncodedAncillaryData<'a> {
     #[inline(always)]
-    fn from(op: &'a [u8]) -> Self { Self(Cow::Borrowed(op)) }
+    fn from(op: &'a [u8]) -> Self {
+        Self(Cow::Borrowed(op))
+    }
 }
 impl From<Vec<u8>> for EncodedAncillaryData<'static> {
     #[inline(always)]
-    fn from(op: Vec<u8>) -> Self { Self(Cow::Owned(op)) }
+    fn from(op: Vec<u8>) -> Self {
+        Self(Cow::Owned(op))
+    }
 }
 impl<'b> FromIterator<AncillaryData<'b>> for EncodedAncillaryData<'static> {
     #[inline(always)]
@@ -2150,7 +2038,9 @@ impl<'b> FromIterator<AncillaryData<'b>> for EncodedAncillaryData<'static> {
 }
 impl<'b> From<Vec<AncillaryData<'b>>> for EncodedAncillaryData<'static> {
     #[inline(always)]
-    fn from(op: Vec<AncillaryData<'b>>) -> Self { Self::from_iter(op) }
+    fn from(op: Vec<AncillaryData<'b>>) -> Self {
+        Self::from_iter(op)
+    }
 }
 impl<'b: 'c, 'c> From<&'c [AncillaryData<'b>]> for EncodedAncillaryData<'static> {
     #[inline(always)]
@@ -2160,7 +2050,9 @@ impl<'b: 'c, 'c> From<&'c [AncillaryData<'b>]> for EncodedAncillaryData<'static>
 }
 impl<'a> AsRef<[u8]> for EncodedAncillaryData<'a> {
     #[inline(always)]
-    fn as_ref(&self) -> &[u8] { &self.0 }
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 /// A buffer used for receiving ancillary data from Unix domain sockets.
@@ -2199,11 +2091,15 @@ impl<'a> AncillaryDataBuf<'a> {
 }
 impl<'a> From<&'a mut [u8]> for AncillaryDataBuf<'a> {
     #[inline(always)]
-    fn from(op: &'a mut [u8]) -> Self { Self::Borrowed(op) }
+    fn from(op: &'a mut [u8]) -> Self {
+        Self::Borrowed(op)
+    }
 }
 impl From<Vec<u8>> for AncillaryDataBuf<'static> {
     #[inline(always)]
-    fn from(op: Vec<u8>) -> Self { Self::Owned(op) }
+    fn from(op: Vec<u8>) -> Self {
+        Self::Owned(op)
+    }
 }
 impl<'a> From<&'a mut AncillaryDataBuf<'a>> for AncillaryDataBuf<'a> {
     #[inline]
@@ -2255,41 +2151,43 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         #[inline(always)]
         fn u32_from_slice(bytes: &[u8]) -> u32 {
-            u32::from_ne_bytes([
-                bytes[0], bytes[1],
-                bytes[2], bytes[3],
-            ])
+            u32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
         }
         #[inline(always)]
         fn u64_from_slice(bytes: &[u8]) -> u64 {
             u64::from_ne_bytes([
-                bytes[0], bytes[1],
-                bytes[2], bytes[3],
-                bytes[4], bytes[5],
-                bytes[6], bytes[7],
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
             ])
         }
         let bytes = self.buffer;
         let end = bytes.len() - 1;
 
         if let Some(diff) = bytes.len().checked_sub(self.i) {
-            if diff == 0 { self.i = end; return None; }
-        } else { self.i = end; return None; }
+            if diff == 0 {
+                self.i = end;
+                return None;
+            }
+        } else {
+            self.i = end;
+            return None;
+        }
 
         // The first field is the length, which is a size_t
         #[cfg(target_pointer_width = "64")]
         let element_size = {
-            if bytes.len() - self.i < 8 { self.i = end; return None; }
-            u64_from_slice(
-                &bytes[self.i .. self.i + 8],
-            ) as usize
+            if bytes.len() - self.i < 8 {
+                self.i = end;
+                return None;
+            }
+            u64_from_slice(&bytes[self.i..self.i + 8]) as usize
         };
         #[cfg(target_pointer_width = "32")]
         let element_size = {
-            if bytes.len() - self.i < 4 { self.i = end; return None; }
-            u32_from_slice(
-                &bytes[self.i .. self.i + 4],
-            ) as usize
+            if bytes.len() - self.i < 4 {
+                self.i = end;
+                return None;
+            }
+            u32_from_slice(&bytes[self.i..self.i + 4]) as usize
         };
         // The cmsg_level field is always SOL_SOCKET — we don't need it, let's get the
         // cmsg_type field right away by first getting the offset at which it's
@@ -2300,15 +2198,13 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
         let type_offset: usize = 4 + 4; // 4 for cmsg_size, 4 for cmsg_level
 
         // Now let's get the type itself:
-        let element_type = u32_from_slice(
-            &bytes[self.i + type_offset ..= self.i + type_offset + 4],
-        );
+        let element_type = u32_from_slice(&bytes[self.i + type_offset..=self.i + type_offset + 4]);
         // The size of cmsg_size, cmsg_level and cmsg_type together
         let element_offset = type_offset + 4;
 
         // Update the counter before returning.
         self.i += element_offset // cmsg_size, cmsg_level and cmsg_type
-                + element_size;  // data size
+                + element_size; // data size
 
         // SAFETY: those are ints lmao
         match element_type as i32 {
@@ -2322,40 +2218,26 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
                 for _ in 0..amount_of_descriptors {
                     descriptors.push(
                         // SAFETY: see above
-                        u32_from_slice(&bytes[descriptor_offset .. descriptor_offset + 4]) as i32
+                        u32_from_slice(&bytes[descriptor_offset..descriptor_offset + 4]) as i32,
                     );
                     descriptor_offset += 4;
                 }
-                Some(
-                    AncillaryData::FileDescriptors(
-                        Cow::Owned(descriptors)
-                    )
-                )
-            },
-            #[cfg(any(
-                doc,
-                not(any(
-                    target_os = "macos",
-                    target_os = "ios",
-                )),
-            ))]
+                Some(AncillaryData::FileDescriptors(Cow::Owned(descriptors)))
+            }
+            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
             SCM_CREDENTIALS => {
                 // We're reading a single ucred structure from the ancillary data payload.
                 // SAFETY: those are still ints
                 let pid_offset = element_offset;
-                let pid: pid_t = unsafe { mem::transmute::<u32, i32>(
-                    u32_from_slice(&bytes[pid_offset .. pid_offset + 4])
-                ) };
+                let pid: pid_t = unsafe {
+                    mem::transmute::<u32, i32>(u32_from_slice(&bytes[pid_offset..pid_offset + 4]))
+                };
                 let uid_offset = pid_offset + 4;
-                let uid: uid_t = u32_from_slice(&bytes[uid_offset .. uid_offset + 4]);
+                let uid: uid_t = u32_from_slice(&bytes[uid_offset..uid_offset + 4]);
                 let gid_offset = uid_offset + 4;
-                let gid: gid_t = u32_from_slice(&bytes[gid_offset .. gid_offset + 4]);
-                Some(
-                    AncillaryData::Credentials {
-                        pid, uid, gid
-                    }
-                )
-            },
+                let gid: gid_t = u32_from_slice(&bytes[gid_offset..gid_offset + 4]);
+                Some(AncillaryData::Credentials { pid, uid, gid })
+            }
             _ => self.next(), // Do nothing if we hit corrupted data.
         }
     }
@@ -2386,6 +2268,6 @@ impl FusedIterator for Incoming<'_> {}
 impl<'a> From<&'a UdStreamListener> for Incoming<'a> {
     #[inline(always)]
     fn from(listener: &'a UdStreamListener) -> Self {
-        Self {listener}
+        Self { listener }
     }
 }

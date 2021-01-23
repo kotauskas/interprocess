@@ -1,13 +1,11 @@
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
-    io::{self, prelude::*, BufReader},
     error::Error,
+    io::{self, prelude::*, BufReader},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    fn handle_error(
-        connection: io::Result<LocalSocketStream>,
-    ) -> Option<LocalSocketStream> {
+    fn handle_error(connection: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
         match connection {
             Ok(val) => Some(val),
             Err(error) => {
@@ -19,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let listener = LocalSocketListener::bind("/tmp/example.sock")?;
     for mut conn in listener.incoming().filter_map(handle_error) {
         println!("Incoming connection!");
-        
+
         conn.write_all(b"Hello from server!\n")?;
 
         // Add buffering to the connection to read a line.

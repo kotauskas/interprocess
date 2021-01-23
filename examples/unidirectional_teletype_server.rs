@@ -1,10 +1,8 @@
-use std::io;
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
+use std::io;
 
 fn main() {
-    fn handle_error(
-        connection: io::Result<LocalSocketStream>,
-    ) -> LocalSocketStream {
+    fn handle_error(connection: io::Result<LocalSocketStream>) -> LocalSocketStream {
         match connection {
             Ok(val) => val,
             Err(error) => {
@@ -14,7 +12,8 @@ fn main() {
         }
     }
 
-    let listener = LocalSocketListener::bind("/tmp/teletype.sock").expect("failed to set up server");
+    let listener =
+        LocalSocketListener::bind("/tmp/teletype.sock").expect("failed to set up server");
     eprintln!("Teletype server listening for connections.");
     for mut conn in listener.incoming().map(handle_error) {
         println!("\n");

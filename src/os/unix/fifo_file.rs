@@ -12,11 +12,7 @@
 //! [`File`]: https://doc.rust-lang.org/stable/std/fs/struct.File.html " "
 //! [`remove_file`]: https://doc.rust-lang.org/stable/std/fs/fn.remove_file.html " "
 
-use std::{
-    path::Path,
-    io,
-    ffi::CString,
-};
+use std::{ffi::CString, io, path::Path};
 
 use super::imports::*;
 
@@ -31,17 +27,8 @@ use super::imports::*;
 /// [`umask`]: https://en.wikipedia.org/wiki/Umask " "
 #[inline]
 pub fn create_fifo<P: AsRef<Path>>(path: P, mode: mode_t) -> io::Result<()> {
-    let path = CString::new(
-            path.as_ref()
-                .as_os_str()
-                .as_bytes()
-    )?;
-    let success = unsafe {
-        libc::mkfifo(
-            path.as_bytes_with_nul().as_ptr() as *const _,
-            mode,
-        ) == 0
-    };
+    let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
+    let success = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };
     if success {
         Ok(())
     } else {
