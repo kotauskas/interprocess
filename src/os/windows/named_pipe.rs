@@ -243,11 +243,11 @@ mod seal {
 
     /// The actual implementation of a named pipe server or client.
     #[repr(transparent)]
-    pub struct PipeOps(pub(crate) FileHandleOps);
+    pub struct PipeOps(pub(super) FileHandleOps);
     impl PipeOps {
         /// Reads a message from the pipe instance into the specified buffer, returning the size of the message written as `Ok(Ok(...))`. If the buffer is too small to fit the message, a bigger buffer is allocated and returned as `Ok(Err(...))`, with the exact size and capacity to hold the message. Errors are returned as `Err(Err(...))`.
         #[inline]
-        pub(crate) fn read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
+        pub(super) fn read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
             match self.try_read_msg(buf)? {
                 Ok(bytes_read) => Ok(Ok(bytes_read)),
                 Err(bytes_left_in_message) => {
@@ -270,7 +270,7 @@ mod seal {
                 }
             }
         }
-        pub(crate) fn try_read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, usize>> {
+        pub(super) fn try_read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, usize>> {
             debug_assert!(
                 buf.len() <= DWORD::max_value() as usize,
                 "buffer is bigger than maximum buffer size for ReadFile",
@@ -313,21 +313,21 @@ mod seal {
         }
         /// Reads bytes from the named pipe. Mirrors `std::io::Read`.
         #[inline]
-        pub(crate) fn read_bytes(&self, buf: &mut [u8]) -> io::Result<usize> {
+        pub(super) fn read_bytes(&self, buf: &mut [u8]) -> io::Result<usize> {
             self.0.read(buf)
         }
         /// Writes data to the named pipe. There is no way to check/ensure that the message boundaries will be preserved which is why there's only one function to do this.
         #[inline]
-        pub(crate) fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        pub(super) fn write(&self, buf: &[u8]) -> io::Result<usize> {
             self.0.write(buf)
         }
         /// Blocks until the client has fully read the buffer.
         #[inline]
-        pub(crate) fn flush(&self) -> io::Result<()> {
+        pub(super) fn flush(&self) -> io::Result<()> {
             self.0.flush()
         }
 
-        pub(crate) fn get_client_process_id(&self) -> io::Result<u32> {
+        pub(super) fn get_client_process_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeClientProcessId(self.0 .0, &mut id as *mut _) != 0 };
             if success {
@@ -336,7 +336,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
-        pub(crate) fn get_client_session_id(&self) -> io::Result<u32> {
+        pub(super) fn get_client_session_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeClientSessionId(self.0 .0, &mut id as *mut _) != 0 };
             if success {
@@ -345,7 +345,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
-        pub(crate) fn get_server_process_id(&self) -> io::Result<u32> {
+        pub(super) fn get_server_process_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeServerProcessId(self.0 .0, &mut id as *mut _) != 0 };
             if success {
@@ -354,7 +354,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
-        pub(crate) fn get_server_session_id(&self) -> io::Result<u32> {
+        pub(super) fn get_server_session_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeServerSessionId(self.0 .0, &mut id as *mut _) != 0 };
             if success {
@@ -365,7 +365,7 @@ mod seal {
         }
 
         /// Blocks until connected. If connected, does not do anything.
-        pub(crate) fn connect(&self) -> io::Result<()> {
+        pub(super) fn connect(&self) -> io::Result<()> {
             let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), zeroed()) != 0 };
             if success {
                 Ok(())
@@ -380,14 +380,14 @@ mod seal {
         }
         /// Flushes and disconnects, obviously.
         #[inline]
-        pub(crate) fn flush_and_disconnect(&self) -> io::Result<()> {
+        pub(super) fn flush_and_disconnect(&self) -> io::Result<()> {
             self.flush()?;
             self.disconnect()?;
             Ok(())
         }
         /// Disconnects without flushing. Drops all data which has been sent but not yet received on the other side, if any.
         #[inline]
-        pub(crate) fn disconnect(&self) -> io::Result<()> {
+        pub(super) fn disconnect(&self) -> io::Result<()> {
             let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
             if success {
                 Ok(())
@@ -469,7 +469,7 @@ impl<'a> PipeListenerOptions<'a> {
     /// [`name`]: #structfield.name " "
     #[inline]
     #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn name(mut self, name: impl Into<Cow<'static, OsStr>>) -> Self {
+    pub fn name(mut self, name: impl Into<Cow<'a, OsStr>>) -> Self {
         self.name = name.into();
         self
     }
