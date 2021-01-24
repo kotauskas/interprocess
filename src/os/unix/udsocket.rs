@@ -131,7 +131,28 @@ unsafe fn get_peer_ucred(socket: i32) -> Option<ucred> {
         Some(cred)
     } else {
         // The outer function is supposed to query errno because separation of
-        // concerns is a good thing
+        // concerns is a good thing.
+        None
+    }
+}
+unsafe fn raw_set_nonblocking(socket: i32, nonblocking: bool) -> bool {
+    let old_flags = fcntl(socket, F_GETFL, ptr::null());
+    if old_flags == -1 {
+        return false;
+    }
+    new_flags = if nonblocking {
+        old_flags | O_NONBLOCK
+    } else {
+        old_flags & !O_NONBLOCK
+    };
+    fcntl(socket, F_SETFL, new_flags) != -1
+}
+unsafe fn raw_get_nonblocking(socket: i32) -> Option<bool> {
+    let flags = fcntl(socket, F_GETFL, ptr::null());
+    if flags != -1 {
+        Some(flags & O_NONBLOCK != 0)
+    } else {
+        // Again, querying errno is left to the outer function.
         None
     }
 }
@@ -400,6 +421,27 @@ impl UdStreamListener {
     #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
+    }
+
+    /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
+    ///
+    /// In nonblocking mode, calls to [`accept`], and, by extension, iteration through [`incoming`] will never wait for a client to become available to connect and will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations while there are no new client connections to accept.
+    ///
+    /// [`accept`]: #method.accept " "
+    /// [`incoming`]: #method.incoming " "
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    #[inline]
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        if unsafe { raw_set_nonblocking(self.fd.0, nonblocking) } {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    /// Checks whether the socket is currently in nonblocking mode or not.
+    #[inline]
+    pub fn is_nonblocking(&self) -> io::Result<bool> {
+        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
     }
 }
 impl Debug for UdStreamListener {
@@ -755,6 +797,27 @@ impl UdStream {
         } else {
             Err(io::Error::last_os_error())
         }
+    }
+
+    /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
+    ///
+    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one byte of data to become available; calls to `send…` methods and the `Write` trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the meantime.
+    ///
+    /// [`accept`]: #method.accept " "
+    /// [`incoming`]: #method.incoming " "
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    #[inline]
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        if unsafe { raw_set_nonblocking(self.fd.0, nonblocking) } {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    /// Checks whether the stream is currently in nonblocking mode or not.
+    #[inline]
+    pub fn is_nonblocking(&self) -> io::Result<bool> {
+        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -1263,6 +1326,28 @@ impl UdSocket {
             Err(io::Error::last_os_error())
         }
     }
+
+    /// Enables or disables the nonblocking mode for the socket. By default, it is disabled.
+    ///
+    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one message to become available; calls to `send…` methods and the `Write` trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the meantime.
+    ///
+    /// [`accept`]: #method.accept " "
+    /// [`incoming`]: #method.incoming " "
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    #[inline]
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        if unsafe { raw_set_nonblocking(self.fd.0, nonblocking) } {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    /// Checks whether the socket is currently in nonblocking mode or not.
+    #[inline]
+    pub fn is_nonblocking(&self) -> io::Result<bool> {
+        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
+    }
+
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
     #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
     #[cfg_attr(
