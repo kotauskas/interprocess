@@ -155,8 +155,8 @@ impl LocalSocketStream {
     ///
     /// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html " "
     #[inline]
-    pub fn get_peer_pid(&self) -> io::Result<u32> {
-        self.inner.get_peer_pid()
+    pub fn peer_pid(&self) -> io::Result<u32> {
+        self.inner.peer_pid()
     }
 }
 impl Read for LocalSocketStream {

@@ -65,10 +65,10 @@ impl LocalSocketStream {
         })
     }
     #[inline]
-    pub fn get_peer_pid(&self) -> io::Result<u32> {
+    pub fn peer_pid(&self) -> io::Result<u32> {
         match self.server_or_client {
-            ServerOrClient::Server => self.inner.get_client_process_id(),
-            ServerOrClient::Client => self.inner.get_server_process_id(),
+            ServerOrClient::Server => self.inner.client_process_id(),
+            ServerOrClient::Client => self.inner.server_process_id(),
             ServerOrClient::Nah => Err(io::Error::new(
                 ErrorKind::Other,
                 "\

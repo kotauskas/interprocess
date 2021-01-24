@@ -651,22 +651,22 @@ macro_rules! create_stream_type {
             }
             /// Retrieves the process identifier of the client side of the named pipe connection.
             #[inline]
-            pub fn get_client_process_id(&self) -> io::Result<u32> {
+            pub fn client_process_id(&self) -> io::Result<u32> {
                 self.instance.0.get_client_process_id()
             }
             /// Retrieves the session identifier of the client side of the named pipe connection.
             #[inline]
-            pub fn get_client_session_id(&self) -> io::Result<u32> {
+            pub fn client_session_id(&self) -> io::Result<u32> {
                 self.instance.0.get_client_session_id()
             }
             /// Retrieves the process identifier of the server side of the named pipe connection.
             #[inline]
-            pub fn get_server_process_id(&self) -> io::Result<u32> {
+            pub fn server_process_id(&self) -> io::Result<u32> {
                 self.instance.0.get_server_process_id()
             }
             /// Retrieves the session identifier of the server side of the named pipe connection.
             #[inline]
-            pub fn get_server_session_id(&self) -> io::Result<u32> {
+            pub fn server_session_id(&self) -> io::Result<u32> {
                 self.instance.0.get_server_session_id()
             }
             /// Disconnects the named pipe stream without flushing buffers, causing all data in those buffers to be lost. This is much faster than simply dropping the stream, since the `Drop` implementation flushes first. Only makes sense for server-side pipes and will panic in debug builds if called on a client stream.
