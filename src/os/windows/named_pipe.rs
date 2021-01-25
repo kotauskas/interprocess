@@ -41,7 +41,7 @@ use winapi::{
     um::{
         fileapi::{CreateFileW, OPEN_EXISTING},
         handleapi::INVALID_HANDLE_VALUE,
-        namedpipeapi::CreateNamedPipeW,
+        namedpipeapi::{CreateNamedPipeW, SetNamedPipeHandleState},
         winbase::{
             FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
             PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE, PIPE_TYPE_BYTE,
@@ -127,6 +127,28 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     pub fn incoming(&self) -> Incoming<'_, Stream> {
         Incoming { listener: self }
     }
+    /// Enables or disables the nonblocking mode for all existing instances of the listener and future ones. By default, it is disabled.
+    ///
+    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation options, unless there's a good reason not to: this method has O(n) complexity, since it has to iterate through all instances, and it may leave the instances in an inconsistent state where some are nonblocking and some are not if the operation fails for one of them (which will be reported as failure, even though some may have successfully been reconfigured).
+    ///
+    /// See the documentation of the aforementioned field for the exact effects of enabling this mode.
+    ///
+    /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        for instance in self
+            .instances
+            .read()
+            .expect("unexpected lock poison")
+            .iter()
+        {
+            unsafe {
+                set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
+            }
+        }
+        self.config.nonblocking = nonblocking;
+        Ok(())
+    }
 
     /// Returns a pipe instance either by using an existing one or returning a newly created instance using `add_instance`.
     fn alloc_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
@@ -162,6 +184,28 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         Ok(new_instance)
     }
 }
+
+unsafe fn set_nonblocking_for_stream<Stream: PipeStream>(
+    handle: HANDLE,
+    nonblocking: bool,
+) -> io::Result<()> {
+    let read_mode: u32 = Stream::READ_MODE.map_or(0, PipeMode::to_readmode);
+    // Bitcast the boolean without additional transformatinos since
+    // the flag is in the first bit.
+    let mut mode: u32 = read_mode | nonblocking as u32;
+    let success = SetNamedPipeHandleState(
+        handle,
+        &mut mode as *mut _,
+        ptr::null_mut(),
+        ptr::null_mut(),
+    ) != 0;
+    if success {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
 mod pipe_listener_debug_impl {
     #[cfg(windows)]
     use super::AsRawHandle;
@@ -332,6 +376,7 @@ mod seal {
             self.0.flush()
         }
 
+        #[inline]
         pub(super) fn get_client_process_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeClientProcessId(self.0 .0, &mut id as *mut _) != 0 };
@@ -341,6 +386,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
+        #[inline]
         pub(super) fn get_client_session_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeClientSessionId(self.0 .0, &mut id as *mut _) != 0 };
@@ -350,6 +396,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
+        #[inline]
         pub(super) fn get_server_process_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeServerProcessId(self.0 .0, &mut id as *mut _) != 0 };
@@ -359,6 +406,7 @@ mod seal {
                 Err(io::Error::last_os_error())
             }
         }
+        #[inline]
         pub(super) fn get_server_session_id(&self) -> io::Result<u32> {
             let mut id: u32 = 0;
             let success = unsafe { GetNamedPipeServerSessionId(self.0 .0, &mut id as *mut _) != 0 };
@@ -427,7 +475,9 @@ mod seal {
     unsafe impl Sync for PipeOps {}
     unsafe impl Send for PipeOps {}
 }
-/// The builder which can be used to create `PipeListener`.
+/// Allows for thorough customization of [`PipeListener`]s during creation.
+///
+/// [`PipeListener`]: struct.PipeListener.html " "
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
@@ -435,6 +485,16 @@ pub struct PipeListenerOptions<'a> {
     pub name: Cow<'a, OsStr>,
     /// Specifies how data is written into the data stream. This is required in all cases, regardless of whether the pipe is inbound, outbound or duplex, since this affects all data being written into the pipe, not just the data written by the server.
     pub mode: PipeMode,
+    /// Specifies whether nonblocking mode will be enabled for all stream instances upon creation. By default, it is disabled.
+    ///
+    /// There are two ways in which the listener is affected by nonblocking mode:
+    /// - Whenever [`accept`] is called or [`incoming`] is being iterated through, if there is no client currently attempting to connect to the named pipe server, the method will return immediately with the [`WouldBlock`] error instead of blocking until one arrives.
+    /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an explanation of the exact effects.
+    ///
+    /// [`accept`]: struct.PipeListener.html#method.accept " "
+    /// [`incoming`]: struct.PipeListener.html#method.incoming " "
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    pub nonblocking: bool,
     /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many clients can be communicated with at once. If set to 1, trying to create multiple instances at the same time will return an error. If set to `None`, no limit is applied. The value 255 is not allowed because of Windows limitations.
     pub instance_limit: Option<NonZeroU8>,
     /// Enables write-through mode, which applies only to network connections to the pipe. If enabled, writing to the pipe would always block until all data is delivered to the other end instead of piling up in the kernel's network buffer until a certain amount of data accamulates or a certain period of time passes, which is when the system actually sends the contents of the buffer over the network.
@@ -461,6 +521,7 @@ impl<'a> PipeListenerOptions<'a> {
         Self {
             name: Cow::Borrowed(OsStr::new("")),
             mode: PipeMode::Bytes,
+            nonblocking: false,
             instance_limit: None,
             write_through: false,
             accept_remote: false,
@@ -485,6 +546,15 @@ impl<'a> PipeListenerOptions<'a> {
     #[must_use = "builder setters take the entire structure and return the result"]
     pub fn mode(mut self, mode: PipeMode) -> Self {
         self.mode = mode;
+        self
+    }
+    /// Sets the [`nonblocking`] parameter to the specified value.
+    ///
+    /// [`nonblocking`]: #structfield.nonblocking " "
+    #[inline]
+    #[must_use = "builder setters take the entire structure and return the result"]
+    pub fn nonblocking(mut self, nonblocking: bool) -> Self {
+        self.nonblocking = nonblocking;
         self
     }
     /// Sets the [`instance_limit`] parameter to the specified value.
@@ -557,7 +627,9 @@ impl<'a> PipeListenerOptions<'a> {
                     }
                     flags
                 },
-                self.mode.to_pipe_type() | Stream::READ_MODE.map_or(0, |x| x.to_readmode()),
+                self.mode.to_pipe_type()
+                    | Stream::READ_MODE.map_or(0, |x| x.to_readmode())
+                    | self.nonblocking as u32,
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
                     x.get() as DWORD
@@ -594,6 +666,7 @@ impl<'a> PipeListenerOptions<'a> {
         let owned_config = PipeListenerOptions {
             name: Cow::Owned(self.name.clone().into_owned()),
             mode: self.mode,
+            nonblocking: self.nonblocking,
             instance_limit: self.instance_limit,
             write_through: self.write_through,
             accept_remote: self.accept_remote,
@@ -620,7 +693,14 @@ impl Default for PipeListenerOptions<'_> {
 }
 
 macro_rules! create_stream_type {
-    ($($ty:ident, $desired_access:expr, doc: $doc:tt)+) => ($(
+    ($(
+        $ty:ident:
+            desired_access: $desired_access:expr,
+            role: $role:expr,
+            read_mode: $read_mode:expr,
+            write_mode: $write_mode:expr,
+            doc: $doc:tt
+    )+) => ($(
         #[doc = $doc]
         pub struct $ty {
             instance: Arc<(PipeOps, AtomicBool)>,
@@ -652,6 +732,21 @@ macro_rules! create_stream_type {
                     }})
                 } else {
                     Err(io::Error::last_os_error())
+                }
+            }
+            /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
+            ///
+            /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`] error is immediately returned, allowing the thread to perform useful actions in the meantime.
+            ///
+            /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
+            ///
+            /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+            /// [`nonblocking`]:
+            /// [`set_nonblocking`]:
+            #[inline]
+            pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+                unsafe {
+                    set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
                 }
             }
             /// Retrieves the process identifier of the client side of the named pipe connection.
@@ -688,6 +783,11 @@ macro_rules! create_stream_type {
                 mem::forget(self);
                 Ok(())
             }
+        }
+        impl PipeStream for $ty {
+            const ROLE: PipeStreamRole = $role;
+            const WRITE_MODE: Option<PipeMode> = $write_mode;
+            const READ_MODE: Option<PipeMode> = $read_mode;
         }
         impl Sealed for $ty {}
         impl NamedPipeStreamInternals for $ty {}
@@ -746,21 +846,36 @@ macro_rules! create_stream_type {
     )+);
 }
 create_stream_type! {
-    ByteReaderPipeStream, GENERIC_READ, doc: "
+    ByteReaderPipeStream:
+        desired_access: GENERIC_READ,
+        role: PipeStreamRole::Reader,
+        read_mode: Some(PipeMode::Bytes),
+        write_mode: None,
+        doc: "
 [Byte stream reader] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [Byte stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
 "
-    ByteWriterPipeStream, GENERIC_WRITE, doc: "
+    ByteWriterPipeStream:
+        desired_access: GENERIC_WRITE,
+        role: PipeStreamRole::Writer,
+        read_mode: None,
+        write_mode: Some(PipeMode::Bytes),
+        doc: "
 [Byte stream writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [Byte stream writer]: https://doc.rust-lang.org/std/io/trait.Write.html
 "
-    DuplexBytePipeStream, GENERIC_READ | GENERIC_WRITE, doc: "
+    DuplexBytePipeStream:
+        desired_access: GENERIC_READ | GENERIC_WRITE,
+        role: PipeStreamRole::ReaderAndWriter,
+        read_mode: Some(PipeMode::Bytes),
+        write_mode: Some(PipeMode::Bytes),
+        doc: "
 Byte stream [reader] and [writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
@@ -768,21 +883,36 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 [reader]: https://doc.rust-lang.org/std/io/trait.Read.html
 [writer]: https://doc.rust-lang.org/std/io/trait.Write.html
 "
-    MsgReaderPipeStream, GENERIC_READ, doc: "
+    MsgReaderPipeStream:
+        desired_access: GENERIC_READ,
+        role: PipeStreamRole::Reader,
+        read_mode: Some(PipeMode::Messages),
+        write_mode: None,
+        doc: "
 [Message stream reader] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [Message stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
 "
-    MsgWriterPipeStream, GENERIC_WRITE, doc: "
+    MsgWriterPipeStream:
+        desired_access: GENERIC_WRITE,
+        role: PipeStreamRole::Writer,
+        read_mode: None,
+        write_mode: Some(PipeMode::Messages),
+        doc: "
 [Message stream writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [Message stream writer]: https://doc.rust-lang.org/std/io/trait.Write.html
 "
-    DuplexMsgPipeStream, GENERIC_READ | GENERIC_WRITE, doc: "
+    DuplexMsgPipeStream:
+    desired_access: GENERIC_READ | GENERIC_WRITE,
+    role: PipeStreamRole::ReaderAndWriter,
+    read_mode: Some(PipeMode::Messages),
+    write_mode: Some(PipeMode::Messages),
+    doc: "
 Message stream [reader] and [writer] for a named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
@@ -911,36 +1041,6 @@ pub trait PipeStream:
     ///
     /// For writer streams, this value has no meaning: if the writer stream belongs to the server (server sends data, client receives), then the server doesn't read data at all and thus this does not affect anything; if the writer stream belongs to the client, then the client doesn't read anything and the value is meaningless as well.
     const READ_MODE: Option<PipeMode>;
-}
-impl PipeStream for ByteReaderPipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::Reader;
-    const WRITE_MODE: Option<PipeMode> = None;
-    const READ_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-}
-impl PipeStream for ByteWriterPipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::Writer;
-    const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-    const READ_MODE: Option<PipeMode> = None;
-}
-impl PipeStream for DuplexBytePipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::ReaderAndWriter;
-    const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-    const READ_MODE: Option<PipeMode> = Some(PipeMode::Bytes);
-}
-impl PipeStream for MsgReaderPipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::Reader;
-    const WRITE_MODE: Option<PipeMode> = None;
-    const READ_MODE: Option<PipeMode> = Some(PipeMode::Messages);
-}
-impl PipeStream for MsgWriterPipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::Writer;
-    const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Messages);
-    const READ_MODE: Option<PipeMode> = None;
-}
-impl PipeStream for DuplexMsgPipeStream {
-    const ROLE: PipeStreamRole = PipeStreamRole::ReaderAndWriter;
-    const WRITE_MODE: Option<PipeMode> = Some(PipeMode::Messages);
-    const READ_MODE: Option<PipeMode> = Some(PipeMode::Messages);
 }
 
 /// Connects to the specified named pipe, returning a named pipe stream of the stream type provided via generic parameters.
