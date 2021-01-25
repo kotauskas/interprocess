@@ -896,7 +896,9 @@ impl Write for DuplexMsgPipeStream {
 /// The distinction between datagram-oriented connections and byte streams exists for symmetry with the standard library, where UDP and TCP sockets are represented by different types. The idea behind this is that by separating the two semantic types of sockets into two types, the distinction between those semantics can be enforced at compile time instead of using runtime errors to signal that, for example, a datagram read operation is attempted on a byte stream.
 ///
 /// The fact that named pipes can have different data flow directions further increases the amount of various stream types. By restricting the implemented stream traits at compile time, named pipe streams can be used correctly in generic contexts unaware of named pipes without extra runtime checking for the correct pipe direction.
-pub trait PipeStream: AsRawHandle + NamedPipeStreamInternals {
+pub trait PipeStream:
+    AsRawHandle + IntoRawHandle + FromRawHandle + NamedPipeStreamInternals
+{
     /// The data stream flow direction for the pipe. See the [`PipeStreamRole`] enumeration for more on what this means.
     ///
     /// [`PipeStreamRole`]: enum.PipeStreamRole.html " "
