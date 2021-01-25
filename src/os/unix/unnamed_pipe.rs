@@ -101,7 +101,7 @@ impl IntoRawFd for UnnamedPipeWriter {
 impl FromRawFd for UnnamedPipeWriter {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self(FdOps(fd))
+        Self(FdOps::new(fd))
     }
 }
 impl Debug for UnnamedPipeWriter {

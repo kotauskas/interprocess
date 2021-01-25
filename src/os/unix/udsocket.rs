@@ -469,7 +469,7 @@ impl IntoRawFd for UdStreamListener {
 impl FromRawFd for UdStreamListener {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self { fd: FdOps(fd) }
+        Self { fd: FdOps::new(fd) }
     }
 }
 
@@ -883,7 +883,7 @@ impl IntoRawFd for UdStream {
 impl FromRawFd for UdStream {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self { fd: FdOps(fd) }
+        Self { fd: FdOps::new(fd) }
     }
 }
 
@@ -1409,7 +1409,7 @@ impl IntoRawFd for UdSocket {
 impl FromRawFd for UdSocket {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self { fd: FdOps(fd) }
+        Self { fd: FdOps::new(fd) }
     }
 }
 

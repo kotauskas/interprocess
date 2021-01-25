@@ -156,3 +156,4 @@ impl FromRawHandle for FileHandleOps {
     }
 }
 unsafe impl Send for FileHandleOps {}
+unsafe impl Sync for FileHandleOps {} // WriteFile and ReadFile are thread-safe, apparently

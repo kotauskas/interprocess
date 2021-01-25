@@ -52,9 +52,13 @@ use std::{
 };
 
 #[cfg(unix)]
-pub(crate) struct FdOps(pub(crate) c_int);
+pub(crate) struct FdOps(pub c_int, PhantomData<*mut ()>);
 #[cfg(unix)]
 impl FdOps {
+    #[inline]
+    pub fn new(fd: c_int) -> Self {
+        Self(fd, PhantomData)
+    }
     #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let (success, num_bytes_read) = unsafe {
@@ -145,3 +149,5 @@ impl Drop for FdOps {
         });
     }
 }
+unsafe impl Send for FdOps {}
+unsafe impl Sync for FdOps {}
