@@ -24,8 +24,9 @@ use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
     marker::PhantomData,
-    mem::{self, zeroed},
+    mem,
     num::{NonZeroU32, NonZeroU8},
+    ptr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, RwLock,
@@ -223,8 +224,12 @@ use seal::*;
 mod seal {
     use super::super::FileHandleOps;
     #[cfg(windows)]
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-    use std::{io, mem::zeroed, sync::atomic::AtomicBool};
+    use std::{
+        io,
+        os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
+        ptr,
+        sync::atomic::AtomicBool,
+    };
     #[cfg(windows)]
     use winapi::{
         shared::{minwindef::DWORD, winerror::ERROR_PIPE_CONNECTED},
@@ -259,7 +264,7 @@ mod seal {
                             new_buffer.as_mut_slice().as_mut_ptr() as *mut _,
                             buf.len() as DWORD,
                             &mut _number_of_bytes_read as *mut _,
-                            zeroed(),
+                            ptr::null_mut(),
                         ) != 0
                     };
                     if success {
@@ -279,10 +284,10 @@ mod seal {
                 let mut bytes_left_in_message: DWORD = 0;
                 let result = PeekNamedPipe(
                     self.as_raw_handle(),
-                    zeroed(),
+                    ptr::null_mut(),
                     0,
-                    zeroed(),
-                    zeroed(),
+                    ptr::null_mut(),
+                    ptr::null_mut(),
                     &mut bytes_left_in_message as *mut _,
                 );
                 if result == 0 {
@@ -299,7 +304,7 @@ mod seal {
                         buf.as_mut_ptr() as *mut _,
                         buf.len() as DWORD,
                         &mut _number_of_bytes_read as *mut _,
-                        zeroed(),
+                        ptr::null_mut(),
                     ) != 0
                 };
                 if success {
@@ -366,7 +371,7 @@ mod seal {
 
         /// Blocks until connected. If connected, does not do anything.
         pub(super) fn connect(&self) -> io::Result<()> {
-            let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), zeroed()) != 0 };
+            let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), ptr::null_mut()) != 0 };
             if success {
                 Ok(())
             } else {
@@ -562,7 +567,7 @@ impl<'a> PipeListenerOptions<'a> {
                 self.input_buffer_size_hint.try_into()
                     .expect("input buffer size hint overflowed DWORD"),
                 self.wait_timeout.get(),
-                zeroed(),
+                ptr::null_mut(),
             );
             (handle, handle != INVALID_HANDLE_VALUE)
         };
@@ -630,10 +635,10 @@ macro_rules! create_stream_type {
                         name.as_ptr() as *mut _,
                         $desired_access,
                         FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        zeroed(),
+                        ptr::null_mut(),
                         OPEN_EXISTING,
                         0,
-                        zeroed(),
+                        ptr::null_mut(),
                     );
                     (handle != INVALID_HANDLE_VALUE, handle)
                 };
@@ -675,7 +680,12 @@ macro_rules! create_stream_type {
                 self.instance.0.disconnect()?;
                 // We keep the atomic store anyway since checking whether we're a client or a server and avoiding an atomic write is potentially slower than that write.
                 self.instance.1.store(false, Ordering::Release);
-                mem::forget(self); // Prevents normal drop
+                let instance = unsafe {
+                    // SAFETY: mem::forget is used to safely destroy the invalidated master copy
+                    ptr::read(&self.instance)
+                };
+                drop(instance);
+                mem::forget(self);
                 Ok(())
             }
         }
@@ -965,10 +975,10 @@ pub fn connect<Stream: PipeStream>(
                 access_flags
             },
             0,
-            zeroed(),
+            ptr::null_mut(),
             OPEN_EXISTING,
             0,
-            zeroed(),
+            ptr::null_mut(),
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };

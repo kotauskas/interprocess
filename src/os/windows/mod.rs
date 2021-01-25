@@ -25,10 +25,7 @@ pub type HANDLE = *mut ();
 pub trait AsRawHandle {}
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-use std::{
-    io,
-    mem::{self, zeroed},
-};
+use std::{io, mem, ptr};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -86,7 +83,7 @@ impl FileHandleOps {
                 buf.as_mut_ptr() as *mut _,
                 buf.len() as DWORD,
                 &mut num_bytes_read as *mut _,
-                zeroed(),
+                ptr::null_mut(),
             );
             (result != 0, num_bytes_read as usize)
         };
@@ -109,7 +106,7 @@ impl FileHandleOps {
                 buf.as_ptr() as *mut _,
                 buf.len() as DWORD,
                 &mut number_of_bytes_written as *mut _,
-                zeroed(),
+                ptr::null_mut(),
             );
             (result != 0, number_of_bytes_written as usize)
         };
