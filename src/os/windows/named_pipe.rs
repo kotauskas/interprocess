@@ -1033,7 +1033,7 @@ impl PipeDirection {
     /// # }
     /// ```
     #[inline]
-    pub fn client_role(self) -> PipeStreamRole {
+    pub const fn client_role(self) -> PipeStreamRole {
         match self {
             Self::ClientToServer => PipeStreamRole::Writer,
             Self::ServerToClient => PipeStreamRole::Reader,
@@ -1061,7 +1061,7 @@ impl PipeDirection {
     /// # }
     /// ```
     #[inline]
-    pub fn server_role(self) -> PipeStreamRole {
+    pub const fn server_role(self) -> PipeStreamRole {
         match self {
             Self::ClientToServer => PipeStreamRole::Reader,
             Self::ServerToClient => PipeStreamRole::Writer,
@@ -1128,7 +1128,7 @@ impl PipeStreamRole {
     /// # }
     /// ```
     #[inline]
-    pub fn direction_as_server(self) -> PipeDirection {
+    pub const fn direction_as_server(self) -> PipeDirection {
         match self {
             Self::Reader => PipeDirection::ClientToServer,
             Self::Writer => PipeDirection::ServerToClient,
@@ -1156,7 +1156,7 @@ impl PipeStreamRole {
     /// # }
     /// ```
     #[inline]
-    pub fn direction_as_client(self) -> PipeDirection {
+    pub const fn direction_as_client(self) -> PipeDirection {
         match self {
             Self::Reader => PipeDirection::ServerToClient,
             Self::Writer => PipeDirection::ClientToServer,
@@ -1177,12 +1177,12 @@ pub enum PipeMode {
 impl PipeMode {
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending on the value.
     #[inline]
-    pub fn to_pipe_type(self) -> DWORD {
-        unsafe { mem::transmute(self) } // We already store PIPE_TYPE_*
+    pub const fn to_pipe_type(self) -> DWORD {
+        self as _
     }
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE` depending on the value.
     #[inline]
-    pub fn to_readmode(self) -> DWORD {
+    pub const fn to_readmode(self) -> DWORD {
         match self {
             Self::Bytes => PIPE_READMODE_BYTE,
             Self::Messages => PIPE_READMODE_MESSAGE,
