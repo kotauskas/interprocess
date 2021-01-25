@@ -81,6 +81,21 @@ impl LocalSocketListener {
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
+    /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
+    ///
+    /// In nonblocking mode, calling [`accept`] and iterating through [`incoming`] will immediately return a [`WouldBlock`] error if there is no client attempting to connect at the moment instead of blocking until one arrives.
+    ///
+    /// # Platform-specific behavior
+    /// ## Windows
+    /// The nonblocking mode will be also be set for the streams produced by [`accept`] and [`incoming`], both existing and new ones.
+    ///
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    /// [`accept`]: #method.accept " "
+    /// [`incoming`]: #method.incoming " "
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
+    }
 }
 impl Debug for LocalSocketListener {
     #[inline]
@@ -153,6 +168,17 @@ impl LocalSocketStream {
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.peer_pid()
+    }
+    /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
+    ///
+    /// In nonblocking mode, reading and writing will immediately return with the [`WouldBlock`] error in situations when they would normally block for an uncontrolled amount of time. The specific situations are:
+    /// - When reading is attempted and there is no new data available;
+    /// - When writing is attempted and the buffer is full due to the other side not yet having read previously sent data.
+    ///
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
     }
 }
 impl Read for LocalSocketStream {

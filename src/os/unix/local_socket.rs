@@ -26,6 +26,10 @@ impl LocalSocketListener {
         let inner = self.inner.accept()?;
         Ok(LocalSocketStream { inner })
     }
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
+    }
 }
 impl Debug for LocalSocketListener {
     #[inline]
@@ -66,8 +70,13 @@ impl LocalSocketStream {
         let inner = UdStream::connect(path)?;
         Ok(Self { inner })
     }
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.get_peer_credentials().map(|ucred| ucred.pid)
+    }
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
     }
 }
 impl Read for LocalSocketStream {

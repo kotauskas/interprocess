@@ -37,6 +37,10 @@ impl LocalSocketListener {
             server_or_client: AtomicU8::new(ServerOrClient::Server as _),
         })
     }
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
+    }
 }
 impl Debug for LocalSocketListener {
     #[inline]
@@ -103,6 +107,10 @@ impl LocalSocketStream {
                 self.peer_pid()
             }
         }
+    }
+    #[inline]
+    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+        self.inner.set_nonblocking(nonblocking)
     }
 }
 impl Read for LocalSocketStream {
