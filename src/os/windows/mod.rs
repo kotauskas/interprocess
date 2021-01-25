@@ -23,6 +23,12 @@ pub type HANDLE = *mut ();
 #[cfg(not(windows))]
 #[doc(hidden)]
 pub trait AsRawHandle {}
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub trait IntoRawHandle {}
+#[cfg(not(windows))]
+#[doc(hidden)]
+pub unsafe trait FromRawHandle {}
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
 use std::{io, mem, ptr};

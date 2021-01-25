@@ -12,11 +12,9 @@
 
 // TODO improve docs, add examples
 
+use super::{AsRawHandle, FromRawHandle, IntoRawHandle};
 #[cfg(windows)]
-use std::os::windows::{
-    ffi::OsStrExt,
-    io::{AsRawHandle, FromRawHandle, IntoRawHandle},
-};
+use std::os::windows::ffi::OsStrExt;
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
@@ -32,9 +30,6 @@ use std::{
         Arc, RwLock,
     },
 };
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub trait AsRawHandle {}
 #[cfg(windows)]
 use winapi::{
     shared::minwindef::DWORD,
@@ -63,6 +58,8 @@ macro_rules! fake_consts {
 fake_consts! {
     PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
     PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
+    PIPE_READMODE_BYTE = 0, PIPE_READMODE_MESSAGE = 1,
+
 }
 #[cfg(not(windows))]
 #[doc(hidden)]
@@ -185,6 +182,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     }
 }
 
+#[cfg(windows)]
 unsafe fn set_nonblocking_for_stream<Stream: PipeStream>(
     handle: HANDLE,
     nonblocking: bool,
@@ -268,12 +266,8 @@ use seal::*;
 mod seal {
     use super::super::FileHandleOps;
     #[cfg(windows)]
-    use std::{
-        io,
-        os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
-        ptr,
-        sync::atomic::AtomicBool,
-    };
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+    use std::{io, ptr, sync::atomic::AtomicBool};
     #[cfg(windows)]
     use winapi::{
         shared::{minwindef::DWORD, winerror::ERROR_PIPE_CONNECTED},
@@ -741,8 +735,8 @@ macro_rules! create_stream_type {
             /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
             ///
             /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
-            /// [`nonblocking`]:
-            /// [`set_nonblocking`]:
+            /// [`nonblocking`]: struct.PipeListenerOptions.html#structfield.nonblocking " "
+            /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
             #[inline]
             pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
                 unsafe {

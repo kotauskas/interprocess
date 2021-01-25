@@ -397,6 +397,7 @@ impl NameTypeSupport {
 /// [`PathBuf`]: https://doc.rust-lang.org/std/path/struct.PathBuf.html " "
 pub trait ToLocalSocketName<'a> {
     /// Performs the conversion to a local socket name.
+    #[allow(clippy::wrong_self_convention)] // shut the fuck up
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>>;
 }
 // TODO document inpls for symmetry with ud-sockets

@@ -72,7 +72,16 @@ impl LocalSocketStream {
     }
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        self.inner.get_peer_credentials().map(|ucred| ucred.pid)
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        {
+            self.inner
+                .get_peer_credentials()
+                .map(|ucred| ucred.pid as u32)
+        }
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        {
+            Err(io::Error::new(io::ErrorKind::Other, "not supported"))
+        }
     }
     #[inline]
     pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {

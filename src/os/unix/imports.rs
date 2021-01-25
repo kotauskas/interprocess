@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code, unused_imports, non_camel_case_types)]
 
 use cfg_if::cfg_if;
 
@@ -40,6 +40,9 @@ cfg_if! {
             SOL_SOCKET,
             SCM_RIGHTS,
             MSG_TRUNC, MSG_CTRUNC,
+            F_GETFL,
+            F_SETFL,
+            O_NONBLOCK,
             sockaddr_un,
             msghdr, cmsghdr,
         };
@@ -47,12 +50,17 @@ cfg_if! {
         pub(super) use libc::{
             SIGPOLL,
             SO_PASSCRED,
+            SO_PEERCRED,
             SCM_CREDENTIALS,
+            socklen_t,
             ucred,
         };
 
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         pub(super) const SIGPOLL: i32 = 999;
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        #[doc(hidden)]
+        pub struct ucred {}
 
         pub(super) use super::FdOps;
 
@@ -78,20 +86,18 @@ cfg_if! {
             SIGCHLD = 13, SIGXFSZ   = 27,
         }
         #[doc(hidden)]
-        #[allow(non_camel_case_types)]
         pub type c_int = i32;
         #[doc(hidden)]
-        #[allow(non_camel_case_types)]
         pub type pid_t = i32;
         #[doc(hidden)]
-        #[allow(non_camel_case_types)]
         pub type uid_t = i32;
         #[doc(hidden)]
-        #[allow(non_camel_case_types)]
         pub type gid_t = i32;
         #[doc(hidden)]
-        #[allow(non_camel_case_types)]
         pub type mode_t = u32;
+
+        #[doc(hidden)]
+        pub struct ucred {}
 
         pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 

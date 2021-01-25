@@ -17,7 +17,7 @@ use cfg_if::cfg_if;
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
-    ffi::{CStr, CString, NulError, OsStr, OsString},
+    ffi::{c_void, CStr, CString, NulError, OsStr, OsString},
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
     iter::{self, FromIterator, FusedIterator},
@@ -114,18 +114,18 @@ unsafe fn enable_passcred(socket: i32) -> bool {
         true
     } // Cannot have passcred on macOS and iOS.
 }
-#[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 unsafe fn get_peer_ucred(socket: i32) -> Option<ucred> {
     // SAFETY: it's safe for the ucred structure to be zero-initialized, since
     // it only contains integers
     let mut cred: ucred = mem::zeroed();
-    let mut cred_len = mem::size_of::<ucred>() as _;
+    let mut cred_len = mem::size_of::<ucred>() as socklen_t;
     let success = libc::getsockopt(
         socket,
         SOL_SOCKET,
         SO_PEERCRED,
         &mut cred as *mut _ as *mut _,
-        &mut cred_len as *mut _ as *mut _,
+        &mut cred_len as *mut _,
     ) != -1;
     if success {
         Some(cred)
@@ -136,19 +136,19 @@ unsafe fn get_peer_ucred(socket: i32) -> Option<ucred> {
     }
 }
 unsafe fn raw_set_nonblocking(socket: i32, nonblocking: bool) -> bool {
-    let old_flags = fcntl(socket, F_GETFL, ptr::null());
+    let old_flags = libc::fcntl(socket, F_GETFL, ptr::null::<c_void>());
     if old_flags == -1 {
         return false;
     }
-    new_flags = if nonblocking {
+    let new_flags = if nonblocking {
         old_flags | O_NONBLOCK
     } else {
         old_flags & !O_NONBLOCK
     };
-    fcntl(socket, F_SETFL, new_flags) != -1
+    libc::fcntl(socket, F_SETFL, new_flags) != -1
 }
 unsafe fn raw_get_nonblocking(socket: i32) -> Option<bool> {
-    let flags = fcntl(socket, F_GETFL, ptr::null());
+    let flags = libc::fcntl(socket, F_GETFL, ptr::null::<c_void>());
     if flags != -1 {
         Some(flags & O_NONBLOCK != 0)
     } else {
@@ -1783,6 +1783,7 @@ impl UdSocketPath<'static> {
 /// [`str`]: https://doc.rust-lang.org/stable/std/primitive.str.html
 pub trait ToUdSocketPath<'a> {
     /// Performs the conversion from `self` to a Unix domain socket path.
+    #[allow(clippy::wrong_self_convention)]
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>>;
 }
 impl<'a> ToUdSocketPath<'a> for UdSocketPath<'a> {

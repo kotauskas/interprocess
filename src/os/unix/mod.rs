@@ -47,7 +47,9 @@ pub(crate) mod unnamed_pipe;
 use libc::{c_int, size_t};
 #[cfg(unix)]
 use std::{
-    io, mem,
+    io,
+    marker::PhantomData,
+    mem,
     os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
@@ -125,7 +127,7 @@ impl IntoRawFd for FdOps {
 impl FromRawFd for FdOps {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self(fd)
+        Self::new(fd)
     }
 }
 #[cfg(unix)]
@@ -149,5 +151,7 @@ impl Drop for FdOps {
         });
     }
 }
+#[cfg(unix)]
 unsafe impl Send for FdOps {}
+#[cfg(unix)]
 unsafe impl Sync for FdOps {}
