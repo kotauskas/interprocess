@@ -81,6 +81,8 @@ fn convert_path(osstr: &OsStr) -> Vec<u16> {
 /// [`PipeListenerOptions`]: struct.PipeListenerOptions.html " "
 pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
+    // Store the nonblocking boolean separately to change it without mutable access
+    nonblocking: AtomicBool,
     instances: RwLock<Vec<Arc<(PipeOps, AtomicBool)>>>,
     _phantom: PhantomData<fn() -> Stream>,
 }
@@ -132,7 +134,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     ///
     /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
     #[inline]
-    pub fn set_nonblocking(&mut self, nonblocking: bool) -> io::Result<()> {
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         for instance in self
             .instances
             .read()
@@ -143,7 +145,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
                 set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
             }
         }
-        self.config.nonblocking = nonblocking;
+        self.nonblocking.store(nonblocking, Ordering::SeqCst);
         Ok(())
     }
 
@@ -175,7 +177,10 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     /// Increases instance count by 1 and returns the created instance.
     #[inline]
     fn add_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
-        let new_instance = Arc::new(self.config.create_instance::<Stream>(false)?);
+        let new_instance = Arc::new(
+            self.config
+                .create_instance::<Stream>(false, self.nonblocking.load(Ordering::SeqCst))?,
+        );
         let mut instances = self.instances.write().expect("unexpected lock poison");
         instances.push(Arc::clone(&new_instance));
         Ok(new_instance)
@@ -609,6 +614,7 @@ impl<'a> PipeListenerOptions<'a> {
     fn create_instance<Stream: PipeStream>(
         &self,
         first: bool,
+        nonblocking: bool,
     ) -> io::Result<(PipeOps, AtomicBool)> {
         let path = convert_path(&self.name);
         let (handle, success) = unsafe {
@@ -623,7 +629,7 @@ impl<'a> PipeListenerOptions<'a> {
                 },
                 self.mode.to_pipe_type()
                     | Stream::READ_MODE.map_or(0, |x| x.to_readmode())
-                    | self.nonblocking as u32,
+                    | nonblocking as u32,
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
                     x.get() as DWORD
@@ -670,10 +676,13 @@ impl<'a> PipeListenerOptions<'a> {
         };
         Ok(PipeListener {
             config: owned_config,
+            nonblocking: AtomicBool::new(self.nonblocking),
             instances: RwLock::new({
                 let capacity = self.instance_limit.map_or(8, |x| x.get()) as usize;
                 let mut vec = Vec::with_capacity(capacity);
-                vec.push(Arc::new(self.create_instance::<Stream>(true)?));
+                vec.push(Arc::new(
+                    self.create_instance::<Stream>(true, self.nonblocking)?,
+                ));
                 vec
             }),
             _phantom: PhantomData,
