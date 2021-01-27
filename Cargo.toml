@@ -25,7 +25,7 @@ futures = {version = "0.3", optional = true}
 cfg-if = "1.0"
 
 [dev_dependencies]
-tokio = {version = "0.3", features = ["rt", "macros", "rt-multi-thread"]}
+tokio = {version = "1.0", features = ["rt", "macros", "rt-multi-thread"]}
 
 [target.'cfg(windows)'.dependencies]
 winapi = {version = "0.3", features = ["std", "winbase", "winerror", "processthreadsapi", "fileapi", "handleapi", "namedpipeapi"]}
