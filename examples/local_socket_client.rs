@@ -5,12 +5,12 @@ use std::{
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut conn = LocalSocketStream::connect("/tmp/example.sock").unwrap();
-    conn.write_all(b"Hello from client!\n").unwrap();
+    let mut conn = LocalSocketStream::connect("/tmp/example.sock")?;
+    conn.write_all(b"Hello from client!\n")?;
 
     let mut conn = BufReader::new(conn);
     let mut buffer = String::new();
-    conn.read_line(&mut buffer).unwrap();
+    conn.read_line(&mut buffer)?;
 
     println!("Server answered: {}", buffer);
 

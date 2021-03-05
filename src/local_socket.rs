@@ -480,11 +480,9 @@ mod test {
         let server_barrier = Arc::clone(&barrier);
 
         std::thread::spawn(move || {
-            fn handle_error(
-                connection: io::Result<LocalSocketStream>,
-            ) -> Option<LocalSocketStream> {
+            fn handle_error(connection: io::Result<LocalSocketStream>) -> LocalSocketStream {
                 match connection {
-                    Ok(val) => Some(val),
+                    Ok(val) => val,
                     Err(error) => {
                         panic!("Incoming connection failed: {}", error);
                     }
@@ -493,7 +491,7 @@ mod test {
 
             let listener = LocalSocketListener::bind("/tmp/example.sock").unwrap();
             server_barrier.wait();
-            for mut conn in listener.incoming().filter_map(handle_error) {
+            for mut conn in listener.incoming().map(handle_error) {
                 println!("Incoming connection!");
                 conn.write_all(b"Hello from server!\n").unwrap();
                 // Add buffering to the connection to read a line.
