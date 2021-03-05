@@ -4,4 +4,5 @@
 //!
 //! The layout of this module aims to closely resemble the crate root, in that all the modules here mirror their blocking counterparts — check them out for usage examples and details about the differences you may encounter when porting blocking code to an async architecture.
 
+mod imports;
 pub mod local_socket;

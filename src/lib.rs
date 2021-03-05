@@ -147,7 +147,8 @@ pub(crate) mod private {
 }
 
 pub mod local_socket;
-#[cfg(feature = "nonblocking")]
+#[cfg(any(doc, feature = "nonblocking"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "nonblocking")))]
 pub mod nonblocking;
 pub mod unnamed_pipe;
 //pub mod shared_memory;

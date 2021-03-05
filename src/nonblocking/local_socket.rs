@@ -4,27 +4,25 @@
 //!
 //! [blocking version of this module]: ../../local_socket/index.html " "
 
-use blocking::{unblock, Unblock};
-use futures::{
-    stream::{FusedStream, Stream},
-    AsyncRead, AsyncWrite,
-};
-use std::{io, sync::Arc};
-
+use std::{io, sync::Arc, pin::Pin, task::{Context, Poll}};
+use super::imports::*;
 use crate::local_socket::{self as sync, ToLocalSocketName};
 
 /// An asynchronous local socket server, listening for connections.
 ///
 /// # Example
 /// ```no_run
+/// # #[cfg(feature = "nonblocking")]
 /// use futures::{
 ///     io::{BufReader, AsyncBufReadExt, AsyncWriteExt},
 ///     stream::TryStreamExt,
 /// };
+/// # #[cfg(feature = "nonblocking")]
 /// use interprocess::nonblocking::local_socket::*;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<std::error::Error>> {
+/// # #[cfg(feature = "nonblocking")] {
 /// let listener = LocalSocketListener::bind("/tmp/example.sock")
 ///     .await?;
 /// listener
@@ -38,6 +36,7 @@ use crate::local_socket::{self as sync, ToLocalSocketName};
 ///         Ok(())
 ///     })
 ///     .await?;
+/// # }
 /// # Ok(()) }
 /// ```
 #[derive(Debug)]
@@ -92,6 +91,7 @@ impl LocalSocketListener {
 pub struct Incoming {
     inner: Unblock<SyncArcIncoming>,
 }
+#[cfg(feature = "nonblocking")]
 impl Stream for Incoming {
     type Item = Result<LocalSocketStream, io::Error>;
     #[inline]
@@ -111,6 +111,7 @@ impl Stream for Incoming {
         }
     }
 }
+#[cfg(feature = "nonblocking")]
 impl FusedStream for Incoming {
     #[inline]
     fn is_terminated(&self) -> bool {
@@ -134,11 +135,14 @@ impl Iterator for SyncArcIncoming {
 ///
 /// # Example
 /// ```no_run
+/// # #[cfg(feature = "nonblocking")]
 /// use futures::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
+/// # #[cfg(feature = "nonblocking")]
 /// use interprocess::nonblocking::local_socket::*;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<std::error::Error>> {
+/// # #[cfg(feature = "nonblocking")] {
 /// // Replace the path as necessary on Windows.
 /// let mut conn = LocalSocketStream::connect("/tmp/example.sock")
 ///     .await?;
@@ -147,6 +151,7 @@ impl Iterator for SyncArcIncoming {
 /// let mut buffer = String::new();
 /// conn.read_line(&mut buffer).await?;
 /// println!("Server answered: {}", buffer);
+/// # }
 /// # Ok(()) }
 /// ```
 ///
@@ -166,35 +171,35 @@ impl LocalSocketStream {
     }
 }
 
-use futures::task::{Context, Poll};
-use std::pin::Pin;
+#[cfg(feature = "nonblocking")]
 impl AsyncRead for LocalSocketStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<Result<usize, futures::io::Error>> {
+    ) -> Poll<Result<usize, io::Error>> {
         AsyncRead::poll_read(Pin::new(&mut self.inner), cx, buf)
     }
 }
+#[cfg(feature = "nonblocking")]
 impl AsyncWrite for LocalSocketStream {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, futures::io::Error>> {
+    ) -> Poll<Result<usize, io::Error>> {
         AsyncWrite::poll_write(Pin::new(&mut self.inner), cx, buf)
     }
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), futures::io::Error>> {
+    ) -> Poll<Result<(), io::Error>> {
         AsyncWrite::poll_flush(Pin::new(&mut self.inner), cx)
     }
     fn poll_close(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(), futures::io::Error>> {
+    ) -> Poll<Result<(), io::Error>> {
         AsyncWrite::poll_close(Pin::new(&mut self.inner), cx)
     }
 }
