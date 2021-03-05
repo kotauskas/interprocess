@@ -39,3 +39,11 @@ jobs:
           command: test
         env:
           RUSTFLAGS: -D warnings
+      
+      - name: Run rustdoc
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: "--no-deps" # We don't have time to waste.
+        env:
+          RUSTFLAGS: -D warnings
