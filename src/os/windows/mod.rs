@@ -1,6 +1,8 @@
 //! Windows-specific functionality for various interprocess communication primitives, as well as Windows-specific ones.
 
 pub mod named_pipe;
+#[cfg(any(doc, feature = "signals"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "signals")))]
 pub mod signal;
 pub mod unnamed_pipe;
 // TODO mailslots
@@ -8,29 +10,9 @@ pub mod unnamed_pipe;
 #[cfg(windows)]
 pub(crate) mod local_socket;
 
-#[cfg(windows)]
-use winapi::{
-    shared::{minwindef::DWORD, ntdef::HANDLE},
-    um::{
-        fileapi::{FlushFileBuffers, ReadFile, WriteFile},
-        handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
-        processthreadsapi::GetCurrentProcess,
-    },
-};
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub type HANDLE = *mut ();
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub trait AsRawHandle {}
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub trait IntoRawHandle {}
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub unsafe trait FromRawHandle {}
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+mod imports;
+use imports::*;
+
 use std::{io, mem, ptr};
 
 /// Objects which own handles which can be shared with another processes.
@@ -66,9 +48,13 @@ pub trait ShareHandle: AsRawHandle {
         }
     }
 }
+#[cfg(windows)]
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
+#[cfg(windows)]
 impl ShareHandle for unnamed_pipe::UnnamedPipeReader {}
+#[cfg(windows)]
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
+#[cfg(windows)]
 impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.

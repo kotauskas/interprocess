@@ -104,3 +104,12 @@ cfg_if! {
         pub(super) type FdOps = ();
     }
 }
+
+cfg_if! {
+    if #[cfg(feature = "signals")] {
+        pub use intmap::IntMap;
+        pub use once_cell::sync::Lazy;
+        pub use spinning::{RwLock, RwLockUpgradableReadGuard};
+        pub use thiserror::Error;
+    }
+}

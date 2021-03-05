@@ -12,9 +12,8 @@
 
 // TODO improve docs, add examples
 
+use super::imports::*;
 use super::{AsRawHandle, FromRawHandle, IntoRawHandle};
-#[cfg(windows)]
-use std::os::windows::ffi::OsStrExt;
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
@@ -30,40 +29,7 @@ use std::{
         Arc, RwLock,
     },
 };
-#[cfg(windows)]
-use winapi::{
-    shared::minwindef::DWORD,
-    um::{
-        fileapi::{CreateFileW, OPEN_EXISTING},
-        handleapi::INVALID_HANDLE_VALUE,
-        namedpipeapi::{CreateNamedPipeW, SetNamedPipeHandleState},
-        winbase::{
-            FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
-            PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE, PIPE_TYPE_BYTE,
-            PIPE_TYPE_MESSAGE,
-        },
-        winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE, HANDLE},
-    },
-};
-#[cfg(not(windows))]
-macro_rules! fake_consts {
-    ($($name:ident = $val:expr),+ $(,)?) => (
-        $(
-            #[cfg(not(windows))]
-            const $name : u32 = $val;
-        )+
-    );
-}
-#[cfg(not(windows))]
-fake_consts! {
-    PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
-    PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
-    PIPE_READMODE_BYTE = 0, PIPE_READMODE_MESSAGE = 1,
 
-}
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub type DWORD = u32;
 use crate::{PartialMsgWriteError, ReliableReadMsg, Sealed};
 
 fn convert_path(osstr: &OsStr) -> Vec<u16> {
@@ -210,11 +176,7 @@ unsafe fn set_nonblocking_for_stream<Stream: PipeStream>(
 }
 
 mod pipe_listener_debug_impl {
-    #[cfg(windows)]
-    use super::AsRawHandle;
-    use super::{
-        fmt, Arc, AtomicBool, Debug, Formatter, Ordering, PipeListener, PipeOps, PipeStream, RwLock,
-    };
+    use super::*;
     /// Shim used to improve pipe instance formatting
     struct Instance<'a> {
         instance: &'a (PipeOps, AtomicBool),
@@ -263,31 +225,12 @@ mod pipe_listener_debug_impl {
     }
 }
 
-// SAFETY: all fields are Send and Sync except for the PhantomData
-//unsafe impl<Stream> Send for PipeListener<Stream> {}
-//unsafe impl<Stream> Sync for PipeListener<Stream> {}
-
 use seal::*;
 mod seal {
     use super::super::FileHandleOps;
-    #[cfg(windows)]
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-    use std::{io, ptr, sync::atomic::AtomicBool};
-    #[cfg(windows)]
-    use winapi::{
-        shared::{minwindef::DWORD, winerror::ERROR_PIPE_CONNECTED},
-        um::{
-            fileapi::ReadFile,
-            namedpipeapi::{ConnectNamedPipe, DisconnectNamedPipe, PeekNamedPipe},
-            winbase::{
-                GetNamedPipeClientProcessId, GetNamedPipeClientSessionId,
-                GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
-            },
-            winnt::HANDLE,
-        },
-    };
+    use super::*;
 
-    pub trait NamedPipeStreamInternals: From<std::sync::Arc<(super::PipeOps, AtomicBool)>> {}
+    pub trait NamedPipeStreamInternals: From<Arc<(PipeOps, AtomicBool)>> {}
 
     /// The actual implementation of a named pipe server or client.
     #[repr(transparent)]
@@ -787,12 +730,14 @@ macro_rules! create_stream_type {
                 Ok(())
             }
         }
+        #[cfg(windows)]
         impl PipeStream for $ty {
             const ROLE: PipeStreamRole = $role;
             const WRITE_MODE: Option<PipeMode> = $write_mode;
             const READ_MODE: Option<PipeMode> = $read_mode;
         }
         impl Sealed for $ty {}
+        #[cfg(windows)]
         impl NamedPipeStreamInternals for $ty {}
         impl Drop for $ty {
             #[inline]

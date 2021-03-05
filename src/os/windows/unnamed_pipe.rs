@@ -6,36 +6,16 @@
 
 // TODO add examples
 
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+use super::imports::*;
+use super::FileHandleOps;
+use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
     mem::{self, size_of, zeroed},
     num::NonZeroUsize,
+    ptr,
 };
-#[cfg(windows)]
-use winapi::{
-    shared::{
-        minwindef::LPVOID,
-        ntdef::{HANDLE, NULL},
-    },
-    um::{
-        handleapi::INVALID_HANDLE_VALUE, minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreatePipe,
-    },
-};
-#[cfg(not(windows))]
-#[doc(hidden)]
-#[allow(non_camel_case_types)]
-pub struct SECURITY_ATTRIBUTES {}
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub type LPVOID = *mut ();
-#[cfg(not(windows))]
-#[doc(hidden)]
-pub const NULL: LPVOID = 0 as _;
-use super::FileHandleOps;
-use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///
@@ -62,7 +42,7 @@ impl UnnamedPipeCreationOptions {
     pub const fn new() -> Self {
         Self {
             inheritable: true,
-            security_descriptor: NULL,
+            security_descriptor: ptr::null_mut(),
             buffer_size_hint: None,
         }
     }

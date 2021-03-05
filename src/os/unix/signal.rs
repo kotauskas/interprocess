@@ -138,9 +138,6 @@
 #![cfg_attr(not(unix), allow(unused_imports))]
 
 use cfg_if::cfg_if;
-use intmap::IntMap;
-use lazy_static::lazy_static;
-use spinning::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -149,7 +146,6 @@ use std::{
     mem::zeroed,
     panic, process,
 };
-use thiserror::Error;
 
 use super::imports::*;
 
@@ -200,11 +196,11 @@ pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
 }
 
 /// The first field is the current method of handling a specific signal, the second one is the flags which were set for it.
+#[cfg(all(unix, feature = "signals"))]
 type HandlerAndFlags = (SignalHandler, i32);
-#[cfg(unix)]
-lazy_static! {
-    static ref HANDLERS: RwLock<IntMap<HandlerAndFlags>> = RwLock::new(IntMap::new());
-}
+
+#[cfg(all(unix, feature = "signals"))]
+static HANDLERS: Lazy<RwLock<IntMap<HandlerAndFlags>>> = Lazy::new(|| RwLock::new(IntMap::new()));
 
 /// Installs the specified handler for the specified standard signal, using the default values for the flags.
 ///
@@ -213,7 +209,7 @@ lazy_static! {
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -250,7 +246,7 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -291,7 +287,7 @@ pub unsafe fn set_unsafe_handler(
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -338,7 +334,7 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -579,11 +575,11 @@ impl HandlerOptions {
 
 /// The error produced when setting a signal handler fails.
 #[derive(Debug)]
-#[cfg_attr(unix, derive(Error))]
+#[cfg_attr(all(unix, feature = "signals"), derive(Error))]
 pub enum SetHandlerError {
     /// An unsafe signal was attempted to be handled using `set` instead of `set_unsafe`.
     #[cfg_attr(
-        unix,
+        all(unix, feature = "signals"),
         error("an unsafe signal was attempted to be handled using `set` instead of `set_unsafe`")
     )]
     UnsafeSignal,
@@ -592,13 +588,13 @@ pub enum SetHandlerError {
     /// [`Kill`]: enum.SignalType.html#variant.Kill " "
     /// [`ForceSuspend`]: enum.SignalType.html#variant.ForceSuspend " "
     #[cfg_attr(
-        unix,
+        all(unix, feature = "signals"),
         error("the signal {:?} cannot be handled", .0),
     )]
     UnblockableSignal(SignalType),
     /// The specified real-time signal is not available on this OS.
     #[cfg_attr(
-        unix,
+        all(unix, feature = "signals"),
         error(
             "the real-time signal number {} is not available ({} is the highest possible)",
             .attempted,
@@ -613,10 +609,10 @@ pub enum SetHandlerError {
     },
     /// An unexpected OS error ocurred during signal handler setup.
     #[cfg_attr(
-        unix,
+        all(unix, feature = "signals"),
         error("{}", .0),
     )]
-    UnexpectedSystemCallFailure(#[cfg_attr(unix, from)] io::Error),
+    UnexpectedSystemCallFailure(#[cfg_attr(all(unix, feature = "signals"), from)] io::Error),
 }
 
 /// The actual hook which is passed to `sigaction` which dispatches signals according to the global handler map (the `HANDLERS` static).
@@ -739,7 +735,7 @@ impl From<SignalHook> for fn() {
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
@@ -768,7 +764,7 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
@@ -801,7 +797,7 @@ pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Resul
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///
@@ -827,7 +823,7 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
+/// # #[cfg(all(unix, feature = "signals"))] {
 /// use interprocess::os::unix::signal::{self, SignalType};
 /// use std::process;
 ///

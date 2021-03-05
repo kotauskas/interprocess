@@ -10,10 +10,12 @@
 //!
 //! Unix domain sockets are not available on ARM Newlib, but are supported on all other Unix-like systems.
 
-pub mod fifo_file;
-pub mod signal;
-
 mod imports;
+
+pub mod fifo_file;
+#[cfg(any(doc, feature = "signals"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "signals")))]
+pub mod signal;
 
 #[cfg(any(
     target_os = "linux",

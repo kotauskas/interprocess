@@ -11,29 +11,20 @@
 //! - atomic C functions, but only the ones which are lock-free (practically never used in Rust since it has its own atomics which use compiler intrinsics)
 //! - `atomic_is_lock_free`
 
-// TODO unfinished
-
-use intmap::IntMap;
-use lazy_static::lazy_static;
-use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
-use spinning::{RwLock, RwLockUpgradableReadGuard};
+use super::imports::*;
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
     fmt::{self, Formatter},
     panic, process,
 };
-use thiserror::Error;
-
-// FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
-const SIG_DFL: sighandler_t = 0;
 
 /// Installs the specified handler for the specified signal.
 ///
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(windows)] {
+/// # #[cfg(all(windows, feature = "signals"))] {
 /// use interprocess::os::windows::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -70,7 +61,7 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 /// # Example
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(windows)] {
+/// # #[cfg(all(windows, feature = "signals"))] {
 /// use interprocess::os::windows::signal::{self, SignalType, SignalHandler};
 ///
 /// let handler = unsafe {
@@ -121,9 +112,8 @@ pub unsafe fn set_unsafe_handler(
     Ok(())
 }
 
-lazy_static! {
-    static ref HANDLERS: RwLock<IntMap<SignalHandler>> = RwLock::new(IntMap::new());
-}
+#[cfg(all(windows, feature = "signals"))]
+static HANDLERS: Lazy<RwLock<IntMap<SignalHandler>>> = Lazy::new(|| RwLock::new(IntMap::new()));
 
 unsafe fn install_hook(signum: i32, hook: usize) -> Result<(), ()> {
     let success = { libc::signal(signum, hook) != libc::SIG_ERR as _ };
@@ -158,16 +148,23 @@ extern "C" fn signal_receiver(signum: i32) {
 }
 
 /// The error produced when setting a signal handler fails.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(all(windows, feature = "signals"), derive(Error))]
 pub enum SetHandlerError {
     /// An unsafe signal was attempted to be handled using `set_handler` instead of `set_unsafe_handler`.
-    #[error(
-        "\
+    #[cfg_attr(
+        all(windows, feature = "signals"),
+        error(
+            "\
 an unsafe signal was attempted to be handled using `set_handler` instead of `set_unsafe_handler`"
+        )
     )]
     UnsafeSignal,
     /// the C library call unexpectedly failed without error information.
-    #[error("the C library call unexpectedly failed without error information")]
+    #[cfg_attr(
+        all(windows, feature = "signals"),
+        error("the C library call unexpectedly failed without error information")
+    )]
     UnexpectedLibcCallFailure,
 }
 
