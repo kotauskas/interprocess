@@ -13,6 +13,7 @@
 // TODO improve docs, add examples
 
 mod enums;
+mod instancer;
 mod listener;
 mod pipeops;
 mod stream;
@@ -21,6 +22,7 @@ pub use listener::*;
 pub use stream::*;
 
 use super::imports::*;
+use instancer::*;
 use pipeops::*;
 use std::{
     ffi::{OsStr, OsString},

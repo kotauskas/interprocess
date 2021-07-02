@@ -1,6 +1,6 @@
 use super::{
     super::{imports::*, AsRawHandle, FromRawHandle},
-    convert_path, set_nonblocking_for_stream, PipeMode, PipeOps, PipeStream,
+    convert_path, set_nonblocking_for_stream, Instancer, PipeMode, PipeOps, PipeStream,
 };
 use std::{
     borrow::Cow,
@@ -9,7 +9,6 @@ use std::{
     fmt::{self, Debug, Formatter},
     io,
     marker::PhantomData,
-    mem,
     num::{NonZeroU32, NonZeroU8},
     ptr,
     sync::{
@@ -27,7 +26,7 @@ pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     // Store the nonblocking boolean separately to change it without mutable access
     nonblocking: AtomicBool,
-    instances: RwLock<Vec<Arc<(PipeOps, AtomicBool)>>>,
+    instancer: Instancer<PipeOps>,
     _phantom: PhantomData<fn() -> Stream>,
 }
 /// An iterator that infinitely [`accept`]s connections on a [`PipeListener`].
@@ -61,7 +60,11 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     /// See `incoming` for an iterator version of this.
     #[inline]
     pub fn accept(&self) -> io::Result<Stream> {
-        let instance = self.alloc_instance()?;
+        let instance = if let Some(instance) = self.instancer.allocate() {
+            instance
+        } else {
+            self.instancer.add_instance(self.create_instance()?)
+        };
         instance.0.connect()?;
         Ok(Stream::build(instance))
     }
@@ -80,7 +83,8 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         for instance in self
-            .instances
+            .instancer
+            .0
             .read()
             .expect("unexpected lock poison")
             .iter()
@@ -93,41 +97,9 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         Ok(())
     }
 
-    /// Returns a pipe instance either by using an existing one or returning a newly created instance using `add_instance`.
-    fn alloc_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
-        let instances = self.instances.read().expect("unexpected lock poison");
-        for inst in instances.iter() {
-            // Try to ownership for the instance by doing a combined compare+exchange, just
-            // like a mutex does.
-            let cmpxchg_result =
-                inst.1
-                    .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed);
-            if cmpxchg_result.is_ok() {
-                // If the compare+exchange returned Ok, then we successfully took ownership of the
-                // pipe instance and we can return it right away.
-                return Ok(Arc::clone(inst));
-            }
-            // If not, the pipe we tried to claim is already at work and we need to seek a new
-            // one, which is what the next iteration will do.
-        }
-        // If we searched through the entire thing and never found a free pipe, there isn't one
-        // available, which is why we need a new one.
-        let new_inst = self.add_instance()?;
-        mem::drop(instances); // Get rid of the old lock to lock again with write access.
-        let mut instances = self.instances.write().expect("unexpected lock poison");
-        instances.push(Arc::clone(&new_inst));
-        Ok(new_inst)
-    }
-    /// Increases instance count by 1 and returns the created instance.
-    #[inline]
-    fn add_instance(&self) -> io::Result<Arc<(PipeOps, AtomicBool)>> {
-        let new_instance = Arc::new(
-            self.config
-                .create_instance::<Stream>(false, self.nonblocking.load(Ordering::SeqCst))?,
-        );
-        let mut instances = self.instances.write().expect("unexpected lock poison");
-        instances.push(Arc::clone(&new_instance));
-        Ok(new_instance)
+    fn create_instance(&self) -> io::Result<PipeOps> {
+        self.config
+            .create_instance::<Stream>(false, self.nonblocking.load(Ordering::SeqCst))
     }
 }
 
@@ -173,7 +145,7 @@ mod debug_impl {
                 .field(
                     "instances",
                     &Instances {
-                        instances: &self.instances,
+                        instances: &self.instancer.0,
                     },
                 )
                 .finish()
@@ -182,8 +154,6 @@ mod debug_impl {
 }
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
-///
-/// [`PipeListener`]: struct.PipeListener.html " "
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
@@ -197,9 +167,9 @@ pub struct PipeListenerOptions<'a> {
     /// - Whenever [`accept`] is called or [`incoming`] is being iterated through, if there is no client currently attempting to connect to the named pipe server, the method will return immediately with the [`WouldBlock`] error instead of blocking until one arrives.
     /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an explanation of the exact effects.
     ///
-    /// [`accept`]: struct.PipeListener.html#method.accept " "
-    /// [`incoming`]: struct.PipeListener.html#method.incoming " "
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    /// [`accept`]: struct.PipeListener.html#method.accept
+    /// [`incoming`]: struct.PipeListener.html#method.incoming
+    /// [`WouldBlock`]: io::ErrorKind::WouldBlock
     pub nonblocking: bool,
     /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many clients can be communicated with at once. If set to 1, trying to create multiple instances at the same time will return an error. If set to `None`, no limit is applied. The value 255 is not allowed because of Windows limitations.
     pub instance_limit: Option<NonZeroU8>,
@@ -220,6 +190,20 @@ pub struct PipeListenerOptions<'a> {
     /// The default timeout when waiting for a client to connect. Used unless another timeout is specified when waiting for a client.
     pub wait_timeout: NonZeroU32,
 }
+macro_rules! genset {
+    ($name:ident : $ty:ty) => {
+        #[doc = concat!("Sets the [`", stringify!($name), "`](#structfield.", stringify!($name), ") parameter to the specified value.")]
+        #[inline]
+        #[must_use = "builder setters take the entire structure and return the result"]
+        pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
+            self.$name = $name.into();
+            self
+        }
+    };
+    ($($name:ident : $ty:ty),+ $(,)?) => {
+        $(genset!($name : $ty);)+
+    };
+}
 impl<'a> PipeListenerOptions<'a> {
     /// Creates a new builder with default options.
     #[inline]
@@ -233,96 +217,26 @@ impl<'a> PipeListenerOptions<'a> {
             accept_remote: false,
             input_buffer_size_hint: 512,
             output_buffer_size_hint: 512,
-            wait_timeout: unsafe { NonZeroU32::new_unchecked(50) },
+            wait_timeout: NonZeroU32::new(50).unwrap(),
         }
     }
-    /// Sets the [`name`] parameter to the specified value.
-    ///
-    /// [`name`]: #structfield.name " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn name(mut self, name: impl Into<Cow<'a, OsStr>>) -> Self {
-        self.name = name.into();
-        self
-    }
-    /// Sets the [`mode`] parameter to the specified value.
-    ///
-    /// [`mode`]: #structfield.mode " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn mode(mut self, mode: PipeMode) -> Self {
-        self.mode = mode;
-        self
-    }
-    /// Sets the [`nonblocking`] parameter to the specified value.
-    ///
-    /// [`nonblocking`]: #structfield.nonblocking " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn nonblocking(mut self, nonblocking: bool) -> Self {
-        self.nonblocking = nonblocking;
-        self
-    }
-    /// Sets the [`instance_limit`] parameter to the specified value.
-    ///
-    /// [`instance_limit`]: #structfield.instance_limit " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn instance_limit(mut self, instance_limit: impl Into<Option<NonZeroU8>>) -> Self {
-        self.instance_limit = instance_limit.into();
-        self
-    }
-    /// Sets the [`write_through`] parameter to the specified value.
-    ///
-    /// [`write_through`]: #structfield.write_through " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn write_through(mut self, write_through: bool) -> Self {
-        self.write_through = write_through;
-        self
-    }
-    /// Sets the [`accept_remote`] parameter to the specified value.
-    ///
-    /// [`accept_remote`]: #structfield.accept_remote " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn accept_remote(mut self, accept_remote: bool) -> Self {
-        self.accept_remote = accept_remote;
-        self
-    }
-    /// Sets the [`input_buffer_size_hint`] parameter to the specified value.
-    ///
-    /// [`input_buffer_size_hint`]: #structfield.input_buffer_size_hint " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn input_buffer_size_hint(mut self, input_buffer_size_hint: impl Into<usize>) -> Self {
-        self.input_buffer_size_hint = input_buffer_size_hint.into();
-        self
-    }
-    /// Sets the [`output_buffer_size_hint`] parameter to the specified value.
-    ///
-    /// [`output_buffer_size_hint`]: #structfield.output_buffer_size_hint " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn output_buffer_size_hint(mut self, output_buffer_size_hint: impl Into<usize>) -> Self {
-        self.output_buffer_size_hint = output_buffer_size_hint.into();
-        self
-    }
-    /// Sets the [`wait_timeout`] parameter to the specified value.
-    ///
-    /// [`wait_timeout`]: #structfield.wait_timeout " "
-    #[inline]
-    #[must_use = "builder setters take the entire structure and return the result"]
-    pub fn wait_timeout(mut self, wait_timeout: impl Into<NonZeroU32>) -> Self {
-        self.wait_timeout = wait_timeout.into();
-        self
-    }
+    genset!(
+        name: Cow<'a, OsStr>,
+        mode: PipeMode,
+        nonblocking: bool,
+        instance_limit: Option<NonZeroU8>,
+        write_through: bool,
+        accept_remote: bool,
+        input_buffer_size_hint: usize,
+        output_buffer_size_hint: usize,
+        wait_timeout: NonZeroU32,
+    );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
     fn create_instance<Stream: PipeStream>(
         &self,
         first: bool,
         nonblocking: bool,
-    ) -> io::Result<(PipeOps, AtomicBool)> {
+    ) -> io::Result<PipeOps> {
         let path = convert_path(&self.name);
         let (handle, success) = unsafe {
             let handle = CreateNamedPipeW(
@@ -352,10 +266,7 @@ impl<'a> PipeListenerOptions<'a> {
         };
         if success {
             // SAFETY: we just created this handle
-            Ok((
-                unsafe { PipeOps::from_raw_handle(handle) },
-                AtomicBool::new(false),
-            ))
+            Ok(unsafe { PipeOps::from_raw_handle(handle) })
         } else {
             Err(io::Error::last_os_error())
         }
@@ -381,17 +292,17 @@ impl<'a> PipeListenerOptions<'a> {
             output_buffer_size_hint: self.output_buffer_size_hint,
             wait_timeout: self.wait_timeout,
         };
+        let instancer_capacity = self.instance_limit.map_or(8, |x| x.get()) as usize;
+        let mut instance_vec = Vec::with_capacity(instancer_capacity);
+        let first_instance = Arc::new((
+            self.create_instance::<Stream>(true, self.nonblocking)?,
+            AtomicBool::new(false),
+        ));
+        instance_vec.push(first_instance);
         Ok(PipeListener {
             config: owned_config,
             nonblocking: AtomicBool::new(self.nonblocking),
-            instances: RwLock::new({
-                let capacity = self.instance_limit.map_or(8, |x| x.get()) as usize;
-                let mut vec = Vec::with_capacity(capacity);
-                vec.push(Arc::new(
-                    self.create_instance::<Stream>(true, self.nonblocking)?,
-                ));
-                vec
-            }),
+            instancer: Instancer(RwLock::new(instance_vec)),
             _phantom: PhantomData,
         })
     }
