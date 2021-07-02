@@ -497,7 +497,7 @@ impl HandlerOptions {
                 max: NUM_REALTIME_SIGNALS,
             });
         }
-        let handlers = HANDLERS.upgradable_read();
+        let handlers = HANDLERS.read();
         let new_flags = self.flags_as_i32();
         let mut need_to_upgrade_handle = false;
         let need_to_install_hook =
@@ -520,13 +520,12 @@ impl HandlerOptions {
                 need_to_upgrade_handle = true;
                 !self.handler.unwrap_or_default().is_default()
             };
+        drop(handlers);
         if need_to_upgrade_handle {
-            let mut handlers = RwLockUpgradableReadGuard::upgrade(handlers);
+            let mut handlers = HANDLERS.write();
             let signal_u64 = self.signal as u64;
             handlers.remove(signal_u64);
             handlers.insert(signal_u64, (self.handler.unwrap_or_default(), new_flags));
-        } else {
-            drop(handlers);
         }
         if need_to_install_hook {
             let hook_val = match self.handler.unwrap_or_default() {

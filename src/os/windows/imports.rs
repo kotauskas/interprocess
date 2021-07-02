@@ -58,7 +58,7 @@ cfg_if! {
         pub use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
         pub use intmap::IntMap;
         pub use once_cell::sync::Lazy;
-        pub use spinning::{RwLock, RwLockUpgradableReadGuard};
+        pub use spinning::RwLock;
         pub use thiserror::Error;
 
         // FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged

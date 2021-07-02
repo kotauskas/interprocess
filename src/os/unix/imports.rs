@@ -109,7 +109,7 @@ cfg_if! {
     if #[cfg(feature = "signals")] {
         pub use intmap::IntMap;
         pub use once_cell::sync::Lazy;
-        pub use spinning::{RwLock, RwLockUpgradableReadGuard};
+        pub use spinning::RwLock;
         pub use thiserror::Error;
     }
 }

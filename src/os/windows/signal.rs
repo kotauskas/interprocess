@@ -91,10 +91,11 @@ pub unsafe fn set_unsafe_handler(
     handler: SignalHandler,
 ) -> Result<(), SetHandlerError> {
     let signal_type = signal_type as u64;
-    let handlers = HANDLERS.upgradable_read();
+    let handlers = HANDLERS.read();
     let new_signal = handlers.get(signal_type).is_none();
+    drop(handlers);
     if new_signal {
-        let mut handlers = RwLockUpgradableReadGuard::upgrade(handlers);
+        let mut handlers = HANDLERS.write();
         handlers.remove(signal_type);
         handlers.insert(signal_type, handler);
         drop(handlers);
