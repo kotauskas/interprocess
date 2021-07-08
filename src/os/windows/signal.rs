@@ -117,7 +117,10 @@ pub unsafe fn set_unsafe_handler(
 static HANDLERS: Lazy<RwLock<IntMap<SignalHandler>>> = Lazy::new(|| RwLock::new(IntMap::new()));
 
 unsafe fn install_hook(signum: i32, hook: usize) -> Result<(), ()> {
-    let success = { libc::signal(signum, hook) != libc::SIG_ERR as _ };
+    let success = unsafe {
+        // SAFETY: hook validity is required via safety contract
+        libc::signal(signum, hook)
+    } != libc::SIG_ERR as _;
     if success {
         Ok(())
     } else {
@@ -212,7 +215,11 @@ impl SignalHandler {
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
     #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
-        Self::Hook(SignalHook::from_fn(function))
+        let hook = unsafe {
+            // SAFETY: hook validity required by safety contract
+            SignalHook::from_fn(function)
+        };
+        Self::Hook(hook)
     }
     /// Creates a handler which calls the specified function and is known to never return.
     ///
@@ -222,7 +229,11 @@ impl SignalHandler {
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
     #[inline]
     pub unsafe fn from_fn_noreturn(function: fn() -> !) -> Self {
-        Self::NoReturnHook(NoReturnSignalHook::from_fn(function))
+        let hook = unsafe {
+            // SAFETY: hook validity required by safety contract
+            NoReturnSignalHook::from_fn(function)
+        };
+        Self::NoReturnHook(hook)
     }
 }
 impl Default for SignalHandler {

@@ -63,7 +63,10 @@ impl IntoRawFd for UnnamedPipeReader {
 impl FromRawFd for UnnamedPipeReader {
     #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self(FdOps::from_raw_fd(fd))
+        Self(unsafe {
+            // SAFETY: guaranteed by safety contract
+            FdOps::from_raw_fd(fd)
+        })
     }
 }
 impl Debug for UnnamedPipeReader {

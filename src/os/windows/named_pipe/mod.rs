@@ -42,15 +42,17 @@ unsafe fn set_nonblocking_for_stream<Stream: PipeStream>(
     nonblocking: bool,
 ) -> io::Result<()> {
     let read_mode: u32 = Stream::READ_MODE.map_or(0, PipeMode::to_readmode);
-    // Bitcast the boolean without additional transformatinos since
+    // Bitcast the boolean without additional transformations since
     // the flag is in the first bit.
     let mut mode: u32 = read_mode | nonblocking as u32;
-    let success = SetNamedPipeHandleState(
-        handle,
-        &mut mode as *mut _,
-        ptr::null_mut(),
-        ptr::null_mut(),
-    ) != 0;
+    let success = unsafe {
+        SetNamedPipeHandleState(
+            handle,
+            &mut mode as *mut _,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    } != 0;
     if success {
         Ok(())
     } else {

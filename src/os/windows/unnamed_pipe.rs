@@ -104,22 +104,26 @@ impl UnnamedPipeCreationOptions {
             None => 0,
         } as u32;
         let [mut writer, mut reader] = [INVALID_HANDLE_VALUE; 2];
-        let success = CreatePipe(
-            &mut reader as *mut _,
-            &mut writer as *mut _,
-            &mut self.extract_security_attributes() as *mut _,
-            hint_raw,
-        ) != 0;
+        let success = unsafe {
+            CreatePipe(
+                &mut reader as *mut _,
+                &mut writer as *mut _,
+                &mut self.extract_security_attributes() as *mut _,
+                hint_raw,
+            )
+        } != 0;
         if success {
-            // SAFETY: we just created those handles which means that we own them
-            Ok((
-                PubWriter {
+            let (writer, reader) = unsafe {
+                // SAFETY: we just created those handles which means that we own them
+                let writer = PubWriter {
                     inner: UnnamedPipeWriter::from_raw_handle(writer),
-                },
-                PubReader {
+                };
+                let reader = PubReader {
                     inner: UnnamedPipeReader::from_raw_handle(reader),
-                },
-            ))
+                };
+                (writer, reader)
+            };
+            Ok((writer, reader))
         } else {
             Err(io::Error::last_os_error())
         }
@@ -167,7 +171,11 @@ impl IntoRawHandle for UnnamedPipeReader {
 impl FromRawHandle for UnnamedPipeReader {
     #[inline]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        Self(FileHandleOps::from_raw_handle(handle))
+        let fho = unsafe {
+            // SAFETY: validity guaranteed by safety contract
+            FileHandleOps::from_raw_handle(handle)
+        };
+        Self(fho)
     }
 }
 impl Debug for UnnamedPipeReader {

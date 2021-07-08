@@ -55,7 +55,7 @@ impl FromRawFd for LocalSocketListener {
     #[inline]
     unsafe fn from_raw_fd(fd: i32) -> Self {
         Self {
-            inner: UdStreamListener::from_raw_fd(fd),
+            inner: unsafe { UdStreamListener::from_raw_fd(fd) },
         }
     }
 }
@@ -136,7 +136,7 @@ impl FromRawFd for LocalSocketStream {
     #[inline]
     unsafe fn from_raw_fd(fd: i32) -> Self {
         Self {
-            inner: UdStream::from_raw_fd(fd),
+            inner: unsafe { UdStream::from_raw_fd(fd) },
         }
     }
 }

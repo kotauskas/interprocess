@@ -149,11 +149,12 @@ macro_rules! create_stream_type {
         impl FromRawHandle for $ty {
             #[inline]
             unsafe fn from_raw_handle(handle: HANDLE) -> Self {
+                let pipeops = unsafe {
+                    // SAFETY: guaranteed via safety contract
+                    PipeOps::from_raw_handle(handle)
+                };
                 Self {
-                    instance: Arc::new((
-                        PipeOps::from_raw_handle(handle),
-                        AtomicBool::new(false),
-                    ))
+                    instance: Arc::new((pipeops, AtomicBool::new(false)))
                 }
             }
         }

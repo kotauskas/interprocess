@@ -276,9 +276,11 @@ pub unsafe fn set_unsafe_handler(
     signal_type: SignalType,
     handler: SignalHandler,
 ) -> Result<(), SetHandlerError> {
-    HandlerOptions::for_signal(signal_type)
-        .set_new_handler(handler)
-        .set_unsafe()
+    unsafe {
+        HandlerOptions::for_signal(signal_type)
+            .set_new_handler(handler)
+            .set_unsafe()
+    }
 }
 /// Installs the specified handler for the specified real-time signal, using the default values for the flags.
 ///
@@ -317,10 +319,20 @@ pub fn set_rthandler(rtsignal: u32, handler: SignalHandler) -> Result<(), SetHan
 
 unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
     let success = {
-        let [mut old_handler, mut new_handler] = [zeroed::<sigaction>(); 2];
-        new_handler.sa_sigaction = hook as usize;
+        let [mut old_handler, mut new_handler] = unsafe {
+            // SAFETY: sigaction only consists of integers and therefore can
+            // contain an all-0 bit pattern
+            [zeroed::<sigaction>(); 2]
+        };
+        new_handler.sa_sigaction = hook;
         new_handler.sa_flags = flags;
-        libc::sigaction(signum, &new_handler as *const _, &mut old_handler as *mut _) != -1
+        unsafe {
+            // SAFETY: all the pointers that are being passed come from references and only involve
+            // a single cast, which means that it's just a reference-to-pointer cast and not a
+            // pointer-to-pointer cast (the latter can cast any pointer to any other pointer, but
+            // you need two casts in order to convert a reference to a pointer to an arbitrary type)
+            libc::sigaction(signum, &new_handler as *const _, &mut old_handler as *mut _) != -1
+        }
     };
     if success {
         Ok(())
@@ -543,16 +555,17 @@ impl HandlerOptions {
     #[inline]
     fn flags_as_i32(self) -> i32 {
         if self.handler.unwrap_or_default().is_default() {
-            debug_assert_eq!(
-                self.recursive_handler, false,
+            debug_assert!(
+                !self.recursive_handler,
                 "cannot use the recursive_handler flag with the default handling method",
             );
         }
         if self.signal != SIGCHLD {
-            debug_assert_eq!(
-                self.ignore_child_stop_events, false,
-                "cannot use the ignore_child_stop_events flag when the signal to be handled isn't \
-                ChildProcessEvent",
+            debug_assert!(
+                !self.ignore_child_stop_events,
+                "\
+cannot use the ignore_child_stop_events flag when the signal to be handled isn't \
+ChildProcessEvent",
             );
         }
         let mut flags = 0;
@@ -683,7 +696,7 @@ impl SignalHandler {
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
     #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
-        Self::Hook(SignalHook::from_fn(function))
+        Self::Hook(unsafe { SignalHook::from_fn(function) })
     }
 }
 impl Default for SignalHandler {

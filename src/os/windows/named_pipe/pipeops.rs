@@ -182,7 +182,8 @@ impl IntoRawHandle for PipeOps {
 #[cfg(windows)]
 impl FromRawHandle for PipeOps {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        Self(FileHandleOps::from_raw_handle(handle))
+        let fho = unsafe { FileHandleOps::from_raw_handle(handle) };
+        Self(fho)
     }
 }
 // SAFETY: we don't expose reading/writing for immutable references of PipeInstance

@@ -160,8 +160,12 @@ impl IntoRawHandle for LocalSocketStream {
 impl FromRawHandle for LocalSocketStream {
     #[inline]
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
+        let inner = unsafe {
+            // SAFETY: guaranteed via safety contract
+            PipeStream::from_raw_handle(handle)
+        };
         Self {
-            inner: PipeStream::from_raw_handle(handle),
+            inner,
             server_or_client: AtomicU8::new(ServerOrClient::Nah as _),
         }
     }

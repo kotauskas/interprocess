@@ -20,9 +20,10 @@
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
+#![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
-#![allow(unused_unsafe)]
+#![allow(clippy::nonstandard_macro_braces)]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
 #[cfg(not(any(
@@ -119,7 +120,9 @@ pub(crate) mod private {
                 #[inline]
                 unsafe fn from_raw_handle(handle: *mut ::std::ffi::c_void) -> Self {
                     Self {
-                        inner: ::std::os::windows::io::FromRawHandle::from_raw_handle(handle),
+                        inner: unsafe {
+                            ::std::os::windows::io::FromRawHandle::from_raw_handle(handle)
+                        },
                     }
                 }
             }
@@ -128,7 +131,7 @@ pub(crate) mod private {
                 #[inline]
                 unsafe fn from_raw_fd(fd: ::libc::c_int) -> Self {
                     Self {
-                        inner: ::std::os::unix::io::FromRawFd::from_raw_fd(fd),
+                        inner: unsafe { ::std::os::unix::io::FromRawFd::from_raw_fd(fd) },
                     }
                 }
             }

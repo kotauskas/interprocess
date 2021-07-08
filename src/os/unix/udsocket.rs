@@ -101,13 +101,15 @@ unsafe fn enable_passcred(socket: i32) -> bool {
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
         let passcred: c_int = 1;
-        libc::setsockopt(
-            socket,
-            SOL_SOCKET,
-            SO_PASSCRED,
-            &passcred as *const _ as *const _,
-            mem::size_of_val(&passcred) as u32,
-        ) != -1
+        unsafe {
+            libc::setsockopt(
+                socket,
+                SOL_SOCKET,
+                SO_PASSCRED,
+                &passcred as *const _ as *const _,
+                mem::size_of_val(&passcred) as u32,
+            ) != -1
+        }
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
@@ -115,45 +117,64 @@ unsafe fn enable_passcred(socket: i32) -> bool {
     } // Cannot have passcred on macOS and iOS.
 }
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-unsafe fn get_peer_ucred(socket: i32) -> Option<ucred> {
-    // SAFETY: it's safe for the ucred structure to be zero-initialized, since
-    // it only contains integers
-    let mut cred: ucred = mem::zeroed();
+unsafe fn get_peer_ucred(socket: i32) -> io::Result<ucred> {
+    let mut cred: ucred = unsafe {
+        // SAFETY: it's safe for the ucred structure to be zero-initialized, since
+        // it only contains integers
+        mem::zeroed()
+    };
     let mut cred_len = mem::size_of::<ucred>() as socklen_t;
-    let success = libc::getsockopt(
-        socket,
-        SOL_SOCKET,
-        SO_PEERCRED,
-        &mut cred as *mut _ as *mut _,
-        &mut cred_len as *mut _,
-    ) != -1;
+    let success = unsafe {
+        libc::getsockopt(
+            socket,
+            SOL_SOCKET,
+            SO_PEERCRED,
+            &mut cred as *mut _ as *mut _,
+            &mut cred_len as *mut _,
+        )
+    } != -1;
     if success {
-        Some(cred)
+        Ok(cred)
     } else {
-        // The outer function is supposed to query errno because separation of
-        // concerns is a good thing.
-        None
+        // This used to delegate error handling to the outer function, but I changed it to do it
+        // here because the function had thread-local state associated with it which persisted
+        // past the moment it returned — it's part of the function's signature, in some way,
+        // that errno contains the error result after the function is called, meaning that
+        // leaving usable data in global variables is part of its API, and that's a bad pratice.
+        Err(io::Error::last_os_error())
     }
 }
 unsafe fn raw_set_nonblocking(socket: i32, nonblocking: bool) -> bool {
-    let old_flags = libc::fcntl(socket, F_GETFL, ptr::null::<c_void>());
+    let old_flags = unsafe {
+        // SAFETY: nothing too unsafe about this function. One thing to note is that we're passing
+        // it a null pointer, which is, for some reason, required yet ignored for F_GETFL.
+        libc::fcntl(socket, F_GETFL, ptr::null::<c_void>())
+    };
     if old_flags == -1 {
         return false;
     }
     let new_flags = if nonblocking {
         old_flags | O_NONBLOCK
     } else {
+        // Inverting the O_NONBLOCK value sets all the bits in the flag set to 1 except for the
+        // nonblocking flag, which clears the flag when ANDed.
         old_flags & !O_NONBLOCK
     };
-    libc::fcntl(socket, F_SETFL, new_flags) != -1
+    unsafe {
+        // SAFETY: new_flags is a c_int, as documented in the manpage.
+        libc::fcntl(socket, F_SETFL, new_flags) != -1
+    }
 }
-unsafe fn raw_get_nonblocking(socket: i32) -> Option<bool> {
-    let flags = libc::fcntl(socket, F_GETFL, ptr::null::<c_void>());
+unsafe fn raw_get_nonblocking(socket: i32) -> io::Result<bool> {
+    let flags = unsafe {
+        // SAFETY: exactly the same as above.
+        libc::fcntl(socket, F_GETFL, ptr::null::<c_void>())
+    };
     if flags != -1 {
-        Some(flags & O_NONBLOCK != 0)
+        Ok(flags & O_NONBLOCK != 0)
     } else {
-        // Again, querying errno is left to the outer function.
-        None
+        // Again, querying errno was previously left to the outer function but is now done here.
+        Err(io::Error::last_os_error())
     }
 }
 
@@ -441,7 +462,7 @@ impl UdStreamListener {
     /// Checks whether the socket is currently in nonblocking mode or not.
     #[inline]
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
+        unsafe { raw_get_nonblocking(self.fd.0) }
     }
 }
 impl Debug for UdStreamListener {
@@ -817,7 +838,7 @@ impl UdStream {
     /// Checks whether the stream is currently in nonblocking mode or not.
     #[inline]
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
+        unsafe { raw_get_nonblocking(self.fd.0) }
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -827,7 +848,7 @@ impl UdStream {
         doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.fd.0).ok_or_else(io::Error::last_os_error) }
+        unsafe { get_peer_ucred(self.fd.0) }
     }
 }
 impl Read for UdStream {
@@ -1345,7 +1366,7 @@ impl UdSocket {
     /// Checks whether the socket is currently in nonblocking mode or not.
     #[inline]
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }.ok_or_else(io::Error::last_os_error)
+        unsafe { raw_get_nonblocking(self.fd.0) }
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -1355,7 +1376,7 @@ impl UdSocket {
         doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.fd.0).ok_or_else(io::Error::last_os_error) }
+        unsafe { get_peer_ucred(self.fd.0) }
     }
 }
 impl Debug for UdSocket {
@@ -1999,10 +2020,10 @@ pub enum AncillaryData<'a> {
     /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser — for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
     ///
     /// [`credentials`]: #method.credentials " "
-    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
     #[cfg_attr(
         feature = "doc_cfg",
-        doc(cfg(not(any(target_os = "macos", target_os = "ios",)),))
+        doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
     )]
     Credentials {
         /// The process identificator (PID) for the process.
@@ -2053,8 +2074,8 @@ impl<'a> AncillaryData<'a> {
     #[inline]
     pub fn clone_ref(&'a self) -> Self {
         match *self {
-            Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(&fds)),
-            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+            Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(fds)),
+            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
             Self::Credentials { pid, uid, gid } => Self::Credentials { pid, uid, gid },
         }
     }
@@ -2064,7 +2085,7 @@ impl<'a> AncillaryData<'a> {
     pub fn encoded_size(&self) -> usize {
         match self {
             Self::FileDescriptors(fds) => Self::encoded_size_of_file_descriptors(fds.len()),
-            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
             Self::Credentials { .. } => Self::ENCODED_SIZE_OF_CREDENTIALS,
         }
     }
