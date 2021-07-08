@@ -149,6 +149,10 @@ pub(crate) mod private {
 pub mod local_socket;
 #[cfg(any(doc, feature = "nonblocking"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "nonblocking")))]
+#[deprecated(note = "\
+does not integrate with async runtimes, leading to poor performance and bugs related to reading \
+and writing at the same time (you can't) — see the `tokio` modules for relevant IPC primitives \
+or open an issue if you want more async runtimes to be supported as well")]
 pub mod nonblocking;
 pub mod unnamed_pipe;
 //pub mod shared_memory;
