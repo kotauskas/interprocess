@@ -10,7 +10,7 @@ use std::{
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
     ptr,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::{AtomicU8, Ordering::Relaxed},
 };
 use winapi::um::{namedpipeapi::GetNamedPipeInfo, winbase::PIPE_SERVER_END};
 
@@ -80,7 +80,7 @@ impl LocalSocketStream {
     }
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.server_or_client.load(Ordering::Relaxed).into() {
+        match self.server_or_client.load(Relaxed).into() {
             ServerOrClient::Server => self.inner.client_process_id(),
             ServerOrClient::Client => self.inner.server_process_id(),
             ServerOrClient::Nah => {
@@ -103,7 +103,7 @@ impl LocalSocketStream {
                 flags &= PIPE_SERVER_END;
                 // Round-trip into ServerOrClient to validate and fall back to the Nah variant.
                 self.server_or_client
-                    .store(ServerOrClient::from(flags as u8) as _, Ordering::Relaxed);
+                    .store(ServerOrClient::from(flags as u8) as _, Relaxed);
                 self.peer_pid()
             }
         }

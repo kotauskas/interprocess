@@ -12,7 +12,10 @@ use std::{
     num::{NonZeroU32, NonZeroU8},
     ptr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{
+            AtomicBool,
+            Ordering::{Relaxed, SeqCst},
+        },
         Arc, RwLock,
     },
 };
@@ -93,13 +96,13 @@ impl<Stream: PipeStream> PipeListener<Stream> {
                 set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
             }
         }
-        self.nonblocking.store(nonblocking, Ordering::SeqCst);
+        self.nonblocking.store(nonblocking, SeqCst);
         Ok(())
     }
 
     fn create_instance(&self) -> io::Result<PipeOps> {
         self.config
-            .create_instance::<Stream>(false, self.nonblocking.load(Ordering::SeqCst))
+            .create_instance::<Stream>(false, self.nonblocking.load(SeqCst))
     }
 }
 
@@ -114,7 +117,7 @@ mod debug_impl {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeInstance")
                 .field("handle", &self.instance.0.as_raw_handle())
-                .field("connected", &self.instance.1.load(Ordering::Relaxed))
+                .field("connected", &self.instance.1.load(Relaxed))
                 .finish()
         }
     }

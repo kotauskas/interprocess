@@ -10,7 +10,7 @@ use std::{
     io::{self, Read, Write},
     mem, ptr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, Ordering::Release},
         Arc,
     },
 };
@@ -97,7 +97,7 @@ macro_rules! create_stream_type {
             pub fn disconnect_without_flushing(self) -> io::Result<()> {
                 self.instance.0.disconnect()?;
                 // We keep the atomic store anyway since checking whether we're a client or a server and avoiding an atomic write is potentially slower than that write.
-                self.instance.1.store(false, Ordering::Release);
+                self.instance.1.store(false, Release);
                 let instance = unsafe {
                     // SAFETY: mem::forget is used to safely destroy the invalidated master copy
                     ptr::read(&self.instance)
@@ -123,11 +123,8 @@ macro_rules! create_stream_type {
         impl Drop for $ty {
             #[inline]
             fn drop(&mut self) {
-                // We can and should ignore the result because we can't handle it from a Drop
-                // implementation and we can't/shouldn't handle it either
-                let _ = self.instance.0.flush_and_disconnect();
                 // See note about atomics above.
-                self.instance.1.store(false, Ordering::Release);
+                self.instance.1.store(false, Release);
             }
         }
         #[cfg(windows)]
