@@ -1,9 +1,13 @@
-use std::sync::{
-    atomic::{
-        AtomicBool,
-        Ordering::{AcqRel, Relaxed},
+use super::super::imports::*;
+use std::{
+    fmt::{self, Debug, Formatter},
+    sync::{
+        atomic::{
+            AtomicBool,
+            Ordering::{AcqRel, Relaxed},
+        },
+        Arc, RwLock,
     },
-    Arc, RwLock,
 };
 
 pub type Instance<T> = Arc<(T, AtomicBool)>;
@@ -32,5 +36,32 @@ impl<T> Instancer<T> {
         let mut instances = self.0.write().expect("unexpected lock poison");
         instances.push(new_instance_c);
         new_instance
+    }
+}
+
+mod debug_impl {
+    use super::*;
+    /// Shim used to improve pipe instance formatting
+    struct Instance<'a, T: AsRawHandle> {
+        instance: &'a (T, AtomicBool),
+    }
+    impl<'a, T: AsRawHandle> Debug for Instance<'a, T> {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("PipeInstance")
+                .field("handle", &self.instance.0.as_raw_handle())
+                .field("connected", &self.instance.1.load(Relaxed))
+                .finish()
+        }
+    }
+    impl<T: AsRawHandle> Debug for Instancer<T> {
+        #[inline]
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            let mut list_builder = f.debug_list();
+            for instance in self.0.read().expect("unexpected lock poisoning").iter() {
+                list_builder.entry(&Instance { instance });
+            }
+            list_builder.finish()
+        }
     }
 }

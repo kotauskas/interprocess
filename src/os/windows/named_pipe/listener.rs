@@ -23,8 +23,6 @@ use std::{
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
-///
-/// [`PipeListenerOptions`]: struct.PipeListenerOptions.html " "
 pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     // Store the nonblocking boolean separately to change it without mutable access
@@ -36,7 +34,6 @@ pub struct PipeListener<Stream: PipeStream> {
 ///
 /// This iterator is created by the [`incoming`] method on [`PipeListener`]. See its documentation for more.
 ///
-/// [`PipeListener`]: struct.PipeListener.html " "
 /// [`accept`]: struct.PipeListener.html#method.accept " "
 /// [`incoming`]: struct.PipeListener.html#method.incoming " "
 pub struct Incoming<'a, Stream: PipeStream> {
@@ -105,54 +102,13 @@ impl<Stream: PipeStream> PipeListener<Stream> {
             .create_instance::<Stream>(false, self.nonblocking.load(SeqCst))
     }
 }
-
-mod debug_impl {
-    use super::*;
-    /// Shim used to improve pipe instance formatting
-    struct Instance<'a> {
-        instance: &'a (PipeOps, AtomicBool),
-    }
-    impl<'a> Debug for Instance<'a> {
-        #[inline]
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            f.debug_struct("PipeInstance")
-                .field("handle", &self.instance.0.as_raw_handle())
-                .field("connected", &self.instance.1.load(Relaxed))
-                .finish()
-        }
-    }
-    /// Another shim which uses the Instance shim to print each of the instances as a list
-    struct Instances<'a> {
-        instances: &'a RwLock<Vec<Arc<(PipeOps, AtomicBool)>>>,
-    }
-    impl<'a> Debug for Instances<'a> {
-        #[inline]
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            let mut list_builder = f.debug_list();
-            for instance in self
-                .instances
-                .read()
-                .expect("unexpected lock poisoning")
-                .iter()
-            {
-                list_builder.entry(&Instance { instance });
-            }
-            list_builder.finish()
-        }
-    }
-    impl<Stream: PipeStream> Debug for PipeListener<Stream> {
-        #[inline]
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            f.debug_struct("PipeListener")
-                .field("config", &self.config)
-                .field(
-                    "instances",
-                    &Instances {
-                        instances: &self.instancer.0,
-                    },
-                )
-                .finish()
-        }
+impl<Stream: PipeStream> Debug for PipeListener<Stream> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PipeListener")
+            .field("config", &self.config)
+            .field("instances", &self.instancer)
+            .finish()
     }
 }
 
