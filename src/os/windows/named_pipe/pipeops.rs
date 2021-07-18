@@ -132,7 +132,7 @@ impl PipeOps {
     }
 
     /// Blocks until connected. If connected, does not do anything.
-    pub fn connect(&self) -> io::Result<()> {
+    pub fn connect_server(&self) -> io::Result<()> {
         let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), ptr::null_mut()) != 0 };
         if success {
             Ok(())
@@ -198,6 +198,6 @@ impl FromRawHandle for PipeOps {
 unsafe impl Sync for PipeOps {}
 unsafe impl Send for PipeOps {}
 
-pub trait NamedPipeStreamInternals {
+pub trait PipeStreamInternals {
     fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self;
 }

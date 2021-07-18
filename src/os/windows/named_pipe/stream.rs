@@ -1,11 +1,11 @@
 use super::{
     super::{imports::*, AsRawHandle, FromRawHandle, IntoRawHandle},
-    convert_path, set_nonblocking_for_stream, NamedPipeStreamInternals, PipeMode, PipeOps,
+    convert_path, set_nonblocking_for_stream, PipeMode, PipeOps, PipeStreamInternals,
     PipeStreamRole,
 };
-use crate::{PartialMsgWriteError, ReliableReadMsg, Sealed};
+use crate::{PartialMsgWriteError, ReliableReadMsg};
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
     mem, ptr,
@@ -15,63 +15,18 @@ use std::{
     },
 };
 
-macro_rules! create_stream_type {
-    ($(
+macro_rules! create_stream_type_base {
+    (
         $ty:ident:
-            desired_access: $desired_access:expr,
-            role: $role:expr,
-            read_mode: $read_mode:expr,
-            write_mode: $write_mode:expr,
+            extra_methods: {$($extra_methods:tt)*},
             doc: $doc:tt
-    )+) => ($(
+    ) => {
         #[doc = $doc]
         pub struct $ty {
             instance: Arc<(PipeOps, AtomicBool)>,
         }
         impl $ty {
-            /// Connects to an existing named pipe.
-            #[inline]
-            pub fn connect(name: impl AsRef<OsStr>) -> io::Result<Self> {
-                let name = convert_path(name.as_ref());
-                let (success, handle) = unsafe {
-                    let handle = CreateFileW(
-                        name.as_ptr() as *mut _,
-                        $desired_access,
-                        FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        ptr::null_mut(),
-                        OPEN_EXISTING,
-                        0,
-                        ptr::null_mut(),
-                    );
-                    (handle != INVALID_HANDLE_VALUE, handle)
-                };
-                if success {
-                    Ok(unsafe {Self {
-                        // SAFETY: we just created this handle, which means that
-                        // it's not being used anywhere else
-                        instance: Arc::new((
-                            PipeOps::from_raw_handle(handle), AtomicBool::new(false),
-                        ))
-                    }})
-                } else {
-                    Err(io::Error::last_os_error())
-                }
-            }
-            /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
-            ///
-            /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`] error is immediately returned, allowing the thread to perform useful actions in the meantime.
-            ///
-            /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
-            ///
-            /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
-            /// [`nonblocking`]: struct.PipeListenerOptions.html#structfield.nonblocking " "
-            /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
-            #[inline]
-            pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-                unsafe {
-                    set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
-                }
-            }
+            $($extra_methods)*
             /// Retrieves the process identifier of the client side of the named pipe connection.
             #[inline]
             pub fn client_process_id(&self) -> io::Result<u32> {
@@ -92,7 +47,7 @@ macro_rules! create_stream_type {
             pub fn server_session_id(&self) -> io::Result<u32> {
                 self.instance.0.get_server_session_id()
             }
-            /// Disconnects the named pipe stream without flushing buffers, causing all data in those buffers to be lost. This is much faster than simply dropping the stream, since the `Drop` implementation flushes first. Only makes sense for server-side pipes and will panic in debug builds if called on a client stream.
+            /// Disconnects the named pipe stream without flushing buffers, causing all data in those buffers to be lost. This is much faster than simply dropping the stream, since the `Drop` implementation flushes first. Only makes sense for server-side pipes and will return an error if called on a client stream.
             #[inline]
             pub fn disconnect_without_flushing(self) -> io::Result<()> {
                 self.instance.0.disconnect()?;
@@ -107,15 +62,11 @@ macro_rules! create_stream_type {
                 Ok(())
             }
         }
+        #[doc(hidden)]
+        impl crate::Sealed for $ty {}
         #[cfg(windows)]
-        impl PipeStream for $ty {
-            const ROLE: PipeStreamRole = $role;
-            const WRITE_MODE: Option<PipeMode> = $write_mode;
-            const READ_MODE: Option<PipeMode> = $read_mode;
-        }
-        impl Sealed for $ty {}
-        #[cfg(windows)]
-        impl NamedPipeStreamInternals for $ty {
+        #[doc(hidden)]
+        impl PipeStreamInternals for $ty {
             fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self {
                 Self { instance }
             }
@@ -134,14 +85,89 @@ macro_rules! create_stream_type {
                 self.instance.0.as_raw_handle()
             }
         }
-        #[cfg(windows)]
-        impl IntoRawHandle for $ty {
+        impl Debug for $ty {
             #[inline]
-            fn into_raw_handle(self) -> HANDLE {
-                let handle = self.instance.0.as_raw_handle();
-                handle
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                f.debug_struct(stringify!($ty))
+                    .field("handle", &self.as_raw_handle())
+                    .finish()
             }
         }
+    };
+    ($(
+        $ty:ident:
+            extra_methods: {$($extra_methods:tt)*},
+            doc: $doc:tt
+    )+) => {
+        $(create_stream_type_base!(
+            $ty:
+                extra_methods: {$($extra_methods)*},
+                doc: $doc
+        );)+
+    };
+}
+
+macro_rules! create_stream_type {
+    (
+        $ty:ident:
+            desired_access: $desired_access:expr,
+            role: $role:expr,
+            read_mode: $read_mode:expr,
+            write_mode: $write_mode:expr,
+            doc: $doc:tt
+    ) => {
+        create_stream_type_base!(
+            $ty:
+            extra_methods: {
+                /// Connects to an existing named pipe. The `\\.\pipe\` prefix is added automatically.
+                #[inline]
+                pub fn connect(name: impl AsRef<OsStr>) -> io::Result<Self> {
+                    Self::_connect(name.as_ref())
+                }
+                fn _connect(name: &OsStr) -> io::Result<Self> {
+                    let name = convert_path(name.as_ref(), None);
+                    let (success, handle) = unsafe {
+                        let handle = CreateFileW(
+                            name.as_ptr() as *mut _,
+                            $desired_access,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            ptr::null_mut(),
+                            OPEN_EXISTING,
+                            0,
+                            ptr::null_mut(),
+                        );
+                        (handle != INVALID_HANDLE_VALUE, handle)
+                    };
+                    if success {
+                        Ok(unsafe {Self {
+                            // SAFETY: we just created this handle, which means that
+                            // it's not being used anywhere else
+                            instance: Arc::new((
+                                PipeOps::from_raw_handle(handle), AtomicBool::new(true),
+                            ))
+                        }})
+                    } else {
+                        Err(io::Error::last_os_error())
+                    }
+                }
+                /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
+                ///
+                /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`] error is immediately returned, allowing the thread to perform useful actions in the meantime.
+                ///
+                /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
+                ///
+                /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+                /// [`nonblocking`]: struct.PipeListenerOptions.html#structfield.nonblocking " "
+                /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
+                #[inline]
+                pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+                    unsafe {
+                        set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
+                    }
+                }
+            },
+            doc: $doc
+        );
         #[cfg(windows)]
         impl FromRawHandle for $ty {
             #[inline]
@@ -151,19 +177,42 @@ macro_rules! create_stream_type {
                     PipeOps::from_raw_handle(handle)
                 };
                 Self {
-                    instance: Arc::new((pipeops, AtomicBool::new(false)))
+                    instance: Arc::new((pipeops, AtomicBool::new(true)))
                 }
             }
         }
-        impl Debug for $ty {
+        #[cfg(windows)]
+        impl IntoRawHandle for $ty {
             #[inline]
-            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                f.debug_struct(stringify!($ty))
-                    .field("handle", &self.as_raw_handle())
-                    .finish()
+            fn into_raw_handle(self) -> HANDLE {
+                let handle = self.instance.0.as_raw_handle();
+                handle
             }
         }
-    )+);
+        #[cfg(windows)]
+        impl PipeStream for $ty {
+            const ROLE: PipeStreamRole = $role;
+            const WRITE_MODE: Option<PipeMode> = $write_mode;
+            const READ_MODE: Option<PipeMode> = $read_mode;
+        }
+    };
+    ($(
+        $ty:ident:
+            desired_access: $desired_access:expr,
+            role: $role:expr,
+            read_mode: $read_mode:expr,
+            write_mode: $write_mode:expr,
+            doc: $doc:tt
+    )+) => {
+        $(create_stream_type!(
+            $ty:
+            desired_access: $desired_access,
+            role: $role,
+            read_mode: $read_mode,
+            write_mode: $write_mode,
+            doc: $doc
+        );)+
+    };
 }
 create_stream_type! {
     ByteReaderPipeStream:
@@ -346,12 +395,8 @@ impl Write for DuplexMsgPipeStream {
 /// The distinction between datagram-oriented connections and byte streams exists for symmetry with the standard library, where UDP and TCP sockets are represented by different types. The idea behind this is that by separating the two semantic types of sockets into two types, the distinction between those semantics can be enforced at compile time instead of using runtime errors to signal that, for example, a datagram read operation is attempted on a byte stream.
 ///
 /// The fact that named pipes can have different data flow directions further increases the amount of various stream types. By restricting the implemented stream traits at compile time, named pipe streams can be used correctly in generic contexts unaware of named pipes without extra runtime checking for the correct pipe direction.
-pub trait PipeStream:
-    AsRawHandle + IntoRawHandle + FromRawHandle + NamedPipeStreamInternals
-{
+pub trait PipeStream: AsRawHandle + IntoRawHandle + FromRawHandle + PipeStreamInternals {
     /// The data stream flow direction for the pipe. See the [`PipeStreamRole`] enumeration for more on what this means.
-    ///
-    /// [`PipeStreamRole`]: enum.PipeStreamRole.html " "
     const ROLE: PipeStreamRole;
     /// The data stream mode for the pipe. If set to `PipeMode::Bytes`, message boundaries will broken and having `READ_MODE` at `PipeMode::Messages` would be a pipe creation error.
     ///
@@ -366,32 +411,40 @@ pub trait PipeStream:
 /// Connects to the specified named pipe, returning a named pipe stream of the stream type provided via generic parameters.
 ///
 /// Since named pipes can work across multiple machines, an optional hostname can be supplied. Leave it at `None` if you're using named pipes on the local machine exclusively, which is most likely the case.
+#[inline]
 pub fn connect<Stream: PipeStream>(
     pipe_name: impl AsRef<OsStr>,
     hostname: Option<impl AsRef<OsStr>>,
 ) -> io::Result<Stream> {
-    let mut path = {
-        let mut path = OsString::from(r"\\.");
-        if let Some(host) = hostname {
-            path.push(host);
-        } else {
-            path.push(".");
-        }
-        path.push(r"\pipe\");
-        path.push(pipe_name.as_ref());
-        let mut path = path.encode_wide().collect::<Vec<u16>>();
-        path.push(0);
-        path
-    };
+    let handle = _connect(
+        pipe_name.as_ref(),
+        hostname.as_ref().map(AsRef::as_ref),
+        Stream::READ_MODE.is_some(),
+        Stream::WRITE_MODE.is_some(),
+    )?;
+    let stream = Stream::build(Arc::from((
+        unsafe { PipeOps::from_raw_handle(handle) }, // SAFETY: we just created this handle
+        AtomicBool::new(true),
+    )));
+    Ok(stream)
+}
+
+fn _connect(
+    pipe_name: &OsStr,
+    hostname: Option<&OsStr>,
+    read: bool,
+    write: bool,
+) -> io::Result<HANDLE> {
+    let mut path = convert_path(pipe_name, hostname);
     let (success, handle) = unsafe {
         let handle = CreateFileW(
             path.as_mut_ptr() as *mut _,
             {
                 let mut access_flags: DWORD = 0;
-                if Stream::READ_MODE.is_some() {
+                if read {
                     access_flags |= GENERIC_READ;
                 }
-                if Stream::WRITE_MODE.is_some() {
+                if write {
                     access_flags |= GENERIC_WRITE;
                 }
                 access_flags
@@ -405,10 +458,7 @@ pub fn connect<Stream: PipeStream>(
         (handle != INVALID_HANDLE_VALUE, handle)
     };
     if success {
-        Ok(Stream::build(Arc::from((
-            unsafe { PipeOps::from_raw_handle(handle) }, // SAFETY: we just created this handle
-            AtomicBool::new(true),
-        ))))
+        Ok(handle)
     } else {
         Err(io::Error::last_os_error())
     }

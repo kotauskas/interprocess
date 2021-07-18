@@ -1,6 +1,7 @@
 use super::{
-    super::{imports::*, AsRawHandle, FromRawHandle},
+    super::{imports::*, FromRawHandle},
     convert_path, set_nonblocking_for_stream, Instancer, PipeMode, PipeOps, PipeStream,
+    PipeStreamRole,
 };
 use std::{
     borrow::Cow,
@@ -12,10 +13,7 @@ use std::{
     num::{NonZeroU32, NonZeroU8},
     ptr,
     sync::{
-        atomic::{
-            AtomicBool,
-            Ordering::{Relaxed, SeqCst},
-        },
+        atomic::{AtomicBool, Ordering::SeqCst},
         Arc, RwLock,
     },
 };
@@ -65,7 +63,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         } else {
             self.instancer.add_instance(self.create_instance()?)
         };
-        instance.0.connect()?;
+        instance.0.connect_server()?;
         Ok(Stream::build(instance))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
@@ -98,8 +96,14 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     }
 
     fn create_instance(&self) -> io::Result<PipeOps> {
-        self.config
-            .create_instance::<Stream>(false, self.nonblocking.load(SeqCst))
+        let handle = self.config.create_instance(
+            false,
+            self.nonblocking.load(SeqCst),
+            Stream::ROLE,
+            Stream::READ_MODE,
+        )?;
+        // SAFETY: we just created this handle
+        Ok(unsafe { PipeOps::from_raw_handle(handle) })
     }
 }
 impl<Stream: PipeStream> Debug for PipeListener<Stream> {
@@ -179,6 +183,28 @@ impl<'a> PipeListenerOptions<'a> {
             wait_timeout: NonZeroU32::new(50).unwrap(),
         }
     }
+    /// Clones configuration options which are not owned by value and returns a copy of the original option table which is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
+    ///
+    /// This is used instead of the `ToOwned` trait for backwards compatibility — this will be fixed in the next breaking release.
+    #[inline]
+    pub fn to_owned(&self) -> PipeListenerOptions<'static> {
+        // We need this ugliness because the compiler does not understand that
+        // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
+        // replace the name field with Cow::Owned and just copy all other elements over thanks
+        // to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
+        // RFC for this, would be nice.
+        PipeListenerOptions {
+            name: Cow::Owned(self.name.clone().into_owned()),
+            mode: self.mode,
+            nonblocking: self.nonblocking,
+            instance_limit: self.instance_limit,
+            write_through: self.write_through,
+            accept_remote: self.accept_remote,
+            input_buffer_size_hint: self.input_buffer_size_hint,
+            output_buffer_size_hint: self.output_buffer_size_hint,
+            wait_timeout: self.wait_timeout,
+        }
+    }
     genset!(
         name: Cow<'a, OsStr>,
         mode: PipeMode,
@@ -191,24 +217,26 @@ impl<'a> PipeListenerOptions<'a> {
         wait_timeout: NonZeroU32,
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
-    fn create_instance<Stream: PipeStream>(
+    pub(super) fn create_instance(
         &self,
         first: bool,
         nonblocking: bool,
-    ) -> io::Result<PipeOps> {
-        let path = convert_path(&self.name);
+        role: PipeStreamRole,
+        read_mode: Option<PipeMode>,
+    ) -> io::Result<HANDLE> {
+        let path = convert_path(&self.name, None);
         let (handle, success) = unsafe {
             let handle = CreateNamedPipeW(
                 path.as_ptr(),
                 {
-                    let mut flags = DWORD::from(Stream::ROLE.direction_as_server());
+                    let mut flags = DWORD::from(role.direction_as_server());
                     if first {
                         flags |= FILE_FLAG_FIRST_PIPE_INSTANCE;
                     }
                     flags
                 },
                 self.mode.to_pipe_type()
-                    | Stream::READ_MODE.map_or(0, |x| x.to_readmode())
+                    | read_mode.map_or(0, PipeMode::to_readmode)
                     | nonblocking as u32,
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
@@ -224,8 +252,7 @@ impl<'a> PipeListenerOptions<'a> {
             (handle, handle != INVALID_HANDLE_VALUE)
         };
         if success {
-            // SAFETY: we just created this handle
-            Ok(unsafe { PipeOps::from_raw_handle(handle) })
+            Ok(handle)
         } else {
             Err(io::Error::last_os_error())
         }
@@ -235,37 +262,37 @@ impl<'a> PipeListenerOptions<'a> {
     /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
     #[inline]
     pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
-        // We need this ugliness because the compiler does not understand that
-        // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
-        // replace the name field with Cow::Owned and just copy all other elements over thanks
-        // to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
-        // RFC for this, would be nice.
-        let owned_config = PipeListenerOptions {
-            name: Cow::Owned(self.name.clone().into_owned()),
-            mode: self.mode,
-            nonblocking: self.nonblocking,
-            instance_limit: self.instance_limit,
-            write_through: self.write_through,
-            accept_remote: self.accept_remote,
-            input_buffer_size_hint: self.input_buffer_size_hint,
-            output_buffer_size_hint: self.output_buffer_size_hint,
-            wait_timeout: self.wait_timeout,
-        };
-        let instancer_capacity = self.instance_limit.map_or(8, |x| x.get()) as usize;
-        let mut instance_vec = Vec::with_capacity(instancer_capacity);
-        let first_instance = Arc::new((
-            self.create_instance::<Stream>(true, self.nonblocking)?,
-            AtomicBool::new(false),
-        ));
-        instance_vec.push(first_instance);
+        let (owned_config, instancer) = self._create(Stream::ROLE, Stream::READ_MODE)?;
         Ok(PipeListener {
             config: owned_config,
             nonblocking: AtomicBool::new(self.nonblocking),
-            instancer: Instancer(RwLock::new(instance_vec)),
+            instancer,
             _phantom: PhantomData,
         })
     }
+    fn _create(
+        &self,
+        role: PipeStreamRole,
+        read_mode: Option<PipeMode>,
+    ) -> io::Result<(PipeListenerOptions<'static>, Instancer<PipeOps>)> {
+        let owned_config = self.to_owned();
+        let instancer_capacity = self
+            .instance_limit
+            .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
+            .into();
+        let mut instance_vec = Vec::with_capacity(instancer_capacity);
+        let first_instance_raw = self.create_instance(true, self.nonblocking, role, read_mode)?;
+        let first_instance = Arc::new((
+            // SAFETY: we just created this handle
+            unsafe { PipeOps::from_raw_handle(first_instance_raw) },
+            AtomicBool::new(false),
+        ));
+        instance_vec.push(first_instance);
+        let instancer = Instancer(RwLock::new(instance_vec));
+        Ok((owned_config, instancer))
+    }
 }
+pub(super) const INITIAL_INSTANCER_CAPACITY: u8 = 8;
 impl Default for PipeListenerOptions<'_> {
     fn default() -> Self {
         Self::new()

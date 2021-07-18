@@ -29,9 +29,15 @@ use std::{
     io, ptr,
 };
 
-fn convert_path(osstr: &OsStr) -> Vec<u16> {
-    let mut path = OsString::from(r"\\.\pipe\");
-    path.push(osstr);
+fn convert_path(pipe_name: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
+    let mut path = OsString::from(r"\\.");
+    if let Some(host) = hostname {
+        path.push(host);
+    } else {
+        path.push(".");
+    }
+    path.push(r"\pipe\");
+    path.push(pipe_name);
     let mut path = path.encode_wide().collect::<Vec<u16>>();
     path.push(0); // encode_wide does not include the terminating NULL, so we have to add it ourselves
     path
