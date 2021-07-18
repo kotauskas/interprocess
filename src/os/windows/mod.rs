@@ -1,4 +1,5 @@
 //! Windows-specific functionality for various interprocess communication primitives, as well as Windows-specific ones.
+#![cfg_attr(not(windows), allow(warnings))]
 
 pub mod named_pipe;
 #[cfg(any(doc, feature = "signals"))]
