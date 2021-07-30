@@ -39,7 +39,6 @@ pub struct Incoming<'a, Stream: PipeStream> {
 }
 impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
     type Item = io::Result<Stream>;
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
@@ -47,7 +46,6 @@ impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
 impl<'a, Stream: PipeStream> IntoIterator for &'a PipeListener<Stream> {
     type IntoIter = Incoming<'a, Stream>;
     type Item = <Incoming<'a, Stream> as Iterator>::Item;
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.incoming()
     }
@@ -56,7 +54,6 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
     ///
     /// See `incoming` for an iterator version of this.
-    #[inline]
     pub fn accept(&self) -> io::Result<Stream> {
         let instance = if let Some(instance) = self.instancer.allocate() {
             instance
@@ -67,7 +64,6 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         Ok(Stream::build(instance))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
-    #[inline]
     pub fn incoming(&self) -> Incoming<'_, Stream> {
         Incoming { listener: self }
     }
@@ -78,7 +74,6 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     /// See the documentation of the aforementioned field for the exact effects of enabling this mode.
     ///
     /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
-    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         for instance in self
             .instancer
@@ -107,7 +102,6 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     }
 }
 impl<Stream: PipeStream> Debug for PipeListener<Stream> {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
@@ -156,7 +150,6 @@ pub struct PipeListenerOptions<'a> {
 macro_rules! genset {
     ($name:ident : $ty:ty) => {
         #[doc = concat!("Sets the [`", stringify!($name), "`](#structfield.", stringify!($name), ") parameter to the specified value.")]
-        #[inline]
         #[must_use = "builder setters take the entire structure and return the result"]
         pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
             self.$name = $name.into();
@@ -169,7 +162,6 @@ macro_rules! genset {
 }
 impl<'a> PipeListenerOptions<'a> {
     /// Creates a new builder with default options.
-    #[inline]
     pub fn new() -> Self {
         Self {
             name: Cow::Borrowed(OsStr::new("")),
@@ -186,7 +178,6 @@ impl<'a> PipeListenerOptions<'a> {
     /// Clones configuration options which are not owned by value and returns a copy of the original option table which is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
     ///
     /// This is used instead of the `ToOwned` trait for backwards compatibility — this will be fixed in the next breaking release.
-    #[inline]
     pub fn to_owned(&self) -> PipeListenerOptions<'static> {
         // We need this ugliness because the compiler does not understand that
         // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
@@ -260,7 +251,6 @@ impl<'a> PipeListenerOptions<'a> {
     /// Creates the pipe listener from the builder. The `Stream` generic argument specifies the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
     ///
     /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
-    #[inline]
     pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
         let (owned_config, instancer) = self._create(Stream::ROLE, Stream::READ_MODE)?;
         Ok(PipeListener {

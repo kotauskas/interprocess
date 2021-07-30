@@ -63,7 +63,6 @@ impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 #[derive(Debug)]
 pub(crate) struct FileHandleOps(pub(crate) HANDLE);
 impl FileHandleOps {
-    #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         debug_assert!(
             buf.len() <= DWORD::max_value() as usize,
@@ -86,7 +85,6 @@ impl FileHandleOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         debug_assert!(
             buf.len() <= DWORD::max_value() as usize,
@@ -109,7 +107,6 @@ impl FileHandleOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn flush(&self) -> io::Result<()> {
         let success = unsafe { FlushFileBuffers(self.0) != 0 };
         if success {
@@ -120,21 +117,18 @@ impl FileHandleOps {
     }
 }
 impl Drop for FileHandleOps {
-    #[inline]
     fn drop(&mut self) {
         debug_assert!(unsafe { CloseHandle(self.0) } != 0);
     }
 }
 #[cfg(windows)]
 impl AsRawHandle for FileHandleOps {
-    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for FileHandleOps {
-    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         let handle = self.0;
         mem::forget(self);
@@ -143,7 +137,6 @@ impl IntoRawHandle for FileHandleOps {
 }
 #[cfg(windows)]
 impl FromRawHandle for FileHandleOps {
-    #[inline]
     unsafe fn from_raw_handle(op: HANDLE) -> Self {
         Self(op)
     }

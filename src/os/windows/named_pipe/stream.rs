@@ -28,27 +28,22 @@ macro_rules! create_stream_type_base {
         impl $ty {
             $($extra_methods)*
             /// Retrieves the process identifier of the client side of the named pipe connection.
-            #[inline]
             pub fn client_process_id(&self) -> io::Result<u32> {
                 self.instance.0.get_client_process_id()
             }
             /// Retrieves the session identifier of the client side of the named pipe connection.
-            #[inline]
             pub fn client_session_id(&self) -> io::Result<u32> {
                 self.instance.0.get_client_session_id()
             }
             /// Retrieves the process identifier of the server side of the named pipe connection.
-            #[inline]
             pub fn server_process_id(&self) -> io::Result<u32> {
                 self.instance.0.get_server_process_id()
             }
             /// Retrieves the session identifier of the server side of the named pipe connection.
-            #[inline]
             pub fn server_session_id(&self) -> io::Result<u32> {
                 self.instance.0.get_server_session_id()
             }
             /// Disconnects the named pipe stream without flushing buffers, causing all data in those buffers to be lost. This is much faster than simply dropping the stream, since the `Drop` implementation flushes first. Only makes sense for server-side pipes and will return an error if called on a client stream.
-            #[inline]
             pub fn disconnect_without_flushing(self) -> io::Result<()> {
                 self.instance.0.disconnect()?;
                 // We keep the atomic store anyway since checking whether we're a client or a server and avoiding an atomic write is potentially slower than that write.
@@ -72,7 +67,6 @@ macro_rules! create_stream_type_base {
             }
         }
         impl Drop for $ty {
-            #[inline]
             fn drop(&mut self) {
                 // See note about atomics above.
                 self.instance.1.store(false, Release);
@@ -80,13 +74,11 @@ macro_rules! create_stream_type_base {
         }
         #[cfg(windows)]
         impl AsRawHandle for $ty {
-            #[inline]
             fn as_raw_handle(&self) -> HANDLE {
                 self.instance.0.as_raw_handle()
             }
         }
         impl Debug for $ty {
-            #[inline]
             fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
                 f.debug_struct(stringify!($ty))
                     .field("handle", &self.as_raw_handle())
@@ -120,7 +112,6 @@ macro_rules! create_stream_type {
             $ty:
             extra_methods: {
                 /// Connects to an existing named pipe. The `\\.\pipe\` prefix is added automatically.
-                #[inline]
                 pub fn connect(name: impl AsRef<OsStr>) -> io::Result<Self> {
                     Self::_connect(name.as_ref())
                 }
@@ -159,7 +150,6 @@ macro_rules! create_stream_type {
                 /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
                 /// [`nonblocking`]: struct.PipeListenerOptions.html#structfield.nonblocking " "
                 /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
-                #[inline]
                 pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
                     unsafe {
                         set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
@@ -170,7 +160,6 @@ macro_rules! create_stream_type {
         );
         #[cfg(windows)]
         impl FromRawHandle for $ty {
-            #[inline]
             unsafe fn from_raw_handle(handle: HANDLE) -> Self {
                 let pipeops = unsafe {
                     // SAFETY: guaranteed via safety contract
@@ -183,7 +172,6 @@ macro_rules! create_stream_type {
         }
         #[cfg(windows)]
         impl IntoRawHandle for $ty {
-            #[inline]
             fn into_raw_handle(self) -> HANDLE {
                 let handle = self.instance.0.as_raw_handle();
                 handle
@@ -292,14 +280,12 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 }
 
 impl Read for ByteReaderPipeStream {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 
 impl Write for ByteWriterPipeStream {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.instance.0.write(buf)
     }
@@ -309,41 +295,34 @@ impl Write for ByteWriterPipeStream {
 }
 
 impl Read for DuplexBytePipeStream {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl Write for DuplexBytePipeStream {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.instance.0.write(buf)
     }
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
 }
 
 impl Read for MsgReaderPipeStream {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl ReliableReadMsg for MsgReaderPipeStream {
-    #[inline]
     fn read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
         self.instance.0.read_msg(buf)
     }
-    #[inline]
     fn try_read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>> {
         self.instance.0.try_read_msg(buf)
     }
 }
 
 impl Write for MsgWriterPipeStream {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.instance.0.write(buf)? == buf.len() {
             Ok(buf.len())
@@ -351,20 +330,17 @@ impl Write for MsgWriterPipeStream {
             Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
 }
 
 impl Read for DuplexMsgPipeStream {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.instance.0.read_bytes(buf)
     }
 }
 impl ReliableReadMsg for DuplexMsgPipeStream {
-    #[inline]
     fn read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
         self.instance.0.read_msg(buf)
     }
@@ -373,7 +349,6 @@ impl ReliableReadMsg for DuplexMsgPipeStream {
     }
 }
 impl Write for DuplexMsgPipeStream {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.instance.0.write(buf)? == buf.len() {
             Ok(buf.len())
@@ -381,7 +356,6 @@ impl Write for DuplexMsgPipeStream {
             Err(io::Error::new(io::ErrorKind::Other, PartialMsgWriteError))
         }
     }
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.instance.0.flush()
     }
@@ -411,7 +385,6 @@ pub trait PipeStream: AsRawHandle + IntoRawHandle + FromRawHandle + PipeStreamIn
 /// Connects to the specified named pipe, returning a named pipe stream of the stream type provided via generic parameters.
 ///
 /// Since named pipes can work across multiple machines, an optional hostname can be supplied. Leave it at `None` if you're using named pipes on the local machine exclusively, which is most likely the case.
-#[inline]
 pub fn connect<Stream: PipeStream>(
     pipe_name: impl AsRef<OsStr>,
     hostname: Option<impl AsRef<OsStr>>,

@@ -11,7 +11,6 @@ use std::{
     os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
-#[inline]
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     let (success, fds) = unsafe {
         let mut fds: [c_int; 2] = [0; 2];
@@ -40,20 +39,17 @@ pub(crate) struct UnnamedPipeReader(FdOps);
 // reading a pipe concurrently is UB and UnnamedPipeReader is Send and Sync. If you do, the
 // universe will collapse immediately.
 impl Read for UnnamedPipeReader {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
 }
 impl Sealed for UnnamedPipeReader {}
 impl AsRawFd for UnnamedPipeReader {
-    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0.as_raw_fd()
     }
 }
 impl IntoRawFd for UnnamedPipeReader {
-    #[inline]
     fn into_raw_fd(self) -> c_int {
         let fd = self.as_raw_fd();
         mem::forget(self);
@@ -61,7 +57,6 @@ impl IntoRawFd for UnnamedPipeReader {
     }
 }
 impl FromRawFd for UnnamedPipeReader {
-    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(unsafe {
             // SAFETY: guaranteed by safety contract
@@ -70,7 +65,6 @@ impl FromRawFd for UnnamedPipeReader {
     }
 }
 impl Debug for UnnamedPipeReader {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
             .field("file_descriptor", &self.as_raw_fd())
@@ -80,7 +74,6 @@ impl Debug for UnnamedPipeReader {
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Write for UnnamedPipeWriter {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
@@ -90,25 +83,21 @@ impl Write for UnnamedPipeWriter {
 }
 impl Sealed for UnnamedPipeWriter {}
 impl AsRawFd for UnnamedPipeWriter {
-    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0.as_raw_fd()
     }
 }
 impl IntoRawFd for UnnamedPipeWriter {
-    #[inline]
     fn into_raw_fd(self) -> c_int {
         self.0.into_raw_fd()
     }
 }
 impl FromRawFd for UnnamedPipeWriter {
-    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(FdOps::new(fd))
     }
 }
 impl Debug for UnnamedPipeWriter {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
             .field("file_descriptor", &self.as_raw_fd())

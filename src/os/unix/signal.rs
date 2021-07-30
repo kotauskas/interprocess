@@ -189,7 +189,6 @@ pub const REALTIME_SIGNALS_SUPPORTED: bool = NUM_REALTIME_SIGNALS != 0;
 /// - **Redox**: 5 (does not conform with POSIX)
 pub const NUM_REALTIME_SIGNALS: u32 = (SIGRTMAX - SIGRTMIN + 1) as u32;
 /// Returns `true` if the specified signal is a valid real-time signal value, `false` otherwise.
-#[inline]
 #[allow(clippy::absurd_extreme_comparisons)] // For systems where there are no realtime signals
 pub const fn is_valid_rtsignal(rtsignal: u32) -> bool {
     rtsignal < NUM_REALTIME_SIGNALS
@@ -230,7 +229,6 @@ static HANDLERS: Lazy<RwLock<IntMap<HandlerAndFlags>>> = Lazy::new(|| RwLock::ne
 /// ```
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
-#[inline]
 pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
     HandlerOptions::for_signal(signal_type)
         .set_new_handler(handler)
@@ -271,7 +269,6 @@ pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<()
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
 /// [`set_unsafe`]: struct.HandlerOptions.html#method.set_unsafe " "
-#[inline]
 pub unsafe fn set_unsafe_handler(
     signal_type: SignalType,
     handler: SignalHandler,
@@ -310,7 +307,6 @@ pub unsafe fn set_unsafe_handler(
 /// ```
 ///
 /// [`HandlerOptions`]: struct.HandlerOptions.html " "
-#[inline]
 pub fn set_rthandler(rtsignal: u32, handler: SignalHandler) -> Result<(), SetHandlerError> {
     HandlerOptions::for_rtsignal(rtsignal)
         .set_new_handler(handler)
@@ -408,7 +404,6 @@ pub struct HandlerOptions {
 }
 impl HandlerOptions {
     /// Creates a builder for a handler for the specified signal.
-    #[inline]
     pub fn for_signal(signal: SignalType) -> Self {
         Self {
             signal: signal.into(),
@@ -441,7 +436,6 @@ impl HandlerOptions {
         }
     }
     /// Sets the handler for the signal to the specified value. If `None`, the old value is used.
-    #[inline]
     pub fn set_new_handler(mut self, handler: impl Into<Option<SignalHandler>>) -> Self {
         self.handler = handler.into();
         self
@@ -449,7 +443,6 @@ impl HandlerOptions {
     /// Sets the [`ignore_child_stop_events`] flag to the specified value.
     ///
     /// [`ignore_child_stop_events`]: #structfield.ignore_child_stop_events " "
-    #[inline]
     pub fn ignore_child_stop_events(mut self, ignore: impl Into<bool>) -> Self {
         self.ignore_child_stop_events = ignore.into();
         self
@@ -457,7 +450,6 @@ impl HandlerOptions {
     /// Sets the [`recursive_handler`] flag to the specified value.
     ///
     /// [`recursive_handler`]: #structfield.recursive_handler " "
-    #[inline]
     pub fn recursive_handler(mut self, recursive: impl Into<bool>) -> Self {
         self.recursive_handler = recursive.into();
         self
@@ -465,7 +457,6 @@ impl HandlerOptions {
     /// Sets the [`system_call_restart`] flag to the specified value.
     ///
     /// [`system_call_restart`]: #structfield.system_call_restart " "
-    #[inline]
     pub fn system_call_restart(mut self, restart: impl Into<bool>) -> Self {
         self.system_call_restart = restart.into();
         self
@@ -473,13 +464,11 @@ impl HandlerOptions {
     /// Sets the [`auto_reset_handler`] flag to the specified value.
     ///
     /// [`auto_reset_handler`]: #structfield.auto_reset_handler " "
-    #[inline]
     pub fn auto_reset_handler(mut self, reset: impl Into<bool>) -> Self {
         self.auto_reset_handler = reset.into();
         self
     }
     /// Installs the signal handler.
-    #[inline]
     pub fn set(self) -> Result<(), SetHandlerError> {
         if let Ok(val) = SignalType::try_from(self.signal) {
             if val.is_unsafe() {
@@ -552,7 +541,6 @@ impl HandlerOptions {
         Ok(())
     }
 
-    #[inline]
     fn flags_as_i32(self) -> i32 {
         if self.handler.unwrap_or_default().is_default() {
             debug_assert!(
@@ -670,21 +658,18 @@ impl SignalHandler {
     /// Returns `true` for the [`Default`] variant, `false` otherwise.
     ///
     /// [`Default`]: #variant.Default.html " "
-    #[inline]
     pub const fn is_default(self) -> bool {
         matches!(self, Self::Default)
     }
     /// Returns `true` for the [`Ignore`] variant, `false` otherwise.
     ///
     /// [`Ignore`]: #variant.Ignore.html " "
-    #[inline]
     pub const fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
     /// Returns `true` for the [`Hook`] variant, `false` otherwise.
     ///
     /// [`Hook`]: #variant.Hook.html " "
-    #[inline]
     pub const fn is_hook(self) -> bool {
         matches!(self, Self::Hook(..))
     }
@@ -694,7 +679,6 @@ impl SignalHandler {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self::Hook(unsafe { SignalHook::from_fn(function) })
     }
@@ -703,13 +687,11 @@ impl Default for SignalHandler {
     /// Returns [`SignalHandler::Default`].
     ///
     /// [`SignalHandler::Default`]: #variant.Default " "
-    #[inline]
     fn default() -> Self {
         Self::Default
     }
 }
 impl From<SignalHook> for SignalHandler {
-    #[inline]
     fn from(op: SignalHook) -> Self {
         Self::Hook(op)
     }
@@ -725,18 +707,15 @@ impl SignalHook {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline]
     pub fn inner(self) -> fn() {
         self.0
     }
 }
 impl From<SignalHook> for fn() {
-    #[inline]
     fn from(op: SignalHook) -> Self {
         op.0
     }
@@ -756,7 +735,6 @@ impl From<SignalHook> for fn() {
 /// # }
 /// # Ok(()) }
 /// ```
-#[inline]
 pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
     let pid =
         i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
@@ -785,7 +763,6 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
 /// # }
 /// # Ok(()) }
 /// ```
-#[inline]
 pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
     let pid =
         i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
@@ -844,7 +821,6 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
 /// # }
 /// # Ok(()) }
 /// ```
-#[inline]
 pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
     #[allow(clippy::neg_multiply)]
     let pid = i32::try_from(pid.into())
@@ -1051,12 +1027,10 @@ impl SignalType {
     ///
     /// [`Kill`]: #variant.Kill " "
     /// [`ForceSuspend`]: #variant.ForceSuspend " "
-    #[inline]
     pub const fn is_unblockable(self) -> bool {
         matches!(self, Self::Kill | Self::ForceSuspend)
     }
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
-    #[inline]
     pub const fn is_unsafe(self) -> bool {
         matches!(
             self,
@@ -1065,13 +1039,11 @@ impl SignalType {
     }
 }
 impl From<SignalType> for i32 {
-    #[inline]
     fn from(op: SignalType) -> Self {
         op as i32
     }
 }
 impl From<SignalType> for u32 {
-    #[inline]
     fn from(op: SignalType) -> Self {
         op as u32
     }
@@ -1124,7 +1096,6 @@ impl TryFrom<i32> for SignalType {
 }
 impl TryFrom<u32> for SignalType {
     type Error = UnknownSignalError;
-    #[inline]
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         (value as u32).try_into()
     }
@@ -1141,7 +1112,6 @@ pub struct UnknownSignalError {
     pub value: i32,
 }
 impl Display for UnknownSignalError {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "unknown signal value {}", self.value)
     }

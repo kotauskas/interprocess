@@ -9,7 +9,6 @@ use std::{
 pub struct PipeOps(pub(crate) FileHandleOps);
 impl PipeOps {
     /// Reads a message from the pipe instance into the specified buffer, returning the size of the message written as `Ok(Ok(...))`. If the buffer is too small to fit the message, a bigger buffer is allocated and returned as `Ok(Err(...))`, with the exact size and capacity to hold the message. Errors are returned as `Err(Err(...))`.
-    #[inline]
     pub fn read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
         match self.try_read_msg(buf)? {
             Ok(bytes_read) => Ok(Ok(bytes_read)),
@@ -75,22 +74,18 @@ impl PipeOps {
         }
     }
     /// Reads bytes from the named pipe. Mirrors `std::io::Read`.
-    #[inline]
     pub fn read_bytes(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
     /// Writes data to the named pipe. There is no way to check/ensure that the message boundaries will be preserved which is why there's only one function to do this.
-    #[inline]
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
     /// Blocks until the client has fully read the buffer.
-    #[inline]
     pub fn flush(&self) -> io::Result<()> {
         self.0.flush()
     }
 
-    #[inline]
     pub fn get_client_process_id(&self) -> io::Result<u32> {
         let mut id: u32 = 0;
         let success = unsafe { GetNamedPipeClientProcessId(self.0 .0, &mut id as *mut _) != 0 };
@@ -100,7 +95,6 @@ impl PipeOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn get_client_session_id(&self) -> io::Result<u32> {
         let mut id: u32 = 0;
         let success = unsafe { GetNamedPipeClientSessionId(self.0 .0, &mut id as *mut _) != 0 };
@@ -110,7 +104,6 @@ impl PipeOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn get_server_process_id(&self) -> io::Result<u32> {
         let mut id: u32 = 0;
         let success = unsafe { GetNamedPipeServerProcessId(self.0 .0, &mut id as *mut _) != 0 };
@@ -120,7 +113,6 @@ impl PipeOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn get_server_session_id(&self) -> io::Result<u32> {
         let mut id: u32 = 0;
         let success = unsafe { GetNamedPipeServerSessionId(self.0 .0, &mut id as *mut _) != 0 };
@@ -146,14 +138,12 @@ impl PipeOps {
         }
     }
     /// Flushes and disconnects, obviously.
-    #[inline]
     pub fn flush_and_disconnect(&self) -> io::Result<()> {
         self.flush()?;
         self.disconnect()?;
         Ok(())
     }
     /// Disconnects without flushing. Drops all data which has been sent but not yet received on the other side, if any.
-    #[inline]
     pub fn disconnect(&self) -> io::Result<()> {
         let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
         if success {
@@ -173,14 +163,12 @@ impl Drop for PipeOps {
 }
 #[cfg(windows)]
 impl AsRawHandle for PipeOps {
-    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0 .0 // I hate this nested tuple syntax.
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for PipeOps {
-    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         let handle = self.as_raw_handle();
         std::mem::forget(self);

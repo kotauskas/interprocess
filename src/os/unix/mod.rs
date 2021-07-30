@@ -61,11 +61,9 @@ use std::{
 pub(crate) struct FdOps(pub c_int, PhantomData<*mut ()>);
 #[cfg(unix)]
 impl FdOps {
-    #[inline]
     pub fn new(fd: c_int) -> Self {
         Self(fd, PhantomData)
     }
-    #[inline]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let (success, num_bytes_read) = unsafe {
             let length_to_read = buf.len() as size_t;
@@ -83,7 +81,6 @@ impl FdOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let (success, num_bytes_written) = unsafe {
             let length_to_write = buf.len() as size_t;
@@ -101,7 +98,6 @@ impl FdOps {
             Err(io::Error::last_os_error())
         }
     }
-    #[inline]
     pub fn flush(&self) -> io::Result<()> {
         let success = unsafe { libc::fsync(self.as_raw_fd()) >= 0 };
         if success {
@@ -113,14 +109,12 @@ impl FdOps {
 }
 #[cfg(unix)]
 impl AsRawFd for FdOps {
-    #[inline]
     fn as_raw_fd(&self) -> c_int {
         self.0
     }
 }
 #[cfg(unix)]
 impl IntoRawFd for FdOps {
-    #[inline]
     fn into_raw_fd(self) -> c_int {
         let fd = self.as_raw_fd();
         mem::forget(self);
@@ -129,14 +123,12 @@ impl IntoRawFd for FdOps {
 }
 #[cfg(unix)]
 impl FromRawFd for FdOps {
-    #[inline]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self::new(fd)
     }
 }
 #[cfg(unix)]
 impl Drop for FdOps {
-    #[inline]
     fn drop(&mut self) {
         debug_assert!(unsafe {
             let mut success = true;

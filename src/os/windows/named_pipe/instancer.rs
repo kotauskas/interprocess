@@ -46,7 +46,6 @@ mod debug_impl {
         instance: &'a (T, AtomicBool),
     }
     impl<'a, T: AsRawHandle> Debug for Instance<'a, T> {
-        #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("PipeInstance")
                 .field("handle", &self.instance.0.as_raw_handle())
@@ -55,7 +54,6 @@ mod debug_impl {
         }
     }
     impl<T: AsRawHandle> Debug for Instancer<T> {
-        #[inline]
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             let mut list_builder = f.debug_list();
             for instance in self.0.read().expect("unexpected lock poisoning").iter() {

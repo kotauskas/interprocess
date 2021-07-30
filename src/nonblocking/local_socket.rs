@@ -46,8 +46,7 @@ pub struct LocalSocketListener {
 
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
-    #[inline]
-    pub async fn bind<'a>(name: impl ToLocalSocketName<'_> + Send + 'static) -> io::Result<Self> {
+        pub async fn bind<'a>(name: impl ToLocalSocketName<'_> + Send + 'static) -> io::Result<Self> {
         Ok(Self {
             inner: Arc::new(unblock(move || sync::LocalSocketListener::bind(name)).await?),
         })
@@ -57,8 +56,7 @@ impl LocalSocketListener {
     /// See [`incoming`] for a convenient way to create a main loop for a server.
     ///
     /// [`incoming`]: #method.incoming " "
-    #[inline]
-    pub async fn accept(&self) -> io::Result<LocalSocketStream> {
+        pub async fn accept(&self) -> io::Result<LocalSocketStream> {
         let s = self.inner.clone();
         Ok(LocalSocketStream {
             inner: Unblock::new(unblock(move || s.accept()).await?),
@@ -71,8 +69,7 @@ impl LocalSocketListener {
     ///
     /// [`for_each`]: https://docs.rs/futures/*/futures/stream/trait.StreamExt.html#method.for_each " "
     /// [`try_for_each`]: https://docs.rs/futures/*/futures/stream/trait.TryStreamExt.html#method.try_for_each " "
-    #[inline]
-    pub fn incoming(&self) -> Incoming {
+        pub fn incoming(&self) -> Incoming {
         Incoming {
             inner: Unblock::new(SyncArcIncoming {
                 inner: Arc::clone(&self.inner),
@@ -94,8 +91,7 @@ pub struct Incoming {
 #[cfg(feature = "nonblocking")]
 impl Stream for Incoming {
     type Item = Result<LocalSocketStream, io::Error>;
-    #[inline]
-    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = <Unblock<_> as Stream>::poll_next(Pin::new(&mut self.inner), ctx);
         match poll {
             Poll::Ready(val) => {
@@ -113,8 +109,7 @@ impl Stream for Incoming {
 }
 #[cfg(feature = "nonblocking")]
 impl FusedStream for Incoming {
-    #[inline]
-    fn is_terminated(&self) -> bool {
+        fn is_terminated(&self) -> bool {
         false
     }
 }
@@ -125,8 +120,7 @@ struct SyncArcIncoming {
 }
 impl Iterator for SyncArcIncoming {
     type Item = Result<sync::LocalSocketStream, io::Error>;
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
+        fn next(&mut self) -> Option<Self::Item> {
         Some(self.inner.accept())
     }
 }

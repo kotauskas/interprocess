@@ -38,7 +38,6 @@ pub struct UnnamedPipeCreationOptions {
 }
 impl UnnamedPipeCreationOptions {
     /// Starts with the default parameters for the pipe. Identical to `Default::default()`.
-    #[inline]
     pub const fn new() -> Self {
         Self {
             inheritable: true,
@@ -51,7 +50,6 @@ impl UnnamedPipeCreationOptions {
     /// See the [associated field] for more.
     ///
     /// [associated field]: #structfield.inheritable " "
-    #[inline]
     #[must_use = "this is not an in-place operation"]
     pub fn inheritable(mut self, inheritable: bool) -> Self {
         self.inheritable = inheritable;
@@ -81,7 +79,6 @@ impl UnnamedPipeCreationOptions {
     /// Extracts the [`SECURITY_ATTRIBUTES`] from the builder. Primarily an implementation detail, but has other uses.
     ///
     /// [`SECURITY_ATTRIBUTES`]: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/aa379560(v=vs.85)
-    #[inline]
     pub fn extract_security_attributes(self) -> SECURITY_ATTRIBUTES {
         // Safe because WinAPI parameter structs are typically rejected if a required field is zero
         let mut security_attributes = unsafe { zeroed::<SECURITY_ATTRIBUTES>() };
@@ -97,7 +94,6 @@ impl UnnamedPipeCreationOptions {
     /// The [`security_descriptor`] field is passed directly to Win32 which is then dereferenced there, resulting in undefined behavior if it was an invalid non-null pointer. For the default configuration, this should never be a concern.
     ///
     /// [`security_descriptor`]: #field.security_descriptor " "
-    #[inline]
     pub unsafe fn build(self) -> io::Result<(PubWriter, PubReader)> {
         let hint_raw = match self.buffer_size_hint {
             Some(num) => num.get(),
@@ -130,7 +126,6 @@ impl UnnamedPipeCreationOptions {
     }
 }
 impl Default for UnnamedPipeCreationOptions {
-    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -139,28 +134,24 @@ impl Default for UnnamedPipeCreationOptions {
 // yet.
 unsafe impl Send for UnnamedPipeCreationOptions {}
 
-#[inline]
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     unsafe { UnnamedPipeCreationOptions::default().build() }
 }
 
 pub(crate) struct UnnamedPipeReader(FileHandleOps);
 impl Read for UnnamedPipeReader {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
     }
 }
 #[cfg(windows)]
 impl AsRawHandle for UnnamedPipeReader {
-    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeReader {
-    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         let handle = self.as_raw_handle();
         mem::forget(self);
@@ -169,7 +160,6 @@ impl IntoRawHandle for UnnamedPipeReader {
 }
 #[cfg(windows)]
 impl FromRawHandle for UnnamedPipeReader {
-    #[inline]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         let fho = unsafe {
             // SAFETY: validity guaranteed by safety contract
@@ -179,7 +169,6 @@ impl FromRawHandle for UnnamedPipeReader {
     }
 }
 impl Debug for UnnamedPipeReader {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
             .field("handle", &self.as_raw_handle())
@@ -189,25 +178,21 @@ impl Debug for UnnamedPipeReader {
 
 pub(crate) struct UnnamedPipeWriter(FileHandleOps);
 impl Write for UnnamedPipeWriter {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.0.flush()
     }
 }
 #[cfg(windows)]
 impl AsRawHandle for UnnamedPipeWriter {
-    #[inline]
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeWriter {
-    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         let handle = self.as_raw_handle();
         mem::forget(self);
@@ -216,13 +201,11 @@ impl IntoRawHandle for UnnamedPipeWriter {
 }
 #[cfg(windows)]
 impl FromRawHandle for UnnamedPipeWriter {
-    #[inline]
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         Self(FileHandleOps(handle))
     }
 }
 impl Debug for UnnamedPipeWriter {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
             .field("handle", &self.as_raw_handle())

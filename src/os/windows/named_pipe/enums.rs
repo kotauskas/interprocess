@@ -39,7 +39,6 @@ impl PipeDirection {
     /// );
     /// # }
     /// ```
-    #[inline]
     pub const fn client_role(self) -> PipeStreamRole {
         match self {
             Self::ClientToServer => PipeStreamRole::Writer,
@@ -67,7 +66,6 @@ impl PipeDirection {
     /// );
     /// # }
     /// ```
-    #[inline]
     pub const fn server_role(self) -> PipeStreamRole {
         match self {
             Self::ClientToServer => PipeStreamRole::Reader,
@@ -82,7 +80,6 @@ impl TryFrom<DWORD> for PipeDirection {
     ///
     /// # Errors
     /// Returns `Err` if the value is not a valid pipe direction constant.
-    #[inline]
     fn try_from(op: DWORD) -> Result<Self, ()> {
         assert!((1..=3).contains(&op));
         // See the comment block above for why this is safe.
@@ -90,7 +87,6 @@ impl TryFrom<DWORD> for PipeDirection {
     }
 }
 impl From<PipeDirection> for DWORD {
-    #[inline]
     fn from(op: PipeDirection) -> Self {
         unsafe { mem::transmute(op) }
     }
@@ -134,7 +130,6 @@ impl PipeStreamRole {
     /// );
     /// # }
     /// ```
-    #[inline]
     pub const fn direction_as_server(self) -> PipeDirection {
         match self {
             Self::Reader => PipeDirection::ClientToServer,
@@ -162,7 +157,6 @@ impl PipeStreamRole {
     /// );
     /// # }
     /// ```
-    #[inline]
     pub const fn direction_as_client(self) -> PipeDirection {
         match self {
             Self::Reader => PipeDirection::ServerToClient,
@@ -183,12 +177,10 @@ pub enum PipeMode {
 }
 impl PipeMode {
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending on the value.
-    #[inline]
     pub const fn to_pipe_type(self) -> DWORD {
         self as _
     }
     /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE` depending on the value.
-    #[inline]
     pub const fn to_readmode(self) -> DWORD {
         match self {
             Self::Bytes => PIPE_READMODE_BYTE,
@@ -202,7 +194,6 @@ impl TryFrom<DWORD> for PipeMode {
     ///
     /// # Errors
     /// Returns `Err` if the value is not a valid pipe stream mode constant.
-    #[inline]
     fn try_from(op: DWORD) -> Result<Self, ()> {
         // It's nicer to only match than to check and transmute
         #[allow(unreachable_patterns)] // PIPE_READMODE_BYTE and PIPE_TYPE_BYTE are equal

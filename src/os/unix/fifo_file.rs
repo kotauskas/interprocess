@@ -25,7 +25,6 @@ use super::imports::*;
 ///
 /// [`mkfifo`]: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mkfifo.html " "
 /// [`umask`]: https://en.wikipedia.org/wiki/Umask " "
-#[inline]
 pub fn create_fifo<P: AsRef<Path>>(path: P, mode: mode_t) -> io::Result<()> {
     let path = CString::new(path.as_ref().as_os_str().as_bytes())?;
     let success = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };

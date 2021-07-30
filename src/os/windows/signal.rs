@@ -43,7 +43,6 @@ use std::{
 /// # }
 /// # Ok(()) }
 /// ```
-#[inline]
 pub fn set_handler(signal_type: SignalType, handler: SignalHandler) -> Result<(), SetHandlerError> {
     if signal_type.is_unsafe() {
         return Err(SetHandlerError::UnsafeSignal);
@@ -188,14 +187,12 @@ impl SignalHandler {
     /// Returns `true` for the [`Default`] variant, `false` otherwise.
     ///
     /// [`Default`]: #variant.Default.html " "
-    #[inline]
     pub const fn is_default(self) -> bool {
         matches!(self, Self::Default)
     }
     /// Returns `true` for the [`Ignore`] variant, `false` otherwise.
     ///
     /// [`Ignore`]: #variant.Ignore.html " "
-    #[inline]
     pub const fn is_ignore(self) -> bool {
         matches!(self, Self::Ignore)
     }
@@ -203,7 +200,6 @@ impl SignalHandler {
     ///
     /// [`Hook`]: #variant.Hook.html " "
     /// [`NoReturnHook`]: #variant.NoReturnHook.html " "
-    #[inline]
     pub const fn is_hook(self) -> bool {
         matches!(self, Self::Hook(..))
     }
@@ -213,7 +209,6 @@ impl SignalHandler {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         let hook = unsafe {
             // SAFETY: hook validity required by safety contract
@@ -227,7 +222,6 @@ impl SignalHandler {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe C functions] for more.
     ///
     /// [module-level section on signal-safe C functions]: index.html#signal-safe-c-functions " "
-    #[inline]
     pub unsafe fn from_fn_noreturn(function: fn() -> !) -> Self {
         let hook = unsafe {
             // SAFETY: hook validity required by safety contract
@@ -240,7 +234,6 @@ impl Default for SignalHandler {
     /// Returns [`SignalHandler::Default`].
     ///
     /// [`SignalHandler::Default`]: #variant.Default " "
-    #[inline]
     fn default() -> Self {
         Self::Default
     }
@@ -257,18 +250,15 @@ impl SignalHook {
     /// The function must not call any C functions which are not considered signal-safe. See the [module-level section on signal-safe functions] for more.
     ///
     /// [module-level section on signal-safe functions]: index.html#signal-safe-functions " "
-    #[inline]
     pub unsafe fn from_fn(function: fn()) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline]
     pub fn inner(self) -> fn() {
         self.0
     }
 }
 impl From<SignalHook> for fn() {
-    #[inline]
     fn from(op: SignalHook) -> Self {
         op.0
     }
@@ -285,18 +275,15 @@ impl NoReturnSignalHook {
     /// Same as for the normal [`SignalHook`].
     ///
     /// [`SignalHook`]: struct.SignalHook.html " "
-    #[inline]
     pub unsafe fn from_fn(function: fn() -> !) -> Self {
         Self(function)
     }
     /// Returns the wrapped function.
-    #[inline]
     pub fn inner(self) -> fn() -> ! {
         self.0
     }
 }
 impl From<NoReturnSignalHook> for fn() -> ! {
-    #[inline]
     fn from(op: NoReturnSignalHook) -> Self {
         op.0
     }
@@ -349,7 +336,6 @@ pub enum SignalType {
 }
 impl SignalType {
     /// Returns `true` if the value is a signal which requires its custom handler functions to never return, `false` otherwise.
-    #[inline]
     pub const fn requires_diverging_hook(self) -> bool {
         matches!(
             self,
@@ -357,19 +343,16 @@ impl SignalType {
         )
     }
     /// Returns `true` if the value is an unsafe signal which requires unsafe code when setting a handling method, `false` otherwise.
-    #[inline]
     pub const fn is_unsafe(self) -> bool {
         matches!(self, Self::SegmentationFault | Self::IllegalInstruction)
     }
 }
 impl From<SignalType> for i32 {
-    #[inline]
     fn from(op: SignalType) -> Self {
         op as i32
     }
 }
 impl From<SignalType> for u32 {
-    #[inline]
     fn from(op: SignalType) -> Self {
         op as u32
     }
@@ -390,7 +373,6 @@ impl TryFrom<i32> for SignalType {
 }
 impl TryFrom<u32> for SignalType {
     type Error = UnknownSignalError;
-    #[inline]
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         (value as u32).try_into()
     }
@@ -406,7 +388,6 @@ pub struct UnknownSignalError {
     pub value: i32,
 }
 impl fmt::Display for UnknownSignalError {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "unknown signal value {}", self.value)
     }

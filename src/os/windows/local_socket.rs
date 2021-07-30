@@ -20,7 +20,6 @@ pub struct LocalSocketListener {
     inner: PipeListener,
 }
 impl LocalSocketListener {
-    #[inline]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let inner = PipeListenerOptions::new()
@@ -29,7 +28,6 @@ impl LocalSocketListener {
             .create()?;
         Ok(Self { inner })
     }
-    #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
         Ok(LocalSocketStream {
@@ -37,13 +35,11 @@ impl LocalSocketListener {
             server_or_client: AtomicU8::new(ServerOrClient::Server as _),
         })
     }
-    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
     }
 }
 impl Debug for LocalSocketListener {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("LocalSocketListener")
     }
@@ -60,7 +56,6 @@ enum ServerOrClient {
     Nah = 2,
 }
 impl From<u8> for ServerOrClient {
-    #[inline]
     fn from(value: u8) -> Self {
         match value {
             0 => Self::Client,
@@ -78,7 +73,6 @@ impl LocalSocketStream {
             server_or_client: AtomicU8::new(ServerOrClient::Client as _),
         })
     }
-    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         match self.server_or_client.load(Relaxed).into() {
             ServerOrClient::Server => self.inner.client_process_id(),
@@ -108,37 +102,30 @@ impl LocalSocketStream {
             }
         }
     }
-    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
     }
 }
 impl Read for LocalSocketStream {
-    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }
-    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         self.inner.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
-    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
 }
 impl Debug for LocalSocketStream {
-    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSocketStream")
             .field("handle", &self.as_raw_handle())
@@ -146,19 +133,16 @@ impl Debug for LocalSocketStream {
     }
 }
 impl AsRawHandle for LocalSocketStream {
-    #[inline]
     fn as_raw_handle(&self) -> *mut c_void {
         self.inner.as_raw_handle()
     }
 }
 impl IntoRawHandle for LocalSocketStream {
-    #[inline]
     fn into_raw_handle(self) -> *mut c_void {
         self.inner.into_raw_handle()
     }
 }
 impl FromRawHandle for LocalSocketStream {
-    #[inline]
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
         let inner = unsafe {
             // SAFETY: guaranteed via safety contract
@@ -173,15 +157,12 @@ impl FromRawHandle for LocalSocketStream {
 
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
 
-#[inline]
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }
-#[inline]
 pub fn to_local_socket_name_osstr(osstr: &OsStr) -> LocalSocketName<'_> {
     LocalSocketName::from_raw_parts(Cow::Borrowed(osstr), true)
 }
-#[inline]
 pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'static> {
     LocalSocketName::from_raw_parts(Cow::Owned(osstring), true)
 }
