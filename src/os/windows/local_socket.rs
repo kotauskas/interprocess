@@ -12,6 +12,7 @@ use std::{
     ptr,
     sync::atomic::{AtomicU8, Ordering::Relaxed},
 };
+use to_method::To;
 use winapi::um::{namedpipeapi::GetNamedPipeInfo, winbase::PIPE_SERVER_END};
 
 type PipeListener = GenericPipeListener<PipeStream>;
@@ -74,7 +75,7 @@ impl LocalSocketStream {
         })
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.server_or_client.load(Relaxed).into() {
+        match self.server_or_client.load(Relaxed).to::<ServerOrClient>() {
             ServerOrClient::Server => self.inner.client_process_id(),
             ServerOrClient::Client => self.inner.server_process_id(),
             ServerOrClient::Nah => {

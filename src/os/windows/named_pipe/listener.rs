@@ -17,6 +17,7 @@ use std::{
         Arc, RwLock,
     },
 };
+use to_method::To;
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
@@ -231,7 +232,7 @@ impl<'a> PipeListenerOptions<'a> {
                     | nonblocking as u32,
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
-                    x.get() as DWORD
+                    x.get().to::<DWORD>()
                 }),
                 self.output_buffer_size_hint.try_into()
                     .expect("output buffer size hint overflowed DWORD"),
@@ -269,7 +270,7 @@ impl<'a> PipeListenerOptions<'a> {
         let instancer_capacity = self
             .instance_limit
             .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
-            .into();
+            .to::<usize>();
         let mut instance_vec = Vec::with_capacity(instancer_capacity);
         let first_instance_raw = self.create_instance(true, self.nonblocking, role, read_mode)?;
         let first_instance = Arc::new((

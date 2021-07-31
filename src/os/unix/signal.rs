@@ -135,8 +135,7 @@
 //!
 //! [`SignalType`]: enum.SignalType.html " "
 
-#![cfg_attr(not(unix), allow(unused_imports))]
-
+use super::imports::*;
 use cfg_if::cfg_if;
 use std::{
     convert::{TryFrom, TryInto},
@@ -146,8 +145,7 @@ use std::{
     mem::zeroed,
     panic, process,
 };
-
-use super::imports::*;
+use to_method::To;
 
 cfg_if! {
     if #[cfg(any(
@@ -736,8 +734,10 @@ impl From<SignalHook> for fn() {
 /// # Ok(()) }
 /// ```
 pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
-    let pid =
-        i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
+    let pid = pid
+        .to::<u32>()
+        .try_to::<i32>()
+        .unwrap_or_else(|_| panic!("process identifier out of range"));
     debug_assert_ne!(
         pid, 0,
         "to send the signal to the process group of the calling process, use send_to_group instead"
@@ -764,8 +764,10 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
 /// # Ok(()) }
 /// ```
 pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
-    let pid =
-        i32::try_from(pid.into()).unwrap_or_else(|_| panic!("process identifier out of range"));
+    let pid = pid
+        .to::<u32>()
+        .try_to::<i32>()
+        .unwrap_or_else(|_| panic!("process identifier out of range"));
     debug_assert_ne!(
         pid, 0,
         "to send the signal to the process group of the calling process, use send_to_group instead"
@@ -797,7 +799,9 @@ pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Resul
 /// ```
 pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::Result<()> {
     #[allow(clippy::neg_multiply)] // "it's more readable to just negate"? how about no
-    let pid = i32::try_from(pid.into())
+    let pid = pid
+        .to::<u32>()
+        .try_to::<i32>()
         .unwrap_or_else(|_| panic!("process group identifier out of range"))
         * -1;
     let success = unsafe { libc::kill(signal.into().map_or(0, Into::into), pid) != -1 };
@@ -823,7 +827,9 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
 /// ```
 pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Result<()> {
     #[allow(clippy::neg_multiply)]
-    let pid = i32::try_from(pid.into())
+    let pid = pid
+        .to::<u32>()
+        .try_to::<i32>()
         .unwrap_or_else(|_| panic!("process identifier out of range"))
         * -1;
     debug_assert_ne!(
