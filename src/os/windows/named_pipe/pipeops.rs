@@ -152,6 +152,10 @@ impl PipeOps {
             Err(io::Error::last_os_error())
         }
     }
+    /// Called by pipe streams when dropped, used to abstract over the fact that non-async streams flush before returning the pipe to the server while async ones don't.
+    pub fn server_drop_disconnect(&self) {
+        let _ = self.flush_and_disconnect();
+    }
 }
 impl Drop for PipeOps {
     fn drop(&mut self) {
