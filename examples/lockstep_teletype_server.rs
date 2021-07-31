@@ -31,15 +31,14 @@ fn main() {
             conn.get_mut()
                 .write_all(buffer.as_ref())
                 .expect("failed to write line to socket");
-            buffer.clear();
         } else {
             conn.read_line(&mut buffer)
                 .expect("failed to read line from socket");
             io::stdout()
                 .write_all(buffer.as_ref())
                 .expect("failed to write line to stdout");
-            buffer.clear();
         }
+        buffer.clear();
         our_turn = !our_turn;
     }
 }
