@@ -4,9 +4,14 @@
 //!
 //! [blocking version of this module]: ../../local_socket/index.html " "
 
-use std::{io, sync::Arc, pin::Pin, task::{Context, Poll}};
 use super::imports::*;
 use crate::local_socket::{self as sync, ToLocalSocketName};
+use std::{
+    io,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 /// An asynchronous local socket server, listening for connections.
 ///
@@ -46,7 +51,7 @@ pub struct LocalSocketListener {
 
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
-        pub async fn bind<'a>(name: impl ToLocalSocketName<'_> + Send + 'static) -> io::Result<Self> {
+    pub async fn bind<'a>(name: impl ToLocalSocketName<'_> + Send + 'static) -> io::Result<Self> {
         Ok(Self {
             inner: Arc::new(unblock(move || sync::LocalSocketListener::bind(name)).await?),
         })
@@ -56,7 +61,7 @@ impl LocalSocketListener {
     /// See [`incoming`] for a convenient way to create a main loop for a server.
     ///
     /// [`incoming`]: #method.incoming " "
-        pub async fn accept(&self) -> io::Result<LocalSocketStream> {
+    pub async fn accept(&self) -> io::Result<LocalSocketStream> {
         let s = self.inner.clone();
         Ok(LocalSocketStream {
             inner: Unblock::new(unblock(move || s.accept()).await?),
@@ -69,7 +74,7 @@ impl LocalSocketListener {
     ///
     /// [`for_each`]: https://docs.rs/futures/*/futures/stream/trait.StreamExt.html#method.for_each " "
     /// [`try_for_each`]: https://docs.rs/futures/*/futures/stream/trait.TryStreamExt.html#method.try_for_each " "
-        pub fn incoming(&self) -> Incoming {
+    pub fn incoming(&self) -> Incoming {
         Incoming {
             inner: Unblock::new(SyncArcIncoming {
                 inner: Arc::clone(&self.inner),
@@ -91,7 +96,7 @@ pub struct Incoming {
 #[cfg(feature = "nonblocking")]
 impl Stream for Incoming {
     type Item = Result<LocalSocketStream, io::Error>;
-        fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = <Unblock<_> as Stream>::poll_next(Pin::new(&mut self.inner), ctx);
         match poll {
             Poll::Ready(val) => {
@@ -109,7 +114,7 @@ impl Stream for Incoming {
 }
 #[cfg(feature = "nonblocking")]
 impl FusedStream for Incoming {
-        fn is_terminated(&self) -> bool {
+    fn is_terminated(&self) -> bool {
         false
     }
 }
@@ -120,7 +125,7 @@ struct SyncArcIncoming {
 }
 impl Iterator for SyncArcIncoming {
     type Item = Result<sync::LocalSocketStream, io::Error>;
-        fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
         Some(self.inner.accept())
     }
 }
@@ -184,16 +189,10 @@ impl AsyncWrite for LocalSocketStream {
     ) -> Poll<Result<usize, io::Error>> {
         AsyncWrite::poll_write(Pin::new(&mut self.inner), cx, buf)
     }
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         AsyncWrite::poll_flush(Pin::new(&mut self.inner), cx)
     }
-    fn poll_close(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         AsyncWrite::poll_close(Pin::new(&mut self.inner), cx)
     }
 }
