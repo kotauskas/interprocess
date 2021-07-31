@@ -43,8 +43,9 @@ cfg_if! {
             F_GETFL,
             F_SETFL,
             O_NONBLOCK,
-            sockaddr_un,
+            sockaddr_un, sockaddr,
             msghdr, cmsghdr,
+            socklen_t, size_t,
         };
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         pub(super) use libc::{
@@ -52,7 +53,6 @@ cfg_if! {
             SO_PASSCRED,
             SO_PEERCRED,
             SCM_CREDENTIALS,
-            socklen_t,
             ucred,
         };
 

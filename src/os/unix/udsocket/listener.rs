@@ -1,0 +1,341 @@
+use super::{
+    imports::*,
+    util::{enable_passcred, raw_get_nonblocking, raw_set_nonblocking},
+    ToUdSocketPath, UdStream,
+};
+use std::{
+    fmt::{self, Debug, Formatter},
+    io,
+    iter::FusedIterator,
+    mem::{size_of, zeroed},
+};
+
+/// A Unix domain byte stream socket server, listening for connections.
+///
+/// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP server.
+///
+/// # Examples
+/// Basic server:
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(unix)] {
+/// use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
+/// use std::io::{self, prelude::*};
+///
+/// fn handle_error(result: io::Result<UdStream>) -> Option<UdStream> {
+///     match result {
+///         Ok(val) => Some(val),
+///         Err(error) => {
+///             eprintln!("There was an error with an incoming connection: {}", error);
+///             None
+///         }
+///     }
+/// }
+///
+/// let listener = UdStreamListener::bind("/tmp/example.sock")?;
+/// for mut connection in listener.incoming()
+///     // Use filter_map to report all errors with connections and skip those connections in the loop,
+///     // making the actual server loop part much cleaner than if it contained error handling as well.
+///     .filter_map(handle_error) {
+///     connection.write_all(b"Hello from server!");
+///     let mut input_string = String::new();
+///     connection.read_to_string(&mut input_string);
+///     println!("Client answered: {}", input_string);
+/// }
+/// # }
+/// # Ok(()) }
+/// ```
+///
+/// Sending and receiving ancillary data:
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))] {
+/// use interprocess::{
+///     unnamed_pipe::{pipe, UnnamedPipeReader},
+///     os::unix::udsocket::{UdStreamListener, UdStream, AncillaryData, AncillaryDataBuf},
+/// };
+/// use std::{
+///     io::{self, prelude::*},
+///     fs,
+///     iter,
+///     borrow::Cow,
+///     os::unix::io::{FromRawFd, IntoRawFd},
+/// };
+///
+/// fn handle_error(result: io::Result<UdStream>) -> Option<UdStream> {
+///     match result {
+///         Ok(val) => Some(val),
+///         Err(error) => {
+///             eprintln!("There was an error with an incoming connection: {}", error);
+///             None
+///         }
+///     }
+/// }
+///
+/// let listener = UdStreamListener::bind("/tmp/example.sock")?;
+///
+/// // Allocate a sufficient buffer for receiving ancillary data.
+/// let mut ancillary_buffer = AncillaryDataBuf::owned_with_capacity(
+///     AncillaryData::ENCODED_SIZE_OF_CREDENTIALS
+///   + AncillaryData::encoded_size_of_file_descriptors(1),
+/// );
+/// // Prepare valid credentials.
+/// let credentials = AncillaryData::credentials();
+///
+/// for mut connection in listener.incoming()
+///     .filter_map(handle_error) {
+///     // Create the file descriptor which we will be sending.
+///     let (own_fd, fd_to_send) = pipe()?;
+///     // Borrow the file descriptor in a slice right away to send it later.
+///     let fds = [fd_to_send.into_raw_fd()];
+///     let fd_ancillary = AncillaryData::FileDescriptors(
+///         Cow::Borrowed(&fds),
+///     );
+///     
+///     connection.send_ancillary(
+///         b"File descriptor and credentials from the server!",
+///         iter::once(fd_ancillary),
+///     );
+///     
+///     // The receive buffer size depends on the situation, but since this example
+///     // mirrors the second one from UdSocket, 64 is sufficient.
+///     let mut recv_buffer = [0; 64];
+///     connection.recv_ancillary(
+///         &mut recv_buffer,
+///         &mut ancillary_buffer,
+///     );
+///     
+///     println!("Client answered: {}", String::from_utf8_lossy(&recv_buffer));
+///
+///     // Decode the received ancillary data.
+///     let (mut file_descriptors, mut cred) = (None, None);
+///     for element in ancillary_buffer.decode() {
+///         match element {
+///             AncillaryData::FileDescriptors(fds) => file_descriptors = Some(fds),
+///             AncillaryData::Credentials {pid, uid, gid} => cred = Some((pid, uid, gid)),
+///         }
+///     }
+///     let mut files = Vec::new();
+///     if let Some(fds) = file_descriptors {
+///         // There is a possibility that zero file descriptors were sent — let's account for that.
+///         for fd in fds.iter().copied() {
+///             // This is normally unsafe, but since we know that the descriptor is not owned somewhere
+///             // else in the current process, it's fine to do this:
+///             let file = unsafe {fs::File::from_raw_fd(fd)};
+///             files.push(file);
+///         }
+///     }
+///     for mut file in files {
+///         file.write(b"Hello foreign file descriptor!");
+///     }
+///     if let Some(credentials) = cred {
+///         println!("Client\tPID: {}", credentials.0);
+///         println!(      "\tUID: {}", credentials.1);
+///         println!(      "\tGID: {}", credentials.2);
+///     }
+/// }
+/// # }
+/// # Ok(()) }
+/// ```
+pub struct UdStreamListener {
+    fd: FdOps,
+}
+impl UdStreamListener {
+    /// Creates a new listener socket at the specified address.
+    ///
+    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    ///
+    /// # Example
+    /// See [`ToUdSocketPath`].
+    ///
+    /// # System calls
+    /// - `socket`
+    /// - `bind`
+    ///
+    /// [maximum socket path length]: const.MAX_UDSOCKET_PATH_LEN.html " "
+    /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
+    /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
+    pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        let path = path.to_socket_path()?; // Shadow original by conversion
+        let (addr, addrlen) = unsafe {
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as _;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            (addr, size_of::<sockaddr_un>())
+        };
+        let socket = {
+            let (success, fd) = unsafe {
+                let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
+                (result != -1, result)
+            };
+            if success {
+                fd
+            } else {
+                return Err(io::Error::last_os_error());
+            }
+        };
+        let success = unsafe {
+            // If binding didn't fail, start listening and return true if it succeeded and false if
+            // it failed; if binding failed, short-circuit to returning false
+            if libc::bind(
+                socket,
+                // Double cast because you cannot cast a reference to a pointer of arbitrary type
+                // but you can cast any narrow pointer to any other narrow pointer
+                &addr as *const _ as *const sockaddr,
+                addrlen as u32,
+            ) != -1
+            // FIXME the standard library uses 128 here without an option to change this
+            // number, why? If std has solid reasons to do this, remove this notice and
+            // document the method's behavior on this matter explicitly; otherwise, add
+            // an option to change this value.
+            && libc::listen(socket, 128) != -1
+            {
+                enable_passcred(socket)
+            } else {
+                false
+            }
+        };
+        if success {
+            Ok(unsafe {
+                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+                // not to be used elsewhere
+                Self::from_raw_fd(socket)
+            })
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+
+    /// Listens for incoming connections to the socket, blocking until a client is connected.
+    ///
+    /// See [`incoming`] for a convenient way to create a main loop for a server.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))] {
+    /// use interprocess::os::unix::udsocket::UdStreamListener;
+    ///
+    /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
+    /// loop {
+    ///     match listener.accept() {
+    ///         Ok(connection) => {
+    ///             println!("New client!");
+    ///         },
+    ///         Err(error) => {
+    ///             println!("Incoming connection failed: {}", error);
+    ///         },
+    ///     }
+    /// }
+    /// # }
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// # System calls
+    /// - `accept`
+    ///
+    /// [`incoming`]: #method.incoming " "
+    pub fn accept(&self) -> io::Result<UdStream> {
+        let (success, fd) = unsafe {
+            let result = libc::accept(self.as_raw_fd(), zeroed(), zeroed());
+            (result != -1, result)
+        };
+        if success {
+            Ok(unsafe {
+                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+                // not to be used elsewhere
+                UdStream::from_raw_fd(fd)
+            })
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+
+    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # #[cfg(unix)] {
+    /// use interprocess::os::unix::udsocket::UdStreamListener;
+    ///
+    /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
+    /// // Thanks to incoming(), you get a simple self-documenting infinite server loop
+    /// for connection in listener.incoming()
+    ///     .map(|conn| if let Err(error) = conn {
+    ///         eprintln!("Incoming connection failed: {}", error);
+    ///     }) {
+    ///     eprintln!("New client!");
+    /// }
+    /// # }
+    /// # Ok(()) }
+    /// ```
+    pub fn incoming(&self) -> Incoming<'_> {
+        Incoming::from(self)
+    }
+
+    /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
+    ///
+    /// In nonblocking mode, calls to [`accept`], and, by extension, iteration through [`incoming`] will never wait for a client to become available to connect and will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations while there are no new client connections to accept.
+    ///
+    /// [`accept`]: #method.accept " "
+    /// [`incoming`]: #method.incoming " "
+    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        unsafe { raw_set_nonblocking(self.fd.0, nonblocking) }
+    }
+    /// Checks whether the socket is currently in nonblocking mode or not.
+    pub fn is_nonblocking(&self) -> io::Result<bool> {
+        unsafe { raw_get_nonblocking(self.fd.0) }
+    }
+}
+impl Debug for UdStreamListener {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UdStreamListener")
+            .field("file_descriptor", &self.as_raw_fd())
+            .finish()
+    }
+}
+#[cfg(unix)]
+impl AsRawFd for UdStreamListener {
+    fn as_raw_fd(&self) -> c_int {
+        self.fd.as_raw_fd()
+    }
+}
+#[cfg(unix)]
+impl IntoRawFd for UdStreamListener {
+    fn into_raw_fd(self) -> c_int {
+        self.fd.into_raw_fd()
+    }
+}
+#[cfg(unix)]
+impl FromRawFd for UdStreamListener {
+    unsafe fn from_raw_fd(fd: c_int) -> Self {
+        Self { fd: FdOps::new(fd) }
+    }
+}
+
+/// An infinite iterator over incoming client connections of a [`UdStreamListener`].
+///
+/// This iterator is created by the [`incoming`] method on [`UdStreamListener`] — see its documentation for more.
+///
+/// [`UdStreamListener`]: struct.UdStreamListener.html " "
+/// [`incoming`]: struct.UdStreamListener.html#method.incoming " "
+pub struct Incoming<'a> {
+    listener: &'a UdStreamListener,
+}
+impl<'a> Iterator for Incoming<'a> {
+    type Item = io::Result<UdStream>;
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.listener.accept())
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::MAX, None)
+    }
+}
+impl FusedIterator for Incoming<'_> {}
+impl<'a> From<&'a UdStreamListener> for Incoming<'a> {
+    fn from(listener: &'a UdStreamListener) -> Self {
+        Self { listener }
+    }
+}
