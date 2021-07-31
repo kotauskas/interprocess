@@ -95,6 +95,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         let handle = self.config.create_instance(
             false,
             self.nonblocking.load(SeqCst),
+            false,
             Stream::ROLE,
             Stream::READ_MODE,
         )?;
@@ -213,23 +214,19 @@ impl<'a> PipeListenerOptions<'a> {
         &self,
         first: bool,
         nonblocking: bool,
+        overlapped: bool,
         role: PipeStreamRole,
         read_mode: Option<PipeMode>,
     ) -> io::Result<HANDLE> {
         let path = convert_path(&self.name, None);
+        let open_mode = self.to_open_mode(first, role, overlapped);
+        let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
         let (handle, success) = unsafe {
+            // FIXME doesn't actually pass all parameters
             let handle = CreateNamedPipeW(
                 path.as_ptr(),
-                {
-                    let mut flags = DWORD::from(role.direction_as_server());
-                    if first {
-                        flags |= FILE_FLAG_FIRST_PIPE_INSTANCE;
-                    }
-                    flags
-                },
-                self.mode.to_pipe_type()
-                    | read_mode.map_or(0, PipeMode::to_readmode)
-                    | nonblocking as u32,
+                open_mode,
+                pipe_mode,
                 self.instance_limit.map_or(255, |x| {
                     assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
                     x.get().to::<DWORD>()
@@ -272,7 +269,8 @@ impl<'a> PipeListenerOptions<'a> {
             .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
             .to::<usize>();
         let mut instance_vec = Vec::with_capacity(instancer_capacity);
-        let first_instance_raw = self.create_instance(true, self.nonblocking, role, read_mode)?;
+        let first_instance_raw =
+            self.create_instance(true, self.nonblocking, false, role, read_mode)?;
         let first_instance = Arc::new((
             // SAFETY: we just created this handle
             unsafe { PipeOps::from_raw_handle(first_instance_raw) },
@@ -281,6 +279,33 @@ impl<'a> PipeListenerOptions<'a> {
         instance_vec.push(first_instance);
         let instancer = Instancer(RwLock::new(instance_vec));
         Ok((owned_config, instancer))
+    }
+
+    fn to_open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> DWORD {
+        let mut open_mode = 0_u32;
+        open_mode |= role.direction_as_server().to::<DWORD>();
+        if first {
+            open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+        }
+        if self.write_through {
+            open_mode |= FILE_FLAG_WRITE_THROUGH;
+        }
+        if overlapped {
+            open_mode |= FILE_FLAG_OVERLAPPED;
+        }
+        open_mode
+    }
+    fn to_pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> DWORD {
+        let mut pipe_mode = 0_u32;
+        pipe_mode |= self.mode.to_pipe_type();
+        pipe_mode |= read_mode.map_or(0, PipeMode::to_readmode);
+        if nonblocking {
+            pipe_mode |= PIPE_NOWAIT;
+        }
+        if !self.accept_remote {
+            pipe_mode |= PIPE_REJECT_REMOTE_CLIENTS;
+        }
+        pipe_mode
     }
 }
 pub(super) const INITIAL_INSTANCER_CAPACITY: u8 = 8;
