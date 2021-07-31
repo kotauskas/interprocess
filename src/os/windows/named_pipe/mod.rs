@@ -16,10 +16,13 @@ mod enums;
 mod instancer;
 mod listener;
 mod pipeops;
+#[macro_use]
 mod stream;
 pub use enums::*;
 pub use listener::*;
 pub use stream::*;
+
+pub mod tokio;
 
 use super::imports::*;
 use instancer::*;

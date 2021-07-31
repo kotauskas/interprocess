@@ -15,9 +15,9 @@ cfg_if! {
             shared::{minwindef::{DWORD, LPVOID}, ntdef::HANDLE, winerror::ERROR_PIPE_CONNECTED},
             um::{
                 winbase::{
-                    FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
+                    FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_WRITE_THROUGH, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
                     PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE,
-                    PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
+                    PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS,
                 },
                 winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE},
                 fileapi::{CreateFileW, OPEN_EXISTING, FlushFileBuffers, ReadFile, WriteFile},
@@ -35,21 +35,40 @@ cfg_if! {
                 processthreadsapi::GetCurrentProcess,
             },
         };
-        pub use std::os::windows::{io::{AsRawHandle, FromRawHandle, IntoRawHandle}, ffi::OsStrExt};
+        pub use std::os::windows::{io::{AsRawHandle, FromRawHandle, IntoRawHandle}, ffi::{OsStrExt, OsStringExt}};
     } else {
-        pub type HANDLE = *mut ();
+        pub type HANDLE = *mut std::ffi::c_void;
         pub trait AsRawHandle {}
         pub trait IntoRawHandle {}
         pub unsafe trait FromRawHandle {}
         pub type DWORD = u32;
         pub struct SECURITY_ATTRIBUTES {}
-        pub type LPVOID = *mut ();
+        pub type LPVOID = *mut std::ffi::c_void;
 
         fake_consts! {u32,
             PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
             PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
             PIPE_READMODE_BYTE = 0, PIPE_READMODE_MESSAGE = 1,
         }
+    }
+}
+
+cfg_if! {
+    if #[cfg(all(windows, feature = "tokio"))] {
+        pub use tokio::{
+            io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
+            net::windows::named_pipe::{
+                NamedPipeClient as TokioNPClient,
+                NamedPipeServer as TokioNPServer,
+                ClientOptions as TokioNPClientOptions,
+            },
+        };
+        pub use futures::io::{AsyncRead, AsyncWrite};
+    } else {
+        #[derive(Debug)]
+        pub struct TokioNPClient;
+        #[derive(Debug)]
+        pub struct TokioNPServer;
     }
 }
 
