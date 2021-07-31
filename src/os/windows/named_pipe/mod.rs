@@ -30,7 +30,7 @@ use std::{
 };
 
 fn convert_path(pipe_name: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
-    let mut path = OsString::from(r"\\.");
+    let mut path = OsString::from(r"\\");
     if let Some(host) = hostname {
         path.push(host);
     } else {
