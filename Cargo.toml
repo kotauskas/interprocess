@@ -26,7 +26,10 @@ futures = { version = "0.3", optional = true }
 to_method = "1.1"
 cfg-if = "1.0"
 
-[dev_dependencies]
+[build-dependencies]
+rustc_version = "0.4"
+
+[dev-dependencies]
 tokio = { version = "1.7", features = ["rt", "macros", "rt-multi-thread"] }
 
 [target.'cfg(windows)'.dependencies]

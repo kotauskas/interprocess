@@ -24,10 +24,14 @@
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
-#![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![allow(clippy::nonstandard_macro_braces)]
+#![cfg_attr(
+    unsafe_op_in_unsafe_fn_stable, // This is set by the build script on Rust 1.52+
+    forbid(unsafe_op_in_unsafe_fn),
+)]
+#![cfg_attr(not(unsafe_op_in_unsafe_fn_stable), allow(unused_unsafe))]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
 #[cfg(not(any(
