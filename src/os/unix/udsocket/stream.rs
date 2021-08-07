@@ -1,7 +1,9 @@
 use super::{
+    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{
-        enable_passcred, get_peer_ucred, raw_get_nonblocking, raw_set_nonblocking, to_msghdrsize,
+        enable_passcred, get_peer_ucred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
+        raw_set_nonblocking,
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath,
 };
@@ -9,8 +11,9 @@ use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
     iter,
-    mem::{size_of, zeroed},
+    mem::size_of,
 };
+use to_method::To;
 
 /// A Unix domain socket byte stream, obtained either from [`UdStreamListener`] or by connecting to an existing server.
 ///
@@ -129,13 +132,7 @@ impl UdStream {
     ///
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let path = path.to_socket_path()?; // Shadow original by conversion
-        let (addr, addrlen) = unsafe {
-            let mut addr: sockaddr_un = zeroed();
-            addr.sun_family = AF_UNIX as _;
-            path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, size_of::<sockaddr_un>())
-        };
+        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -148,23 +145,17 @@ impl UdStream {
             }
         };
         let success = unsafe {
-            if libc::connect(
+            libc::connect(
                 socket,
-                // Same as in UdSocketListener::bind()
                 &addr as *const _ as *const _,
-                addrlen as u32,
-            ) != -1
-            {
-                enable_passcred(socket)
-            } else {
-                false
-            }
-        };
-        if success {
-            Ok(unsafe { Self::from_raw_fd(socket) })
-        } else {
-            Err(io::Error::last_os_error())
+                size_of::<sockaddr_un>() as u32,
+            )
+        } != 1;
+        if !success {
+            unsafe { return Err(handle_fd_error(socket)) };
         }
+        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        Ok(unsafe { Self::from_raw_fd(socket) })
     }
 
     /// Receives bytes from the socket stream.
@@ -218,13 +209,7 @@ impl UdStream {
         bufs: &[IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
     ) -> io::Result<(usize, usize)> {
-        let abuf: &mut [u8] = abuf.as_mut();
-        // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe { zeroed::<msghdr>() };
-        hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = to_msghdrsize(bufs.len())?;
-        hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = to_msghdrsize(abuf.len())?;
+        let mut hdr = mk_msghdr_r(bufs, abuf.as_mut())?;
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -288,16 +273,10 @@ impl UdStream {
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data
+        let abuf = ancillary_data
             .into_iter()
             .collect::<EncodedAncillaryData<'_>>();
-        let abuf: &[u8] = abuf_value.as_ref();
-        // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe { zeroed::<msghdr>() };
-        hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = to_msghdrsize(bufs.len())?;
-        hdr.msg_control = abuf.as_ptr() as *mut _;
-        hdr.msg_controllen = to_msghdrsize(abuf.len())?;
+        let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)

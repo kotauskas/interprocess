@@ -52,8 +52,8 @@ cfg_if! {
         const _MAX_UDSOCKET_PATH_LEN: usize = 104;
     } else {
         compile_error!("\
-Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket.rs for your platform \
-if you wish to enable Unix domain socket support for it"
+Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket/mod.rs for your \
+platform if you wish to enable Unix domain socket support for it"
         );
     }
 }

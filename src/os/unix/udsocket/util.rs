@@ -1,8 +1,9 @@
 use super::imports::*;
 use cfg_if::cfg_if;
 use std::{
-    ffi::c_void,
-    io,
+    ffi::{c_void, CStr, CString},
+    hint::unreachable_unchecked,
+    io::{self, IoSlice, IoSliceMut},
     mem::{size_of, size_of_val, zeroed},
     ptr::null,
 };
@@ -32,23 +33,28 @@ pub fn to_msghdrsize(size: usize) -> io::Result<MsghdrSize> {
 }
 
 #[allow(unused_variables)]
-pub unsafe fn enable_passcred(socket: i32) -> bool {
+pub unsafe fn enable_passcred(socket: i32) -> io::Result<()> {
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     {
         let passcred: c_int = 1;
-        unsafe {
+        let success = unsafe {
             libc::setsockopt(
                 socket,
                 SOL_SOCKET,
                 SO_PASSCRED,
                 &passcred as *const _ as *const _,
                 size_of_val(&passcred).try_to::<u32>().unwrap(),
-            ) != -1
+            )
+        } != -1;
+        if success {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
         }
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        true
+        Ok(())
     } // Cannot have passcred on macOS and iOS.
 }
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
@@ -117,4 +123,74 @@ pub unsafe fn raw_get_nonblocking(socket: i32) -> io::Result<bool> {
         // Again, querying errno was previously left to the outer function but is now done here.
         Err(io::Error::last_os_error())
     }
+}
+pub fn empty_cstring() -> CString {
+    unsafe {
+        // SAFETY: the value returned by Vec::new() is always empty, thus it
+        // adheres to the contract of CString::new().
+        CString::new(Vec::new()).unwrap_or_else(|_| unreachable_unchecked())
+    }
+}
+pub fn empty_cstr() -> &'static CStr {
+    unsafe {
+        // SAFETY: a single nul terminator is a valid CStr
+        CStr::from_bytes_with_nul_unchecked(&[0])
+    }
+}
+
+pub fn fill_out_msghdr_r(
+    hdr: &mut msghdr,
+    iov: &[IoSliceMut<'_>],
+    anc: &mut [u8],
+) -> io::Result<()> {
+    _fill_out_msghdr(
+        hdr,
+        iov.as_ptr() as *mut _,
+        to_msghdrsize(iov.len())?,
+        anc.as_mut_ptr(),
+        anc.len(),
+    )
+}
+pub fn fill_out_msghdr_w(hdr: &mut msghdr, iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<()> {
+    _fill_out_msghdr(
+        hdr,
+        iov.as_ptr() as *mut _,
+        to_msghdrsize(iov.len())?,
+        anc.as_ptr() as *mut _,
+        anc.len(),
+    )
+}
+#[cfg(unix)]
+fn _fill_out_msghdr(
+    hdr: &mut msghdr,
+    iov: *mut iovec,
+    iovlen: usize,
+    anc: *mut u8,
+    anclen: usize,
+) -> io::Result<()> {
+    hdr.msg_iov = iov;
+    hdr.msg_iovlen = to_msghdrsize(iovlen)?;
+    hdr.msg_control = anc as *mut _;
+    hdr.msg_controllen = to_msghdrsize(anclen)?;
+    Ok(())
+}
+pub fn mk_msghdr_r(iov: &[IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {
+    let mut hdr = unsafe {
+        // SAFETY: msghdr is plain old data, i.e. an all-zero pattern is allowed
+        zeroed()
+    };
+    fill_out_msghdr_r(&mut hdr, iov, anc)?;
+    Ok(hdr)
+}
+pub fn mk_msghdr_w(iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<msghdr> {
+    let mut hdr = unsafe {
+        // SAFETY: msghdr is plain old data, i.e. an all-zero pattern is allowed
+        zeroed()
+    };
+    fill_out_msghdr_w(&mut hdr, iov, anc)?;
+    Ok(hdr)
+}
+
+pub fn eunreachable<T, U>(_e: T) -> U {
+    unreachable!()
 }

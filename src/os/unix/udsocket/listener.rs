@@ -1,4 +1,5 @@
 use super::{
+    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{enable_passcred, raw_get_nonblocking, raw_set_nonblocking},
     ToUdSocketPath, UdStream,
@@ -9,6 +10,7 @@ use std::{
     iter::FusedIterator,
     mem::{size_of, zeroed},
 };
+use to_method::To;
 
 /// A Unix domain byte stream socket server, listening for connections.
 ///
@@ -156,13 +158,14 @@ impl UdStreamListener {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let path = path.to_socket_path()?; // Shadow original by conversion
-        let (addr, addrlen) = unsafe {
-            let mut addr: sockaddr_un = zeroed();
-            addr.sun_family = AF_UNIX as _;
-            path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, size_of::<sockaddr_un>())
-        };
+        macro_rules! ehndl {
+            ($success:ident, $socket:ident) => {
+                if !$success {
+                    unsafe { return Err(handle_fd_error($socket)) };
+                }
+            };
+        }
+        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -175,35 +178,29 @@ impl UdStreamListener {
             }
         };
         let success = unsafe {
-            // If binding didn't fail, start listening and return true if it succeeded and false if
-            // it failed; if binding failed, short-circuit to returning false
-            if libc::bind(
+            libc::bind(
                 socket,
                 // Double cast because you cannot cast a reference to a pointer of arbitrary type
                 // but you can cast any narrow pointer to any other narrow pointer
                 &addr as *const _ as *const sockaddr,
-                addrlen as u32,
-            ) != -1
+                size_of::<sockaddr_un>() as u32,
+            )
+        } != -1;
+        ehndl!(success, socket);
+        let success = unsafe {
             // FIXME the standard library uses 128 here without an option to change this
             // number, why? If std has solid reasons to do this, remove this notice and
             // document the method's behavior on this matter explicitly; otherwise, add
             // an option to change this value.
-            && libc::listen(socket, 128) != -1
-            {
-                enable_passcred(socket)
-            } else {
-                false
-            }
-        };
-        if success {
-            Ok(unsafe {
-                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-                // not to be used elsewhere
-                Self::from_raw_fd(socket)
-            })
-        } else {
-            Err(io::Error::last_os_error())
-        }
+            libc::listen(socket, 128)
+        } != -1;
+        ehndl!(success, socket);
+        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        Ok(unsafe {
+            // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+            // not to be used elsewhere
+            Self::from_raw_fd(socket)
+        })
     }
 
     /// Listens for incoming connections to the socket, blocking until a client is connected.

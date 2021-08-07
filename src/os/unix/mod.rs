@@ -47,9 +47,7 @@ pub(crate) mod local_socket;
 #[cfg(unix)]
 pub(crate) mod unnamed_pipe;
 
-#[cfg(unix)]
-use libc::{c_int, size_t};
-#[cfg(unix)]
+use imports::*;
 use std::{
     io,
     marker::PhantomData,
@@ -130,24 +128,41 @@ impl FromRawFd for FdOps {
 #[cfg(unix)]
 impl Drop for FdOps {
     fn drop(&mut self) {
-        debug_assert!(unsafe {
-            let mut success = true;
-            // If the close() call fails, the loop starts and keeps retrying until either the error
-            // value isn't Interrupted (in which case the assertion fails) or the close operation
-            // properly fails with a non-Interrupted error type. Why does Unix even have this
-            // idiotic error type?
-            while libc::close(self.0) != 0 {
-                if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
-                    // An actual close error happened — return early now
-                    success = false;
-                    break;
-                }
-            }
-            success
-        });
+        unsafe { close_fd(self.0) };
     }
 }
 #[cfg(unix)]
 unsafe impl Send for FdOps {}
 #[cfg(unix)]
 unsafe impl Sync for FdOps {}
+
+unsafe fn close_fd(fd: i32) {
+    let success = unsafe {
+        let mut success = true;
+        // If the close() call fails, the loop starts and keeps retrying until either the error
+        // value isn't Interrupted (in which case the assertion fails) or the close operation
+        // properly fails with a non-Interrupted error type. Why does Unix even have this
+        // idiotic error type?
+        while libc::close(fd) != 0 {
+            if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+                // An actual close error happened — return early now
+                success = false;
+                break;
+            }
+        }
+        success
+    };
+    debug_assert!(success);
+}
+/// Captures [`io::Error::last_os_error()`] and closes the file descriptor.
+unsafe fn handle_fd_error(fd: i32) -> io::Error {
+    let e = io::Error::last_os_error();
+    unsafe { close_fd(fd) };
+    e
+}
+unsafe fn close_by_error(socket: i32) -> impl FnOnce(io::Error) -> io::Error {
+    move |e| {
+        unsafe { close_fd(socket) };
+        e
+    }
+}

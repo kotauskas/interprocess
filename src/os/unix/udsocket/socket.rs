@@ -1,9 +1,9 @@
-use to_method::To;
-
 use super::{
+    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{
-        enable_passcred, get_peer_ucred, raw_get_nonblocking, raw_set_nonblocking, to_msghdrsize,
+        enable_passcred, fill_out_msghdr_r, get_peer_ucred, mk_msghdr_r, mk_msghdr_w,
+        raw_get_nonblocking, raw_set_nonblocking,
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
@@ -14,6 +14,7 @@ use std::{
     iter,
     mem::{size_of, size_of_val, zeroed},
 };
+use to_method::To;
 
 /// A datagram socket in the Unix domain.
 ///
@@ -37,13 +38,7 @@ impl UdSocket {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let path = path.to_socket_path()?; // Shadow original by conversion
-        let (addr, addrlen) = unsafe {
-            let mut addr: sockaddr_un = zeroed();
-            addr.sun_family = AF_UNIX as _;
-            path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, size_of::<sockaddr_un>())
-        };
+        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -56,28 +51,23 @@ impl UdSocket {
             }
         };
         let success = unsafe {
-            if libc::bind(
+            libc::bind(
                 socket,
                 // Double cast because you cannot cast a reference to a pointer of arbitrary type
                 // but you can cast any narrow pointer to any other narrow pointer
                 &addr as *const _ as *const _,
-                addrlen as u32,
-            ) != -1
-            {
-                enable_passcred(socket)
-            } else {
-                false
-            }
-        };
-        if success {
-            Ok(unsafe {
-                // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-                // not to be used elsewhere
-                Self::from_raw_fd(socket)
-            })
-        } else {
-            Err(io::Error::last_os_error())
+                size_of::<sockaddr_un>() as u32,
+            )
+        } != -1;
+        if !success {
+            unsafe { return Err(handle_fd_error(socket)) };
         }
+        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        Ok(unsafe {
+            // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
+            // not to be used elsewhere
+            Self::from_raw_fd(socket)
+        })
     }
     /// Connect to a Unix domain socket server at the specified path.
     ///
@@ -118,24 +108,13 @@ impl UdSocket {
                 return Err(io::Error::last_os_error());
             }
         };
-        let success = unsafe {
-            if libc::connect(
-                socket,
-                // Same as in UdSocketListener::bind()
-                &addr as *const _ as *const _,
-                addrlen as u32,
-            ) != -1
-            {
-                enable_passcred(socket)
-            } else {
-                false
-            }
-        };
-        if success {
-            Ok(unsafe { Self::from_raw_fd(socket) })
-        } else {
-            Err(io::Error::last_os_error())
+        let success =
+            unsafe { libc::connect(socket, &addr as *const _ as *const _, addrlen as u32) } != -1;
+        if !success {
+            unsafe { return Err(handle_fd_error(socket)) };
         }
+        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        Ok(unsafe { Self::from_raw_fd(socket) })
     }
 
     /// Receives a single datagram from the socket, returning how much of the buffer was filled out and whether a part of the datagram was discarded because the buffer was too small.
@@ -199,13 +178,7 @@ impl UdSocket {
         bufs: &mut [IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
     ) -> io::Result<(usize, bool, usize, bool)> {
-        let abuf: &mut [u8] = abuf.as_mut();
-        // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe { zeroed::<msghdr>() };
-        hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = to_msghdrsize(bufs.len())?;
-        hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = to_msghdrsize(abuf.len())?;
+        let mut hdr = mk_msghdr_r(bufs, abuf.as_mut())?;
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -286,7 +259,6 @@ impl UdSocket {
         abuf: &'b mut AncillaryDataBuf<'a>,
         addr_buf: &'d mut UdSocketPath<'c>,
     ) -> io::Result<(usize, bool, usize, bool)> {
-        let abuf: &mut [u8] = abuf.as_mut();
         // SAFETY: msghdr consists of integers and pointers, all of which are nullable
         let mut hdr = unsafe { zeroed::<msghdr>() };
         // Same goes for sockaddr_un
@@ -294,10 +266,7 @@ impl UdSocket {
         // It's a void* so the doublecast is mandatory
         hdr.msg_name = &mut addr_buf_staging as *mut _ as *mut _;
         hdr.msg_namelen = size_of_val(&addr_buf_staging).try_to::<u32>().unwrap();
-        hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = to_msghdrsize(bufs.len())?;
-        hdr.msg_control = abuf.as_mut_ptr() as *mut _;
-        hdr.msg_controllen = to_msghdrsize(abuf.len())?;
+        fill_out_msghdr_r(&mut hdr, bufs, abuf.as_mut())?;
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -392,16 +361,10 @@ impl UdSocket {
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
-        let abuf_value = ancillary_data
+        let abuf = ancillary_data
             .into_iter()
             .collect::<EncodedAncillaryData<'_>>();
-        let abuf: &[u8] = abuf_value.as_ref();
-        // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe { zeroed::<msghdr>() };
-        hdr.msg_iov = bufs.as_ptr() as *mut _;
-        hdr.msg_iovlen = to_msghdrsize(bufs.len())?;
-        hdr.msg_control = abuf.as_ptr() as *mut _;
-        hdr.msg_controllen = to_msghdrsize(abuf.len())?;
+        let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)

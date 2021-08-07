@@ -1,10 +1,14 @@
-use super::{imports::*, MAX_UDSOCKET_PATH_LEN};
+use super::{
+    imports::*,
+    util::{empty_cstr, empty_cstring, eunreachable},
+    MAX_UDSOCKET_PATH_LEN,
+};
 use std::{
     borrow::Cow,
     convert::TryFrom,
     ffi::{CStr, CString, NulError, OsStr, OsString},
     io,
-    mem::{replace, size_of_val},
+    mem::{replace, size_of_val, zeroed},
     path::{Path, PathBuf},
     ptr,
 };
@@ -40,7 +44,7 @@ impl<'a> UdSocketPath<'a> {
             Self::File(cow) => &*cow,
             #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => &*cow,
-            Self::Unnamed => unsafe { CStr::from_bytes_with_nul_unchecked(&[0]) },
+            Self::Unnamed => empty_cstr(),
         }
     }
     /// Returns the path as a `CString`. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
@@ -49,8 +53,7 @@ impl<'a> UdSocketPath<'a> {
             Self::File(cow) => cow.into_owned(),
             #[cfg(any(doc, target_os = "linux"))]
             Self::Namespaced(cow) => cow.into_owned(),
-            Self::Unnamed => CString::new(Vec::new())
-                .unwrap_or_else(|_| unsafe { std::hint::unreachable_unchecked() }),
+            Self::Unnamed => empty_cstring(),
         }
     }
 
@@ -76,10 +79,7 @@ impl<'a> UdSocketPath<'a> {
                 }
             },
             Self::Unnamed => {
-                *self = Self::File(Cow::Owned(
-                    CString::new(Vec::new())
-                        .expect("unexpected unrecoverable CString creation error"),
-                ));
+                *self = Self::File(Cow::Owned(empty_cstring()));
                 true
             }
         }
@@ -129,83 +129,71 @@ impl<'a> UdSocketPath<'a> {
             }
         };
         if let Some(cstring) = self.try_get_cstring_mut() {
+            let cstring = replace(cstring, empty_cstring());
+            let mut vec = cstring.into_bytes_with_nul();
+            let mut _namespaced = false;
             unsafe {
-                let mut vec = ptr::read::<CString>(cstring as *const _).into_bytes_with_nul();
-                // Write an empty CString to avoid a double-free if a panic happens here, and if it fails, just crash
-                ptr::write::<CString>(
-                    cstring as *mut _,
-                    CString::new(Vec::new()).unwrap_or_else(|_| std::process::abort()),
-                );
-                #[cfg(any(doc, target_os = "linux"))]
-                let (namespaced, src_ptr, path_length) = if addr.sun_path[0] == 0 {
+                #[cfg(target_os = "linux")]
+                let (src_ptr, path_length) = if addr.sun_path[0] == 0 {
+                    _namespaced = true;
                     (
-                        true,
                         addr.sun_path.as_ptr().offset(1) as *const u8,
                         sun_path_length - 1,
                     )
                 } else {
-                    (false, addr.sun_path.as_ptr() as *const u8, sun_path_length)
+                    (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
-                #[cfg(not(any(doc, target_os = "linux")))]
+                #[cfg(not(target_os = "linux"))]
                 let (src_ptr, path_length) =
                     { (addr.sun_path.as_ptr() as *const u8, sun_path_length) };
                 // Fill the space for the name and the nul terminator with nuls
                 vec.resize(path_length, 0);
                 ptr::copy_nonoverlapping(src_ptr, vec.as_mut_ptr(), path_length);
-                // If the system added a nul byte as part of the length, remove the one we added ourselves.
-                if vec.last() == Some(&0) && vec[vec.len() - 2] == 0 {
-                    vec.pop();
-                }
-                // Handle the error anyway — better be safe than sorry
-                let new_cstring = match CString::new(vec) {
-                    Ok(cstring) => cstring,
-                    Err(..) => std::process::abort(),
-                };
-                #[cfg(any(doc, target_os = "linux"))]
-                let path_to_write = if namespaced {
-                    UdSocketPath::Namespaced(Cow::Owned(new_cstring))
-                } else {
-                    UdSocketPath::File(Cow::Owned(new_cstring))
-                };
-                #[cfg(not(any(doc, target_os = "linux")))]
-                let path_to_write = UdSocketPath::File(Cow::Owned(new_cstring));
-                let old_val = replace(self, path_to_write);
-                // Deallocate the empty CString we wrote in the beginning
-                drop(old_val);
+            };
+            // If the system added a nul byte as part of the length, remove the one we added ourselves.
+            if vec.last() == Some(&0) && vec[vec.len() - 2] == 0 {
+                vec.pop();
             }
+            let new_cstring = CString::new(vec).unwrap_or_else(eunreachable);
+            #[cfg(target_os = "linux")]
+            let path_to_write = if _namespaced {
+                UdSocketPath::Namespaced(Cow::Owned(new_cstring))
+            } else {
+                UdSocketPath::File(Cow::Owned(new_cstring))
+            };
+            #[cfg(not(target_os = "linux"))]
+            let path_to_write = UdSocketPath::File(Cow::Owned(new_cstring));
+            *self = path_to_write;
+            // Implicitly drops the empty CString we wrote in the beginning
         } else {
-            #[allow(unused_variables)]
-            let (cstring, namespaced) = unsafe {
-                let (namespaced, src_ptr, path_length) = if addr.sun_path[0] == 0 {
+            let mut _namespaced = false;
+            let mut vec = unsafe {
+                let (src_ptr, path_length) = if addr.sun_path[0] == 0 {
                     (
-                        true,
                         addr.sun_path.as_ptr().offset(1) as *const u8,
                         sun_path_length - 1,
                     )
                 } else {
-                    (false, addr.sun_path.as_ptr() as *const u8, sun_path_length)
+                    (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
                 let mut vec = vec![0; path_length];
                 ptr::copy_nonoverlapping(src_ptr, vec.as_mut_ptr(), path_length);
-                // If the system added a nul byte as part of the length, remove it.
-                if vec.last() == Some(&0) {
-                    vec.pop();
-                }
-                let cstring = match CString::new(vec) {
-                    Ok(cstring) => cstring,
-                    Err(..) => panic!("unrecoverable memory safety violation threat"),
-                };
-                (cstring, namespaced)
+                vec
             };
-            #[cfg(any(doc, target_os = "linux"))]
-            let path = if namespaced {
+            // If the system added a nul byte as part of the length, remove it.
+            if vec.last() == Some(&0) {
+                vec.pop();
+            }
+            let cstring = CString::new(vec).unwrap_or_else(eunreachable);
+            #[cfg(target_os = "linux")]
+            let path_to_write = if _namespaced {
                 UdSocketPath::Namespaced(Cow::Owned(cstring))
             } else {
                 UdSocketPath::File(Cow::Owned(cstring))
             };
-            #[cfg(not(any(doc, target_os = "linux")))]
-            let path = UdSocketPath::File(Cow::Owned(cstring));
-            *self = path;
+            #[cfg(not(target_os = "linux"))]
+            let path_to_write = UdSocketPath::File(Cow::Owned(cstring));
+            *self = path_to_write;
         }
     }
     /// Returns `addr_len` to pass to `bind`/`connect`.
@@ -303,6 +291,17 @@ impl UdSocketPath<'static> {
     #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
     pub fn namespaced_from_vec(vec: Vec<u8>) -> Result<Self, NulError> {
         Ok(Self::Namespaced(Cow::Owned(CString::new(vec)?)))
+    }
+}
+impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
+    type Error = io::Error;
+    fn try_from(path: UdSocketPath<'_>) -> io::Result<Self> {
+        unsafe {
+            let mut addr: sockaddr_un = zeroed();
+            addr.sun_family = AF_UNIX as _;
+            path.write_self_to_sockaddr_un(&mut addr)?;
+            Ok(addr)
+        }
     }
 }
 

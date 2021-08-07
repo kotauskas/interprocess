@@ -45,7 +45,7 @@ cfg_if! {
             O_NONBLOCK,
             sockaddr_un, sockaddr,
             msghdr, cmsghdr,
-            socklen_t, size_t,
+            socklen_t, size_t, iovec,
         };
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         pub(super) use libc::{
@@ -85,19 +85,15 @@ cfg_if! {
             SIGUSR2 = 12, SIGXCPU   = 26,
             SIGCHLD = 13, SIGXFSZ   = 27,
         }
-        #[doc(hidden)]
         pub type c_int = i32;
-        #[doc(hidden)]
         pub type pid_t = i32;
-        #[doc(hidden)]
         pub type uid_t = i32;
-        #[doc(hidden)]
         pub type gid_t = i32;
-        #[doc(hidden)]
         pub type mode_t = u32;
 
-        #[doc(hidden)]
         pub struct ucred {}
+        pub struct sockaddr_un {}
+        pub struct msghdr {}
 
         pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 
