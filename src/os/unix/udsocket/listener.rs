@@ -51,7 +51,7 @@ use to_method::To;
 /// Sending and receiving ancillary data:
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))] {
+/// # #[cfg(uds_scm_credentials)] {
 /// use interprocess::{
 ///     unnamed_pipe::{pipe, UnnamedPipeReader},
 ///     os::unix::udsocket::{UdStreamListener, UdStream, AncillaryData, AncillaryDataBuf},
@@ -210,7 +210,7 @@ impl UdStreamListener {
     /// # Example
     /// ```no_run
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))] {
+    /// # #[cfg(uds_scm_credentials)] {
     /// use interprocess::os::unix::udsocket::UdStreamListener;
     ///
     /// let listener = UdStreamListener::bind("/tmp/example.sock")?;

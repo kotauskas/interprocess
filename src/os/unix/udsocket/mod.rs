@@ -26,30 +26,15 @@ pub use stream::*;
 use super::imports;
 use cfg_if::cfg_if;
 
-#[cfg(unix)]
 cfg_if! {
-    if #[cfg(any(
-        target_os = "linux",
-        target_os = "android",
-        target_os = "emscripten",
-        target_os = "solaris",
-        target_os = "illumos",
-        target_os = "hermit",
-        target_os = "redox",
-        // For some unknown reason, Newlib only declares sockaddr_un on Xtensa
-        all(target_env = "newlib", target_arch = "xtensa"),
-        target_env = "uclibc",
-    ))] {
+    if #[cfg(not(unix))] {
+        const _MAX_UDSOCKET_PATH_LEN: usize = 0;
+    } else if #[cfg(uds_sockaddr_un_len_108)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 108;
-    } else if #[cfg(any( // why are those a thing
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd",
-        target_os = "dragonfly",
-        target_os = "macos",
-        target_os = "ios",
-    ))] {
+    } else if #[cfg(uds_sockaddr_un_len_104)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 104;
+    } else if #[cfg(uds_sockaddr_un_126)] {
+        const _MAX_UDSOCKET_PATH_LEN: usize = 126;
     } else {
         compile_error!("\
 Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket/mod.rs for your \
@@ -66,14 +51,11 @@ platform if you wish to enable Unix domain socket support for it"
 /// The following platforms define the value of this constant as **108**:
 /// - Linux
 ///     - includes Android
-/// - uClibc
-/// - Newlib
-///     - *Only supported on Xtensa*
 /// - Emscripten
 /// - Redox
 /// - HermitCore
 /// - Solaris
-/// - Illumos
+///     - Illumos
 ///
 /// The following platforms define the value of this constant as **104**:
 /// - FreeBSD
@@ -82,6 +64,9 @@ platform if you wish to enable Unix domain socket support for it"
 /// - DragonflyBSD
 /// - macOS
 /// - iOS
+///
+/// The following platforms define the value of this constant as **126**:
+/// - Haiku
 ///
 /// [`UdStreamListener::bind`]: struct.UdStreamListener.html#method.bind " "
 /// [socket namespace]: enum.UdSocketPath.html#namespaced " "

@@ -34,7 +34,7 @@ pub fn to_msghdrsize(size: usize) -> io::Result<MsghdrSize> {
 
 #[allow(unused_variables)]
 pub unsafe fn enable_passcred(socket: i32) -> io::Result<()> {
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(uds_scm_credentials)]
     {
         let passcred: c_int = 1;
         let success = unsafe {
@@ -52,12 +52,12 @@ pub unsafe fn enable_passcred(socket: i32) -> io::Result<()> {
             Err(io::Error::last_os_error())
         }
     }
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(not(uds_scm_credentials))]
     {
         Ok(())
-    } // Cannot have passcred on macOS and iOS.
+    }
 }
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(uds_peercred)]
 pub unsafe fn get_peer_ucred(socket: i32) -> io::Result<ucred> {
     let mut cred: ucred = unsafe {
         // SAFETY: it's safe for the ucred structure to be zero-initialized, since

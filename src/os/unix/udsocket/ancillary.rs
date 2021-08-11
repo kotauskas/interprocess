@@ -16,10 +16,22 @@ pub enum AncillaryData<'a> {
     /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser — for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
     ///
     /// [`credentials`]: #method.credentials " "
-    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
-    #[cfg_attr(
+    #[cfg(any(doc, uds_ucred))]
+    #[cfg_attr( // uds_ucred template
         feature = "doc_cfg",
-        doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
+        doc(cfg(any(
+            all(
+                target_os = "linux",
+                any(
+                    target_env = "gnu",
+                    target_env = "musl",
+                    target_env = "musleabi",
+                    target_env = "musleabihf"
+                )
+            ),
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
     )]
     Credentials {
         /// The process identificator (PID) for the process.
@@ -34,21 +46,11 @@ impl<'a> AncillaryData<'a> {
     /// The size of a single `AncillaryData::Credentials` element when packed into the Unix ancillary data format. Useful for allocating a buffer when you expect to receive credentials.
     pub const ENCODED_SIZE_OF_CREDENTIALS: usize = Self::_ENCODED_SIZE_OF_CREDENTIALS;
     cfg_if! {
-        if #[cfg(all(
-            unix,
-            not(any(
-                target_os = "macos",
-                target_os = "ios",
-            ))
-        ))] {
+        if #[cfg(uds_ucred)] {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>() + size_of::<ucred>();
-        } else if #[cfg(all(
-            unix,
-            any(
-                target_os = "macos",
-                target_os = "ios",
-            ))
-        )] {
+        } /*else if #[cfg(uds_xucred)] {
+            const _ENCODED_SIZE_OF_CREDENTIALS: usize = mem::size_of::<cmsghdr>() + size_of::<xucred>();
+        } */else if #[cfg(unix)] {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = mem::size_of::<cmsghdr>();
         } else {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = 0;
@@ -57,19 +59,14 @@ impl<'a> AncillaryData<'a> {
 
     /// Calculates the size of an `AncillaryData::FileDescriptors` element with the specified amount of file descriptors when packed into the Unix ancillary data format. Useful for allocating a buffer when you expect to receive a specific amount of file descriptors.
     pub const fn encoded_size_of_file_descriptors(num_descriptors: usize) -> usize {
-        #[cfg(not(doc))]
-        {
-            size_of::<cmsghdr>() + num_descriptors * 4
-        }
-        #[cfg(doc)]
-        0
+        size_of::<cmsghdr>() + num_descriptors * size_of::<pid_t>()
     }
 
     /// Inexpensievly clones `self` by borrowing the `FileDescriptors` variant or copying the `Credentials` variant.
     pub fn clone_ref(&'a self) -> Self {
         match *self {
             Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(fds)),
-            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+            #[cfg(uds_ucred)]
             Self::Credentials { pid, uid, gid } => Self::Credentials { pid, uid, gid },
         }
     }
@@ -78,7 +75,7 @@ impl<'a> AncillaryData<'a> {
     pub fn encoded_size(&self) -> usize {
         match self {
             Self::FileDescriptors(fds) => Self::encoded_size_of_file_descriptors(fds.len()),
-            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
+            #[cfg(uds_scm_credentials)]
             Self::Credentials { .. } => Self::ENCODED_SIZE_OF_CREDENTIALS,
         }
     }
@@ -114,7 +111,7 @@ impl<'a> AncillaryData<'a> {
                         buffer.extend_from_slice(&desc_bytes);
                     }
                 }
-                #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+                #[cfg(uds_ucred)]
                 AncillaryData::Credentials { pid, uid, gid } => {
                     cmsg_type_bytes = SCM_RIGHTS.to_ne_bytes();
                     cmsg_len += size_of::<ucred>();
@@ -139,10 +136,22 @@ impl AncillaryData<'static> {
     /// Fetches the credentials of the process from the system and returns a value which can be safely sent to another process without the system complaining about an unauthorized attempt to impersonate another process/user/group.
     ///
     /// If you want to send credentials to another process, this is usually the function you need to obtain the desired ancillary payload.
-    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
-    #[cfg_attr(
-        feature = "doc_cfg",
-        doc(cfg(not(any(target_os = "macos", target_os = "ios",)),))
+    #[cfg(any(doc, uds_ucred))]
+    #[cfg_attr( // uds_ucred template
+    feature = "doc_cfg",
+        doc(cfg(any(
+            all(
+                target_os = "linux",
+                any(
+                    target_env = "gnu",
+                    target_env = "musl",
+                    target_env = "musleabi",
+                    target_env = "musleabihf"
+                )
+            ),
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
     )]
     pub fn credentials() -> Self {
         Self::Credentials {
@@ -347,7 +356,7 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
                 }
                 Some(AncillaryData::FileDescriptors(Cow::Owned(descriptors)))
             }
-            #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios",)),))]
+            #[cfg(uds_ucred)]
             SCM_CREDENTIALS => {
                 // We're reading a single ucred structure from the ancillary data payload.
                 // SAFETY: those are still ints

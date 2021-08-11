@@ -63,13 +63,13 @@ impl LocalSocketStream {
         Ok(Self { inner })
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
-        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        #[cfg(uds_peercred)]
         {
             self.inner
                 .get_peer_credentials()
                 .map(|ucred| ucred.pid as u32)
         }
-        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        #[cfg(not(uds_peercred))]
         {
             Err(io::Error::new(io::ErrorKind::Other, "not supported"))
         }
@@ -139,7 +139,7 @@ fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<
             Cow::Owned(val) => Ok(Cow::Owned(CString::new(val.into_vec())?)),
         }
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(uds_linux_namespace)]
     if name.is_namespaced() {
         return Ok(UdSocketPath::Namespaced(cow_osstr_to_cstr(
             name.into_inner_cow(),
@@ -153,9 +153,9 @@ fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }
-#[cfg(target_os = "linux")]
+#[cfg(uds_linux_namespace)]
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::Both;
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(uds_linux_namespace))]
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyPaths;
 
 const AT_SIGN: u8 = 0x40;

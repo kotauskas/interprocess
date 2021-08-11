@@ -19,27 +19,7 @@ pub mod fifo_file;
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "signals")))]
 pub mod signal;
 
-#[cfg(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "emscripten",
-    target_os = "solaris",
-    target_os = "illumos",
-    target_os = "hermit",
-    target_os = "redox",
-    // For some unknown reason, Newlib only declares sockaddr_un on Xtensa, which is why we don't
-    // support Ud-sockets on ARM
-    all(target_env = "newlib", target_arch = "xtensa"),
-    target_env = "uclibc",
-    target_os = "freebsd",
-    target_os = "openbsd",
-    target_os = "netbsd",
-    target_os = "dragonfly",
-    target_os = "macos",
-    target_os = "ios",
-
-    doc,
-))]
+#[cfg(any(doc, uds_supported))]
 pub mod udsocket;
 
 #[cfg(unix)]
@@ -48,12 +28,7 @@ pub(crate) mod local_socket;
 pub(crate) mod unnamed_pipe;
 
 use imports::*;
-use std::{
-    io,
-    marker::PhantomData,
-    mem,
-    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
-};
+use std::{io, marker::PhantomData, mem};
 
 #[cfg(unix)]
 pub(crate) struct FdOps(pub c_int, PhantomData<*mut ()>);

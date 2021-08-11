@@ -33,8 +33,11 @@ pub enum UdSocketPath<'a> {
     /// Identifies a socket in the dedicated socket namespace, where it exists until the server closes it rather than persisting as a file. See the [enum-level documentation] for more.
     ///
     /// [enum-level documentation]: #namespaced " "
-    #[cfg(any(target_os = "linux", doc))]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
+    #[cfg(uds_linux_namespace)]
+    #[cfg_attr( // uds_linux_namespace template
+        feature = "doc_cfg",
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     Namespaced(Cow<'a, CStr>),
 }
 impl<'a> UdSocketPath<'a> {
@@ -42,7 +45,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn as_cstr(&'a self) -> &'a CStr {
         match self {
             Self::File(cow) => &*cow,
-            #[cfg(any(doc, target_os = "linux"))]
+            #[cfg(uds_linux_namespace)]
             Self::Namespaced(cow) => &*cow,
             Self::Unnamed => empty_cstr(),
         }
@@ -51,7 +54,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn into_cstring(self) -> CString {
         match self {
             Self::File(cow) => cow.into_owned(),
-            #[cfg(any(doc, target_os = "linux"))]
+            #[cfg(uds_linux_namespace)]
             Self::Namespaced(cow) => cow.into_owned(),
             Self::Unnamed => empty_cstring(),
         }
@@ -70,7 +73,7 @@ impl<'a> UdSocketPath<'a> {
                     true
                 }
             },
-            #[cfg(any(doc, target_os = "linux"))]
+            #[cfg(uds_linux_namespace)]
             Self::Namespaced(cow) => match cow {
                 Cow::Owned(..) => false,
                 Cow::Borrowed(slice) => {
@@ -97,7 +100,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn try_get_cstring_mut(&mut self) -> Option<&mut CString> {
         let cow = match self {
             Self::File(cow) => cow,
-            #[cfg(any(doc, target_os = "linux"))]
+            #[cfg(uds_linux_namespace)]
             Self::Namespaced(cow) => cow,
             Self::Unnamed => return None,
         };
@@ -111,7 +114,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn is_owned(&self) -> bool {
         let cow = match self {
             Self::File(cow) => cow,
-            #[cfg(any(doc, target_os = "linux"))]
+            #[cfg(uds_linux_namespace)]
             Self::Namespaced(cow) => cow,
             Self::Unnamed => return false,
         };
@@ -133,7 +136,7 @@ impl<'a> UdSocketPath<'a> {
             let mut vec = cstring.into_bytes_with_nul();
             let mut _namespaced = false;
             unsafe {
-                #[cfg(target_os = "linux")]
+                #[cfg(uds_linux_namespace)]
                 let (src_ptr, path_length) = if addr.sun_path[0] == 0 {
                     _namespaced = true;
                     (
@@ -143,7 +146,7 @@ impl<'a> UdSocketPath<'a> {
                 } else {
                     (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(not(uds_linux_namespace))]
                 let (src_ptr, path_length) =
                     { (addr.sun_path.as_ptr() as *const u8, sun_path_length) };
                 // Fill the space for the name and the nul terminator with nuls
@@ -155,13 +158,13 @@ impl<'a> UdSocketPath<'a> {
                 vec.pop();
             }
             let new_cstring = CString::new(vec).unwrap_or_else(eunreachable);
-            #[cfg(target_os = "linux")]
+            #[cfg(uds_linux_namespace)]
             let path_to_write = if _namespaced {
                 UdSocketPath::Namespaced(Cow::Owned(new_cstring))
             } else {
                 UdSocketPath::File(Cow::Owned(new_cstring))
             };
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(uds_linux_namespace))]
             let path_to_write = UdSocketPath::File(Cow::Owned(new_cstring));
             *self = path_to_write;
             // Implicitly drops the empty CString we wrote in the beginning
@@ -185,13 +188,13 @@ impl<'a> UdSocketPath<'a> {
                 vec.pop();
             }
             let cstring = CString::new(vec).unwrap_or_else(eunreachable);
-            #[cfg(target_os = "linux")]
+            #[cfg(uds_linux_namespace)]
             let path_to_write = if _namespaced {
                 UdSocketPath::Namespaced(Cow::Owned(cstring))
             } else {
                 UdSocketPath::File(Cow::Owned(cstring))
             };
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(uds_linux_namespace))]
             let path_to_write = UdSocketPath::File(Cow::Owned(cstring));
             *self = path_to_write;
         }
@@ -214,7 +217,7 @@ impl<'a> UdSocketPath<'a> {
                     ));
                 }
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(uds_linux_namespace)]
             UdSocketPath::Namespaced(..) => {
                 is_namespaced = true;
                 if len_of_self > (MAX_UDSOCKET_PATH_LEN - 1) {
@@ -287,8 +290,11 @@ impl UdSocketPath<'static> {
         Ok(Self::File(Cow::Owned(CString::new(vec)?)))
     }
     /// Constructs a `UdSocketPath::Namespaced` value from a `Vec` of bytes, wrapping `CString::new`.
-    #[cfg(any(target_os = "linux", doc))]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
+    #[cfg(uds_linux_namespace)]
+    #[cfg_attr( // uds_linux_namespace template
+        feature = "doc_cfg",
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     pub fn namespaced_from_vec(vec: Vec<u8>) -> Result<Self, NulError> {
         Ok(Self::Namespaced(Cow::Owned(CString::new(vec)?)))
     }
@@ -384,7 +390,7 @@ impl<'a> ToUdSocketPath<'a> for &'a CStr {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         // 0x40 is the ASCII code for @, and since UTF-8 is ASCII-compatible, it would work too
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.to_bytes().first() == Some(&0x40) {
             let without_at_sign = &self.to_bytes_with_nul()[1..];
             let without_at_sign = unsafe {
@@ -405,7 +411,7 @@ impl ToUdSocketPath<'static> for CString {
     /// [`File`]: enum.UdSocketPath.html#file " "
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.as_bytes().first() == Some(&0x40) {
             let without_at_sign = {
                 let mut without_at_sign = self.into_bytes();
@@ -430,7 +436,7 @@ impl<'a> ToUdSocketPath<'a> for &'a OsStr {
     /// [`File`]: enum.UdSocketPath.html#file " "
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.as_bytes().first() == Some(&0x40) {
             if self.as_bytes().last() != Some(&0) {
                 let mut owned = self.to_owned().into_vec();
@@ -463,7 +469,7 @@ impl ToUdSocketPath<'static> for OsString {
     /// [`File`]: enum.UdSocketPath.html#file " "
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.as_os_str().as_bytes().first() == Some(&0x40) {
             let mut without_at_sign = self.into_vec();
             without_at_sign.remove(0);
@@ -517,7 +523,7 @@ impl<'a> ToUdSocketPath<'a> for &'a str {
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         // Use chars().next() instead of raw indexing to account for UTF-8 with BOM
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.starts_with('@') {
             if !self.ends_with('\0') {
                 let mut owned = self.to_owned();
@@ -550,7 +556,7 @@ impl ToUdSocketPath<'static> for String {
     /// [`File`]: enum.UdSocketPath.html#file " "
     /// [namespaced socket paths]: enum.UdSocketPath.html#namespaced " "
     fn to_socket_path(self) -> io::Result<UdSocketPath<'static>> {
-        #[cfg(any(doc, target_os = "linux"))]
+        #[cfg(uds_linux_namespace)]
         if self.starts_with('@') {
             let mut without_at_sign = self;
             without_at_sign.remove(0);

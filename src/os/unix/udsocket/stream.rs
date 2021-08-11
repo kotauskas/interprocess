@@ -1,10 +1,9 @@
+#[cfg(uds_peercred)]
+use super::util::get_peer_ucred;
 use super::{
     super::{close_by_error, handle_fd_error},
     imports::*,
-    util::{
-        enable_passcred, get_peer_ucred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
-        raw_set_nonblocking,
-    },
+    util::{enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking, raw_set_nonblocking},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath,
 };
 use std::{
@@ -37,7 +36,7 @@ use to_method::To;
 /// Receiving and sending ancillary data:
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))] {
+/// # #[cfg(uds_scm_credentials)] {
 /// use interprocess::os::unix::udsocket::{UdStream, AncillaryData, AncillaryDataBuf};
 /// use std::{
 ///     io::{self, prelude::*},
@@ -304,10 +303,23 @@ impl UdStream {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, not(any(target_os = "macos", target_os = "ios"))))]
-    #[cfg_attr(
+    #[cfg(any(doc, uds_peercred))]
+    #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
-        doc(cfg(not(any(target_os = "macos", target_os = "ios"))))
+        doc(cfg(any(
+            all(
+                target_os = "linux",
+                any(
+                    target_env = "gnu",
+                    target_env = "musl",
+                    target_env = "musleabi",
+                    target_env = "musleabihf"
+                )
+            ),
+            target_os = "emscripten",
+            target_os = "redox",
+            target_os = "haiku"
+        )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
         unsafe { get_peer_ucred(self.fd.0) }
