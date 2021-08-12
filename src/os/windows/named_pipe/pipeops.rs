@@ -157,14 +157,6 @@ impl PipeOps {
         let _ = self.flush_and_disconnect();
     }
 }
-impl Drop for PipeOps {
-    fn drop(&mut self) {
-        let _ = self.flush_and_disconnect();
-        unsafe {
-            CloseHandle(self.as_raw_handle());
-        }
-    }
-}
 #[cfg(windows)]
 impl AsRawHandle for PipeOps {
     fn as_raw_handle(&self) -> HANDLE {
