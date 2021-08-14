@@ -65,7 +65,7 @@ macro_rules! create_stream_type_base {
                 self.instance.1.store(false, Release);
                 let self_ = ManuallyDrop::new(self);
                 let instance = unsafe {
-                    // SAFETY: mem::forget is used to safely destroy the invalidated master copy
+                    // SAFETY: ManuallyDrop is used to safely destroy the invalidated original
                     ptr::read(&self_.instance)
                 };
                 drop(instance);

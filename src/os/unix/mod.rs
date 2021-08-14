@@ -28,7 +28,7 @@ pub(crate) mod local_socket;
 pub(crate) mod unnamed_pipe;
 
 use imports::*;
-use std::{io, marker::PhantomData, mem};
+use std::{io, marker::PhantomData, mem::ManuallyDrop};
 
 #[cfg(unix)]
 pub(crate) struct FdOps(pub c_int, PhantomData<*mut ()>);
@@ -89,9 +89,8 @@ impl AsRawFd for FdOps {
 #[cfg(unix)]
 impl IntoRawFd for FdOps {
     fn into_raw_fd(self) -> c_int {
-        let fd = self.as_raw_fd();
-        mem::forget(self);
-        fd
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_fd()
     }
 }
 #[cfg(unix)]

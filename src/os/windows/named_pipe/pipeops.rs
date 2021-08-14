@@ -1,6 +1,8 @@
 use super::super::{imports::*, FileHandleOps};
 use std::{
-    io, ptr,
+    io,
+    mem::ManuallyDrop,
+    ptr,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -166,9 +168,8 @@ impl AsRawHandle for PipeOps {
 #[cfg(windows)]
 impl IntoRawHandle for PipeOps {
     fn into_raw_handle(self) -> HANDLE {
-        let handle = self.as_raw_handle();
-        std::mem::forget(self);
-        handle
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_handle()
     }
 }
 #[cfg(windows)]

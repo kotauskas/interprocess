@@ -7,7 +7,7 @@ use libc::c_int;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
-    mem,
+    mem::ManuallyDrop,
     os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
@@ -51,9 +51,8 @@ impl AsRawFd for UnnamedPipeReader {
 }
 impl IntoRawFd for UnnamedPipeReader {
     fn into_raw_fd(self) -> c_int {
-        let fd = self.as_raw_fd();
-        mem::forget(self);
-        fd
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_fd()
     }
 }
 impl FromRawFd for UnnamedPipeReader {

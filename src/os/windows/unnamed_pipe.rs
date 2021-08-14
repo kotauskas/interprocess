@@ -12,7 +12,7 @@ use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as P
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
-    mem::{self, size_of, zeroed},
+    mem::{size_of, zeroed, ManuallyDrop},
     num::NonZeroUsize,
     ptr,
 };
@@ -153,9 +153,8 @@ impl AsRawHandle for UnnamedPipeReader {
 #[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeReader {
     fn into_raw_handle(self) -> HANDLE {
-        let handle = self.as_raw_handle();
-        mem::forget(self);
-        handle
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_handle()
     }
 }
 #[cfg(windows)]
@@ -194,9 +193,8 @@ impl AsRawHandle for UnnamedPipeWriter {
 #[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeWriter {
     fn into_raw_handle(self) -> HANDLE {
-        let handle = self.as_raw_handle();
-        mem::forget(self);
-        handle
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_handle()
     }
 }
 #[cfg(windows)]

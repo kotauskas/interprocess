@@ -14,7 +14,7 @@ pub(crate) mod local_socket;
 mod imports;
 use imports::*;
 
-use std::{io, mem, ptr};
+use std::{io, mem::ManuallyDrop, ptr};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -135,9 +135,8 @@ impl AsRawHandle for FileHandleOps {
 #[cfg(windows)]
 impl IntoRawHandle for FileHandleOps {
     fn into_raw_handle(self) -> HANDLE {
-        let handle = self.0;
-        mem::forget(self);
-        handle
+        let self_ = ManuallyDrop::new(self);
+        self_.as_raw_handle()
     }
 }
 #[cfg(windows)]
