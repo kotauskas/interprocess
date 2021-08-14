@@ -1,7 +1,6 @@
 use super::{
     super::{imports::*, AsRawHandle, FromRawHandle, IntoRawHandle},
-    convert_path, set_nonblocking_for_stream, PipeMode, PipeOps, PipeStreamInternals,
-    PipeStreamRole,
+    PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole,
 };
 use crate::{PartialMsgWriteError, ReliableReadMsg};
 use std::{
@@ -158,7 +157,7 @@ macro_rules! create_stream_type {
                 /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
                 pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
                     unsafe {
-                        set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
+                        super::set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
                     }
                 }
                 /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
@@ -430,7 +429,7 @@ fn _connect(
     read: bool,
     write: bool,
 ) -> io::Result<PipeOps> {
-    let mut path = convert_path(pipe_name, hostname);
+    let mut path = super::convert_path(pipe_name, hostname);
     let (success, handle) = unsafe {
         let handle = CreateFileW(
             path.as_mut_ptr() as *mut _,

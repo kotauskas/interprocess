@@ -4,14 +4,14 @@ use cfg_if::cfg_if;
 macro_rules! fake_consts {
     ($ty:ty, $($name:ident = $val:expr),+ $(,)?) => (
         $(
-            pub const $name : $ty = $val;
+            pub(super) const $name : $ty = $val;
         )+
     );
 }
 
 cfg_if! {
     if #[cfg(windows)] {
-        pub use winapi::{
+        pub(super) use winapi::{
             shared::{minwindef::{DWORD, LPVOID}, ntdef::HANDLE, winerror::ERROR_PIPE_CONNECTED},
             um::{
                 winbase::{
@@ -35,15 +35,15 @@ cfg_if! {
                 processthreadsapi::GetCurrentProcess,
             },
         };
-        pub use std::os::windows::{io::{AsRawHandle, FromRawHandle, IntoRawHandle}, ffi::{OsStrExt, OsStringExt}};
+        pub(super) use std::os::windows::{io::{AsRawHandle, FromRawHandle, IntoRawHandle}, ffi::{OsStrExt, OsStringExt}};
     } else {
-        pub type HANDLE = *mut std::ffi::c_void;
+        pub(super) type HANDLE = *mut std::ffi::c_void;
         pub trait AsRawHandle {}
         pub trait IntoRawHandle {}
         pub unsafe trait FromRawHandle {}
-        pub type DWORD = u32;
-        pub struct SECURITY_ATTRIBUTES {}
-        pub type LPVOID = *mut std::ffi::c_void;
+        pub(super) type DWORD = u32;
+        pub(super) struct SECURITY_ATTRIBUTES {}
+        pub(super) type LPVOID = *mut std::ffi::c_void;
 
         fake_consts! {u32,
             PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
@@ -54,16 +54,20 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(all(windows, feature = "tokio"))] {
+    if #[cfg(feature = "tokio_support")] {
         pub use tokio::{
             io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
-            net::windows::named_pipe::{
-                NamedPipeClient as TokioNPClient,
-                NamedPipeServer as TokioNPServer,
-                ClientOptions as TokioNPClientOptions,
-            },
         };
         pub use futures::io::{AsyncRead, AsyncWrite};
+    }
+}
+cfg_if! {
+    if #[cfg(all(windows, feature = "tokio_support"))] {
+        pub(super) use tokio::net::windows::named_pipe::{
+            NamedPipeClient as TokioNPClient,
+            NamedPipeServer as TokioNPServer,
+            ClientOptions as TokioNPClientOptions,
+        };
     } else {
         #[derive(Debug)]
         pub struct TokioNPClient;
@@ -74,11 +78,11 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(all(windows, feature = "signals"))] {
-        pub use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
-        pub use intmap::IntMap;
-        pub use once_cell::sync::Lazy;
-        pub use spinning::RwLock;
-        pub use thiserror::Error;
+        pub(super) use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
+        pub(super) use intmap::IntMap;
+        pub(super) use once_cell::sync::Lazy;
+        pub(super) use spinning::RwLock;
+        pub(super) use thiserror::Error;
 
         // FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
         pub const SIG_DFL: sighandler_t = 0;

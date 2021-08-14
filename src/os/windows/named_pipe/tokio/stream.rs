@@ -248,6 +248,7 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 "
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for ByteReaderPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -257,6 +258,7 @@ impl AsyncRead for ByteReaderPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for &ByteReaderPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -267,6 +269,7 @@ impl AsyncRead for &ByteReaderPipeStream {
     }
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for ByteWriterPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -282,6 +285,7 @@ impl AsyncWrite for ByteWriterPipeStream {
         self.instance.0.poll_shutdown(ctx)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &ByteWriterPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -298,6 +302,7 @@ impl AsyncWrite for &ByteWriterPipeStream {
     }
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for DuplexBytePipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -307,6 +312,7 @@ impl AsyncRead for DuplexBytePipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for DuplexBytePipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -322,6 +328,7 @@ impl AsyncWrite for DuplexBytePipeStream {
         self.instance.0.poll_shutdown(ctx)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for &DuplexBytePipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -331,6 +338,7 @@ impl AsyncRead for &DuplexBytePipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &DuplexBytePipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -347,6 +355,7 @@ impl AsyncWrite for &DuplexBytePipeStream {
     }
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for MsgReaderPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -356,6 +365,7 @@ impl AsyncRead for MsgReaderPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for &MsgReaderPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -366,6 +376,7 @@ impl AsyncRead for &MsgReaderPipeStream {
     }
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for MsgWriterPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -381,6 +392,7 @@ impl AsyncWrite for MsgWriterPipeStream {
         self.instance.0.poll_shutdown(ctx)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &MsgWriterPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -397,6 +409,7 @@ impl AsyncWrite for &MsgWriterPipeStream {
     }
 }
 
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for DuplexMsgPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -406,6 +419,7 @@ impl AsyncRead for DuplexMsgPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for DuplexMsgPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -421,6 +435,7 @@ impl AsyncWrite for DuplexMsgPipeStream {
         self.instance.0.poll_shutdown(ctx)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncRead for &DuplexMsgPipeStream {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -430,6 +445,7 @@ impl AsyncRead for &DuplexMsgPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
+#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &DuplexMsgPipeStream {
     fn poll_write(
         self: Pin<&mut Self>,

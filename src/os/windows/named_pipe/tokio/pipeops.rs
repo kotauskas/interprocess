@@ -144,14 +144,18 @@ impl PipeOps {
         DryWrite(self).await;
     }
 }
+#[cfg(windows)]
 struct DryRead<'a>(&'a PipeOps);
+#[cfg(windows)]
 impl Future for DryRead<'_> {
     type Output = ();
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         self.0.poll_read(ctx, &mut []).map(|_| ())
     }
 }
+#[cfg(windows)]
 struct DryWrite<'a>(&'a PipeOps);
+#[cfg(windows)]
 impl Future for DryWrite<'_> {
     type Output = ();
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -159,6 +163,7 @@ impl Future for DryWrite<'_> {
     }
 }
 
+#[cfg(windows)]
 impl AsRawHandle for PipeOps {
     fn as_raw_handle(&self) -> HANDLE {
         match self {

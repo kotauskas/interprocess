@@ -1,7 +1,6 @@
 use super::{
     super::{imports::*, FromRawHandle},
-    convert_path, set_nonblocking_for_stream, Instancer, PipeMode, PipeOps, PipeStream,
-    PipeStreamRole,
+    Instancer, PipeMode, PipeOps, PipeStream, PipeStreamRole,
 };
 use std::{
     borrow::Cow,
@@ -84,7 +83,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
             .iter()
         {
             unsafe {
-                set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
+                super::set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
             }
         }
         self.nonblocking.store(nonblocking, SeqCst);
@@ -218,7 +217,7 @@ impl<'a> PipeListenerOptions<'a> {
         role: PipeStreamRole,
         read_mode: Option<PipeMode>,
     ) -> io::Result<HANDLE> {
-        let path = convert_path(&self.name, None);
+        let path = super::convert_path(&self.name, None);
         let open_mode = self.to_open_mode(first, role, overlapped);
         let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
         let (handle, success) = unsafe {
