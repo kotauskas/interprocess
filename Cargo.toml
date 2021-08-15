@@ -50,13 +50,5 @@ nonblocking = ["blocking", "futures"]
 tokio_support = ["tokio", "futures"]
 doc_cfg = []
 
-[[example]]
-name = "async_local_socket_client"
-required-features = ["nonblocking"]
-
-[[example]]
-name = "async_local_socket_server"
-required-features = ["nonblocking"]
-
 [package.metadata.docs.rs]
 features = ["doc_cfg"]
