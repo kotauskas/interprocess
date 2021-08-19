@@ -432,9 +432,11 @@ impl ToLocalSocketName<'static> for CString {
 #[cfg(test)]
 mod test {
     use crate::local_socket::{LocalSocketListener, LocalSocketStream};
+    static SOCKET_NAME: &str = "/tmp/interprocess_local_soocket_test_basic.sock";
     #[test]
     fn basic() {
         use std::{
+            fs::remove_file,
             io::{self, prelude::*, BufReader},
             sync::{Arc, Barrier},
         };
@@ -454,28 +456,27 @@ mod test {
                 }
             }
 
-            let listener = LocalSocketListener::bind("/tmp/example.sock").unwrap();
+            let _ = remove_file(SOCKET_NAME);
+            let listener = LocalSocketListener::bind(SOCKET_NAME).unwrap();
             server_barrier.wait();
-            for mut conn in listener.incoming().map(handle_error) {
-                println!("Incoming connection!");
-                conn.write_all(b"Hello from server!\n").unwrap();
-                // Add buffering to the connection to read a line.
-                let mut conn = BufReader::new(conn);
-                let mut buffer = String::new();
-                conn.read_line(&mut buffer).unwrap();
-                println!("Client answered: {}", buffer);
-            }
-        });
 
-        barrier.wait();
-        let h2 = std::thread::spawn(move || {
-            let mut conn = LocalSocketStream::connect("/tmp/example.sock").unwrap();
-            conn.write_all(b"Hello from client!\n").unwrap();
+            let mut conn = handle_error(listener.accept());
+            println!("Incoming connection!");
+            conn.write_all(b"Hello from server!\n").unwrap();
+            // Add buffering to the connection to read a line.
             let mut conn = BufReader::new(conn);
             let mut buffer = String::new();
             conn.read_line(&mut buffer).unwrap();
-            println!("Server answered: {}", buffer);
+            println!("Client answered: {}", buffer);
         });
-        h2.join().unwrap();
+
+        barrier.wait();
+
+        let mut conn = LocalSocketStream::connect(SOCKET_NAME).unwrap();
+        conn.write_all(b"Hello from client!\n").unwrap();
+        let mut conn = BufReader::new(conn);
+        let mut buffer = String::new();
+        conn.read_line(&mut buffer).unwrap();
+        println!("Server answered: {}", buffer);
     }
 }

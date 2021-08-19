@@ -25,9 +25,9 @@ use to_method::To;
 /// use std::io::prelude::*;
 ///
 /// let mut conn = UdStream::connect("/tmp/example1.sock")?;
-/// conn.write(b"Hello from client!");
+/// conn.write_all(b"Hello from client!")?;
 /// let mut string_buffer = String::new();
-/// conn.read_to_string(&mut string_buffer);
+/// conn.read_to_string(&mut string_buffer)?;
 /// println!("Server answered: {}", string_buffer);
 /// # }
 /// # Ok(()) }
@@ -94,7 +94,7 @@ use to_method::To;
 ///     }
 /// }
 /// for mut file in files {
-///     file.write(b"Hello foreign file descriptor!");
+///     file.write(b"Hello foreign file descriptor!\n")?;
 /// }
 /// if let Some(credentials) = cred {
 ///     println!("Server\tPID: {}", credentials.0);
@@ -160,11 +160,7 @@ impl UdStream {
     /// Receives bytes from the socket stream.
     ///
     /// # System calls
-    /// - `recvmsg`
-    ///     - Future versions may use `read` instead; for now, this method is a wrapper around [`recv_vectored`].
-    ///
-    /// [`recv_vectored`]: #method.recv_vectored " "
-    // TODO use read
+    /// - `read`
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.fd.read(buf)
     }
@@ -223,11 +219,7 @@ impl UdStream {
     /// Sends bytes into the socket stream.
     ///
     /// # System calls
-    /// - `sendmsg`
-    ///     - Future versions of `interprocess` may use `write` instead; for now, this method is a wrapper around [`send_vectored`].
-    ///
-    /// [`send_vectored`]: #method.send_vectored " "
-    // TODO use write
+    /// - `write`
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.fd.write(buf)
     }

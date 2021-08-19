@@ -22,7 +22,7 @@ use to_method::To;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
-/// use std::io::{self, prelude::*};
+/// use std::{io::{self, prelude::*}, net::Shutdown};
 ///
 /// fn handle_error(result: io::Result<UdStream>) -> Option<UdStream> {
 ///     match result {
@@ -39,9 +39,10 @@ use to_method::To;
 ///     // Use filter_map to report all errors with connections and skip those connections in the loop,
 ///     // making the actual server loop part much cleaner than if it contained error handling as well.
 ///     .filter_map(handle_error) {
-///     connection.write_all(b"Hello from server!");
+///     connection.write_all(b"Hello from server!")?;
+///     connection.shutdown(Shutdown::Write)?;
 ///     let mut input_string = String::new();
-///     connection.read_to_string(&mut input_string);
+///     connection.read_to_string(&mut input_string)?;
 ///     println!("Client answered: {}", input_string);
 /// }
 /// # }
@@ -97,7 +98,7 @@ use to_method::To;
 ///     connection.send_ancillary(
 ///         b"File descriptor and credentials from the server!",
 ///         iter::once(fd_ancillary),
-///     );
+///     )?;
 ///     
 ///     // The receive buffer size depends on the situation, but since this example
 ///     // mirrors the second one from UdSocket, 64 is sufficient.
@@ -105,7 +106,7 @@ use to_method::To;
 ///     connection.recv_ancillary(
 ///         &mut recv_buffer,
 ///         &mut ancillary_buffer,
-///     );
+///     )?;
 ///     
 ///     println!("Client answered: {}", String::from_utf8_lossy(&recv_buffer));
 ///
@@ -128,7 +129,7 @@ use to_method::To;
 ///         }
 ///     }
 ///     for mut file in files {
-///         file.write(b"Hello foreign file descriptor!");
+///         file.write_all(b"Hello foreign file descriptor!\n")?;
 ///     }
 ///     if let Some(credentials) = cred {
 ///         println!("Client\tPID: {}", credentials.0);
