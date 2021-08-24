@@ -41,6 +41,7 @@ cfg_if! {
             MSG_TRUNC, MSG_CTRUNC,
             AF_UNIX, SOCK_STREAM, SOCK_DGRAM, SOL_SOCKET,
             O_NONBLOCK, F_GETFL, F_SETFL,
+            SHUT_RD, SHUT_WR, SHUT_RDWR,
         };
     } else {
         pub struct sockaddr_un {}

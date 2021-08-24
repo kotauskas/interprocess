@@ -3,7 +3,10 @@ use super::util::get_peer_ucred;
 use super::{
     super::{close_by_error, handle_fd_error},
     imports::*,
-    util::{enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking, raw_set_nonblocking},
+    util::{
+        enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking, raw_set_nonblocking,
+        raw_shutdown,
+    },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath,
 };
 use std::{
@@ -11,6 +14,7 @@ use std::{
     io::{self, IoSlice, IoSliceMut, Read, Write},
     iter,
     mem::size_of,
+    net::Shutdown,
 };
 use to_method::To;
 
@@ -277,6 +281,13 @@ impl UdStream {
         } else {
             Err(io::Error::last_os_error())
         }
+    }
+
+    /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].
+    ///
+    /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        unsafe { raw_shutdown(self.as_raw_fd(), how) }
     }
 
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.

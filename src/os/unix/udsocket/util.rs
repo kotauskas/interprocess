@@ -1,5 +1,7 @@
 use super::imports::*;
 use cfg_if::cfg_if;
+#[cfg(uds_supported)]
+use std::net::Shutdown;
 use std::{
     ffi::{c_void, CStr, CString},
     hint::unreachable_unchecked,
@@ -121,6 +123,20 @@ pub unsafe fn raw_get_nonblocking(socket: i32) -> io::Result<bool> {
         Ok(flags & O_NONBLOCK != 0)
     } else {
         // Again, querying errno was previously left to the outer function but is now done here.
+        Err(io::Error::last_os_error())
+    }
+}
+#[cfg(uds_supported)]
+pub unsafe fn raw_shutdown(socket: i32, how: Shutdown) -> io::Result<()> {
+    let how = match how {
+        Shutdown::Read => SHUT_RD,
+        Shutdown::Write => SHUT_WR,
+        Shutdown::Both => SHUT_RDWR,
+    };
+    let success = unsafe { libc::shutdown(socket, how) } != -1;
+    if success {
+        Ok(())
+    } else {
         Err(io::Error::last_os_error())
     }
 }
