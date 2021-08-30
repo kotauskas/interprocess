@@ -294,12 +294,7 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
         let bytes = self.buffer;
         let end = bytes.len() - 1;
 
-        if let Some(diff) = bytes.len().checked_sub(self.i) {
-            if diff == 0 {
-                self.i = end;
-                return None;
-            }
-        } else {
+        if matches!(bytes.len().checked_sub(self.i), Some(0) | None) {
             self.i = end;
             return None;
         }

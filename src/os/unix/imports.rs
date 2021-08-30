@@ -38,7 +38,6 @@ cfg_if! {
             sockaddr_un, sockaddr,
             msghdr, cmsghdr,
             socklen_t, iovec,
-            MSG_TRUNC, MSG_CTRUNC,
             AF_UNIX, SOCK_STREAM, SOCK_DGRAM, SOL_SOCKET,
             O_NONBLOCK, F_GETFL, F_SETFL,
             SHUT_RD, SHUT_WR, SHUT_RDWR,

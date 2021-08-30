@@ -4,8 +4,8 @@ use super::{
     super::{close_by_error, handle_fd_error},
     imports::*,
     util::{
-        enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking, raw_set_nonblocking,
-        raw_shutdown,
+        check_ancillary_unsound, enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
+        raw_set_nonblocking, raw_shutdown,
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath,
 };
@@ -171,15 +171,11 @@ impl UdStream {
     /// Receives bytes from the socket stream, making use of [scatter input] for the main data.
     ///
     /// # System calls
-    /// - `recvmsg`
-    ///     - Future versions may use `readv` instead; for now, this method is a wrapper around [`recv_ancillary_vectored`].
+    /// - `readv`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    /// [`recv_ancillary_vectored`]: #method.recv_ancillary_vectored " "
-    // TODO use readv
     pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        let mut abuf = AncillaryDataBuf::Owned(Vec::new());
-        self.recv_ancillary_vectored(bufs, &mut abuf).map(|x| x.0)
+        self.fd.read_vectored(bufs)
     }
     /// Receives both bytes and ancillary data from the socket stream.
     ///
@@ -192,7 +188,8 @@ impl UdStream {
         buf: &mut [u8],
         abuf: &'b mut AncillaryDataBuf<'a>,
     ) -> io::Result<(usize, usize)> {
-        self.recv_ancillary_vectored(&[IoSliceMut::new(buf)], abuf)
+        check_ancillary_unsound()?;
+        self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
     /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data.
     ///
@@ -205,9 +202,10 @@ impl UdStream {
     #[allow(clippy::useless_conversion)]
     pub fn recv_ancillary_vectored<'a: 'b, 'b>(
         &self,
-        bufs: &[IoSliceMut<'_>],
+        bufs: &mut [IoSliceMut<'_>],
         abuf: &'b mut AncillaryDataBuf<'a>,
     ) -> io::Result<(usize, usize)> {
+        check_ancillary_unsound()?;
         let mut hdr = mk_msghdr_r(bufs, abuf.as_mut())?;
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
@@ -230,15 +228,11 @@ impl UdStream {
     /// Sends bytes into the socket stream, making use of [gather output] for the main data.
     ///
     /// # System calls
-    /// - `sendmsg`
-    ///     - Future versions of `interprocess` may use `writev` instead; for now, this method is a wrapper around [`send_ancillary_vectored`].
+    /// - `senv`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
-    // TODO use writev
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_ancillary_vectored(bufs, iter::empty())
-            .map(|x| x.0)
+        self.fd.write_vectored(bufs)
     }
     /// Sends bytes and ancillary data into the socket stream.
     ///
@@ -251,6 +245,7 @@ impl UdStream {
         buf: &[u8],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
+        check_ancillary_unsound()?;
         self.send_ancillary_vectored(&[IoSlice::new(buf)], ancillary_data)
     }
 
@@ -268,6 +263,7 @@ impl UdStream {
         bufs: &[IoSlice<'_>],
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
+        check_ancillary_unsound()?;
         let abuf = ancillary_data
             .into_iter()
             .collect::<EncodedAncillaryData<'_>>();

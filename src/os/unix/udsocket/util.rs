@@ -156,7 +156,7 @@ pub fn empty_cstr() -> &'static CStr {
 
 pub fn fill_out_msghdr_r(
     hdr: &mut msghdr,
-    iov: &[IoSliceMut<'_>],
+    iov: &mut [IoSliceMut<'_>],
     anc: &mut [u8],
 ) -> io::Result<()> {
     _fill_out_msghdr(
@@ -190,7 +190,7 @@ fn _fill_out_msghdr(
     hdr.msg_controllen = to_msghdrsize(anclen)?;
     Ok(())
 }
-pub fn mk_msghdr_r(iov: &[IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {
+pub fn mk_msghdr_r(iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {
     let mut hdr = unsafe {
         // SAFETY: msghdr is plain old data, i.e. an all-zero pattern is allowed
         zeroed()
@@ -205,6 +205,28 @@ pub fn mk_msghdr_w(iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<msghdr> {
     };
     fill_out_msghdr_w(&mut hdr, iov, anc)?;
     Ok(hdr)
+}
+pub fn check_ancillary_unsound() -> io::Result<()> {
+    if cfg!(uds_ancillary_unsound) {
+        let error_kind = {
+            #[cfg(io_error_kind_unsupported_stable)]
+            {
+                io::ErrorKind::Unsupported
+            }
+            #[cfg(not(io_error_kind_unsupported_stable))]
+            {
+                io::ErrorKind::Other
+            }
+        };
+        Err(io::Error::new(
+            error_kind,
+            "\
+ancillary data has been disabled for non-x86 ISAs in a hotfix because it \
+doesn't account for alignment",
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn eunreachable<T, U>(_e: T) -> U {

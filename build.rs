@@ -5,13 +5,17 @@ use std::{
 };
 
 fn main() {
+    let version = version().expect("Rust version detection failed");
     if is_unix() {
         let target = TargetTriplet::fetch();
         collect_uds_features(&target);
         collect_signals(&target);
     }
-    if unsafe_op_in_unsafe_fn_stable() {
+    if checkver(&version, 52) {
         define("unsafe_op_in_unsafe_fn_stable");
+    }
+    if checkver(&version, 53) {
+        define("io_error_kind_unsupported_stable");
     }
 }
 
@@ -73,6 +77,7 @@ fn collect_uds_features(target: &TargetTriplet) {
     }
     if uds {
         if scm_rights { define("uds_scm_rights") };
+        if !target.arch_any(&["x86", "x86_64"]) { define("uds_ancillary_unsound") };
         define("uds_supported");
     }
 }
@@ -104,10 +109,10 @@ fn collect_signals(target: &TargetTriplet) {
     }
 }
 
-fn unsafe_op_in_unsafe_fn_stable() -> bool {
+fn checkver(version: &Version, m: u64) -> bool {
     // A build script is needed for this because the `rustversion` crate has some weird problems
     // around being used as a crate-level inner attribute.
-    version().unwrap() >= Version::new(1, 52, 0)
+    *version >= Version::new(1, m, 0)
 }
 
 fn define(cfg: &str) {
@@ -138,7 +143,6 @@ impl TargetTriplet {
         }
     }
     fn arch(&self, arch: &str) -> bool { self.arch == arch }
-    #[allow(dead_code)]
     fn arch_any(&self, arches: &[&str]) -> bool { arches.iter().copied().any(|x| x == self.arch) }
     fn os(&self, os: &str) -> bool { self.os == os }
     fn os_any(&self, oses: &[&str]) -> bool { oses.iter().copied().any(|x| x == self.os) }
