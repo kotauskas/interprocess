@@ -9,7 +9,10 @@ use super::{
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
-use crate::{ReliableReadMsg, Sealed};
+use crate::Sealed;
+#[cfg(any(doc, target_os = "linux"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
+use crate::ReliableReadMsg;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut},

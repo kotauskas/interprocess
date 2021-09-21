@@ -7,7 +7,7 @@ jobs:
     strategy:
         matrix:
           os: [ubuntu-latest, windows-latest, macos-latest]
-          toolchain: ["1.46.0", nightly]
+          toolchain: ["1.54.0", nightly]
     
     name: ${{ matrix.toolchain }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -29,7 +29,7 @@ jobs:
           command: clippy
           # Clippy on 1.46 doesn't have some lints from the latest nightly that we use, so we
           # disable warning about that altogether.
-          args: "-- -A clippy::unknown_clippy_lints"
+          args: "-- -A unknown_lints"
         env:
           RUSTFLAGS: -D warnings
       

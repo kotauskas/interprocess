@@ -1,36 +1,18 @@
 use super::imports::*;
-use cfg_if::cfg_if;
+use std::convert::TryFrom;
 #[cfg(uds_supported)]
 use std::net::Shutdown;
 use std::{
     ffi::{c_void, CStr, CString},
     hint::unreachable_unchecked,
     io::{self, IoSlice, IoSliceMut},
-    mem::{size_of, size_of_val, zeroed},
+    mem::zeroed,
     ptr::null,
 };
 use to_method::To;
 
-cfg_if! {
-    if #[cfg(any(
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd",
-        target_os = "dragonfly",
-        all(target_os = "linux", target_env = "musl"),
-        target_env = "newlib",
-        all(target_env = "uclibc", target_arch = "arm"),
-        target_os = "android",
-        target_os = "emscripten",
-    ))] {
-        pub type MsghdrSize = socklen_t;
-    } else {
-        pub type MsghdrSize = size_t;
-    }
-}
-
-pub fn to_msghdrsize(size: usize) -> io::Result<MsghdrSize> {
-    size.try_to::<MsghdrSize>()
+pub fn to_msghdrsize<T: TryFrom<usize>>(size: usize) -> io::Result<T> {
+    size.try_to::<T>()
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "size overflowed `socklen_t`"))
 }
 
@@ -45,7 +27,7 @@ pub unsafe fn enable_passcred(socket: i32) -> io::Result<()> {
                 SOL_SOCKET,
                 SO_PASSCRED,
                 &passcred as *const _ as *const _,
-                size_of_val(&passcred).try_to::<u32>().unwrap(),
+                std::mem::size_of_val(&passcred).try_to::<u32>().unwrap(),
             )
         } != -1;
         if success {
@@ -66,7 +48,7 @@ pub unsafe fn get_peer_ucred(socket: i32) -> io::Result<ucred> {
         // it only contains integers
         zeroed()
     };
-    let mut cred_len = size_of::<ucred>() as socklen_t;
+    let mut cred_len = std::mem::size_of::<ucred>() as socklen_t;
     let success = unsafe {
         libc::getsockopt(
             socket,
