@@ -185,9 +185,9 @@ fn _fill_out_msghdr(
     anclen: usize,
 ) -> io::Result<()> {
     hdr.msg_iov = iov;
-    hdr.msg_iovlen = to_msghdrsize(iovlen)?;
+    hdr.msg_iovlen = to_msghdrsize(iovlen)? as i32;
     hdr.msg_control = anc as *mut _;
-    hdr.msg_controllen = to_msghdrsize(anclen)?;
+    hdr.msg_controllen = to_msghdrsize(anclen)? as u32;
     Ok(())
 }
 pub fn mk_msghdr_r(iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {

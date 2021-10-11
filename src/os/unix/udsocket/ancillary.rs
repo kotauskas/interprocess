@@ -51,7 +51,7 @@ impl<'a> AncillaryData<'a> {
         } /*else if #[cfg(uds_xucred)] {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = mem::size_of::<cmsghdr>() + size_of::<xucred>();
         } */else if #[cfg(unix)] {
-            const _ENCODED_SIZE_OF_CREDENTIALS: usize = mem::size_of::<cmsghdr>();
+            const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>();
         } else {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = 0;
         }
