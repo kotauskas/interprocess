@@ -7,7 +7,7 @@ use super::{
         check_ancillary_unsound, enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
         raw_set_nonblocking, raw_shutdown,
     },
-    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath,
+    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
 use std::{
     fmt::{self, Debug, Formatter},
@@ -18,7 +18,7 @@ use std::{
 };
 use to_method::To;
 
-/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`] or by connecting to an existing server.
+/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by connecting to an existing server.
 ///
 /// # Examples
 /// Basic example:
@@ -36,97 +36,12 @@ use to_method::To;
 /// # }
 /// # Ok(()) }
 /// ```
-///
-/// Receiving and sending ancillary data:
-/// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(uds_scm_credentials)] {
-/// use interprocess::os::unix::udsocket::{UdStream, AncillaryData, AncillaryDataBuf};
-/// use std::{
-///     io::{self, prelude::*},
-///     borrow::Cow,
-///     fs,
-///     os::unix::io::{IntoRawFd, FromRawFd},
-/// };
-///
-/// // Create one file descriptor which we will be sending.
-/// let fd = fs::File::open("/tmp/example_file.mfa")?.into_raw_fd();
-/// // Borrow the file descriptor in a slice right away to send it later.
-/// let fds = [fd];
-/// let fd_ancillary = AncillaryData::FileDescriptors(
-///     Cow::Borrowed(&fds),
-/// );
-/// // Prepare valid credentials. Keep in mind that this is not supported on Apple platforms.
-/// let credentials = AncillaryData::credentials();
-/// // Allocate a sufficient buffer for receiving ancillary data.
-/// let mut ancillary_buffer = AncillaryDataBuf::owned_with_capacity(
-///     AncillaryData::ENCODED_SIZE_OF_CREDENTIALS
-///   + AncillaryData::encoded_size_of_file_descriptors(1),
-/// );
-///
-/// let conn = UdStream::connect("/tmp/example2.sock")?;
-///
-/// conn.send_ancillary(
-///     b"File descriptor and credentials from client!",
-///     [fd_ancillary, credentials].iter().map(|x| x.clone_ref()),
-/// )?;
-/// // The receive buffer size depends on the situation, but since this example
-/// // mirrors the second one from UdSocketListener, 64 is sufficient.
-/// let mut recv_buffer = [0; 64];
-///
-/// conn.recv_ancillary(
-///     &mut recv_buffer,
-///     &mut ancillary_buffer,
-/// )?;
-/// println!("Server answered: {}", String::from_utf8_lossy(&recv_buffer));
-/// // Decode the received ancillary data.
-/// let (mut file_descriptors, mut cred) = (None, None);
-/// for element in ancillary_buffer.decode() {
-///     match element {
-///         AncillaryData::FileDescriptors(fds) => file_descriptors = Some(fds),
-///         AncillaryData::Credentials {pid, uid, gid} => cred = Some((pid, uid, gid)),
-///     }
-/// }
-/// let mut files = Vec::new();
-/// if let Some(fds) = file_descriptors {
-///     // There is a possibility that zero file descriptors were sent — let's account for that.
-///     for fd in fds.iter().copied() {
-///         // This is normally unsafe, but since we know that the descriptor is not owned somewhere
-///         // else in the current process, it's fine to do this:
-///         let file = unsafe {fs::File::from_raw_fd(fd)};
-///         files.push(file);
-///     }
-/// }
-/// for mut file in files {
-///     file.write(b"Hello foreign file descriptor!\n")?;
-/// }
-/// if let Some(credentials) = cred {
-///     println!("Server\tPID: {}", credentials.0);
-///     println!(      "\tUID: {}", credentials.1);
-///     println!(      "\tGID: {}", credentials.2);
-/// }
-/// # }
-/// # Ok(()) }
-/// ```
-///
-/// [`UdStreamListener`]: struct.UdStreamListener.html " "
 pub struct UdStream {
     fd: FdOps,
 }
 impl UdStream {
-    /// Connect to a Unix domain socket server at the specified path.
+    /// Connects to a Unix domain socket server at the specified path.
     ///
-    /// # Example
-    /// ```no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # #[cfg(unix)] {
-    /// use interprocess::os::unix::udsocket::UdStream;
-    ///
-    /// let conn = UdStream::connect("/tmp/example.sock")?;
-    /// // Handle the connection to the server
-    /// # }
-    /// # Ok(()) }
-    /// ```
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     ///
     /// # System calls

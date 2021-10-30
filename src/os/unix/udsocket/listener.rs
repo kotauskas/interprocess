@@ -2,7 +2,7 @@ use super::{
     super::{close_by_error, handle_fd_error},
     imports::*,
     util::{enable_passcred, raw_get_nonblocking, raw_set_nonblocking},
-    ToUdSocketPath, UdStream,
+    ToUdSocketPath, UdSocketPath, UdStream,
 };
 use std::{
     fmt::{self, Debug, Formatter},
@@ -35,15 +35,17 @@ use to_method::To;
 /// }
 ///
 /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
-/// for mut connection in listener.incoming()
+/// // Outside the loop so that we could reuse the memory allocation for every client
+/// let mut input_string = String::new();
+/// for mut conn in listener.incoming()
 ///     // Use filter_map to report all errors with connections and skip those connections in the loop,
 ///     // making the actual server loop part much cleaner than if it contained error handling as well.
 ///     .filter_map(handle_error) {
-///     connection.write_all(b"Hello from server!")?;
-///     connection.shutdown(Shutdown::Write)?;
-///     let mut input_string = String::new();
-///     connection.read_to_string(&mut input_string)?;
+///     conn.write_all(b"Hello from server!")?;
+///     conn.shutdown(Shutdown::Write)?;
+///     conn.read_to_string(&mut input_string)?;
 ///     println!("Client answered: {}", input_string);
+///     input_string.clear();
 /// }
 /// # }
 /// # Ok(()) }
@@ -267,6 +269,7 @@ impl UdStreamListener {
     ///         eprintln!("Incoming connection failed: {}", error);
     ///     }) {
     ///     eprintln!("New client!");
+    /// #   drop(connection);
     /// }
     /// # }
     /// # Ok(()) }
