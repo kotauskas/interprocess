@@ -159,6 +159,9 @@ impl UdStreamListener {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_bind(path.to_socket_path()?)
+    }
+    fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
         macro_rules! ehndl {
             ($success:ident, $socket:ident) => {
                 if !$success {
@@ -166,7 +169,7 @@ impl UdStreamListener {
                 }
             };
         }
-        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
+        let addr = path.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);

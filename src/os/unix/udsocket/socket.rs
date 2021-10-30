@@ -40,7 +40,10 @@ impl UdSocket {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
+        Self::_bind(path.to_socket_path()?)
+    }
+    fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
+        let addr = path.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -92,13 +95,10 @@ impl UdSocket {
     ///
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let path = path.to_socket_path()?; // Shadow original by conversion
-        let (addr, addrlen) = unsafe {
-            let mut addr: sockaddr_un = zeroed();
-            addr.sun_family = AF_UNIX as _;
-            path.write_self_to_sockaddr_un(&mut addr)?;
-            (addr, size_of::<sockaddr_un>())
-        };
+        Self::_connect(path.to_socket_path()?)
+    }
+    fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
+        let addr = path.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -110,8 +110,13 @@ impl UdSocket {
                 return Err(io::Error::last_os_error());
             }
         };
-        let success =
-            unsafe { libc::connect(socket, &addr as *const _ as *const _, addrlen as u32) } != -1;
+        let success = unsafe {
+            libc::connect(
+                socket,
+                &addr as *const _ as *const _,
+                size_of::<sockaddr_un>() as u32,
+            )
+        } != -1;
         if !success {
             unsafe { return Err(handle_fd_error(socket)) };
         }

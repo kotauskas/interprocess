@@ -132,10 +132,11 @@ impl UdStream {
     /// # System calls
     /// - `socket`
     /// - `connect`
-    ///
-    /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let addr = path.to_socket_path()?.try_to::<sockaddr_un>()?;
+        Self::_connect(path.to_socket_path()?)
+    }
+    fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
+        let addr = path.try_to::<sockaddr_un>()?;
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);

@@ -83,7 +83,11 @@ impl<Stream: PipeStream> PipeListener<Stream> {
             .iter()
         {
             unsafe {
-                super::set_nonblocking_for_stream::<Stream>(instance.0 .0 .0, nonblocking)?;
+                super::set_nonblocking_for_stream(
+                    instance.0 .0 .0,
+                    Stream::READ_MODE,
+                    nonblocking,
+                )?;
             }
         }
         self.nonblocking.store(nonblocking, SeqCst);

@@ -157,7 +157,7 @@ macro_rules! create_stream_type {
                 /// [`set_nonblocking`]: struct.PipeListener.html#method.set_nonblocking " "
                 pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
                     unsafe {
-                        super::set_nonblocking_for_stream::<Self>(self.as_raw_handle(), nonblocking)
+                        super::set_nonblocking_for_stream(self.as_raw_handle(), Self::READ_MODE, nonblocking)
                     }
                 }
                 /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
@@ -407,7 +407,7 @@ pub trait PipeStream: AsRawHandle + IntoRawHandle + FromRawHandle + PipeStreamIn
 /// Since named pipes can work across multiple machines, an optional hostname can be supplied. Leave it at `None` if you're using named pipes on the local machine exclusively, which is most likely the case.
 #[deprecated(note = "\
 poor ergonomics: you can't use turbofish syntax due to `impl AsRef<OsStr>` parameters and you \
-have to use `None::<&AsRef>` instead of just `None` to provide an empty hostname")]
+have to use `None::<&OsStr>` instead of just `None` to provide an empty hostname")]
 pub fn connect<Stream: PipeStream>(
     pipe_name: impl AsRef<OsStr>,
     hostname: Option<impl AsRef<OsStr>>,

@@ -46,11 +46,12 @@ fn convert_path(pipe_name: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
     path
 }
 #[cfg(windows)]
-unsafe fn set_nonblocking_for_stream<Stream: PipeStream>(
+unsafe fn set_nonblocking_for_stream(
     handle: HANDLE,
+    read_mode: Option<PipeMode>,
     nonblocking: bool,
 ) -> io::Result<()> {
-    let read_mode: u32 = Stream::READ_MODE.map_or(0, PipeMode::to_readmode);
+    let read_mode: u32 = read_mode.map_or(0, PipeMode::to_readmode);
     // Bitcast the boolean without additional transformations since
     // the flag is in the first bit.
     let mut mode: u32 = read_mode | nonblocking as u32;
