@@ -4,7 +4,7 @@ use super::{
     MAX_UDSOCKET_PATH_LEN,
 };
 use std::{
-    borrow::Cow,
+    borrow::{Cow, ToOwned},
     convert::TryFrom,
     ffi::{CStr, CString, NulError, OsStr, OsString},
     io,
@@ -41,7 +41,7 @@ pub enum UdSocketPath<'a> {
     Namespaced(Cow<'a, CStr>),
 }
 impl<'a> UdSocketPath<'a> {
-    /// Returns the path as a `CStr`. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
+    /// Returns the path as a [`CStr`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
     pub fn as_cstr(&'a self) -> &'a CStr {
         match self {
             Self::File(cow) => &*cow,
@@ -50,7 +50,11 @@ impl<'a> UdSocketPath<'a> {
             Self::Unnamed => empty_cstr(),
         }
     }
-    /// Returns the path as a `CString`. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
+    /// Returns the path as an [`OsStr`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
+    pub fn as_osstr(&'a self) -> &'a OsStr {
+        OsStr::from_bytes(self.as_cstr().to_bytes())
+    }
+    /// Returns the path as a [`CString`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
     pub fn into_cstring(self) -> CString {
         match self {
             Self::File(cow) => cow.into_owned(),
@@ -59,32 +63,36 @@ impl<'a> UdSocketPath<'a> {
             Self::Unnamed => empty_cstring(),
         }
     }
+    /// Returns the path as an [`OsString`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
+    pub fn into_osstring(self) -> OsString {
+        OsString::from_vec(self.into_cstring().into_bytes())
+    }
 
     /// Ensures that the path is stored as an owned `CString` in place, and returns whether that required cloning or not. If `self` was not referring to any socket ([`Unnamed` variant]), the value is set to an empty `CString` (only nul terminator) of type [`File`].
     ///
     /// [`Unnamed` variant]: #variant.Unnamed " "
     /// [`File`]: #file " "
     pub fn make_owned(&mut self) -> bool {
+        let required_cloning = !self.is_owned();
+        *self = self.to_owned();
+        required_cloning
+    }
+    /// Converts to a `UdSocketPath<'static>` which stores the path as an owned `CString`, cloning if necessary.
+    // TODO implement ToOwned instead of Clone in 2.0.0
+    pub fn to_owned(&self) -> UdSocketPath<'static> {
         match self {
-            Self::File(cow) => match cow {
-                Cow::Owned(..) => false,
-                Cow::Borrowed(slice) => {
-                    *self = Self::File(Cow::Owned(slice.to_owned()));
-                    true
-                }
-            },
+            Self::File(f) => UdSocketPath::File(Cow::Owned(f.as_ref().to_owned())),
             #[cfg(uds_linux_namespace)]
-            Self::Namespaced(cow) => match cow {
-                Cow::Owned(..) => false,
-                Cow::Borrowed(slice) => {
-                    *self = Self::Namespaced(Cow::Owned(slice.to_owned()));
-                    true
-                }
-            },
-            Self::Unnamed => {
-                *self = Self::File(Cow::Owned(empty_cstring()));
-                true
-            }
+            Self::Namespaced(n) => UdSocketPath::Namespaced(Cow::Owned(n.as_ref().to_owned())),
+            Self::Unnamed => UdSocketPath::Unnamed,
+        }
+    }
+    /// Borrows into another `UdSocketPath<'_>` instance. If borrowed here, reborrows; if owned here, returns a fresh borrow.
+    pub fn borrow(&self) -> UdSocketPath<'_> {
+        match self {
+            UdSocketPath::File(f) => UdSocketPath::File(Cow::Borrowed(f.as_ref())),
+            UdSocketPath::Namespaced(n) => UdSocketPath::Namespaced(Cow::Borrowed(n.as_ref())),
+            UdSocketPath::Unnamed => UdSocketPath::Unnamed,
         }
     }
 
@@ -112,13 +120,12 @@ impl<'a> UdSocketPath<'a> {
 
     /// Returns `true` if the path to the socket is stored as an owned `CString`, i.e. if `into_cstring` doesn't require cloning the path; `false` otherwise.
     pub fn is_owned(&self) -> bool {
-        let cow = match self {
-            Self::File(cow) => cow,
+        match self {
+            Self::File(Cow::Borrowed(..)) => true,
             #[cfg(uds_linux_namespace)]
-            Self::Namespaced(cow) => cow,
-            Self::Unnamed => return false,
-        };
-        matches!(cow, Cow::Owned(..))
+            Self::Namespaced(Cow::Borrowed(..)) => true,
+            _ => false,
+        }
     }
 
     #[cfg(unix)]
@@ -233,7 +240,7 @@ impl<'a> UdSocketPath<'a> {
             UdSocketPath::Unnamed => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "must provide a proper name for the socket",
+                    "must provide a name for the socket",
                 ))
             }
         }
@@ -297,6 +304,26 @@ impl UdSocketPath<'static> {
     )]
     pub fn namespaced_from_vec(vec: Vec<u8>) -> Result<Self, NulError> {
         Ok(Self::Namespaced(Cow::Owned(CString::new(vec)?)))
+    }
+}
+impl From<UdSocketPath<'_>> for CString {
+    fn from(path: UdSocketPath<'_>) -> Self {
+        path.into_cstring()
+    }
+}
+impl AsRef<CStr> for UdSocketPath<'_> {
+    fn as_ref(&self) -> &CStr {
+        self.as_cstr()
+    }
+}
+impl From<UdSocketPath<'_>> for OsString {
+    fn from(path: UdSocketPath<'_>) -> Self {
+        path.into_osstring()
+    }
+}
+impl AsRef<OsStr> for UdSocketPath<'_> {
+    fn as_ref(&self) -> &OsStr {
+        self.as_osstr()
     }
 }
 impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
@@ -377,7 +404,7 @@ pub trait ToUdSocketPath<'a> {
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>>;
 }
 impl<'a> ToUdSocketPath<'a> for UdSocketPath<'a> {
-    /// Accepts explicit `UdSocketPath`s in the `bind` constructor.
+    /// Accepts explicit `UdSocketPath`s in relevant constructors.
     fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
         Ok(self)
     }
