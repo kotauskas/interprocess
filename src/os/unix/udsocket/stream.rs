@@ -1,11 +1,14 @@
 #[cfg(uds_peercred)]
 use super::util::get_peer_ucred;
+#[cfg(uds_supported)]
+use super::util::raw_shutdown;
+#[cfg(unix)]
+use super::super::{close_by_error, handle_fd_error};
 use super::{
-    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{
         check_ancillary_unsound, enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
-        raw_set_nonblocking, raw_shutdown,
+        raw_set_nonblocking,
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };

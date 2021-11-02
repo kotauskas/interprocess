@@ -91,6 +91,7 @@ impl<'a> UdSocketPath<'a> {
     pub fn borrow(&self) -> UdSocketPath<'_> {
         match self {
             UdSocketPath::File(f) => UdSocketPath::File(Cow::Borrowed(f.as_ref())),
+            #[cfg(uds_linux_namespace)]
             UdSocketPath::Namespaced(n) => UdSocketPath::Namespaced(Cow::Borrowed(n.as_ref())),
             UdSocketPath::Unnamed => UdSocketPath::Unnamed,
         }
@@ -119,7 +120,9 @@ impl<'a> UdSocketPath<'a> {
     }
 
     /// Returns `true` if the path to the socket is stored as an owned `CString`, i.e. if `into_cstring` doesn't require cloning the path; `false` otherwise.
-    pub fn is_owned(&self) -> bool {
+    // Cannot use `matches!` due to #[cfg(...)]
+    #[allow(clippy::match_like_matches_macro)]
+    pub const fn is_owned(&self) -> bool {
         match self {
             Self::File(Cow::Borrowed(..)) => true,
             #[cfg(uds_linux_namespace)]

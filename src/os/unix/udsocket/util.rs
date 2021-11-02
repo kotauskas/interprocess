@@ -1,18 +1,23 @@
 use super::imports::*;
 use cfg_if::cfg_if;
+#[cfg(uds_peercred)]
+use std::mem::size_of;
+#[cfg(uds_scm_credentials)]
+use std::mem::size_of_val;
 #[cfg(uds_supported)]
 use std::net::Shutdown;
 use std::{
     ffi::{c_void, CStr, CString},
     hint::unreachable_unchecked,
     io::{self, IoSlice, IoSliceMut},
-    mem::{size_of, size_of_val, zeroed},
+    mem::zeroed,
     ptr::null,
 };
 use to_method::To;
 
 //pub type MsghdrNamelen = socklen_t;
 
+#[cfg(unix)]
 #[allow(dead_code)]
 mod tname {
     pub static SOCKLEN_T: &str = "`socklen_t`";
@@ -20,6 +25,7 @@ mod tname {
     pub static C_INT: &str = "`c_int`";
 }
 
+#[cfg(unix)]
 cfg_if! {
     if #[cfg(uds_msghdr_iovlen_c_int)] {
         pub type MsghdrIovlen = c_int;
@@ -29,6 +35,7 @@ cfg_if! {
         static MSGHDR_IOVLEN_NAME: &str = tname::SIZE_T;
     }
 }
+#[cfg(unix)]
 cfg_if! {
     if #[cfg(uds_msghdr_controllen_socklen_t)] {
         pub type MsghdrControllen = socklen_t;
@@ -39,6 +46,7 @@ cfg_if! {
     }
 }
 
+#[cfg(unix)]
 pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
     iovlen.try_to::<MsghdrIovlen>().map_err(|_| {
         io::Error::new(
@@ -50,6 +58,7 @@ pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
         )
     })
 }
+#[cfg(unix)]
 pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
     controllen.try_to::<MsghdrControllen>().map_err(|_| {
         io::Error::new(

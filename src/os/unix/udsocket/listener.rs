@@ -1,5 +1,6 @@
+#[cfg(unix)]
+use super::super::{close_by_error, handle_fd_error};
 use super::{
-    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{enable_passcred, raw_get_nonblocking, raw_set_nonblocking},
     ToUdSocketPath, UdSocketPath, UdStream,

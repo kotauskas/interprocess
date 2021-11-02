@@ -1,7 +1,8 @@
+#[cfg(unix)]
+use super::super::{close_by_error, handle_fd_error};
 #[cfg(uds_peercred)]
 use super::util::get_peer_ucred;
 use super::{
-    super::{close_by_error, handle_fd_error},
     imports::*,
     util::{
         check_ancillary_unsound, enable_passcred, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w,
@@ -9,7 +10,7 @@ use super::{
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(doc, target_os = "linux"))]
 use crate::{ReliableReadMsg, Sealed};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -453,7 +454,7 @@ impl ReliableReadMsg for UdSocket {
         }
     }
 }
-#[cfg(unix)]
+#[cfg(any(doc, target_os = "linux"))]
 impl Sealed for UdSocket {}
 #[cfg(unix)]
 impl AsRawFd for UdSocket {
