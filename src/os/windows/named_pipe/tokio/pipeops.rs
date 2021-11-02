@@ -55,7 +55,9 @@ impl PipeOps {
     }
     pub fn poll_read(&self, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = TokioReadBuf::new(buf);
-        futures::ready!(self.poll_read_readbuf(ctx, &mut buf))?;
+        if let Poll::Ready(Err(e)) = self.poll_read_readbuf(ctx, &mut buf) {
+            return Poll::Ready(Err(e));
+        }
         Poll::Ready(Ok(buf.filled().len()))
     }
     pub fn poll_write(&self, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {

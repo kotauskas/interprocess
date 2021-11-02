@@ -58,7 +58,7 @@ cfg_if! {
         pub use tokio::{
             io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
         };
-        pub use futures::io::{AsyncRead, AsyncWrite};
+        pub use futures_io::{AsyncRead, AsyncWrite};
     }
 }
 cfg_if! {
