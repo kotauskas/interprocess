@@ -9,6 +9,7 @@ use super::{
     },
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
+#[cfg(target_os = "linux")]
 use crate::{ReliableReadMsg, Sealed};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -134,8 +135,6 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `read`
-    ///
-    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<(usize, bool)> {
         self.fd.read(buf).map(Self::add_fake_trunc_flag)
     }
@@ -325,14 +324,10 @@ impl UdSocket {
 
     /// Sends a datagram into the socket.
     ///
-    ///
     /// # System calls
-    /// - `sendmsg`
-    ///     - Future versions of `interprocess` may use `write` instead; for now, this method is a wrapper around [`send_vectored`].
-    ///
-    /// [`send_vectored`]: #method.send_vectored " "
+    /// - `write`
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.send_vectored(&[IoSlice::new(buf)])
+        self.fd.write(buf)
     }
     /// Sends a datagram into the socket, making use of [gather output] for the main data.
     ///

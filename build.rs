@@ -40,6 +40,12 @@ fn is_unix() -> bool {
 ///     - `uds_sockaddr_un_len_108`
 ///     - `uds_sockaddr_un_len_104`, on the BSD family
 ///     - `uds_sockaddr_un_len_126`, only on Haiku
+/// - `msghdr`'s `msg_iovlen` type:
+///     - `uds_msghdr_iovlen_c_int`
+///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, Android, uClibc MIPS64, and uClibc x86-64
+/// - `msghdr`'s `msg_controllen` type:
+///     - `uds_msghdr_controllen_socklen_t`
+///     - `uds_msghdr_controllen_size_t`, on Linux with GNU, Android, uClibc MIPS64, and uClibc x86-64
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
     let (mut uds, mut scm_rights) = (false, true);
@@ -51,6 +57,13 @@ fn collect_uds_features(target: &TargetTriplet) {
         if !target.os("emscripten") {
             ldefine(&["uds_ucred", "uds_scm_credentials", "uds_peercred"]);
         }
+        if (target.os("linux") && target.env("gnu"))
+        || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
+        || target.os("android") {
+            ldefine(&["uds_msghdr_iovlen_size_t", "uds_msghdr_controllen_size_t"]);
+        } else {
+            ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
+        }
         if target.os_any(&["linux", "android"]) {
             // Only actual Linux has that... I think? lmao
             define("uds_linux_namespace");
@@ -58,11 +71,17 @@ fn collect_uds_features(target: &TargetTriplet) {
     } else if target.env("newlib") && target.arch("xtensa") {
         uds = true;
         scm_rights = false;
-        define("sockaddr_un_len_108");
+        ldefine(&[
+            "sockaddr_un_len_108", "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t",
+        ]);
     } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
         // The BSD OS family
         uds = true;
-        define("uds_sockaddr_un_len_104");
+        ldefine(&[
+            "uds_sockaddr_un_len_104",
+            "uds_msghdr_iovlen_c_int",
+            "uds_msghdr_controllen_socklen_t",
+        ]);
         if target.os("netbsd") {
             // NetBSD differs from all other BSDs in that it uses its own
             // credential structure, sockcred
@@ -70,10 +89,21 @@ fn collect_uds_features(target: &TargetTriplet) {
         }
     } else if target.os_any(&["solaris", "illumos"]) {
         uds = true;
-        ldefine(&["uds_sockaddr_un_len_108", "uds_getpeerucred"]);
+        ldefine(&[
+            "uds_sockaddr_un_len_108",
+            "uds_getpeerucred",
+            "uds_msghdr_iovlen_c_int",
+            "uds_msghdr_controllen_socklen_t",
+        ]);
     } else if target.os("haiku") {
         uds = true;
-        ldefine(&["uds_sockaddr_un_len_126", "uds_ucred", "uds_peercred"]);
+        ldefine(&[
+            "uds_sockaddr_un_len_126",
+            "uds_ucred",
+            "uds_peercred",
+            "uds_msghdr_iovlen_c_int",
+            "uds_msghdr_controllen_socklen_t",
+        ]);
     }
     if uds {
         if scm_rights { define("uds_scm_rights") };

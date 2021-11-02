@@ -17,11 +17,7 @@ mod path;
 mod socket;
 mod stream;
 mod util;
-pub use ancillary::*;
-pub use listener::*;
-pub use path::*;
-pub use socket::*;
-pub use stream::*;
+pub use {ancillary::*, listener::*, path::*, socket::*, stream::*};
 
 #[cfg(all(uds_supported, test))]
 mod tests;
@@ -36,7 +32,7 @@ cfg_if! {
         const _MAX_UDSOCKET_PATH_LEN: usize = 108;
     } else if #[cfg(uds_sockaddr_un_len_104)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 104;
-    } else if #[cfg(uds_sockaddr_un_126)] {
+    } else if #[cfg(uds_sockaddr_un_len_126)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 126;
     } else {
         compile_error!("\

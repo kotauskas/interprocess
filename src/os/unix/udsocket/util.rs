@@ -11,27 +11,55 @@ use std::{
 };
 use to_method::To;
 
+//pub type MsghdrNamelen = socklen_t;
+
+#[allow(dead_code)]
+mod tname {
+    pub static SOCKLEN_T: &str = "`socklen_t`";
+    pub static SIZE_T: &str = "`size_t`";
+    pub static C_INT: &str = "`c_int`";
+}
+
 cfg_if! {
-    if #[cfg(any(
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd",
-        target_os = "dragonfly",
-        all(target_os = "linux", target_env = "musl"),
-        target_env = "newlib",
-        all(target_env = "uclibc", target_arch = "arm"),
-        target_os = "android",
-        target_os = "emscripten",
-    ))] {
-        pub type MsghdrSize = socklen_t;
-    } else {
-        pub type MsghdrSize = size_t;
+    if #[cfg(uds_msghdr_iovlen_c_int)] {
+        pub type MsghdrIovlen = c_int;
+        static MSGHDR_IOVLEN_NAME: &str = tname::C_INT;
+    } else if #[cfg(uds_msghdr_iovlen_size_t)] {
+        pub type MsghdrIovlen = size_t;
+        static MSGHDR_IOVLEN_NAME: &str = tname::SIZE_T;
+    }
+}
+cfg_if! {
+    if #[cfg(uds_msghdr_controllen_socklen_t)] {
+        pub type MsghdrControllen = socklen_t;
+        static MSGHDR_CONTROLLEN_NAME: &str = tname::SOCKLEN_T;
+} else if #[cfg(uds_msghdr_controllen_size_t)] {
+        pub type MsghdrControllen = size_t;
+        static MSGHDR_CONTROLLEN_NAME: &str = tname::SIZE_T;
     }
 }
 
-pub fn to_msghdrsize(size: usize) -> io::Result<MsghdrSize> {
-    size.try_to::<MsghdrSize>()
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "size overflowed `socklen_t`"))
+pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
+    iovlen.try_to::<MsghdrIovlen>().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "number of scatter-gather buffers overflowed {}",
+                MSGHDR_IOVLEN_NAME,
+            ),
+        )
+    })
+}
+pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
+    controllen.try_to::<MsghdrControllen>().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "ancillary data buffer length overflowed {}",
+                MSGHDR_CONTROLLEN_NAME,
+            ),
+        )
+    })
 }
 
 #[allow(unused_variables)]
@@ -162,32 +190,32 @@ pub fn fill_out_msghdr_r(
     _fill_out_msghdr(
         hdr,
         iov.as_ptr() as *mut _,
-        to_msghdrsize(iov.len())?,
+        to_msghdr_iovlen(iov.len())?,
         anc.as_mut_ptr(),
-        anc.len(),
+        to_msghdr_controllen(anc.len())?,
     )
 }
 pub fn fill_out_msghdr_w(hdr: &mut msghdr, iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<()> {
     _fill_out_msghdr(
         hdr,
         iov.as_ptr() as *mut _,
-        to_msghdrsize(iov.len())?,
+        to_msghdr_iovlen(iov.len())?,
         anc.as_ptr() as *mut _,
-        anc.len(),
+        to_msghdr_controllen(anc.len())?,
     )
 }
 #[cfg(unix)]
 fn _fill_out_msghdr(
     hdr: &mut msghdr,
     iov: *mut iovec,
-    iovlen: usize,
-    anc: *mut u8,
-    anclen: usize,
+    iovlen: MsghdrIovlen,
+    control: *mut u8,
+    controllen: MsghdrControllen,
 ) -> io::Result<()> {
     hdr.msg_iov = iov;
-    hdr.msg_iovlen = to_msghdrsize(iovlen)?;
-    hdr.msg_control = anc as *mut _;
-    hdr.msg_controllen = to_msghdrsize(anclen)?;
+    hdr.msg_iovlen = iovlen;
+    hdr.msg_control = control as *mut _;
+    hdr.msg_controllen = controllen;
     Ok(())
 }
 pub fn mk_msghdr_r(iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {
