@@ -7,7 +7,6 @@ async fn main() {
     };
     use interprocess::os::windows::named_pipe::tokio::*;
 
-    // Replace the path as necessary on Windows.
     let conn = DuplexBytePipeStream::connect("Example").unwrap();
     let (reader, mut writer) = conn.split();
     let mut reader = BufReader::new(reader);

@@ -19,13 +19,7 @@ async fn main() {
         let mut buffer = String::new();
         let write = writer.write_all(b"Hello from server!\n");
         let read = reader.read_line(&mut buffer);
-        let result = try_join!(read, write);
-        if let Err(e) = result {
-            dbg!(e);
-            dbg!(&reader);
-            dbg!(&writer);
-            dbg!(&listener);
-        }
+        try_join!(read, write).unwrap();
         println!("Client answered: {}", buffer.trim());
     }
 }
