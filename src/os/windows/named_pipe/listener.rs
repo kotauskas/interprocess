@@ -153,16 +153,21 @@ pub struct PipeListenerOptions<'a> {
     pub wait_timeout: NonZeroU32,
 }
 macro_rules! genset {
-    ($name:ident : $ty:ty) => {
-        #[doc = concat!("Sets the [`", stringify!($name), "`](#structfield.", stringify!($name), ") parameter to the specified value.")]
+    // TODO get rid of this $namel thing when bumping MSRV in 2.0.0
+    ($name:ident $namel:literal : $ty:ty) => {
+        #[doc = "Sets the [`"]
+        #[doc = $namel]
+        #[doc = "`](#structfield."]
+        #[doc = $namel]
+        #[doc = ") parameter to the specified value."]
         #[must_use = "builder setters take the entire structure and return the result"]
         pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
             self.$name = $name.into();
             self
         }
     };
-    ($($name:ident : $ty:ty),+ $(,)?) => {
-        $(genset!($name : $ty);)+
+    ($($name:ident $namel:literal : $ty:ty),+ $(,)?) => {
+        $(genset!($name $namel : $ty);)+
     };
 }
 impl<'a> PipeListenerOptions<'a> {
@@ -202,15 +207,15 @@ impl<'a> PipeListenerOptions<'a> {
         }
     }
     genset!(
-        name: Cow<'a, OsStr>,
-        mode: PipeMode,
-        nonblocking: bool,
-        instance_limit: Option<NonZeroU8>,
-        write_through: bool,
-        accept_remote: bool,
-        input_buffer_size_hint: usize,
-        output_buffer_size_hint: usize,
-        wait_timeout: NonZeroU32,
+        name "name": Cow<'a, OsStr>,
+        mode "mode": PipeMode,
+        nonblocking "nonblocking": bool,
+        instance_limit "instance_limit": Option<NonZeroU8>,
+        write_through "write_through": bool,
+        accept_remote "accept_remote": bool,
+        input_buffer_size_hint "input_buffer_size_hint": usize,
+        output_buffer_size_hint "output_buffer_size_hint": usize,
+        wait_timeout "wait_timeout": NonZeroU32,
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
     pub(super) fn create_instance(
