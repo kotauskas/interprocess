@@ -59,6 +59,8 @@ impl<'a> AncillaryData<'a> {
 
     /// Calculates the size of an `AncillaryData::FileDescriptors` element with the specified amount of file descriptors when packed into the Unix ancillary data format. Useful for allocating a buffer when you expect to receive a specific amount of file descriptors.
     pub const fn encoded_size_of_file_descriptors(num_descriptors: usize) -> usize {
+        #[cfg(not(unix))]
+        struct cmsghdr; // ???????????????
         size_of::<cmsghdr>() + num_descriptors * size_of::<pid_t>()
     }
 
