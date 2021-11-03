@@ -42,7 +42,7 @@ cfg_if! {
         pub trait IntoRawHandle {}
         pub unsafe trait FromRawHandle {}
         pub(super) type DWORD = u32;
-        pub(super) struct SECURITY_ATTRIBUTES {}
+        pub struct SECURITY_ATTRIBUTES {}
         pub(super) type LPVOID = *mut std::ffi::c_void;
 
         fake_consts! {u32,
