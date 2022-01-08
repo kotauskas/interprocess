@@ -4,7 +4,7 @@ use std::{
     io::{self, prelude::*, BufReader},
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<(), Box<dyn Error>> {
     fn handle_error(connection: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
         connection
             .map_err(|error| eprintln!("Incoming connection failed: {}", error))

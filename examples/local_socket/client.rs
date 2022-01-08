@@ -4,7 +4,7 @@ use std::{
     io::{prelude::*, BufReader},
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<(), Box<dyn Error>> {
     let mut conn = LocalSocketStream::connect("/tmp/example.sock")?;
     conn.write_all(b"Hello from client!\n")?;
 

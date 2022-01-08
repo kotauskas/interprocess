@@ -1,7 +1,10 @@
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-use std::io::{self, prelude::*, BufReader};
+use std::{
+    error::Error,
+    io::{self, prelude::*, BufReader},
+};
 
-fn main() {
+pub fn main() -> Result<(), Box<dyn Error>> {
     fn handle_error(connection: io::Result<LocalSocketStream>) -> LocalSocketStream {
         match connection {
             Ok(val) => val,
@@ -12,8 +15,7 @@ fn main() {
         }
     }
 
-    let listener =
-        LocalSocketListener::bind("/tmp/teletype.sock").expect("failed to set up server");
+    let listener = LocalSocketListener::bind("/tmp/teletype.sock")?;
     eprintln!("Teletype server listening for connections.");
     let mut conn = listener
         .incoming()
@@ -25,18 +27,11 @@ fn main() {
     let mut buffer = String::new();
     loop {
         if our_turn {
-            io::stdin()
-                .read_line(&mut buffer)
-                .expect("failed to read line from stdin");
-            conn.get_mut()
-                .write_all(buffer.as_ref())
-                .expect("failed to write line to socket");
+            io::stdin().read_line(&mut buffer)?;
+            conn.get_mut().write_all(buffer.as_ref())?;
         } else {
-            conn.read_line(&mut buffer)
-                .expect("failed to read line from socket");
-            io::stdout()
-                .write_all(buffer.as_ref())
-                .expect("failed to write line to stdout");
+            conn.read_line(&mut buffer)?;
+            io::stdout().write_all(buffer.as_ref())?;
         }
         buffer.clear();
         our_turn = !our_turn;
