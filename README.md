@@ -18,6 +18,11 @@ Interprocess communication toolkit for Rust programs. The crate aims to expose a
     - **C signals** — like POSIX signals, but with less signal types and a smaller API *(practical usage, other than for compatibility reasons, is strongly discouraged)*
 - **Async support** — efficient wrapper around local sockets, Windows named pipes and Ud-sockets for high-performance parallelism, currently only supports the Tokio runtime
 
+## Feature gates
+- **`signals`**, *on* by default — enables support for POSIX signals and C signals. Pulls in additional dependencies.
+- **`tokio_support`**, *off* by default — enables support for Tokio-powered efficient asynchronous IPC. Cannot simply be named `tokio` because of Cargo limitations.
+- **`nonblocking`**, *on* by default — deprecated and will be removed, do not use.
+
 ## License
 This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].
 
