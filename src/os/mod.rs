@@ -1,6 +1,6 @@
 //! Platform-specific functionality for various interprocess communication primitives.
 //!
-//! This module houses two modules: [`unix`] and [`windows`]. Depending on your platform, one of those is available, so if you only see one module here, don't worry — it's just not available for the platform on which you're browsing the docs. If you're using [Docs.rs], you can see the documentation for other platforms using the navigation bar on the top of the page.
+//! This module houses two modules: [`unix`] and [`windows`]. Modules and items for foreign platforms are visible even if they're not available on your platform, so watch out. If you're using [Docs.rs], which enables the nightly-only `doc_cfg` feature by default, everything platform-specific will have a badge next to it which specifies the `cfg(...)` conditions for that item to be available.
 //!
 //! [`unix`]: mod.unix.html " "
 //! [`windows`]: mod.windows.html " "
