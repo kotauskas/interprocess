@@ -456,20 +456,20 @@ impl ReliableReadMsg for UdSocket {
 }
 #[cfg(any(doc, target_os = "linux"))]
 impl Sealed for UdSocket {}
-#[cfg(unix)]
 impl AsRawFd for UdSocket {
+    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
-#[cfg(unix)]
 impl IntoRawFd for UdSocket {
+    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
-#[cfg(unix)]
 impl FromRawFd for UdSocket {
+    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps::new(fd) }
     }

@@ -1,9 +1,9 @@
+#[cfg(unix)]
+use super::super::{close_by_error, handle_fd_error};
 #[cfg(uds_peercred)]
 use super::util::get_peer_ucred;
 #[cfg(uds_supported)]
 use super::util::raw_shutdown;
-#[cfg(unix)]
-use super::super::{close_by_error, handle_fd_error};
 use super::{
     imports::*,
     util::{
@@ -272,20 +272,20 @@ impl Debug for UdStream {
             .finish()
     }
 }
-#[cfg(unix)]
 impl AsRawFd for UdStream {
+    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
-#[cfg(unix)]
 impl IntoRawFd for UdStream {
+    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
-#[cfg(unix)]
 impl FromRawFd for UdStream {
+    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps::new(fd) }
     }

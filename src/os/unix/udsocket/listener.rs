@@ -301,20 +301,20 @@ impl Debug for UdStreamListener {
             .finish()
     }
 }
-#[cfg(unix)]
 impl AsRawFd for UdStreamListener {
+    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
-#[cfg(unix)]
 impl IntoRawFd for UdStreamListener {
+    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
-#[cfg(unix)]
 impl FromRawFd for UdStreamListener {
+    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps::new(fd) }
     }
