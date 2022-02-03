@@ -9,6 +9,7 @@ fn main() {
     if is_unix() {
         let target = TargetTriplet::fetch();
         collect_uds_features(&target);
+        #[cfg(feature = "signals")]
         collect_signals(&target);
     }
     if checkver(&version, 52) {
@@ -121,6 +122,7 @@ fn collect_uds_features(target: &TargetTriplet) {
 /// - `se_sigwinch`, supported everywhere other than HermitCore
 /// - `se_sigpwr`, supported everywhere other than HermitCore and the BSD family
 #[rustfmt::skip]
+#[cfg(feature = "signals")]
 fn collect_signals(target: &TargetTriplet) {
     if !is_unix() { return };
     if target.os_any(
@@ -164,6 +166,7 @@ struct TargetTriplet {
     env: Option<String>,
 }
 #[rustfmt::skip]
+#[allow(dead_code)] // when signals are disabled, some of those are unused
 impl TargetTriplet {
     fn fetch() -> Self {
         Self {
