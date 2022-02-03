@@ -4,6 +4,7 @@ use super::{
     imports::*,
     PipeOps, PipeStreamInternals,
 };
+#[cfg_attr(not(all(windows, feature = "tokio_support")), allow(unused_imports))]
 use std::{
     ffi::{OsStr, OsString},
     fmt::{self, Debug, Formatter},
@@ -96,7 +97,6 @@ macro_rules! create_stream_type {
             },
             doc: $doc
         );
-        #[cfg(windows)]
         impl TokioPipeStream for $ty {
             const ROLE: PipeStreamRole = $role;
             const WRITE_MODE: Option<PipeMode> = $write_mode;
@@ -302,8 +302,8 @@ impl AsyncWrite for &ByteWriterPipeStream {
     }
 }
 
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for DuplexBytePipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -312,8 +312,8 @@ impl AsyncRead for DuplexBytePipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for DuplexBytePipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -321,15 +321,17 @@ impl AsyncWrite for DuplexBytePipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for &DuplexBytePipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -338,8 +340,8 @@ impl AsyncRead for &DuplexBytePipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &DuplexBytePipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -347,16 +349,18 @@ impl AsyncWrite for &DuplexBytePipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
 }
 
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for MsgReaderPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -365,8 +369,8 @@ impl AsyncRead for MsgReaderPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for &MsgReaderPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -376,8 +380,8 @@ impl AsyncRead for &MsgReaderPipeStream {
     }
 }
 
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for MsgWriterPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -385,15 +389,17 @@ impl AsyncWrite for MsgWriterPipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &MsgWriterPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -401,16 +407,18 @@ impl AsyncWrite for &MsgWriterPipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
 }
 
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for DuplexMsgPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -419,8 +427,8 @@ impl AsyncRead for DuplexMsgPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for DuplexMsgPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -428,15 +436,17 @@ impl AsyncWrite for DuplexMsgPipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncRead for &DuplexMsgPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_read(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -445,8 +455,8 @@ impl AsyncRead for &DuplexMsgPipeStream {
         self.instance.0.poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
 impl AsyncWrite for &DuplexMsgPipeStream {
+    #[cfg(feature = "tokio_support")]
     fn poll_write(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
@@ -454,9 +464,11 @@ impl AsyncWrite for &DuplexMsgPipeStream {
     ) -> Poll<io::Result<usize>> {
         self.instance.0.poll_write(ctx, buf)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_flush(ctx)
     }
+    #[cfg(feature = "tokio_support")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.instance.0.poll_shutdown(ctx)
     }
