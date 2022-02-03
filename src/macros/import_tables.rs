@@ -33,6 +33,7 @@ macro_rules! import_type_or_make_dummy {
         #[cfg($pred)]
         pub use $path::{$src_name as $dst_name};
         #[cfg(not($pred))]
+        #[derive(Copy, Clone, Debug, Default)]
         pub struct $dst_name // Expands the struct name
             $(<$($lt),+>)? // Expands the lifetimes as declaration of generic parameters
             ($($(::core::marker::PhantomData<& $lt ()>),+)?); // Creates a tuple of PhantomData,
@@ -140,7 +141,7 @@ macro_rules! import_trait_or_make_dummy {
     (
         traits {$path:path} :: ( // Instruction name and base path part
             $( // Root repetition block
-                $src_name:ident // The trait name to import
+                $(($unsafety:tt))? $src_name:ident // The trait name to import
                 $(as $dst_name:ident)? // The trait name to reexport as
             ),+
             , // Mandatory trailing comma for the repetition, the compiler complains otherwise
@@ -149,12 +150,12 @@ macro_rules! import_trait_or_make_dummy {
         $(,)? // Optional trailing comma for the whole macro
     ) => {$(
         import_trait_or_make_dummy!(
-            trait {$path}::$src_name $(as $dst_name)?,
+            $(($unsafety))? trait {$path}::$src_name $(as $dst_name)?,
             cfg($pred),
         );
     )+};
     (
-        trait // Instruction name
+        $(($unsafety:tt))? trait // Instruction name, and whether the trait is unsafe
         {$path:path}::$src_name:ident // Path and type alias name to export
         as $dst_name:ident, // The same stuff as in the repeating case, basically
         cfg($pred:meta)
@@ -163,14 +164,14 @@ macro_rules! import_trait_or_make_dummy {
         #[cfg($pred)]
         pub use $path::{$src_name as $dst_name};
         #[cfg(not($pred))]
-        pub trait $dst_name {}
+        pub $($unsafety)? trait $dst_name {}
     };
     (
-        trait // Same as above, but without the `as` part
+        $(($unsafety:tt))? trait // Same as above, but without the `as` part
         {$path:path}::$name:ident,
         cfg($pred:meta)
         $(,)?
     ) => {
-        import_trait_or_make_dummy!(trait {$path}::$name as $name, cfg($pred));
+        import_trait_or_make_dummy!($(($unsafety))? trait {$path}::$name as $name, cfg($pred));
     };
 }

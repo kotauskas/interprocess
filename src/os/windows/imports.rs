@@ -1,94 +1,72 @@
-#![allow(unused_imports, dead_code, unused_macros, non_camel_case_types)]
-use cfg_if::cfg_if;
+#![allow(unused_imports, dead_code, non_camel_case_types)]
+use std::ffi::c_void;
 
-macro_rules! fake_consts {
-    ($ty:ty, $($name:ident = $val:expr),+ $(,)?) => (
-        $(
-            pub(super) const $name : $ty = $val;
-        )+
-    );
-}
-
-cfg_if! {
-    if #[cfg(windows)] {
-        pub(super) use winapi::{
-            shared::{minwindef::{DWORD, LPVOID}, ntdef::HANDLE, winerror::ERROR_PIPE_CONNECTED},
-            um::{
-                winbase::{
-                    FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_WRITE_THROUGH, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND,
-                    PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE,
-                    PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS,
-                },
-                winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE},
-                fileapi::{CreateFileW, OPEN_EXISTING, FlushFileBuffers, ReadFile, WriteFile},
-                handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
-                namedpipeapi::{
-                    ConnectNamedPipe, DisconnectNamedPipe,
-                    PeekNamedPipe,
-                    CreatePipe, CreateNamedPipeW, SetNamedPipeHandleState,
-                },
-                winbase::{
-                    GetNamedPipeClientProcessId, GetNamedPipeClientSessionId,
-                    GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
-                },
-                minwinbase::SECURITY_ATTRIBUTES,
-                processthreadsapi::GetCurrentProcess,
+#[cfg(windows)]
+pub(super) use {
+    std::os::windows::ffi::{OsStrExt, OsStringExt},
+    winapi::{
+        shared::winerror::ERROR_PIPE_CONNECTED,
+        um::{
+            fileapi::{CreateFileW, FlushFileBuffers, ReadFile, WriteFile, OPEN_EXISTING},
+            handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
+            namedpipeapi::{
+                ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe, PeekNamedPipe,
+                SetNamedPipeHandleState,
             },
-        };
-        pub(super) use std::os::windows::{io::{AsRawHandle, FromRawHandle, IntoRawHandle}, ffi::{OsStrExt, OsStringExt}};
-    } else {
-        pub(super) type HANDLE = *mut std::ffi::c_void;
-        pub trait AsRawHandle {}
-        pub trait IntoRawHandle {}
-        pub unsafe trait FromRawHandle {}
-        pub(super) type DWORD = u32;
-        pub struct SECURITY_ATTRIBUTES {}
-        pub(super) type LPVOID = *mut std::ffi::c_void;
+            processthreadsapi::GetCurrentProcess,
+            winbase::{
+                GetNamedPipeClientProcessId, GetNamedPipeClientSessionId,
+                GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
+            },
+            winbase::{
+                FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
+                PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS,
+            },
+            winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE},
+        },
+    },
+};
 
-        fake_consts! {u32,
-            PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
-            PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
-            PIPE_READMODE_BYTE = 0, PIPE_READMODE_MESSAGE = 1,
-        }
-    }
-}
+import_type_alias_or_make_dummy!(types {winapi::shared::minwindef}::(
+    DWORD  = u32,
+    LPVOID = *mut c_void,
+), cfg(windows));
+import_type_alias_or_make_dummy!(type {winapi::shared::ntdef}::HANDLE = *mut c_void, cfg(windows));
+import_type_or_make_dummy!(type {winapi::um::minwinbase}::SECURITY_ATTRIBUTES, cfg(windows));
 
-cfg_if! {
-    if #[cfg(feature = "tokio_support")] {
-        pub use tokio::{
-            io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
-        };
-        pub use futures_io::{AsyncRead, AsyncWrite};
-    }
-}
-cfg_if! {
-    if #[cfg(all(windows, feature = "tokio_support"))] {
-        pub(super) use tokio::net::windows::named_pipe::{
-            NamedPipeClient as TokioNPClient,
-            NamedPipeServer as TokioNPServer,
-            ClientOptions as TokioNPClientOptions,
-        };
-    } else {
-        #[derive(Debug)]
-        pub struct TokioNPClient;
-        #[derive(Debug)]
-        pub struct TokioNPServer;
-    }
-}
+import_const_or_make_dummy!(u32: consts {winapi::um::winbase}::(
+    PIPE_ACCESS_INBOUND = 0, PIPE_ACCESS_OUTBOUND = 1, PIPE_ACCESS_DUPLEX = 2,
+    PIPE_TYPE_BYTE = 1, PIPE_TYPE_MESSAGE = 2,
+    PIPE_READMODE_BYTE = 0, PIPE_READMODE_MESSAGE = 1,
+), cfg(windows));
 
-cfg_if! {
-    if #[cfg(all(windows, feature = "signals"))] {
-        pub(super) use libc::{sighandler_t, SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
-        pub(super) use intmap::IntMap;
-        pub(super) use once_cell::sync::Lazy;
-        pub(super) use spinning::RwLock;
-        pub(super) use thiserror::Error;
+import_trait_or_make_dummy!(traits {std::os::windows::io}::(
+    AsRawHandle, IntoRawHandle, (unsafe) FromRawHandle,
+), cfg(windows));
 
-        // FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
-        pub const SIG_DFL: sighandler_t = 0;
-    } else {
-        fake_consts! {i32,
-            SIGABRT = 100, SIGFPE = 101, SIGILL = 102, SIGINT = 103, SIGSEGV = 104, SIGTERM = 105,
-        }
-    }
-}
+import_trait_or_make_dummy!(traits {futures_io}::(
+    AsyncRead, AsyncWrite,
+), cfg(feature = "tokio_support"));
+import_trait_or_make_dummy!(traits {tokio::io}::(
+    AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite,
+), cfg(feature = "tokio_support"));
+import_type_or_make_dummy!(
+    type {tokio::io}::ReadBuf as TokioReadBuf, cfg(feature = "tokio_support"),
+);
+
+#[cfg(all(windows, feature = "tokio_support"))]
+pub(super) use tokio::net::windows::named_pipe::ClientOptions as TokioNPClientOptions;
+
+import_type_or_make_dummy!(types {tokio::net::windows::named_pipe}::(
+    NamedPipeClient as TokioNPClient,
+    NamedPipeServer as TokioNPServer,
+), cfg(all(windows, feature = "tokio_support")));
+
+#[cfg(all(windows, feature = "signals"))]
+pub(super) use {intmap::IntMap, once_cell::sync::Lazy, spinning::RwLock, thiserror::Error};
+// FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
+pub const SIG_DFL: libc::sighandler_t = 0;
+
+import_const_or_make_dummy!(i32: consts {libc}::(
+    SIGABRT = 100, SIGFPE = 101, SIGILL = 102, SIGINT = 103, SIGSEGV = 104, SIGTERM = 105,
+), cfg(windows));
