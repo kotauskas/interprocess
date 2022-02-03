@@ -65,6 +65,7 @@ impl<'a> AncillaryData<'a> {
     }
 
     /// Inexpensievly clones `self` by borrowing the `FileDescriptors` variant or copying the `Credentials` variant.
+    #[must_use]
     pub fn clone_ref(&'a self) -> Self {
         match *self {
             Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(fds)),

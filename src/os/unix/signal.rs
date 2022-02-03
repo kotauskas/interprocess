@@ -367,6 +367,7 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
 /// # Ok(()) }
 /// ```
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[must_use = "the signal handler is attached by calling `.set()`, which consumes the builder"]
 pub struct HandlerOptions {
     signal: i32,
     /// The handler to be set up. If `None`, the handler is not changed by the call.
