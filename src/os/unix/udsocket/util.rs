@@ -15,8 +15,6 @@ use std::{
 };
 use to_method::To;
 
-//pub type MsghdrNamelen = socklen_t;
-
 #[cfg(unix)]
 #[allow(dead_code)]
 mod tname {
