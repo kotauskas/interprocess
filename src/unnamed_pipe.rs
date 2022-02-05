@@ -2,7 +2,7 @@
 //!
 //! The distinction between named and unnamed pipes is concisely expressed by their names: where named pipes have names, unnamed pipes have handles. This can both be useful or problematic, depending on the use case. Unnamed pipes work best when a child process is used. With the fork model on Unix-like systems, the handle can be transferred to the child process thanks to the cloned address space; on Windows, inheritable handles can be used.
 //!
-//! Another way to use unnamed pipes is to use a named pipe and/or a Unix domain socket to establish an unnamed pipe connection. It just so happens that this crate supports all three.
+//! Another way to use unnamed pipes is to use a named pipe or a Unix domain socket to establish an unnamed pipe connection. It just so happens that this crate supports all three.
 
 impmod! {unnamed_pipe,
     UnnamedPipeReader as UnnamedPipeReaderImpl,
