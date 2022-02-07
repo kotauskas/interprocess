@@ -17,7 +17,6 @@ use {
 ///
 /// # Examples
 /// - [Basic packet exchange](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_udsocket/inner.rs)
-// TODO on that note, I gotta rename the master branch to main, was planning to do that for a while
 #[derive(Debug)]
 pub struct UdSocket(TokioUdSocket);
 impl UdSocket {

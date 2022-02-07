@@ -51,7 +51,7 @@ import_trait_or_make_dummy!(traits {tokio::io}::(
     AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite,
 ), cfg(feature = "tokio_support"));
 import_type_or_make_dummy!(
-    type {tokio::io}::ReadBuf as TokioReadBuf, cfg(feature = "tokio_support"),
+    type {tokio::io}::ReadBuf as TokioReadBuf<'a>, cfg(feature = "tokio_support"),
 );
 
 #[cfg(all(windows, feature = "tokio_support"))]
