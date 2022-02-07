@@ -8,7 +8,8 @@ use super::{
         check_ancillary_unsound, enable_passcred, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w,
         raw_get_nonblocking, raw_set_nonblocking,
     },
-    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
+    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath,
+    UdSocketPath,
 };
 #[cfg(any(doc, target_os = "linux"))]
 use crate::{ReliableReadMsg, Sealed};
@@ -24,12 +25,25 @@ use to_method::To;
 ///
 /// All such sockets have the `SOCK_DGRAM` socket type; in other words, this is the Unix domain version of a UDP socket.
 pub struct UdSocket {
+    // TODO make this not 'static
+    _drop_guard: PathDropGuard<'static>,
     fd: FdOps,
 }
 impl UdSocket {
-    /// Creates a new server socket at the specified address.
+    unsafe fn from_raw_fd_with_dg(fd: c_int, dg: PathDropGuard<'static>) -> Self {
+        unsafe {
+            Self {
+                fd: FdOps::from_raw_fd(fd),
+                _drop_guard: dg,
+            }
+        }
+    }
+
+    /// Creates a new socket at the specified address.
     ///
     /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    ///
+    /// After the socket is dropped, the socket file will be left over. Use [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics (if unwinding is enabled).
     ///
     /// # Example
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
@@ -42,10 +56,17 @@ impl UdSocket {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?)
+        Self::_bind(path.to_socket_path()?, false)
     }
-    fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
-        let addr = path.try_to::<sockaddr_un>()?;
+    /// Creates a new socket at the specified address, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
+    ///
+    /// See the documentation of [`bind()`](Self::bind).
+    pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_bind(path.to_socket_path()?, true)
+    }
+    fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+        let addr = path.borrow().try_to::<sockaddr_un>()?;
+
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -57,6 +78,7 @@ impl UdSocket {
                 return Err(io::Error::last_os_error());
             }
         };
+
         let success = unsafe {
             libc::bind(
                 socket,
@@ -70,10 +92,20 @@ impl UdSocket {
             unsafe { return Err(handle_fd_error(socket)) };
         }
         unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+
+        let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
+            PathDropGuard {
+                path: path.to_owned(),
+                enabled: true,
+            }
+        } else {
+            PathDropGuard::dummy()
+        };
+
         Ok(unsafe {
             // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
             // not to be used elsewhere
-            Self::from_raw_fd(socket)
+            Self::from_raw_fd_with_dg(socket, dg)
         })
     }
     /// Connect to a Unix domain socket server at the specified path.
@@ -97,10 +129,11 @@ impl UdSocket {
     ///
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_connect(path.to_socket_path()?)
+        Self::_connect(path.to_socket_path()?, false)
     }
-    fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
-        let addr = path.try_to::<sockaddr_un>()?;
+    fn _connect(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+        let addr = path.borrow().try_to::<sockaddr_un>()?;
+
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -112,6 +145,7 @@ impl UdSocket {
                 return Err(io::Error::last_os_error());
             }
         };
+
         let success = unsafe {
             libc::connect(
                 socket,
@@ -122,8 +156,19 @@ impl UdSocket {
         if !success {
             unsafe { return Err(handle_fd_error(socket)) };
         }
+
         unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
-        Ok(unsafe { Self::from_raw_fd(socket) })
+
+        let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
+            PathDropGuard {
+                path: path.to_owned(),
+                enabled: true,
+            }
+        } else {
+            PathDropGuard::dummy()
+        };
+
+        Ok(unsafe { Self::from_raw_fd_with_dg(socket, dg) })
     }
 
     fn add_fake_trunc_flag(x: usize) -> (usize, bool) {
@@ -424,13 +469,16 @@ impl UdSocket {
         unsafe { get_peer_ucred(self.fd.0) }
     }
 }
+
 impl Debug for UdSocket {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdSocket")
-            .field("file_descriptor", &self.as_raw_fd())
+            .field("fd", &self.as_raw_fd())
+            .field("has_drop_guard", &self._drop_guard.enabled)
             .finish()
     }
 }
+
 #[cfg(any(doc, target_os = "linux"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
 impl ReliableReadMsg for UdSocket {
@@ -456,6 +504,7 @@ impl ReliableReadMsg for UdSocket {
 }
 #[cfg(any(doc, target_os = "linux"))]
 impl Sealed for UdSocket {}
+
 impl AsRawFd for UdSocket {
     #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
@@ -471,6 +520,6 @@ impl IntoRawFd for UdSocket {
 impl FromRawFd for UdSocket {
     #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self { fd: FdOps::new(fd) }
+        unsafe { Self::from_raw_fd_with_dg(fd, PathDropGuard::dummy()) }
     }
 }

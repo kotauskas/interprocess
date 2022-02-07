@@ -55,6 +55,7 @@ impl UdStream {
     }
     fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
         let addr = path.try_to::<sockaddr_un>()?;
+
         let socket = {
             let (success, fd) = unsafe {
                 let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -66,6 +67,7 @@ impl UdStream {
                 return Err(io::Error::last_os_error());
             }
         };
+
         let success = unsafe {
             libc::connect(
                 socket,
@@ -76,7 +78,9 @@ impl UdStream {
         if !success {
             unsafe { return Err(handle_fd_error(socket)) };
         }
+
         unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+
         Ok(unsafe { Self::from_raw_fd(socket) })
     }
 
@@ -243,6 +247,7 @@ impl UdStream {
         unsafe { get_peer_ucred(self.fd.0) }
     }
 }
+
 impl Read for UdStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.fd.read(buf)
@@ -265,13 +270,15 @@ impl Write for UdStream {
         Ok(())
     }
 }
+
 impl Debug for UdStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UdStream")
-            .field("file_descriptor", &self.as_raw_fd())
+            .field("fd", &self.as_raw_fd())
             .finish()
     }
 }
+
 impl AsRawFd for UdStream {
     #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {

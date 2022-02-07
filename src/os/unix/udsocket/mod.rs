@@ -19,6 +19,9 @@ mod stream;
 mod util;
 pub use {ancillary::*, listener::*, path::*, socket::*, stream::*};
 
+mod path_drop_guard;
+use path_drop_guard::*;
+
 #[cfg(all(uds_supported, test))]
 mod tests;
 
