@@ -14,36 +14,6 @@ use std::{
 };
 
 /// An asynchronous local socket server, listening for connections.
-///
-/// # Example
-/// ```no_run
-/// # #[cfg(feature = "nonblocking")]
-/// use futures::{
-///     io::{BufReader, AsyncBufReadExt, AsyncWriteExt},
-///     stream::TryStreamExt,
-/// };
-/// # #[cfg(feature = "nonblocking")]
-/// use interprocess::nonblocking::local_socket::*;
-///
-/// # #[tokio::main]
-/// # async fn main() -> Result<(), Box<std::error::Error>> {
-/// # #[cfg(feature = "nonblocking")] {
-/// let listener = LocalSocketListener::bind("/tmp/example.sock")
-///     .await?;
-/// listener
-///     .incoming()
-///     .try_for_each(|mut conn| async move {
-///         conn.write_all(b"Hello from server!\n").await?;
-///         let mut conn = BufReader::new(conn);
-///         let mut buffer = String::new();
-///         conn.read_line(&mut buffer).await?;
-///         println!("Client answered: {}", buffer);
-///         Ok(())
-///     })
-///     .await?;
-/// # }
-/// # Ok(()) }
-/// ```
 #[derive(Debug)]
 pub struct LocalSocketListener {
     inner: Arc<sync::LocalSocketListener>,
@@ -131,30 +101,6 @@ impl Iterator for SyncArcIncoming {
 }
 
 /// An asynchronous local socket byte stream, obtained eiter from [`LocalSocketListener`] or by connecting to an existing local socket.
-///
-/// # Example
-/// ```no_run
-/// # #[cfg(feature = "nonblocking")]
-/// use futures::io::{BufReader, AsyncBufReadExt, AsyncWriteExt};
-/// # #[cfg(feature = "nonblocking")]
-/// use interprocess::nonblocking::local_socket::*;
-///
-/// # #[tokio::main]
-/// # async fn main() -> Result<(), Box<std::error::Error>> {
-/// # #[cfg(feature = "nonblocking")] {
-/// // Replace the path as necessary on Windows.
-/// let mut conn = LocalSocketStream::connect("/tmp/example.sock")
-///     .await?;
-/// conn.write_all(b"Hello from client!\n").await?;
-/// let mut conn = BufReader::new(conn);
-/// let mut buffer = String::new();
-/// conn.read_line(&mut buffer).await?;
-/// println!("Server answered: {}", buffer);
-/// # }
-/// # Ok(()) }
-/// ```
-///
-/// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
 #[derive(Debug)]
 pub struct LocalSocketStream {
     inner: Unblock<sync::LocalSocketStream>,

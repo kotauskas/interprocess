@@ -48,7 +48,7 @@ macro_rules! tokio_main {
         mod client;
         mod server;
 
-        #[tokio::main]
+        #[tokio::main(flavor = "current_thread")]
         async fn main() -> Result<(), Box<dyn Error>> {
             tokio_main!(@bmain)
         }
@@ -62,12 +62,12 @@ macro_rules! tokio_main {
         mod server;
 
         #[cfg(all($($pred)*))]
-        #[tokio::main]
+        #[tokio::main(flavor = "current_thread")]
         async fn main() -> Result<(), Box<dyn Error>> {
             tokio_main!(@bmain)
         }
         #[cfg(not(all($($pred)*)))]
-        #[tokio::main]
+        #[tokio::main(flavor = "current_thread")]
         async fn main() -> Result<(), Box<dyn Error>> {
             eprintln!("not supported on this platform");
             Ok(())
