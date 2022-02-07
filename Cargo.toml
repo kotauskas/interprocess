@@ -14,9 +14,16 @@ description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
 keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 
+[features]
+default = ["signals", "nonblocking"]
+signals = ["thiserror", "spinning", "intmap", "once_cell"]
+nonblocking = ["blocking", "futures-core", "futures-io"]
+tokio_support = ["tokio", "futures-core", "futures-io"]
+doc_cfg = []
+
 [dependencies]
 libc = { version = "0.2", features = ["extra_traits"] }
-tokio = { version = "1.7", features = ["net", "time"], optional = true }
+tokio = { version = "1.15", features = ["net", "time"], optional = true }
 thiserror = { version = "1.0", optional = true }
 spinning = { version = "0.1", optional = true }
 intmap = { version = "0.7", optional = true }
@@ -31,7 +38,7 @@ cfg-if = "1.0"
 rustc_version = "0.4"
 
 [dev-dependencies]
-tokio = { version = "1.7", features = ["rt", "macros", "rt-multi-thread"] }
+tokio = { version = "1.15", features = ["rt", "io-util", "macros"] }
 futures = "0.3"
 
 [target.'cfg(windows)'.dependencies]
@@ -45,12 +52,5 @@ winapi = { version = "0.3", features = [
     "namedpipeapi",
 ] }
 
-[features]
-default = ["signals", "nonblocking", "tokio_support"]
-signals = ["thiserror", "spinning", "intmap", "once_cell"]
-nonblocking = ["blocking", "futures-core", "futures-io"]
-tokio_support = ["tokio", "futures-core", "futures-io"]
-doc_cfg = []
-
 [package.metadata.docs.rs]
-features = ["doc_cfg"]
+features = ["doc_cfg", "tokio_support"]

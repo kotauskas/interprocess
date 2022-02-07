@@ -39,7 +39,7 @@ macro_rules! main {
 #[allow(unused_macros)]
 macro_rules! tokio_main {
     (@bmain) => {{
-        tokio::try_join!(client::main(), server::main())?;
+        tokio::try_join!(main_a(), main_b())?;
         Ok(())
     }};
     () => {
@@ -53,13 +53,8 @@ macro_rules! tokio_main {
             tokio_main!(@bmain)
         }
     };
-    ($($pred:tt)*) => {
+    (nomod $($pred:tt)*) => {
         use std::error::Error;
-
-        #[cfg(all($($pred)*))]
-        mod client;
-        #[cfg(all($($pred)*))]
-        mod server;
 
         #[cfg(all($($pred)*))]
         #[tokio::main(flavor = "current_thread")]
@@ -72,5 +67,15 @@ macro_rules! tokio_main {
             eprintln!("not supported on this platform");
             Ok(())
         }
+    };
+    ($($pred:tt)*) => {
+        #[cfg(all($($pred)*))]
+        mod client;
+        #[cfg(all($($pred)*))]
+        mod server;
+        #[cfg(all($($pred)*))]
+        use {server::main as main_a, client::main as main_b};
+
+        tokio_main!(nomod $($pred)*);
     };
 }

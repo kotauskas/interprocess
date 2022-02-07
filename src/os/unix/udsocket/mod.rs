@@ -11,6 +11,10 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
+#[cfg(any(doc, feature = "tokio_support"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio_support")))]
+pub mod tokio;
+
 mod ancillary;
 mod listener;
 mod path;
