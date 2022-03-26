@@ -11,7 +11,7 @@ pub mod unnamed_pipe;
 #[cfg(windows)]
 pub(crate) mod local_socket;
 
-mod imports;
+pub(crate) mod imports;
 use imports::*;
 
 use std::{io, mem::ManuallyDrop, ptr};

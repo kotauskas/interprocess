@@ -12,7 +12,7 @@
 
 #![cfg_attr(not(unix), allow(warnings))]
 
-mod imports;
+pub(crate) mod imports;
 
 #[cfg(unix)]
 mod fdops;

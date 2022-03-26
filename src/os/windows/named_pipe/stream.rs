@@ -73,9 +73,9 @@ macro_rules! create_stream_type_base {
         }
         #[doc(hidden)]
         impl crate::Sealed for $ty {}
-        #[cfg(windows)]
         #[doc(hidden)]
         impl PipeStreamInternals for $ty {
+            #[cfg(windows)]
             fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self {
                 Self { instance }
             }
@@ -90,8 +90,8 @@ macro_rules! create_stream_type_base {
                 }
             }
         }
-        #[cfg(windows)]
         impl AsRawHandle for $ty {
+            #[cfg(windows)]
             fn as_raw_handle(&self) -> HANDLE {
                 self.instance.0.as_raw_handle()
             }
@@ -178,8 +178,8 @@ macro_rules! create_stream_type {
             },
             doc: $doc
         );
-        #[cfg(windows)]
         impl FromRawHandle for $ty {
+            #[cfg(windows)]
             unsafe fn from_raw_handle(handle: HANDLE) -> Self {
                 let pipeops = unsafe {
                     // SAFETY: guaranteed via safety contract
@@ -190,14 +190,13 @@ macro_rules! create_stream_type {
                 }
             }
         }
-        #[cfg(windows)]
         impl IntoRawHandle for $ty {
+            #[cfg(windows)]
             fn into_raw_handle(self) -> HANDLE {
                 let handle = self.instance.0.as_raw_handle();
                 handle
             }
         }
-        #[cfg(windows)]
         impl PipeStream for $ty {
             const ROLE: PipeStreamRole = $role;
             const WRITE_MODE: Option<PipeMode> = $write_mode;

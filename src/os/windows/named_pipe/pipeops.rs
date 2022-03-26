@@ -184,5 +184,6 @@ unsafe impl Sync for PipeOps {}
 unsafe impl Send for PipeOps {}
 
 pub trait PipeStreamInternals {
+    #[cfg(windows)]
     fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self;
 }
