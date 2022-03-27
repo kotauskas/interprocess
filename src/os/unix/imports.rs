@@ -14,6 +14,9 @@ import_type_alias_or_make_dummy!(type {super}::FdOps = (), cfg(unix));
 import_trait_or_make_dummy!(traits {std::os::unix::io}::(
     AsRawFd, IntoRawFd, FromRawFd,
 ), cfg(unix));
+import_trait_or_make_dummy!(traits {std::os::unix::ffi}::(
+    OsStrExt, OsStringExt,
+), cfg(unix));
 
 import_type_or_make_dummy!(types {libc}::(
     sockaddr_un,
@@ -26,15 +29,8 @@ import_type_or_make_dummy!(types {std::os::unix::net}::(
     UnixDatagram as StdUdSocket,
 ), cfg(uds_supported));
 
-cfg_if! {
-    if #[cfg(unix)] {
-        pub (super) use std::os::unix::{
-            ffi::{OsStrExt, OsStringExt},
-        };
-    } else {
-        pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
-    }
-}
+#[cfg(not(unix))]
+pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 
 #[cfg(uds_supported)]
 pub(super) use libc::{
