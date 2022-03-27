@@ -177,5 +177,6 @@ impl AsRawHandle for PipeOps {
 
 // Distinct from the non-async PipeStreamInternals which uses the non-async PipeOps.
 pub trait PipeStreamInternals {
+    #[cfg(windows)]
     fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self;
 }
