@@ -14,7 +14,7 @@ description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
 keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 
-exclude = ["/.github/", "/README.tpl", "/.gitignore"]
+exclude = ["/.github/", "/README.tpl", "/Cargo.lock", "/.gitignore"]
 
 [features]
 default = ["signals", "nonblocking"]
