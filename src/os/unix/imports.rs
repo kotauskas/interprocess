@@ -97,12 +97,16 @@ import_type_or_make_dummy!(types {tokio::net}::(
     UnixDatagram as TokioUdSocket,
 ), cfg(all(uds_supported, feature = "tokio_support")));
 import_type_or_make_dummy!(types {tokio::net::unix}::(
-    ReadHalf as TokioUdStreamReadHalf <'a>,
+    ReadHalf as TokioUdStreamReadHalf<'a>,
     OwnedReadHalf as TokioUdStreamOwnedReadHalf,
-    WriteHalf as TokioUdStreamWriteHalf <'a>,
+    WriteHalf as TokioUdStreamWriteHalf<'a>,
     OwnedWriteHalf as TokioUdStreamOwnedWriteHalf,
-    ReuniteError as TokioReuniteError,
 ), cfg(all(unix, feature = "tokio_support")));
+
+#[cfg(all(unix, feature = "tokio_support"))]
+pub use tokio::net::unix::ReuniteError as TokioReuniteError;
+#[cfg(not(all(unix, feature = "tokio_support")))]
+pub struct TokioReuniteError(pub (), pub ());
 
 import_type_or_make_dummy!(type {tokio::io}::ReadBuf<'a>, cfg(feature = "tokio_support"));
 
