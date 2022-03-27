@@ -41,7 +41,7 @@ import_const_or_make_dummy!(u32: consts {winapi::um::winbase}::(
 ), cfg(windows));
 
 import_trait_or_make_dummy!(traits {std::os::windows::io}::(
-    AsRawHandle, IntoRawHandle, (unsafe) FromRawHandle,
+    AsRawHandle, IntoRawHandle, FromRawHandle,
 ), cfg(windows));
 
 import_trait_or_make_dummy!(traits {futures_io}::(
