@@ -158,7 +158,7 @@ pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::Both;
 #[cfg(not(uds_linux_namespace))]
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyPaths;
 
-const AT_SIGN: u8 = 0x40;
+const AT_SIGN: u8 = b'@';
 
 pub fn to_local_socket_name_osstr(mut val: &OsStr) -> LocalSocketName<'_> {
     let mut namespaced = false;
