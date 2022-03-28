@@ -69,9 +69,8 @@ impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
         self.pinproject().poll_flush(cx)
     }
     /// Finishes immediately. See the `.shutdown()` method.
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.shutdown()?;
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.pinproject().poll_shutdown(cx)
     }
 }
 #[cfg(feature = "tokio_support")]
