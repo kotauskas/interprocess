@@ -1,3 +1,4 @@
+/*
 // You can't generate those with macros just yet, so copypasting is the way for now.
 
 #[cfg_attr( // uds_ucred template
@@ -57,3 +58,5 @@
     feature = "doc_cfg",
     doc(cfg(not(target_os = "hermit"))),
 )]
+
+*/
