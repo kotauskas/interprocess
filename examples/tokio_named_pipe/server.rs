@@ -1,10 +1,10 @@
-use std::error::Error;
 use futures::{
-        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-        try_join,
-    };
-    use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
-    use std::ffi::OsStr;
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    try_join,
+};
+use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
+use std::error::Error;
+use std::ffi::OsStr;
 
 pub async fn main() -> Result<(), Box<dyn Error>> {
     let listener = PipeListenerOptions::new()
