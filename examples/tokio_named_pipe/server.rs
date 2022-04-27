@@ -3,8 +3,7 @@ use futures::{
     try_join,
 };
 use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
-use std::error::Error;
-use std::ffi::OsStr;
+use std::{error::Error, ffi::OsStr};
 
 pub async fn main() -> Result<(), Box<dyn Error>> {
     let listener = PipeListenerOptions::new()
