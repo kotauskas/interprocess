@@ -35,14 +35,19 @@ use std::{
 };
 
 fn convert_path(pipe_name: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
-    let mut path = OsString::from(r"\\");
-    if let Some(host) = hostname {
-        path.push(host);
-    } else {
-        path.push(".");
-    }
-    path.push(r"\pipe\");
+    static PREFIX_LITERAL: &str = r"\\";
+    static PIPEFS_LITERAL: &str = r"\pipe\";
+
+    let hostname = hostname.unwrap_or_else(|| OsStr::new("."));
+
+    let mut path = OsString::with_capacity(
+        PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len(),
+    );
+    path.push(PREFIX_LITERAL);
+    path.push(hostname);
+    path.push(PIPEFS_LITERAL);
     path.push(pipe_name);
+
     let mut path = path.encode_wide().collect::<Vec<u16>>();
     path.push(0); // encode_wide does not include the terminating NULL, so we have to add it ourselves
     path
