@@ -64,7 +64,7 @@ macro_rules! tokio_main {
         #[cfg(not(all($($pred)*)))]
         #[tokio::main(flavor = "current_thread")]
         async fn main() -> Result<(), Box<dyn Error>> {
-            eprintln!("not supported on this platform");
+            eprintln!("not supported on this platform or feature set");
             Ok(())
         }
     };
