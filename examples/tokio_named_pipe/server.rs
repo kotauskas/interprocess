@@ -1,22 +1,71 @@
 use futures::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncReadExt, AsyncWriteExt},
     try_join,
 };
 use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
-use std::{error::Error, ffi::OsStr};
+use std::{error::Error, ffi::OsStr, io};
 
 pub async fn main() -> Result<(), Box<dyn Error>> {
+    // Describe the things we do when we've got a connection ready.
+    async fn handle_conn(conn: DuplexBytePipeStream) -> io::Result<()> {
+        // Split the connection into two halves to process
+        // received and sent data concurrently.
+        let (mut reader, mut writer) = conn.split();
+
+        // Allocate a large buffer for what we're receiving.
+        let mut buffer = String::with_capacity(2048);
+
+        // Describe the write operation as first writing our whole message, and
+        // then shutting down the write half to send an EOF to help the other
+        // side determine the end of the transmission.
+        let write = async {
+            writer.write_all(b"Hello from server!").await?;
+            writer.close().await?;
+            Ok(())
+        };
+
+        // Describe the read operation as reading into our big buffer.
+        let read = reader.read_to_string(&mut buffer);
+
+        // Run both the write-and-send-EOF operation and the read operation concurrently.
+        try_join!(read, write)?;
+
+        // Dispose of our connection right now and not a moment later because I want to!
+        drop((reader, writer));
+
+        // Produce our output!
+        println!("Client answered: {}", buffer.trim());
+        Ok(())
+    }
+
+    // Create our listener. In a more robust program, we'd check for an
+    // existing socket file that has not been deleted for whatever reason,
+    // ensure it's a socket file and not a normal file, and delete it.
     let listener = PipeListenerOptions::new()
         .name(OsStr::new("Example"))
         .create_tokio::<DuplexBytePipeStream>()?;
+
+    // Set up our loop boilerplate that processes our incoming connections.
     loop {
-        let conn = listener.accept().await?;
-        let (reader, mut writer) = conn.split();
-        let mut reader = BufReader::new(reader);
-        let mut buffer = String::new();
-        let write = writer.write_all(b"Hello from server!\n");
-        let read = reader.read_line(&mut buffer);
-        try_join!(read, write)?;
-        println!("Client answered: {}", buffer.trim());
+        // Sort out situations when establishing an incoming connection caused an error.
+        let conn = match listener.accept().await {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("There was an error with an incoming connection: {}", e);
+                continue;
+            }
+        };
+
+        // Spawn new parallel asynchronous tasks onto the Tokio runtime
+        // and hand the connection over to them so that multiple clients
+        // could be processed simultaneously in a lightweight fashion.
+        tokio::spawn(async move {
+            // The outer match processes errors that happen when we're
+            // connecting to something. The inner if-let processes errors that
+            // happen during the connection.
+            if let Err(e) = handle_conn(conn).await {
+                eprintln!("error while handling connection: {}", e);
+            }
+        });
     }
 }
