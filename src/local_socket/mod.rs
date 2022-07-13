@@ -227,17 +227,22 @@ impl<'a> LocalSocketName<'a> {
     ///
     /// [`is_always_supported`]: #method.is_always_supported " "
     pub fn is_supported(&self) -> bool {
-        (NameTypeSupport::query().namespace_supported() && self.is_namespaced())
-            || (NameTypeSupport::query().paths_supported() && !self.is_path())
+        self.is_supported_in_nts_type(NameTypeSupport::query())
     }
     /// Returns `true` if the type of the name is supported by the OS, `false` otherwise.
     ///
     /// The check is performed at compile-time. For a check which might return a more permissive result on certain platforms by checking for support at runtime, see [`is_supported`].
     ///
     /// [`is_supported`]: #method.is_supported " "
-    pub fn is_always_supported(&self) -> bool {
-        (NameTypeSupport::ALWAYS_AVAILABLE.namespace_supported() && self.is_namespaced())
-            || (NameTypeSupport::ALWAYS_AVAILABLE.paths_supported() && self.is_path())
+    pub const fn is_always_supported(&self) -> bool {
+        self.is_supported_in_nts_type(NameTypeSupport::ALWAYS_AVAILABLE)
+    }
+    /// Returns `true` if the type of the name is supported by an OS with the specified name type support class, `false` otherwise.
+    ///
+    /// This is mainly a helper function for [`is_supported()`] and [`is_always_supported()`], but there's no good reason not to expose it as a public method, so why not?
+    pub const fn is_supported_in_nts_type(&self, nts: NameTypeSupport) -> bool {
+        (self.is_namespaced() && nts.namespace_supported())
+            || (self.is_path() && nts.paths_supported())
     }
     /// Returns `true` if the value is a namespaced name, `false` otherwise.
     pub const fn is_namespaced(&self) -> bool {
