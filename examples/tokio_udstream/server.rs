@@ -27,11 +27,10 @@ pub async fn main() -> io::Result<()> {
         // Describe the read operation as reading into our big buffer.
         let read = reader.read_to_string(&mut buffer);
 
-        // Run both the write-and-send-EOF operation and the read operation.
+        // Run both the write-and-send-EOF operation and the read operation concurrently.
         try_join!(read, write)?;
 
-        // Dispose of our connection now because we're not doing anything with
-        // it from this point onwards.
+        // Dispose of our connection right now and not a moment later because I want to!
         drop((reader, writer));
         drop(conn);
 
@@ -55,12 +54,13 @@ pub async fn main() -> io::Result<()> {
                 continue;
             }
         };
+
         // Spawn new parallel asynchronous tasks onto the Tokio runtime
         // and hand the connection over to them so that multiple clients
         // could be processed simultaneously in a lightweight fashion.
         tokio::spawn(async move {
-            // The outer if-let processes errors that happen when we're
-            // connecting to something. The inner one processes errors that
+            // The outer match processes errors that happen when we're
+            // connecting to something. The inner if-let processes errors that
             // happen during the connection.
             if let Err(e) = handle_conn(conn).await {
                 eprintln!("error while handling connection: {}", e);
