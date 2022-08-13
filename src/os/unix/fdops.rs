@@ -96,22 +96,23 @@ unsafe impl Send for FdOps {}
 unsafe impl Sync for FdOps {}
 
 pub(super) unsafe fn close_fd(fd: i32) {
-    let success = unsafe {
-        let mut success = true;
+    let e = unsafe {
+        let mut error = None;
         // If the close() call fails, the loop starts and keeps retrying until either the error
         // value isn't Interrupted (in which case the assertion fails) or the close operation
         // properly fails with a non-Interrupted error type. Why does Unix even have this
         // idiotic error type?
         while libc::close(fd) != 0 {
-            if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
+            let current_error = io::Error::last_os_error();
+            if current_error.kind() != io::ErrorKind::Interrupted {
                 // An actual close error happened — return early now
-                success = false;
+                error = Some(current_error);
                 break;
             }
         }
-        success
+        error
     };
-    debug_assert!(success);
+    debug_assert!(success, "failed to close file descriptor: {}", e);
 }
 /// Captures [`io::Error::last_os_error()`] and closes the file descriptor.
 pub(super) unsafe fn handle_fd_error(fd: i32) -> io::Error {
