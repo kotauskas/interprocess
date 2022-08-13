@@ -122,7 +122,7 @@ impl Drop for FileHandleOps {
         let _success = unsafe { CloseHandle(self.0) != 0 };
         debug_assert!(
             _success,
-            "failed to close file handle: {:?}",
+            "failed to close file handle: {}",
             io::Error::last_os_error()
         );
     }
