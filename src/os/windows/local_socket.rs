@@ -107,12 +107,22 @@ impl LocalSocketStream {
         self.inner.set_nonblocking(nonblocking)
     }
 }
+
+fn thunk_broken_pipe_to_eof(r: io::Result<usize>) -> io::Result<usize> {
+    match r {
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(0),
+        els => els,
+    }
+}
+
+/// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
+/// reader, but Windows shoehorns both into the former.
 impl Read for LocalSocketStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+        thunk_broken_pipe_to_eof(self.inner.read(buf))
     }
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.read_vectored(bufs)
+        thunk_broken_pipe_to_eof(self.inner.read_vectored(bufs))
     }
 }
 impl Write for LocalSocketStream {
