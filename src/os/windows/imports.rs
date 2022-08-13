@@ -30,6 +30,7 @@ pub(super) use {
 import_type_alias_or_make_dummy!(types {winapi::shared::minwindef}::(
     DWORD  = u32,
     LPVOID = *mut c_void,
+    BOOL   = i32,
 ), cfg(windows));
 import_type_alias_or_make_dummy!(type {winapi::shared::ntdef}::HANDLE = *mut c_void, cfg(windows));
 import_type_or_make_dummy!(type {winapi::um::minwinbase}::SECURITY_ATTRIBUTES, cfg(windows));

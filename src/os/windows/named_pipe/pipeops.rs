@@ -89,37 +89,25 @@ impl PipeOps {
     }
 
     pub fn get_client_process_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success = unsafe { GetNamedPipeClientProcessId(self.0 .0, &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeClientProcessId) }
     }
     pub fn get_client_session_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success = unsafe { GetNamedPipeClientSessionId(self.0 .0, &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeClientSessionId) }
     }
     pub fn get_server_process_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success = unsafe { GetNamedPipeServerProcessId(self.0 .0, &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeServerProcessId) }
     }
     pub fn get_server_session_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success = unsafe { GetNamedPipeServerSessionId(self.0 .0, &mut id as *mut _) != 0 };
+        unsafe { self.hget(GetNamedPipeServerSessionId) }
+    }
+    unsafe fn hget(
+        &self,
+        f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
+    ) -> io::Result<u32> {
+        let mut x: u32 = 0;
+        let success = unsafe { f(self.0 .0, &mut x as *mut _) != 0 };
         if success {
-            Ok(id)
+            Ok(x)
         } else {
             Err(io::Error::last_os_error())
         }

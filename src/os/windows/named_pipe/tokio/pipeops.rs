@@ -79,45 +79,30 @@ impl PipeOps {
         }
     }
     pub fn get_client_process_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success =
-            unsafe { GetNamedPipeClientProcessId(self.as_raw_handle(), &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeClientProcessId) }
     }
     pub fn get_client_session_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success =
-            unsafe { GetNamedPipeClientSessionId(self.as_raw_handle(), &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeClientSessionId) }
     }
     pub fn get_server_process_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success =
-            unsafe { GetNamedPipeServerProcessId(self.as_raw_handle(), &mut id as *mut _) != 0 };
-        if success {
-            Ok(id)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        unsafe { self.hget(GetNamedPipeServerProcessId) }
     }
     pub fn get_server_session_id(&self) -> io::Result<u32> {
-        let mut id: u32 = 0;
-        let success =
-            unsafe { GetNamedPipeServerSessionId(self.as_raw_handle(), &mut id as *mut _) != 0 };
+        unsafe { self.hget(GetNamedPipeServerSessionId) }
+    }
+    unsafe fn hget(
+        &self,
+        f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
+    ) -> io::Result<u32> {
+        let mut x: u32 = 0;
+        let success = unsafe { f(self.as_raw_handle(), &mut x as *mut _) != 0 };
         if success {
-            Ok(id)
+            Ok(x)
         } else {
             Err(io::Error::last_os_error())
         }
     }
+
     pub async fn connect_server(&self) -> io::Result<()> {
         match self {
             PipeOps::Client(_) => unimplemented!("connect_server() called on client PipeOps"),
