@@ -1,15 +1,18 @@
-use super::{
-    super::{Instancer, PipeListenerOptions, INITIAL_INSTANCER_CAPACITY},
-    enums::{PipeMode, PipeStreamRole},
-    PipeOps, TokioPipeStream,
+use crate::{
+    os::windows::named_pipe::{
+        enums::{PipeMode, PipeStreamRole},
+        instancer::{Instance, Instancer},
+        tokio::{PipeOps, TokioPipeStream},
+        PipeListenerOptions, INITIAL_INSTANCER_CAPACITY,
+    },
+    Sealed,
 };
-use crate::Sealed;
 use std::{
     fmt::{self, Debug, Formatter},
     io,
     marker::PhantomData,
     num::NonZeroU8,
-    sync::{atomic::AtomicBool, Arc, RwLock},
+    sync::RwLock,
 };
 use to_method::To;
 
@@ -29,7 +32,7 @@ impl<Stream: TokioPipeStream> PipeListener<Stream> {
         } else {
             self.instancer.add_instance(self.create_instance()?)
         };
-        instance.0.connect_server().await?;
+        instance.instance().connect_server().await?;
         // I have no idea why, but every time I run a minimal named pipe server example without
         // this code, the second client to connect causes a "no process on the other end of the
         // pipe" error, and for some reason, performing a read or write with a zero-sized
@@ -37,9 +40,9 @@ impl<Stream: TokioPipeStream> PipeListener<Stream> {
         // crazy bug of interprocess, Tokio or even Windows, but this is the best solution I've
         // come up for.
         if Stream::READ_MODE.is_some() {
-            instance.0.dry_read().await;
+            instance.instance().dry_read().await;
         } else {
-            instance.0.dry_write().await;
+            instance.instance().dry_write().await;
         }
         Ok(Stream::build(instance))
     }
@@ -78,26 +81,40 @@ impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
         })
     }
 }
+impl Sealed for PipeListenerOptions<'_> {}
 fn _create_tokio(
     config: &PipeListenerOptions<'_>,
     role: PipeStreamRole,
     read_mode: Option<PipeMode>,
 ) -> io::Result<(PipeListenerOptions<'static>, Instancer<PipeOps>)> {
-    let mut owned_config = config.to_owned();
-    owned_config.nonblocking = false;
+    // Shadow to avoid mixing them up.
+    let mut config = config.to_owned();
+
+    // Tokio should ideally already set that, but let's do it just in case.
+    config.nonblocking = true;
+
+    // Conversion from `Option<NonZeroU8>` to `usize`, with the `None` case corresponding to
+    // the reasonable default of 8.
     let instancer_capacity = config
         .instance_limit
         .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
         .to::<usize>();
+
+    let first_instance = {
+        let handle = config.create_instance(true, config.nonblocking, true, role, read_mode)?;
+        let ops = unsafe {
+            // SAFETY: we just created this handle, so we know it's unique (and we've checked
+            // that it's valid)
+            PipeOps::from_raw_handle(handle, true)?
+        };
+        Instance::create_non_taken(ops)
+    };
+
+    // Preallocate space for the instances. Actual instance creation will happen lazily.
     let mut instance_vec = Vec::with_capacity(instancer_capacity);
-    let first_instance_raw = config.create_instance(true, false, true, role, read_mode)?;
-    let first_instance = Arc::new((
-        // SAFETY: we just created this handle
-        unsafe { PipeOps::from_raw_handle(first_instance_raw, true)? },
-        AtomicBool::new(false),
-    ));
+    // Except for the first instance, which we'll add right now.
     instance_vec.push(first_instance);
+
     let instancer = Instancer(RwLock::new(instance_vec));
-    Ok((owned_config, instancer))
+    Ok((config, instancer))
 }
-impl Sealed for PipeListenerOptions<'_> {}

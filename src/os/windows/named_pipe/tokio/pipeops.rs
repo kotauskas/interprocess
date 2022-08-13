@@ -1,16 +1,18 @@
 #![allow(clippy::unnecessary_mut_passed)] // We get &mut with mutexes either way
 
-use super::imports::*;
+use crate::os::windows::named_pipe::{tokio::imports::*, Instance};
 use std::{
+    fmt::{self, Debug, Formatter},
     future::Future,
     io,
+    ops::Deref,
     pin::Pin,
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::Mutex,
     task::{Context, Poll},
 };
 use to_method::To;
 
-static LPE: &str = "unexpected lock poisoning";
+static LPE: &str = "unexpected lock poison";
 
 macro_rules! l {
     ($e:expr) => {
@@ -78,6 +80,7 @@ impl PipeOps {
             PipeOps::Server(s) => TokioAsyncWrite::poll_shutdown(Pin::new(l!(s)), ctx),
         }
     }
+
     pub fn get_client_process_id(&self) -> io::Result<u32> {
         unsafe { self.hget(GetNamedPipeClientProcessId) }
     }
@@ -149,6 +152,14 @@ impl Future for DryWrite<'_> {
         self.0.poll_write(ctx, &[]).map(|_| ())
     }
 }
+impl Debug for PipeOps {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            PipeOps::Client(mtx) => Debug::fmt(mtx.lock().expect(LPE).deref(), f),
+            PipeOps::Server(mtx) => Debug::fmt(mtx.lock().expect(LPE).deref(), f),
+        }
+    }
+}
 
 #[cfg(windows)]
 impl AsRawHandle for PipeOps {
@@ -163,5 +174,5 @@ impl AsRawHandle for PipeOps {
 // Distinct from the non-async PipeStreamInternals which uses the non-async PipeOps.
 pub trait PipeStreamInternals {
     #[cfg(windows)]
-    fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self;
+    fn build(instance: Instance<PipeOps>) -> Self;
 }

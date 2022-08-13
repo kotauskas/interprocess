@@ -1,9 +1,9 @@
-use super::super::{imports::*, FileHandleOps};
+use crate::os::windows::{imports::*, named_pipe::Instance, FileHandleOps};
 use std::{
+    fmt::{self, Debug, Formatter},
     io,
     mem::ManuallyDrop,
     ptr,
-    sync::{atomic::AtomicBool, Arc},
 };
 
 /// The actual implementation of a named pipe server or client.
@@ -113,6 +113,40 @@ impl PipeOps {
         }
     }
 
+    /// Retrieves whether the pipe is a server or not from the kernel directly.
+    pub fn is_server(&self) -> io::Result<bool> {
+        // Source: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
+        const PIPE_IS_SERVER_BIT: u32 = 0x00000001;
+
+        let flags = self.get_flags()?;
+        Ok((flags & PIPE_IS_SERVER_BIT) != 0)
+    }
+    /// Retrieves whether the pipe has message boundaries or not from the kernel directly.
+    pub fn does_pipe_have_message_boundaries(&self) -> io::Result<bool> {
+        // Same source.
+        const PIPE_IS_MESSAGE_BIT: u32 = 0x00000004;
+
+        let flags = self.get_flags()?;
+        Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
+    }
+    fn get_flags(&self) -> io::Result<u32> {
+        let mut flags: u32 = 0;
+        let success = unsafe {
+            GetNamedPipeInfo(
+                self.0 .0,
+                &mut flags as *mut _,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+            ) != 0
+        };
+        if success {
+            Ok(flags)
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+
     /// Blocks until connected. If connected, does not do anything.
     pub fn connect_server(&self) -> io::Result<()> {
         let success = unsafe { ConnectNamedPipe(self.as_raw_handle(), ptr::null_mut()) != 0 };
@@ -147,6 +181,11 @@ impl PipeOps {
         let _ = self.flush_and_disconnect();
     }
 }
+impl Debug for PipeOps {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
 #[cfg(windows)]
 impl AsRawHandle for PipeOps {
     fn as_raw_handle(&self) -> HANDLE {
@@ -173,5 +212,5 @@ unsafe impl Send for PipeOps {}
 
 pub trait PipeStreamInternals {
     #[cfg(windows)]
-    fn build(instance: Arc<(PipeOps, AtomicBool)>) -> Self;
+    fn build(instance: Instance<PipeOps>) -> Self;
 }

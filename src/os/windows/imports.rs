@@ -10,8 +10,8 @@ pub(super) use {
             fileapi::{CreateFileW, FlushFileBuffers, ReadFile, WriteFile, OPEN_EXISTING},
             handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
             namedpipeapi::{
-                ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe, PeekNamedPipe,
-                SetNamedPipeHandleState,
+                ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe,
+                GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState,
             },
             processthreadsapi::GetCurrentProcess,
             winbase::{

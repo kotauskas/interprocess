@@ -1,6 +1,6 @@
-use super::{
-    super::{imports::*, FromRawHandle},
-    Instancer, PipeMode, PipeOps, PipeStream, PipeStreamRole,
+use crate::os::windows::{
+    imports::*,
+    named_pipe::{Instance, Instancer, PipeMode, PipeOps, PipeStream, PipeStreamRole},
 };
 use std::{
     borrow::Cow,
@@ -12,8 +12,8 @@ use std::{
     num::{NonZeroU32, NonZeroU8},
     ptr,
     sync::{
-        atomic::{AtomicBool, Ordering::SeqCst},
-        Arc, RwLock,
+        atomic::{AtomicBool, Ordering::*},
+        RwLock,
     },
 };
 use to_method::To;
@@ -60,7 +60,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         } else {
             self.instancer.add_instance(self.create_instance()?)
         };
-        instance.0.connect_server()?;
+        instance.instance().connect_server()?;
         Ok(Stream::build(instance))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
@@ -75,29 +75,36 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     ///
     /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        for instance in self
-            .instancer
-            .0
-            .read()
-            .expect("unexpected lock poison")
-            .iter()
-        {
+        // Lock for write access to prevent concurrent `set_nonblocking()` calls from clashing with
+        // one another, leading to inconsistent state. Normally, this will only be called from one
+        // thread, so the lock isn't supposed to be contended.
+        let instances = self.instancer.0.write().expect("unexpected lock poison");
+
+        // Setting the non-blocking flag per-instance.
+        for instance in instances.iter() {
             unsafe {
                 super::set_nonblocking_for_stream(
-                    instance.0 .0 .0,
+                    instance.instance().as_raw_handle(),
                     Stream::READ_MODE,
                     nonblocking,
                 )?;
             }
         }
-        self.nonblocking.store(nonblocking, SeqCst);
+
+        // `Release` here suits us perfectly, because it ensures that the streams become
+        // non-blocking before we declare the whole thing non-blocking (or vice versa). Not sure if
+        // we actually rely on such a consistency for correct behavior, but it's good to keep
+        // around, and the cost isn't big anyway (free on x86, slight slowdown on other platforms).
+        self.nonblocking.store(nonblocking, Release);
+        // Make it clear that the lock survives until this moment.
+        drop(instances);
         Ok(())
     }
 
     fn create_instance(&self) -> io::Result<PipeOps> {
         let handle = self.config.create_instance(
             false,
-            self.nonblocking.load(SeqCst),
+            self.nonblocking.load(Acquire), // See `.set_nonblocking()`.
             false,
             Stream::ROLE,
             Stream::READ_MODE,
@@ -272,20 +279,32 @@ impl<'a> PipeListenerOptions<'a> {
         read_mode: Option<PipeMode>,
     ) -> io::Result<(PipeListenerOptions<'static>, Instancer<PipeOps>)> {
         let owned_config = self.to_owned();
+
+        // Conversion from `Option<NonZeroU8>` to `usize`, with the `None` case corresponding to
+        // the reasonable default of 8.
         let instancer_capacity = self
             .instance_limit
             .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
             .to::<usize>();
+
+        let first_instance = {
+            let handle = self.create_instance(true, self.nonblocking, false, role, read_mode)?;
+            let ops = unsafe {
+                // SAFETY: we just created this handle, so we know it's unique (and we've checked
+                // that it's valid)
+                PipeOps::from_raw_handle(handle)
+            };
+            Instance::create_non_taken(ops)
+        };
+
+        // Preallocate space for the instances. Actual instance creation will happen lazily.
         let mut instance_vec = Vec::with_capacity(instancer_capacity);
-        let first_instance_raw =
-            self.create_instance(true, self.nonblocking, false, role, read_mode)?;
-        let first_instance = Arc::new((
-            // SAFETY: we just created this handle
-            unsafe { PipeOps::from_raw_handle(first_instance_raw) },
-            AtomicBool::new(false),
-        ));
+        // Except for the first instance, which we'll add right now.
         instance_vec.push(first_instance);
+
+        // Assemble the instancer.
         let instancer = Instancer(RwLock::new(instance_vec));
+        // Create the components that will be pieced together into the final generic object.
         Ok((owned_config, instancer))
     }
 
