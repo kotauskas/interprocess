@@ -9,11 +9,7 @@ use std::{
     fmt::{self, Debug, Formatter},
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
-    ptr,
-    sync::atomic::{AtomicU8, Ordering::Relaxed},
 };
-use to_method::To;
-use winapi::um::{namedpipeapi::GetNamedPipeInfo, winbase::PIPE_SERVER_END};
 
 type PipeListener = GenericPipeListener<PipeStream>;
 
@@ -31,10 +27,7 @@ impl LocalSocketListener {
     }
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         let inner = self.inner.accept()?;
-        Ok(LocalSocketStream {
-            inner,
-            server_or_client: AtomicU8::new(ServerOrClient::Server as _),
-        })
+        Ok(LocalSocketStream { inner })
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
@@ -48,59 +41,17 @@ impl Debug for LocalSocketListener {
 
 pub struct LocalSocketStream {
     inner: PipeStream,
-    server_or_client: AtomicU8,
-}
-#[repr(u8)]
-enum ServerOrClient {
-    Client = 0,
-    Server = 1,
-    Nah = 2,
-}
-impl From<u8> for ServerOrClient {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::Client,
-            1 => Self::Server,
-            _ => Self::Nah,
-        }
-    }
 }
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let inner = PipeStream::connect(name.inner())?;
-        Ok(Self {
-            inner,
-            server_or_client: AtomicU8::new(ServerOrClient::Client as _),
-        })
+        Ok(Self { inner })
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.server_or_client.load(Relaxed).to::<ServerOrClient>() {
-            ServerOrClient::Server => self.inner.client_process_id(),
-            ServerOrClient::Client => self.inner.server_process_id(),
-            ServerOrClient::Nah => {
-                let mut flags: u32 = 0;
-                let success = unsafe {
-                    GetNamedPipeInfo(
-                        self.as_raw_handle(),
-                        &mut flags as *mut _,
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                        ptr::null_mut(),
-                    )
-                } != 0;
-                if !success {
-                    return Err(io::Error::last_os_error());
-                }
-                // The PIPE_SERVER_END bit is either set or unset and that
-                // indicates whether it's a server or client, as opposed to
-                // having two different flags in different bits.
-                flags &= PIPE_SERVER_END;
-                // Round-trip into ServerOrClient to validate and fall back to the Nah variant.
-                self.server_or_client
-                    .store(ServerOrClient::from(flags as u8) as _, Relaxed);
-                self.peer_pid()
-            }
+        match self.inner.is_server() {
+            true => self.inner.client_process_id(),
+            false => self.inner.server_process_id(),
         }
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
@@ -159,10 +110,7 @@ impl FromRawHandle for LocalSocketStream {
             // SAFETY: guaranteed via safety contract
             PipeStream::from_raw_handle(handle)
         };
-        Self {
-            inner,
-            server_or_client: AtomicU8::new(ServerOrClient::Nah as _),
-        }
+        Self { inner }
     }
 }
 
