@@ -15,10 +15,8 @@ use std::{
     mem::ManuallyDrop,
     pin::Pin,
     ptr,
-    sync::Mutex,
     task::{Context, Poll},
 };
-use to_method::To;
 
 /// Defines the properties of Tokio pipe stream types.
 ///
@@ -129,7 +127,7 @@ macro_rules! create_duplex_stream_type {
                 read_mode: $corresponding_reader::READ_MODE,
                 write_mode: $corresponding_writer::WRITE_MODE,
                 extra_methods: {
-                    /// Splits the duplex stream into its reading and writing half. Contended concurrent operations may experience insignificant slowdowns due to necessary synchronization, which is an implementation detail.
+                    /// Splits the duplex stream into its reading and writing half.
                     pub fn split(self) -> ($corresponding_reader, $corresponding_writer) {
                         let self_ = ManuallyDrop::new(self);
                         let reader_half = self_.instance.split();
@@ -479,6 +477,6 @@ fn _connect(
         .read(read)
         .write(write)
         .open(name_ref)?;
-    let pipeops = PipeOps::Client(tnpclient.to::<Mutex<_>>());
+    let pipeops = PipeOps::Client(tnpclient);
     Ok(pipeops)
 }

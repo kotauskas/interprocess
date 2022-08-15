@@ -25,7 +25,11 @@ doc_cfg = []
 
 [dependencies]
 libc = { version = "0.2", features = ["extra_traits"] }
-tokio = { version = "1.15", features = ["net", "time"], optional = true }
+tokio = { version = "1.15", features = [
+    "net",
+    "time",
+    "io-util",
+], optional = true }
 thiserror = { version = "1.0", optional = true }
 spinning = { version = "0.1", optional = true }
 intmap = { version = "0.7", optional = true }
