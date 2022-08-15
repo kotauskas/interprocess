@@ -10,7 +10,10 @@
 //!
 //! If you carefully read through this list, you'd notice how Windows named pipes are similar to Unix domain sockets. For this reason, the implementation of "local sockets" in the `local_socket` module of this crate uses named pipes on Windows and Ud-sockets on Unix.
 
-// TODO improve docs, add examples
+// TODO improve docs
+// TODO add examples
+// TODO get rid of the dumbass autoflush, literally no reason for me to have added it now that i
+// actually write proper examples for this
 
 mod enums;
 mod instancer;
