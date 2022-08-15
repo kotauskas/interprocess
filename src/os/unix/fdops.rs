@@ -96,7 +96,7 @@ unsafe impl Send for FdOps {}
 unsafe impl Sync for FdOps {}
 
 pub(super) unsafe fn close_fd(fd: i32) {
-    let e = unsafe {
+    let error = unsafe {
         let mut error = None;
         // If the close() call fails, the loop starts and keeps retrying until either the error
         // value isn't Interrupted (in which case the assertion fails) or the close operation
@@ -112,7 +112,9 @@ pub(super) unsafe fn close_fd(fd: i32) {
         }
         error
     };
-    debug_assert!(success, "failed to close file descriptor: {}", e);
+    if let Some(e) = error {
+        panic!("failed to close file descriptor: {}", e);
+    }
 }
 /// Captures [`io::Error::last_os_error()`] and closes the file descriptor.
 pub(super) unsafe fn handle_fd_error(fd: i32) -> io::Error {
