@@ -171,7 +171,7 @@ create_stream_type! {
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Byte stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
+[Byte stream reader]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
 "
     ByteWriterPipeStream:
         desired_access: GENERIC_WRITE,
@@ -184,7 +184,7 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Byte stream writer]: https://doc.rust-lang.org/std/io/trait.Write.html
+[Byte stream writer]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
 "
     MsgReaderPipeStream:
         desired_access: GENERIC_READ,
@@ -197,7 +197,7 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Message stream reader]: https://doc.rust-lang.org/std/io/trait.Read.html
+[Message stream reader]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
 "
     MsgWriterPipeStream:
         desired_access: GENERIC_WRITE,
@@ -210,7 +210,7 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[Message stream writer]: https://doc.rust-lang.org/std/io/trait.Write.html
+[Message stream writer]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
 "
 }
 create_duplex_stream_type! {
@@ -222,8 +222,7 @@ Byte stream [reader] and [writer] for a Tokio-based named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[reader]: https://doc.rust-lang.org/std/io/trait.Read.html
-[writer]: https://doc.rust-lang.org/std/io/trait.Write.html
+[reader]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
 "
     DuplexMsgPipeStream:
         corresponding_reader: MsgReaderPipeStream,
@@ -233,8 +232,8 @@ Message stream [reader] and [writer] for a Tokio-based named pipe.
 
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
-[reader]: https://doc.rust-lang.org/std/io/trait.Read.html
-[writer]: https://doc.rust-lang.org/std/io/trait.Write.html
+[reader]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
+[writer]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
 "
 }
 
