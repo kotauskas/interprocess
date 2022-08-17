@@ -5,7 +5,7 @@ use tokio::{
     try_join,
 };
 
-pub async fn main() -> io::Result<()> {
+pub async fn main() -> anyhow::Result<()> {
     // Describe the things we do when we've got a connection ready.
     async fn handle_conn(mut conn: UdStream) -> io::Result<()> {
         // Split the connection into two halves to process

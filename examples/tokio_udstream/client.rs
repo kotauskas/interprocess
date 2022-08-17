@@ -1,11 +1,10 @@
 use interprocess::os::unix::udsocket::tokio::*;
-use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     try_join,
 };
 
-pub async fn main() -> io::Result<()> {
+pub async fn main() -> anyhow::Result<()> {
     // Await this here since we can't do a whole lot without a connection.
     let mut conn = UdStream::connect("/tmp/example.sock").await?;
 

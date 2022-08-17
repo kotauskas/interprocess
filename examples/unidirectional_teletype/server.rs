@@ -1,7 +1,7 @@
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-use std::{error::Error, io};
+use std::io;
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> anyhow::Result<()> {
     fn handle_error(connection: io::Result<LocalSocketStream>) -> LocalSocketStream {
         match connection {
             Ok(val) => val,

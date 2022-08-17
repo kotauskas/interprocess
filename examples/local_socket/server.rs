@@ -1,10 +1,10 @@
+use anyhow::Context;
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport};
 use std::{
-    error::Error,
     io::{self, prelude::*, BufReader},
 };
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> anyhow::Result<()> {
     // Define a function that checks for errors in incoming connections. We'll use this to filter
     // through connections that fail on initialization for one reason or another.
     fn handle_error(conn: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
@@ -67,7 +67,8 @@ another process and try again.",
         // response. Otherwise, because reading and writing on a connection cannot be simultaneous
         // without threads or async, we can deadlock the two processes by having both sides wait for
         // the write buffer to be emptied by the other.
-        conn.read_line(&mut buffer)?;
+        conn.read_line(&mut buffer)
+            .context("Socket receive failed")?;
 
         // Now that the read has come through and the client is waiting on the server's write, do
         // it. (`.get_mut()` is to get the writer, `BufReader` doesn't implement a pass-through

@@ -7,30 +7,26 @@ macro_rules! main {
     }};
 
     () => {
-        use std::error::Error;
-
         mod client;
         mod server;
 
-        fn main() -> Result<(), Box<dyn Error>> {
+        fn main() -> anyhow::Result<()> {
             main!(@bmain)
         }
     };
 
     ($($pred:tt)*) => {
-        use std::error::Error;
-
         #[cfg(all($($pred)*))]
         mod client;
         #[cfg(all($($pred)*))]
         mod server;
 
         #[cfg(all($($pred)*))]
-        fn main() -> Result<(), Box<dyn Error>> {
+        fn main() -> anyhow::Result<()> {
             main!(@bmain);
         }
         #[cfg(not(all($($pred)*)))]
-        fn main() -> Result<(), Box<dyn Error>> {
+        fn main() -> anyhow::Result<()> {
             eprintln!("not supported on this platform");
             Ok(())
         }
@@ -43,27 +39,23 @@ macro_rules! tokio_main {
         Ok(())
     }};
     () => {
-        use std::error::Error;
-
         mod client;
         mod server;
 
         #[tokio::main(flavor = "current_thread")]
-        async fn main() -> Result<(), Box<dyn Error>> {
+        async fn main() -> anyhow::Result<()> {
             tokio_main!(@bmain)
         }
     };
     (nomod $($pred:tt)*) => {
-        use std::error::Error;
-
         #[cfg(all($($pred)*))]
         #[tokio::main(flavor = "current_thread")]
-        async fn main() -> Result<(), Box<dyn Error>> {
+        async fn main() -> anyhow::Result<()> {
             tokio_main!(@bmain)
         }
         #[cfg(not(all($($pred)*)))]
         #[tokio::main(flavor = "current_thread")]
-        async fn main() -> Result<(), Box<dyn Error>> {
+        async fn main() -> anyhow::Result<()> {
             eprintln!("not supported on this platform or feature set");
             Ok(())
         }
