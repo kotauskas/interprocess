@@ -32,8 +32,7 @@ pub async fn main() -> anyhow::Result<()> {
     // Concurrently perform both operations: write-and-send-EOF and read.
     try_join!(write, read)?;
 
-    // Get rid of those here to close the read half too.
-    drop((reader, writer));
+    // Close the connection a bit earlier than you'd think we would. Nice practice!
     drop(conn);
 
     // Display the results when we're done!

@@ -31,7 +31,6 @@ pub async fn main() -> anyhow::Result<()> {
         try_join!(read, write)?;
 
         // Dispose of our connection right now and not a moment later because I want to!
-        drop((reader, writer));
         drop(conn);
 
         // Produce our output!
