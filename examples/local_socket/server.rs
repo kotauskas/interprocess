@@ -2,9 +2,10 @@ use anyhow::Context;
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport};
 use std::{
     io::{self, prelude::*, BufReader},
+    sync::mpsc::Sender,
 };
 
-pub fn main() -> anyhow::Result<()> {
+pub fn main(notify: Sender<()>) -> anyhow::Result<()> {
     // Define a function that checks for errors in incoming connections. We'll use this to filter
     // through connections that fail on initialization for one reason or another.
     fn handle_error(conn: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
@@ -51,6 +52,10 @@ another process and try again.",
         }
         x => x?,
     };
+
+    println!("Server running at {}", name);
+    // Stand-in for the syncronization used, if any, between the client and the server.
+    let _ = notify.send(());
 
     // Preemptively allocate a sizeable buffer for reading at a later moment. This size should be
     // enough and should be easy to find for the allocator. Since we only have one concurrent

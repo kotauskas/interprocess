@@ -1,9 +1,10 @@
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
     io::{self, prelude::*, BufReader},
+    sync::mpsc::Sender,
 };
 
-pub fn main() -> anyhow::Result<()> {
+pub fn main(notify: Sender<()>) -> anyhow::Result<()> {
     fn handle_error(connection: io::Result<LocalSocketStream>) -> LocalSocketStream {
         match connection {
             Ok(val) => val,
@@ -15,6 +16,8 @@ pub fn main() -> anyhow::Result<()> {
     }
 
     let listener = LocalSocketListener::bind("/tmp/teletype.sock")?;
+    // Stand-in for the syncronization used, if any, between the client and the server.
+    let _ = notify.send(());
     eprintln!("Teletype server listening for connections.");
     let mut conn = listener
         .incoming()

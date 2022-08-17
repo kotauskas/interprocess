@@ -44,7 +44,7 @@ cfg-if = "1.0"
 rustc_version = "0.4"
 
 [dev-dependencies]
-tokio = { version = "1.15", features = ["rt", "io-util", "macros"] }
+tokio = { version = "1.15", features = ["rt", "io-util", "sync", "macros"] }
 futures = "0.3"
 anyhow = "1.0.61"
 

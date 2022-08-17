@@ -3,9 +3,10 @@ use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     try_join,
+    sync::oneshot::Sender,
 };
 
-pub async fn main() -> anyhow::Result<()> {
+pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
     // Describe the things we do when we've got a connection ready.
     async fn handle_conn(mut conn: UdStream) -> io::Result<()> {
         // Split the connection into two halves to process
@@ -38,10 +39,15 @@ pub async fn main() -> anyhow::Result<()> {
         Ok(())
     }
 
+    static SOCKET_PATH: &str = "/tmp/example.sock";
+
     // Create our listener. In a more robust program, we'd check for an
     // existing socket file that has not been deleted for whatever reason,
     // ensure it's a socket file and not a normal file, and delete it.
-    let listener = UdStreamListener::bind("/tmp/example.sock")?;
+    let listener = UdStreamListener::bind(SOCKET_PATH)?;
+    // Stand-in for the syncronization used, if any, between the client and the server.
+    let _ = notify.send(());
+    println!("Server running at {}", SOCKET_PATH);
 
     // Set up our loop boilerplate that processes our incoming connections.
     loop {

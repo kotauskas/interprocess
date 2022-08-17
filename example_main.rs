@@ -1,8 +1,16 @@
 #[allow(unused_macros)]
 macro_rules! main {
     (@bmain) => {{
-        std::thread::spawn(|| server::main().unwrap());
-        client::main()?;
+        use std::sync::mpsc;
+        let (snd, rcv) = mpsc::channel();
+        let srv = std::thread::spawn(move || server::main(snd));
+        let _ = rcv.recv();
+        if let Err(e) = client::main() {
+            eprintln!("Client exited early with error: {:#}", e);
+        }
+        if let Err(e) = srv.join().expect("server thread panicked") {
+            eprintln!("Server exited early with error: {:#}", e);
+        }
         Ok(())
     }};
 
@@ -35,7 +43,22 @@ macro_rules! main {
 #[allow(unused_macros)]
 macro_rules! tokio_main {
     (@bmain) => {{
-        tokio::try_join!(main_a(), main_b())?;
+        use tokio::sync::oneshot;
+
+        let (snd, rcv) = oneshot::channel();
+        let a = async {
+            if let Err(e) = main_a(snd).await {
+                eprintln!("Server exited early with error: {:#}", e);
+            }
+        };
+        let b = async {
+            if rcv.await.is_ok() {
+                if let Err(e) = main_b().await {
+                    eprintln!("Client exited early with error: {:#}", e);
+                }
+            }
+        };
+        tokio::join!(a, b);
         Ok(())
     }};
     () => {

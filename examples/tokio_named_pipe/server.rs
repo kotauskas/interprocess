@@ -4,8 +4,9 @@ use futures::{
 };
 use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
 use std::{error::Error, ffi::OsStr, io};
+use tokio::sync::oneshot::Sender;
 
-pub async fn main() -> Result<(), Box<dyn Error>> {
+pub async fn main(notify: Sender<()>) -> Result<(), Box<dyn Error>> {
     // Describe the things we do when we've got a connection ready.
     async fn handle_conn(conn: DuplexBytePipeStream) -> io::Result<()> {
         // Split the connection into two halves to process
@@ -38,12 +39,18 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         Ok(())
     }
 
+    static PIPE_NAME: &str = "Example";
+
     // Create our listener. In a more robust program, we'd check for an
     // existing socket file that has not been deleted for whatever reason,
     // ensure it's a socket file and not a normal file, and delete it.
     let listener = PipeListenerOptions::new()
-        .name(OsStr::new("Example"))
+        .name(OsStr::new(PIPE_NAME))
         .create_tokio::<DuplexBytePipeStream>()?;
+
+    // Stand-in for the syncronization used, if any, between the client and the server.
+    let _ = notify.send(());
+    println!(r"Server running at \\.\pipe\{}", PIPE_NAME);
 
     // Set up our loop boilerplate that processes our incoming connections.
     loop {

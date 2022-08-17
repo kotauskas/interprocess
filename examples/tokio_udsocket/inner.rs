@@ -1,11 +1,14 @@
 use interprocess::os::unix::udsocket::tokio::*;
 use std::io;
-use tokio::{io::ReadBuf, try_join};
+use tokio::{io::ReadBuf, try_join, sync::oneshot::Sender};
 
-pub async fn main(src: &str, dst: &str) -> io::Result<()> {
+pub async fn main(src: &str, dst: &str, notify: Option<Sender<()>>) -> io::Result<()> {
     let socket_path = format!("/tmp/{}", src);
     // Socket creation happens immediately, no futures here.
     let socket = UdSocket::bind(socket_path)?;
+    if let Some(n) = notify {
+        let _ = n.send(());
+    }
     // So does destination assignment.
     socket.set_destination(dst)?;
 
