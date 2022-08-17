@@ -9,6 +9,7 @@ use std::{
     ffi::{CStr, CString, NulError, OsStr, OsString},
     io,
     mem::{replace, size_of_val, zeroed},
+    ops::Deref,
     path::{Path, PathBuf},
     ptr,
 };
@@ -44,9 +45,9 @@ impl<'a> UdSocketPath<'a> {
     /// Returns the path as a [`CStr`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
     pub fn as_cstr(&'a self) -> &'a CStr {
         match self {
-            Self::File(cow) => &*cow,
+            Self::File(cow) => cow.deref(),
             #[cfg(uds_linux_namespace)]
-            Self::Namespaced(cow) => &*cow,
+            Self::Namespaced(cow) => cow.deref(),
             Self::Unnamed => empty_cstr(),
         }
     }

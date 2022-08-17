@@ -162,7 +162,7 @@ const AT_SIGN: u8 = b'@';
 
 pub fn to_local_socket_name_osstr(mut val: &OsStr) -> LocalSocketName<'_> {
     let mut namespaced = false;
-    if let Some(AT_SIGN) = val.as_bytes().get(0).copied() {
+    if let Some(AT_SIGN) = val.as_bytes().first().copied() {
         if val.len() >= 2 {
             val = OsStr::from_bytes(&val.as_bytes()[1..]);
         } else {
@@ -174,7 +174,7 @@ pub fn to_local_socket_name_osstr(mut val: &OsStr) -> LocalSocketName<'_> {
 }
 pub fn to_local_socket_name_osstring(mut val: OsString) -> LocalSocketName<'static> {
     let mut namespaced = false;
-    if let Some(AT_SIGN) = val.as_bytes().get(0).copied() {
+    if let Some(AT_SIGN) = val.as_bytes().first().copied() {
         let new_val = {
             let mut vec = val.into_vec();
             vec.remove(0);
