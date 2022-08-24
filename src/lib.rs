@@ -74,18 +74,11 @@ compile_error!("Your target operating system is not supported by interprocess â€
 #[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
 compile_error!("Platforms with exotic pointer widths (neither 32-bit nor 64-bit) are not supported by interprocess â€” if you think that your specific case needs to be accounted for, please open an issue on the GitHub repository");
 
-pub(crate) use private::Sealed;
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     io,
 };
-
-pub(crate) mod private {
-    // If the trait itself was pub(crate), it wouldn't work as a supertrait on public traits. We use a
-    // private module instead to make it impossible to name the trait from outside the crate.
-    pub trait Sealed {}
-}
 
 #[macro_use]
 mod macros;
@@ -102,6 +95,9 @@ pub mod unnamed_pipe;
 //pub mod shared_memory;
 
 pub mod os;
+
+mod sealed;
+pub(crate) use sealed::Sealed;
 
 /// Reading from named pipes with message boundaries reliably, without truncation.
 ///
