@@ -13,8 +13,9 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
         // received and sent data concurrently.
         let (mut reader, mut writer) = conn.split();
 
-        // Allocate a large buffer for what we're receiving.
-        let mut buffer = String::with_capacity(2048);
+        // Allocate a sizeable buffer for reading.
+        // This size should be enough and should be easy to find for the allocator.
+        let mut buffer = String::with_capacity(128);
 
         // Describe the write operation as first writing our whole message, and
         // then shutting down the write half to send an EOF to help the other

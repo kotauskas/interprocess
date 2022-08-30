@@ -13,9 +13,9 @@ pub async fn main() -> anyhow::Result<()> {
     // the .split() method from the futures crate's AsyncReadExt.
     let (mut reader, mut writer) = conn.split();
 
-    // Let's not do too many allocations now. Half a page should be enough to
-    // accomodate for allocator overhead.
-    let mut buffer = String::with_capacity(2048);
+    // Allocate a sizeable buffer for reading.
+    // This size should be enough and should be easy to find for the allocator.
+    let mut buffer = String::with_capacity(128);
 
     // Describe the write operation as writing our whole string, waiting for
     // that to complete, and then shutting down the write half, which sends

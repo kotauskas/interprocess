@@ -1,6 +1,6 @@
 use interprocess::os::unix::udsocket::tokio::*;
-use std::io;
-use tokio::{io::ReadBuf, try_join, sync::oneshot::Sender};
+use std::{io, mem::MaybeUninit};
+use tokio::{io::ReadBuf, sync::oneshot::Sender, try_join};
 
 pub async fn main(src: &str, dst: &str, notify: Option<Sender<()>>) -> io::Result<()> {
     let socket_path = format!("/tmp/{}", src);
@@ -12,14 +12,9 @@ pub async fn main(src: &str, dst: &str, notify: Option<Sender<()>>) -> io::Resul
     // So does destination assignment.
     socket.set_destination(dst)?;
 
-    // Let's not do too many allocations now. Half a page should be enough to
-    // accomodate for allocator overhead.
-    // TODO: with Rust 1.60, we can replace this with an uninitialized Vec,
-    // created using Vec::with_capacity(2048), and pass it on to the ReadBuf
-    // with ReadBuf::uninit(). Since the MSRV for interprocess 1.x doesn't
-    // include this feature, we don't use it here.
-    let mut buffer = vec![0; 2048];
-    let mut readbuf = ReadBuf::new(&mut buffer);
+    // Allocate a stack buffer for reading at a later moment.
+    let mut buffer = [MaybeUninit::<u8>::uninit(); 128];
+    let mut readbuf = ReadBuf::uninit(&mut buffer);
 
     let message = format!("Hello from {}!", src);
 

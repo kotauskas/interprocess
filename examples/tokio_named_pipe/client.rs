@@ -14,9 +14,9 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     // AsyncReadExt.
     let (mut reader, mut writer) = conn.split();
 
-    // Let's not do too many allocations now. Half a page should be enough to
-    // accomodate for allocator overhead.
-    let mut buffer = String::with_capacity(2048);
+    // Preemptively allocate a sizeable buffer for reading.
+    // This size should be enough and should be easy to find for the allocator.
+    let mut buffer = String::with_capacity(128);
 
     // Describe the write operation as writing our whole string, waiting for
     // that to complete, and then shutting down the write half, which sends

@@ -16,8 +16,8 @@ pub fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Preemptively allocate a sizeable buffer for reading at a later moment. This size should be
-    // enough and should be easy to find for the allocator.
+    // Preemptively allocate a sizeable buffer for reading.
+    // This size should be enough and should be easy to find for the allocator.
     let mut buffer = String::with_capacity(128);
 
     // Create our connection. This will block until the server accepts our connection, but will fail
