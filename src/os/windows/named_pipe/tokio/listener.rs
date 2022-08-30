@@ -91,7 +91,7 @@ fn _create_tokio(
     let mut config = config.to_owned();
 
     // Tokio should ideally already set that, but let's do it just in case.
-    config.nonblocking = true;
+    config.nonblocking = false;
 
     // Conversion from `Option<NonZeroU8>` to `usize`, with the `None` case corresponding to
     // the reasonable default of 8.
