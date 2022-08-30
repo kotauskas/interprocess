@@ -126,6 +126,7 @@ macro_rules! create_stream_type {
                         None,
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
+                        WaitTimeout::DEFAULT,
                     )?;
                     Ok(Self { instance: Instance::create_non_taken(pipeops) })
                 }
@@ -139,6 +140,7 @@ macro_rules! create_stream_type {
                         Some(hostname),
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
+                        WaitTimeout::DEFAULT,
                     )?;
                     Ok(Self { instance: Instance::create_non_taken(pipeops) })
                 }
@@ -418,6 +420,7 @@ pub fn connect<Stream: PipeStream>(
         hostname.as_ref().map(AsRef::as_ref),
         Stream::READ_MODE.is_some(),
         Stream::WRITE_MODE.is_some(),
+        WaitTimeout::DEFAULT,
     )?;
     let instance = Instance::create_non_taken(pipeops);
     Ok(Stream::build(instance))
@@ -428,11 +431,24 @@ fn _connect(
     hostname: Option<&OsStr>,
     read: bool,
     write: bool,
+    timeout: WaitTimeout,
 ) -> io::Result<PipeOps> {
-    let mut path = super::convert_path(pipe_name, hostname);
+    let path = super::convert_path(pipe_name, hostname);
+    loop {
+        match connect_without_waiting(&path, read, write) {
+            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
+                wait_for_server(&path, timeout)?;
+                continue;
+            }
+            els => return els,
+        }
+    }
+}
+
+fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<PipeOps> {
     let (success, handle) = unsafe {
         let handle = CreateFileW(
-            path.as_mut_ptr() as *mut _,
+            path.as_ptr() as *mut _,
             {
                 let mut access_flags: DWORD = 0;
                 if read {
@@ -456,6 +472,32 @@ fn _connect(
             // SAFETY: we just created this handle
             Ok(PipeOps::from_raw_handle(handle))
         }
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+#[repr(transparent)] // #[repr(DWORD)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+struct WaitTimeout(u32);
+impl WaitTimeout {
+    const DEFAULT: Self = Self(0x00000000);
+    //const FOREVER: Self = Self(0xffffffff);
+}
+impl From<WaitTimeout> for u32 {
+    fn from(x: WaitTimeout) -> Self {
+        x.0
+    }
+}
+impl Default for WaitTimeout {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+fn wait_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
+    let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
+    if success {
+        Ok(())
     } else {
         Err(io::Error::last_os_error())
     }
