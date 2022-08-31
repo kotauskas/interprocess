@@ -13,7 +13,7 @@ mod socket;
 mod stream;
 pub use {listener::*, socket::*, stream::*};
 
-#[cfg(uds_peercred)]
+#[cfg(uds_supported)]
 use super::c_wrappers;
 
 #[cfg(all(unix, feature = "tokio_support", test))]
