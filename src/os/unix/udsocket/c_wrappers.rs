@@ -1,12 +1,6 @@
 use {
     super::imports::*,
-    std::{
-        ffi::c_void,
-        io,
-        mem::{size_of, size_of_val, zeroed},
-        net::Shutdown,
-        ptr,
-    },
+    std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr},
 };
 
 pub(super) fn create_uds(ty: c_int) -> io::Result<FdOps> {
@@ -77,6 +71,8 @@ pub(super) fn listen(fd: &FdOps, backlog: c_int) -> io::Result<()> {
 pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
     #[cfg(uds_scm_credentials)]
     {
+        use std::mem::size_of_val;
+
         let passcred = passcred as c_int;
         let success = unsafe {
             libc::setsockopt(
@@ -95,12 +91,14 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
     }
     #[cfg(not(uds_scm_credentials))]
     {
-        let _ = fd;
+        let _ = (fd, passcred);
         Ok(())
     }
 }
 #[cfg(uds_peercred)]
 pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<ucred> {
+    use std::mem::zeroed;
+
     let mut cred: ucred = unsafe {
         // SAFETY: it's safe for the ucred structure to be zero-initialized, since
         // it only contains integers
