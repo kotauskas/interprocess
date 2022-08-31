@@ -15,6 +15,3 @@ pub use {listener::*, socket::*, stream::*};
 
 #[cfg(uds_supported)]
 use super::c_wrappers;
-
-#[cfg(all(unix, feature = "tokio_support", test))]
-mod tests;
