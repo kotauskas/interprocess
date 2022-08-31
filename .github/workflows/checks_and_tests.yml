@@ -5,45 +5,46 @@ on: [push, pull_request]
 jobs:
   check_and_test:
     strategy:
-        matrix:
-          os: [ubuntu-latest, windows-latest, macos-latest]
-          toolchain: ["1.46.0", nightly]
-    
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        toolchain: ["1.46.0", nightly]
+
     name: ${{ matrix.toolchain }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v2
-      
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: ${{ matrix.toolchain }}
-            profile: minimal
-            override: true
-            components: clippy
-      
+          toolchain: ${{ matrix.toolchain }}
+          profile: minimal
+          override: true
+          components: clippy
+
       - name: Run Clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           # Clippy on 1.46 doesn't have some lints from the latest nightly that we use, so we
           # disable warning about that altogether.
-          args: "-- -A clippy::unknown_clippy_lints"
+          args: "--features tokio_support -- -A clippy::unknown_clippy_lints"
         env:
           RUSTFLAGS: -D warnings
-      
+
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: "--features tokio_support"
         env:
           RUSTFLAGS: -D warnings
-      
+
       - name: Run rustdoc
         uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: "--no-deps" # We don't have time to waste.
+          args: "--features tokio_support --no-deps" # We don't have time to waste.
         env:
           RUSTFLAGS: -D warnings
