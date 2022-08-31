@@ -2,7 +2,7 @@ use super::imports::*;
 use std::{
     io::{self, IoSlice, IoSliceMut},
     marker::PhantomData,
-    mem::{transmute, ManuallyDrop},
+    mem::ManuallyDrop,
 };
 use to_method::To;
 
@@ -81,7 +81,7 @@ impl AsRef<FdOps> for c_int {
     fn as_ref(&self) -> &FdOps {
         unsafe {
             // SAFETY: #[repr(transparent)] guarantees layout compatibility
-            transmute(self)
+            &*(self as *const _ as *const FdOps)
         }
     }
 }
