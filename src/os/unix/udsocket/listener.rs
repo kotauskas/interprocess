@@ -1,15 +1,11 @@
-#[cfg(unix)]
-use super::super::{close_by_error, handle_fd_error};
-use super::{
-    imports::*,
-    util::{enable_passcred, raw_get_nonblocking, raw_set_nonblocking},
-    PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream,
-};
+#[cfg(uds_supported)]
+use super::c_wrappers;
+use super::{imports::*, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
     iter::FusedIterator,
-    mem::{size_of, zeroed},
+    mem::zeroed,
 };
 use to_method::To;
 
@@ -149,13 +145,6 @@ pub struct UdStreamListener {
     fd: FdOps,
 }
 impl UdStreamListener {
-    unsafe fn from_raw_fd_with_dg(fd: c_int, dg: PathDropGuard<'static>) -> Self {
-        Self {
-            fd: FdOps::new(fd),
-            _drop_guard: dg,
-        }
-    }
-
     /// Creates a new listener socket at the specified address.
     ///
     /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
@@ -182,49 +171,19 @@ impl UdStreamListener {
         Self::_bind(path.to_socket_path()?, true)
     }
     fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
-        macro_rules! ehndl {
-            ($success:ident, $socket:ident) => {
-                if !$success {
-                    unsafe { return Err(handle_fd_error($socket)) };
-                }
-            };
-        }
-
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let socket = {
-            let (success, fd) = unsafe {
-                let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
-                (result != -1, result)
-            };
-            if success {
-                fd
-            } else {
-                return Err(io::Error::last_os_error());
-            }
-        };
-
-        let success = unsafe {
-            libc::bind(
-                socket,
-                // Double cast because you cannot cast a reference to a pointer of arbitrary type
-                // but you can cast any narrow pointer to any other narrow pointer
-                &addr as *const _ as *const sockaddr,
-                size_of::<sockaddr_un>() as u32,
-            )
-        } != -1;
-        ehndl!(success, socket);
-
-        let success = unsafe {
-            // FIXME the standard library uses 128 here without an option to change this
-            // number, why? If std has solid reasons to do this, remove this notice and
-            // document the method's behavior on this matter explicitly; otherwise, add
-            // an option to change this value.
-            libc::listen(socket, 128)
-        } != -1;
-        ehndl!(success, socket);
-
-        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        let fd = c_wrappers::create_uds(SOCK_STREAM)?;
+        unsafe {
+            // SAFETY: addr is well-constructed
+            c_wrappers::bind(&fd, &addr)?;
+        }
+        // FIXME the standard library uses 128 here without an option to change this
+        // number, why? If std has solid reasons to do this, remove this notice and
+        // document the method's behavior on this matter explicitly; otherwise, add
+        // an option to change this value.
+        c_wrappers::listen(&fd, 128)?;
+        c_wrappers::set_passcred(&fd, true)?;
 
         let dg = if keep_drop_guard {
             PathDropGuard {
@@ -235,10 +194,9 @@ impl UdStreamListener {
             PathDropGuard::dummy()
         };
 
-        Ok(unsafe {
-            // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-            // not to be used elsewhere
-            Self::from_raw_fd_with_dg(socket, dg)
+        Ok(Self {
+            fd,
+            _drop_guard: dg,
         })
     }
 
@@ -319,11 +277,11 @@ impl UdStreamListener {
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        unsafe { raw_set_nonblocking(self.fd.0, nonblocking) }
+        c_wrappers::set_nonblocking(&self.fd, nonblocking)
     }
     /// Checks whether the socket is currently in nonblocking mode or not.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }
+        c_wrappers::get_nonblocking(&self.fd)
     }
 }
 impl Debug for UdStreamListener {
@@ -349,7 +307,11 @@ impl IntoRawFd for UdStreamListener {
 impl FromRawFd for UdStreamListener {
     #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        unsafe { Self::from_raw_fd_with_dg(fd, PathDropGuard::dummy()) }
+        let fd = unsafe { FdOps::from_raw_fd(fd) };
+        Self {
+            fd,
+            _drop_guard: PathDropGuard::dummy(),
+        }
     }
 }
 

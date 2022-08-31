@@ -1,17 +1,10 @@
 use super::imports::*;
 use cfg_if::cfg_if;
-#[cfg(uds_peercred)]
-use std::mem::size_of;
-#[cfg(uds_scm_credentials)]
-use std::mem::size_of_val;
-#[cfg(uds_supported)]
-use std::net::Shutdown;
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString},
     hint::unreachable_unchecked,
     io::{self, IoSlice, IoSliceMut},
     mem::zeroed,
-    ptr::null,
 };
 use to_method::To;
 
@@ -67,113 +60,6 @@ pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
             ),
         )
     })
-}
-
-#[allow(unused_variables)]
-pub unsafe fn enable_passcred(socket: i32) -> io::Result<()> {
-    #[cfg(uds_scm_credentials)]
-    {
-        let passcred: c_int = 1;
-        let success = unsafe {
-            libc::setsockopt(
-                socket,
-                SOL_SOCKET,
-                SO_PASSCRED,
-                &passcred as *const _ as *const _,
-                size_of_val(&passcred).try_to::<u32>().unwrap(),
-            )
-        } != -1;
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
-    }
-    #[cfg(not(uds_scm_credentials))]
-    {
-        Ok(())
-    }
-}
-#[cfg(uds_peercred)]
-pub unsafe fn get_peer_ucred(socket: i32) -> io::Result<ucred> {
-    let mut cred: ucred = unsafe {
-        // SAFETY: it's safe for the ucred structure to be zero-initialized, since
-        // it only contains integers
-        zeroed()
-    };
-    let mut cred_len = size_of::<ucred>() as socklen_t;
-    let success = unsafe {
-        libc::getsockopt(
-            socket,
-            SOL_SOCKET,
-            SO_PEERCRED,
-            &mut cred as *mut _ as *mut _,
-            &mut cred_len as *mut _,
-        )
-    } != -1;
-    if success {
-        Ok(cred)
-    } else {
-        // This used to delegate error handling to the outer function, but I changed it to do it
-        // here because the function had thread-local state associated with it which persisted
-        // past the moment it returned — it's part of the function's signature, in some way,
-        // that errno contains the error result after the function is called, meaning that
-        // leaving usable data in global variables is part of its API, and that's a bad pratice.
-        Err(io::Error::last_os_error())
-    }
-}
-pub unsafe fn raw_set_nonblocking(socket: i32, nonblocking: bool) -> io::Result<()> {
-    let (old_flags, success) = unsafe {
-        // SAFETY: nothing too unsafe about this function. One thing to note is that we're passing
-        // it a null pointer, which is, for some reason, required yet ignored for F_GETFL.
-        let result = libc::fcntl(socket, F_GETFL, null::<c_void>());
-        (result, result != -1)
-    };
-    if !success {
-        return Err(io::Error::last_os_error());
-    }
-    let new_flags = if nonblocking {
-        old_flags | O_NONBLOCK
-    } else {
-        // Inverting the O_NONBLOCK value sets all the bits in the flag set to 1 except for the
-        // nonblocking flag, which clears the flag when ANDed.
-        old_flags & !O_NONBLOCK
-    };
-    let success = unsafe {
-        // SAFETY: new_flags is a c_int, as documented in the manpage.
-        libc::fcntl(socket, F_SETFL, new_flags)
-    } != -1;
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-pub unsafe fn raw_get_nonblocking(socket: i32) -> io::Result<bool> {
-    let flags = unsafe {
-        // SAFETY: exactly the same as above.
-        libc::fcntl(socket, F_GETFL, null::<c_void>())
-    };
-    if flags != -1 {
-        Ok(flags & O_NONBLOCK != 0)
-    } else {
-        // Again, querying errno was previously left to the outer function but is now done here.
-        Err(io::Error::last_os_error())
-    }
-}
-#[cfg(uds_supported)]
-pub unsafe fn raw_shutdown(socket: i32, how: Shutdown) -> io::Result<()> {
-    let how = match how {
-        Shutdown::Read => SHUT_RD,
-        Shutdown::Write => SHUT_WR,
-        Shutdown::Both => SHUT_RDWR,
-    };
-    let success = unsafe { libc::shutdown(socket, how) } != -1;
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
 }
 pub fn empty_cstring() -> CString {
     unsafe {

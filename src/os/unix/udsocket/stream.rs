@@ -1,22 +1,14 @@
-#[cfg(unix)]
-use super::super::{close_by_error, handle_fd_error};
-#[cfg(uds_peercred)]
-use super::util::get_peer_ucred;
 #[cfg(uds_supported)]
-use super::util::raw_shutdown;
+use super::c_wrappers;
 use super::{
     imports::*,
-    util::{
-        check_ancillary_unsound, enable_passcred, mk_msghdr_r, mk_msghdr_w, raw_get_nonblocking,
-        raw_set_nonblocking,
-    },
+    util::{check_ancillary_unsound, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
     iter,
-    mem::size_of,
     net::Shutdown,
 };
 use to_method::To;
@@ -56,32 +48,14 @@ impl UdStream {
     fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
         let addr = path.try_to::<sockaddr_un>()?;
 
-        let socket = {
-            let (success, fd) = unsafe {
-                let result = libc::socket(AF_UNIX, SOCK_STREAM, 0);
-                (result != -1, result)
-            };
-            if success {
-                fd
-            } else {
-                return Err(io::Error::last_os_error());
-            }
-        };
-
-        let success = unsafe {
-            libc::connect(
-                socket,
-                &addr as *const _ as *const _,
-                size_of::<sockaddr_un>() as u32,
-            )
-        } != 1;
-        if !success {
-            unsafe { return Err(handle_fd_error(socket)) };
+        let fd = c_wrappers::create_uds(SOCK_STREAM)?;
+        unsafe {
+            // SAFETY: addr is well-constructed
+            c_wrappers::connect(&fd, &addr)?;
         }
+        c_wrappers::set_passcred(&fd, true)?;
 
-        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
-
-        Ok(unsafe { Self::from_raw_fd(socket) })
+        Ok(Self { fd })
     }
 
     /// Receives bytes from the socket stream.
@@ -206,7 +180,7 @@ impl UdStream {
     ///
     /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        unsafe { raw_shutdown(self.as_raw_fd(), how) }
+        c_wrappers::shutdown(&self.fd, how)
     }
 
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
@@ -217,11 +191,11 @@ impl UdStream {
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        unsafe { raw_set_nonblocking(self.fd.0, nonblocking) }
+        c_wrappers::set_nonblocking(&self.fd, nonblocking)
     }
     /// Checks whether the stream is currently in nonblocking mode or not.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }
+        c_wrappers::get_nonblocking(&self.fd)
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -244,7 +218,7 @@ impl UdStream {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.fd.0) }
+        c_wrappers::get_peer_ucred(&self.fd)
     }
 }
 

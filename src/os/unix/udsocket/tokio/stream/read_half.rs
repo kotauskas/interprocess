@@ -1,7 +1,7 @@
+#[cfg(uds_supported)]
+use super::c_wrappers;
 use super::{OwnedWriteHalf, ReuniteError, UdStream};
 use crate::os::unix::imports::*;
-#[cfg(uds_peercred)]
-use crate::os::unix::udsocket::util::{get_peer_ucred, raw_shutdown};
 use std::{
     io,
     net::Shutdown,
@@ -34,13 +34,13 @@ impl<'a> BorrowedReadHalf<'a> {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.as_stream_raw_fd()) }
+        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
     /// Shuts down the read half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        unsafe { raw_shutdown(self.as_stream_raw_fd(), Shutdown::Read) }
+        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Read)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the read half specifically, but rather for the whole stream, so this isn't exposed as a struct method.
@@ -114,14 +114,14 @@ impl OwnedReadHalf {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.as_stream_raw_fd()) }
+        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
 
     /// Shuts down the read half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        unsafe { raw_shutdown(self.as_stream_raw_fd(), Shutdown::Read) }
+        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Read)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the read half specifically, but rather for the whole stream, so this isn't exposed as a struct method.

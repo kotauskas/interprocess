@@ -1,13 +1,8 @@
-#[cfg(unix)]
-use super::super::{close_by_error, handle_fd_error};
-#[cfg(uds_peercred)]
-use super::util::get_peer_ucred;
+#[cfg(uds_supported)]
+use super::c_wrappers;
 use super::{
     imports::*,
-    util::{
-        check_ancillary_unsound, enable_passcred, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w,
-        raw_get_nonblocking, raw_set_nonblocking,
-    },
+    util::{check_ancillary_unsound, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath,
     UdSocketPath,
 };
@@ -17,7 +12,7 @@ use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut},
     iter,
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of_val, zeroed},
 };
 use to_method::To;
 
@@ -30,15 +25,6 @@ pub struct UdSocket {
     fd: FdOps,
 }
 impl UdSocket {
-    unsafe fn from_raw_fd_with_dg(fd: c_int, dg: PathDropGuard<'static>) -> Self {
-        unsafe {
-            Self {
-                fd: FdOps::from_raw_fd(fd),
-                _drop_guard: dg,
-            }
-        }
-    }
-
     /// Creates a new socket at the specified address.
     ///
     /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
@@ -67,31 +53,12 @@ impl UdSocket {
     fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let socket = {
-            let (success, fd) = unsafe {
-                let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
-                (result != -1, result)
-            };
-            if success {
-                fd
-            } else {
-                return Err(io::Error::last_os_error());
-            }
-        };
-
-        let success = unsafe {
-            libc::bind(
-                socket,
-                // Double cast because you cannot cast a reference to a pointer of arbitrary type
-                // but you can cast any narrow pointer to any other narrow pointer
-                &addr as *const _ as *const _,
-                size_of::<sockaddr_un>() as u32,
-            )
-        } != -1;
-        if !success {
-            unsafe { return Err(handle_fd_error(socket)) };
+        let fd = c_wrappers::create_uds(SOCK_DGRAM)?;
+        unsafe {
+            // SAFETY: addr is well-constructed
+            c_wrappers::bind(&fd, &addr)?;
         }
-        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        c_wrappers::set_passcred(&fd, true)?;
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
             PathDropGuard {
@@ -102,10 +69,9 @@ impl UdSocket {
             PathDropGuard::dummy()
         };
 
-        Ok(unsafe {
-            // SAFETY: we just created the file descriptor, meaning that it's guaranteeed
-            // not to be used elsewhere
-            Self::from_raw_fd_with_dg(socket, dg)
+        Ok(Self {
+            fd,
+            _drop_guard: dg,
         })
     }
     /// Connect to a Unix domain socket server at the specified path.
@@ -134,30 +100,12 @@ impl UdSocket {
     fn _connect(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let socket = {
-            let (success, fd) = unsafe {
-                let result = libc::socket(AF_UNIX, SOCK_DGRAM, 0);
-                (result != -1, result)
-            };
-            if success {
-                fd
-            } else {
-                return Err(io::Error::last_os_error());
-            }
-        };
-
-        let success = unsafe {
-            libc::connect(
-                socket,
-                &addr as *const _ as *const _,
-                size_of::<sockaddr_un>() as u32,
-            )
-        } != -1;
-        if !success {
-            unsafe { return Err(handle_fd_error(socket)) };
+        let fd = c_wrappers::create_uds(SOCK_DGRAM)?;
+        unsafe {
+            // SAFETY: addr is well-constructed
+            c_wrappers::connect(&fd, &addr)?;
         }
-
-        unsafe { enable_passcred(socket).map_err(close_by_error(socket))? };
+        c_wrappers::set_passcred(&fd, true)?;
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
             PathDropGuard {
@@ -168,7 +116,10 @@ impl UdSocket {
             PathDropGuard::dummy()
         };
 
-        Ok(unsafe { Self::from_raw_fd_with_dg(socket, dg) })
+        Ok(Self {
+            fd,
+            _drop_guard: dg,
+        })
     }
 
     fn add_fake_trunc_flag(x: usize) -> (usize, bool) {
@@ -439,11 +390,11 @@ impl UdSocket {
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        unsafe { raw_set_nonblocking(self.fd.0, nonblocking) }
+        c_wrappers::set_nonblocking(&self.fd, nonblocking)
     }
     /// Checks whether the socket is currently in nonblocking mode or not.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        unsafe { raw_get_nonblocking(self.fd.0) }
+        c_wrappers::get_nonblocking(&self.fd)
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -466,7 +417,7 @@ impl UdSocket {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.fd.0) }
+        c_wrappers::get_peer_ucred(&self.fd)
     }
 }
 
@@ -520,6 +471,10 @@ impl IntoRawFd for UdSocket {
 impl FromRawFd for UdSocket {
     #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
-        unsafe { Self::from_raw_fd_with_dg(fd, PathDropGuard::dummy()) }
+        let fd = unsafe { FdOps::from_raw_fd(fd) };
+        Self {
+            fd,
+            _drop_guard: PathDropGuard::dummy(),
+        }
     }
 }

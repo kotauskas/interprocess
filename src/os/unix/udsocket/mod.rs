@@ -26,6 +26,9 @@ pub use {ancillary::*, listener::*, path::*, socket::*, stream::*};
 mod path_drop_guard;
 use path_drop_guard::*;
 
+#[cfg(uds_supported)]
+mod c_wrappers;
+
 #[cfg(all(uds_supported, test))]
 mod tests;
 

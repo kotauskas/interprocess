@@ -2,10 +2,11 @@ use super::imports::*;
 use std::{
     io::{self, IoSlice, IoSliceMut},
     marker::PhantomData,
-    mem::ManuallyDrop,
+    mem::{transmute, ManuallyDrop},
 };
 use to_method::To;
 
+#[repr(transparent)]
 pub(super) struct FdOps(pub(super) c_int, PhantomData<*mut ()>);
 impl FdOps {
     pub fn new(fd: c_int) -> Self {
@@ -71,6 +72,19 @@ impl FdOps {
         }
     }
 }
+impl AsRef<c_int> for FdOps {
+    fn as_ref(&self) -> &c_int {
+        &self.0
+    }
+}
+impl AsRef<FdOps> for c_int {
+    fn as_ref(&self) -> &FdOps {
+        unsafe {
+            // SAFETY: #[repr(transparent)] guarantees layout compatibility
+            transmute(self)
+        }
+    }
+}
 impl AsRawFd for FdOps {
     fn as_raw_fd(&self) -> c_int {
         self.0
@@ -114,17 +128,5 @@ pub(super) unsafe fn close_fd(fd: i32) {
     };
     if let Some(e) = error {
         panic!("failed to close file descriptor: {}", e);
-    }
-}
-/// Captures [`io::Error::last_os_error()`] and closes the file descriptor.
-pub(super) unsafe fn handle_fd_error(fd: i32) -> io::Error {
-    let e = io::Error::last_os_error();
-    unsafe { close_fd(fd) };
-    e
-}
-pub(super) unsafe fn close_by_error(socket: i32) -> impl FnOnce(io::Error) -> io::Error {
-    move |e| {
-        unsafe { close_fd(socket) };
-        e
     }
 }

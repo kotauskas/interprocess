@@ -1,3 +1,5 @@
+#[cfg(uds_supported)]
+use super::c_wrappers;
 use std::{
     convert::TryFrom,
     error::Error,
@@ -7,8 +9,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-#[cfg(uds_peercred)]
-use udsocket::util::{get_peer_ucred, raw_shutdown};
 use {
     crate::os::unix::{imports::*, udsocket},
     udsocket::{ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
@@ -64,7 +64,7 @@ impl UdStream {
     ///
     /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        unsafe { raw_shutdown(self.as_raw_fd(), how) }
+        c_wrappers::shutdown(self.as_raw_fd().as_ref(), how)
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
     #[cfg(any(doc, uds_peercred))]
@@ -86,7 +86,7 @@ impl UdStream {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.as_raw_fd()) }
+        c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
     }
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStream> {
         Pin::new(&mut self.get_mut().0)

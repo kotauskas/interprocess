@@ -1,15 +1,15 @@
-use std::{
-    convert::TryFrom,
-    future::Future,
-    io,
-    net::Shutdown,
-    pin::Pin,
-    task::{Context, Poll},
-};
 #[cfg(uds_peercred)]
-use udsocket::util::get_peer_ucred;
+use super::c_wrappers;
 use {
     crate::os::unix::{imports::*, udsocket},
+    std::{
+        convert::TryFrom,
+        future::Future,
+        io,
+        net::Shutdown,
+        pin::Pin,
+        task::{Context, Poll},
+    },
     udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath},
 };
 
@@ -146,7 +146,7 @@ impl UdSocket {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<ucred> {
-        unsafe { get_peer_ucred(self.as_raw_fd()) }
+        c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
     }
     tokio_wrapper_conversion_methods!(
         sync SyncUdSocket,
