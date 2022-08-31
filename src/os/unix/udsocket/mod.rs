@@ -29,9 +29,6 @@ use path_drop_guard::*;
 #[cfg(uds_supported)]
 mod c_wrappers;
 
-#[cfg(all(uds_supported, test))]
-mod tests;
-
 use super::imports;
 use cfg_if::cfg_if;
 
