@@ -50,7 +50,7 @@ pub(super) unsafe fn connect(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
             fd.0,
             addr as *const _ as *const _,
             size_of::<sockaddr_un>() as u32,
-        ) != 1
+        ) != -1
     };
     if success {
         Ok(())
