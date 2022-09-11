@@ -1,46 +1,18 @@
-use super::named_pipe::{
-    DuplexBytePipeStream as PipeStream, PipeListener as GenericPipeListener, PipeListenerOptions,
-    PipeMode,
+use {
+    crate::{
+        local_socket::ToLocalSocketName,
+        os::windows::named_pipe::DuplexBytePipeStream as PipeStream,
+    },
+    std::{
+        ffi::c_void,
+        fmt::{self, Debug, Formatter},
+        io::{self, prelude::*, IoSlice, IoSliceMut},
+        os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
+    },
 };
-use crate::local_socket::{LocalSocketName, NameTypeSupport, ToLocalSocketName};
-use std::{
-    borrow::Cow,
-    ffi::{c_void, OsStr, OsString},
-    fmt::{self, Debug, Formatter},
-    io::{self, prelude::*, IoSlice, IoSliceMut},
-    os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle},
-};
-
-type PipeListener = GenericPipeListener<PipeStream>;
-
-pub struct LocalSocketListener {
-    inner: PipeListener,
-}
-impl LocalSocketListener {
-    pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let name = name.to_local_socket_name()?;
-        let inner = PipeListenerOptions::new()
-            .name(name.into_inner())
-            .mode(PipeMode::Bytes)
-            .create()?;
-        Ok(Self { inner })
-    }
-    pub fn accept(&self) -> io::Result<LocalSocketStream> {
-        let inner = self.inner.accept()?;
-        Ok(LocalSocketStream { inner })
-    }
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking)
-    }
-}
-impl Debug for LocalSocketListener {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("LocalSocketListener")
-    }
-}
 
 pub struct LocalSocketStream {
-    inner: PipeStream,
+    pub(super) inner: PipeStream,
 }
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
@@ -113,30 +85,3 @@ impl FromRawHandle for LocalSocketStream {
         Self { inner }
     }
 }
-
-pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
-
-pub fn name_type_support_query() -> NameTypeSupport {
-    NAME_TYPE_ALWAYS_SUPPORTED
-}
-pub fn to_local_socket_name_osstr(osstr: &OsStr) -> LocalSocketName<'_> {
-    LocalSocketName::from_raw_parts(Cow::Borrowed(osstr), true)
-}
-pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'static> {
-    LocalSocketName::from_raw_parts(Cow::Owned(osstring), true)
-}
-
-/*
-/// Helper function to check whether a series of UTF-16 bytes starts with `\\.\pipe\`.
-fn has_pipefs_prefix(
-    val: impl IntoIterator<Item = u16>,
-) -> bool {
-    let pipefs_prefix: [u16; 9] = [
-        // The string \\.\pipe\ in UTF-16
-        0x005c, 0x005c, 0x002e, 0x005c, 0x0070, 0x0069, 0x0070, 0x0065, 0x005c,
-    ];
-    pipefs_prefix.iter().copied().eq(val)
-
-}*/
-
-// TODO add Path/PathBuf special-case for \\.\pipe\*
