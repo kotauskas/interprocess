@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// Didn't feel like pulling in the `rand` crate, so have this here beauty instead.
 #[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
 pub struct Xorshift32(pub u32);
 impl Xorshift32 {
     pub fn from_system_time() -> Self {

@@ -16,18 +16,23 @@ use {
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
-fn server(name_sender: Sender<String>, num_clients: u32, shutdown: bool) -> TestResult {
-    let mut rng = Xorshift32::from_system_time();
-    let (name, listener) = loop {
-        let rn = rng.next();
-        let name = format!("/tmp/interprocess-test-{:08x}.sock", rn);
-
-        let listener = match UdStreamListener::bind(&*name) {
-            Err(e) if e.kind() == io::ErrorKind::AddrInUse => continue,
-            x => x.context("Listener bind failed")?,
-        };
-        break (name, listener);
-    };
+fn server(
+    name_sender: Sender<String>,
+    num_clients: u32,
+    mut namegen: NameGen,
+    shutdown: bool,
+) -> TestResult {
+    let (name, listener) = namegen
+        .find_map(|nm| {
+            let l = match UdStreamListener::bind(&*nm) {
+                Ok(l) => l,
+                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
+                Err(e) => return Some(Err(e)),
+            };
+            Some(Ok((nm, l)))
+        })
+        .unwrap()
+        .context("Listener bind failed")?;
 
     let _ = name_sender.send(name);
 
@@ -93,6 +98,18 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
 
 #[test]
 fn udstream_clsrv() {
-    drive_server_and_multiple_clients(|snd, nc| server(snd, nc, false), |nm| client(nm, false));
-    drive_server_and_multiple_clients(|snd, nc| server(snd, nc, true), |nm| client(nm, true));
+    run_with_namegen(NameGen::new(false));
+    if cfg!(target_os = "linux") {
+        run_with_namegen(NameGen::new(true));
+    }
+}
+fn run_with_namegen(namegen: NameGen) {
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, false),
+        |nm| client(nm, false),
+    );
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, true),
+        |nm| client(nm, true),
+    );
 }

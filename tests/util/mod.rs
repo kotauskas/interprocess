@@ -6,6 +6,9 @@ use choke::*;
 mod xorshift;
 pub use xorshift::*;
 
+mod namegen;
+pub use namegen::*;
+
 const NUM_CLIENTS: u32 = 20;
 const NUM_CONCURRENT_CLIENTS: u32 = 4;
 
