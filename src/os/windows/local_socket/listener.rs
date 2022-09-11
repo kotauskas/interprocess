@@ -7,14 +7,12 @@ use {
             PipeListenerOptions, PipeMode,
         },
     },
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-    },
+    std::io,
 };
 
 type PipeListener = GenericPipeListener<PipeStream>;
 
+#[derive(Debug)]
 pub struct LocalSocketListener {
     inner: PipeListener,
 }
@@ -33,10 +31,5 @@ impl LocalSocketListener {
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
-    }
-}
-impl Debug for LocalSocketListener {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("LocalSocketListener")
     }
 }
