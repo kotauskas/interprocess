@@ -1,9 +1,7 @@
-mod util;
-use util::*;
-
 use {
+    super::{util::*, NameGen},
     anyhow::Context,
-    interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport},
+    interprocess::local_socket::{LocalSocketListener, LocalSocketStream},
     std::{
         io::{self, BufRead, BufReader, Write},
         sync::{mpsc::Sender, Arc},
@@ -13,24 +11,22 @@ use {
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
-fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    let mut rng = Xorshift32::from_system_time();
-    let (name, listener) = loop {
-        let rn = rng.next();
-        let name = {
-            use NameTypeSupport::*;
-            match NameTypeSupport::query() {
-                OnlyPaths => format!("/tmp/interprocess-test-{:08x}.sock", rn),
-                OnlyNamespaced | Both => format!("@interprocess-test-{:08x}.sock", rn),
-            }
-        };
-
-        let listener = match LocalSocketListener::bind(&*name) {
-            Err(e) if e.kind() == io::ErrorKind::AddrInUse => continue,
-            x => x.context("Listener bind failed")?,
-        };
-        break (name, listener);
-    };
+pub fn server(
+    name_sender: Sender<String>,
+    num_clients: u32,
+    prefer_namespaced: bool,
+) -> TestResult {
+    let (name, listener) = NameGen::new_auto(prefer_namespaced)
+        .find_map(|nm| {
+            let l = match LocalSocketListener::bind(&*nm) {
+                Ok(l) => l,
+                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
+                Err(e) => return Some(Err(e)),
+            };
+            Some(Ok((nm, l)))
+        })
+        .unwrap()
+        .context("Listener bind failed")?;
 
     let _ = name_sender.send(name);
 
@@ -57,7 +53,7 @@ fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     }
     Ok(())
 }
-fn client(name: Arc<String>) -> TestResult {
+pub fn client(name: Arc<String>) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
     let conn = LocalSocketStream::connect(name.as_str()).context("Connect failed")?;
@@ -73,9 +69,4 @@ fn client(name: Arc<String>) -> TestResult {
     assert_eq!(buffer, SERVER_MSG);
 
     Ok(())
-}
-
-#[test]
-fn local_socket_clsrv() {
-    drive_server_and_multiple_clients(server, client);
 }
