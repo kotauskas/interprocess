@@ -82,11 +82,14 @@ fn collect_uds_features(target: &TargetTriplet) {
             "uds_sockaddr_un_len_104",
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
+            "uds_xucred",
         ]);
         if target.os("netbsd") {
             // NetBSD differs from all other BSDs in that it uses its own
             // credential structure, sockcred
             ldefine(&["uds_sockcred", "uds_peereid"]);
+        } else if target.os_any(&["freebsd", "dragonfly", "macos", "ios"]) {
+            define("uds_xucred");
         }
     } else if target.os_any(&["solaris", "illumos"]) {
         uds = true;
