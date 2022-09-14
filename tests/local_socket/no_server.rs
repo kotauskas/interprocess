@@ -3,14 +3,15 @@
 use {super::util::*, anyhow::*, interprocess::local_socket::LocalSocketStream, std::io};
 
 pub fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
+    use io::ErrorKind::*;
     let err = match client(prefer_namespaced) {
         Err(e) => e.downcast::<io::Error>()?,
         Ok(()) => bail!("client successfully connected to nonexistent server"),
     };
     ensure!(
-        err.kind() == io::ErrorKind::NotFound,
-        "expected error kind to be 'not found', received '{}'",
-        err.kind()
+        matches!(err.kind(), NotFound | ConnectionRefused),
+        "expected error to be 'not found', received '{}'",
+        err
     );
     Ok(())
 }
