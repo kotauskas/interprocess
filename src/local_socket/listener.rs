@@ -13,31 +13,8 @@ impmod! {local_socket,
 
 /// A local socket server, listening for connections.
 ///
-/// # Example
-/// ```no_run
-/// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
-/// use std::io::{self, prelude::*, BufReader};
-///
-/// fn handle_error(conn: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
-///     match conn {
-///         Ok(val) => Some(val),
-///         Err(error) => {
-///             eprintln!("Incoming connection failed: {}", error);
-///             None
-///         }
-///     }
-/// }
-///
-/// let listener = LocalSocketListener::bind("/tmp/example.sock")?;
-/// for mut conn in listener.incoming().filter_map(handle_error) {
-///     conn.write_all(b"Hello from server!\n")?;
-///     let mut conn = BufReader::new(conn);
-///     let mut buffer = String::new();
-///     conn.read_line(&mut buffer);
-///     println!("Client answered: {}", buffer);
-/// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
+/// # Examples
+/// - [Basic server](https://github.com/kotauskas/interprocess/blob/main/examples/local_socket/server.rs)
 pub struct LocalSocketListener {
     inner: LocalSocketListenerImpl,
 }
@@ -59,9 +36,6 @@ impl LocalSocketListener {
         })
     }
     /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
-    ///
-    /// # Example
-    /// See the struct-level documentation for a full example which already uses this method.
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }

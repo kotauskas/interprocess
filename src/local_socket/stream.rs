@@ -12,20 +12,8 @@ impmod! {local_socket,
 
 /// A local socket byte stream, obtained eiter from [`LocalSocketListener`] or by connecting to an existing local socket.
 ///
-/// # Example
-/// ```no_run
-/// use interprocess::local_socket::LocalSocketStream;
-/// use std::io::{prelude::*, BufReader};
-///
-/// // Replace the path as necessary on Windows.
-/// let mut conn = LocalSocketStream::connect("/tmp/example.sock")?;
-/// conn.write_all(b"Hello from client!\n")?;
-/// let mut conn = BufReader::new(conn);
-/// let mut buffer = String::new();
-/// conn.read_line(&mut buffer)?;
-/// println!("Server answered: {}", buffer);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
+/// # Examples
+/// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/local_socket/client.rs)
 ///
 /// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
 pub struct LocalSocketStream {
@@ -43,8 +31,6 @@ impl LocalSocketStream {
     /// # Platform-specific behavior
     /// ## macOS and iOS
     /// Not supported by the OS, will always generate an error at runtime.
-    ///
-    /// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html " "
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.peer_pid()
     }
