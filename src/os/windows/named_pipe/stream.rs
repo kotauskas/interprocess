@@ -197,6 +197,8 @@ message boundaries");
         impl IntoRawHandle for $ty {
             #[cfg(windows)]
             fn into_raw_handle(self) -> HANDLE {
+                assert!(self.is_client(),
+                    "cannot reclaim named pipe instance from server instancer");
                 let handle = self.ops().as_raw_handle();
                 handle
             }
