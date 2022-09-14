@@ -1,4 +1,5 @@
 use {
+    super::thunk_broken_pipe_to_eof,
     crate::{
         local_socket::ToLocalSocketName,
         os::windows::named_pipe::DuplexBytePipeStream as PipeStream,
@@ -28,13 +29,6 @@ impl LocalSocketStream {
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
-    }
-}
-
-fn thunk_broken_pipe_to_eof(r: io::Result<usize>) -> io::Result<usize> {
-    match r {
-        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(0),
-        els => els,
     }
 }
 
