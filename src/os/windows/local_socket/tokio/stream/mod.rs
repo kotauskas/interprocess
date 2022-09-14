@@ -3,6 +3,7 @@ pub use read_half::*;
 
 mod write_half;
 pub use write_half::*;
+// TODO reunite
 
 use {
     super::super::thunk_broken_pipe_to_eof,
