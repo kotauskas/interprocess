@@ -1,13 +1,15 @@
 #![allow(clippy::unnecessary_mut_passed)] // We get &mut with mutexes either way
 
-use crate::os::windows::named_pipe::{tokio::imports::*, Instance};
-use futures_core::ready;
-use std::{
-    fmt::{self, Debug, Formatter},
-    future::Future,
-    io::{self, ErrorKind},
-    pin::Pin,
-    task::{Context, Poll},
+use {
+    crate::os::windows::named_pipe::{tokio::imports::*, Instance, PipeOps as SyncPipeOps},
+    futures_core::ready,
+    std::{
+        fmt::{self, Debug, Formatter},
+        future::Future,
+        io::{self, ErrorKind},
+        pin::Pin,
+        task::{Context, Poll},
+    },
 };
 
 macro_rules! same_clsrv {
@@ -31,6 +33,16 @@ impl PipeOps {
     pub unsafe fn from_raw_handle(handle: HANDLE, server: bool) -> io::Result<Self> {
         // SAFETY: as per safety contract
         let val = if server {
+            Self::Server(unsafe { TokioNPServer::from_raw_handle(handle)? })
+        } else {
+            Self::Client(unsafe { TokioNPClient::from_raw_handle(handle)? })
+        };
+        Ok(val)
+    }
+    pub fn from_sync_pipeops(sync_pipeops: SyncPipeOps) -> io::Result<Self> {
+        let is_server = sync_pipeops.is_server()?;
+        let handle = sync_pipeops.into_raw_handle();
+        let val = if is_server {
             Self::Server(unsafe { TokioNPServer::from_raw_handle(handle)? })
         } else {
             Self::Client(unsafe { TokioNPClient::from_raw_handle(handle)? })

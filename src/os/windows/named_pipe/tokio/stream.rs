@@ -1,21 +1,22 @@
-use crate::os::windows::named_pipe::{
-    convert_path,
-    tokio::{
-        enums::{PipeMode, PipeStreamRole},
-        imports::*,
-        PipeOps, PipeStreamInternals,
+use {
+    crate::os::windows::named_pipe::{
+        convert_path,
+        tokio::{
+            enums::{PipeMode, PipeStreamRole},
+            imports::*,
+            PipeOps, PipeStreamInternals,
+        },
+        Instance, PipeOps as SyncPipeOps,
     },
-    Instance,
-};
-#[cfg_attr(not(all(windows, feature = "tokio_support")), allow(unused_imports))]
-use std::{
-    ffi::{OsStr, OsString},
-    fmt::{self, Debug, Formatter},
-    io,
-    mem::ManuallyDrop,
-    pin::Pin,
-    ptr,
-    task::{Context, Poll},
+    std::{
+        ffi::{OsStr, OsString},
+        fmt::{self, Debug, Formatter},
+        io,
+        mem::ManuallyDrop,
+        pin::Pin,
+        ptr,
+        task::{Context, Poll},
+    },
 };
 
 /// Defines the properties of Tokio pipe stream types.
@@ -83,6 +84,34 @@ macro_rules! create_stream_type {
                 pub fn is_client(&self) -> bool {
                     matches!(self.ops(), &PipeOps::Client(_))
                 }
+                // FIXME: cannot have into_raw_handle just yet, Tokio doesn't expose it
+                /// Creates a Tokio-based async object from a given raw handle. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error (which is why the `FromRawHandle` trait can't be implemented instead).
+                ///
+                /// # Safety
+                /// The given handle must be valid (i.e. refer to an existing kernel object) and must not be owned by any other handle container. If this is not upheld, an arbitrary handle will be closed when the returned object is dropped.
+                pub unsafe fn from_raw_handle(handle: HANDLE) -> io::Result<Self> {
+                    let sync_pipeops = unsafe {
+                        // SAFETY: guaranteed via safety contract
+                        SyncPipeOps::from_raw_handle(handle)
+                    };
+
+                    // If the wrapper type tries to read incoming data as messages, that might break
+                    // if the underlying pipe has no message boundaries. Let's check for that.
+                    if Self::READ_MODE == Some(PipeMode::Messages) {
+                        let has_msg_boundaries = sync_pipeops.does_pipe_have_message_boundaries()
+                        .expect("\
+failed to determine whether the pipe preserves message boundaries");
+                        assert!(has_msg_boundaries, "\
+stream wrapper type uses a message-based read mode, but the underlying pipe does not preserve \
+message boundaries");
+                    }
+
+                    let pipeops = PipeOps::from_sync_pipeops(sync_pipeops)?;
+                    let is_server = pipeops.is_server();
+
+                    let instance = Instance::new(pipeops, is_server);
+                    Ok(Self { instance })
+                }
                 $($extra_methods)*
             },
             doc: $doc
@@ -127,6 +156,7 @@ macro_rules! create_duplex_stream_type {
                 read_mode: $corresponding_reader::READ_MODE,
                 write_mode: $corresponding_writer::WRITE_MODE,
                 extra_methods: {
+                    // TODO borrowed split
                     /// Splits the duplex stream into its reading and writing half.
                     pub fn split(self) -> ($corresponding_reader, $corresponding_writer) {
                         let self_ = ManuallyDrop::new(self);
