@@ -1,4 +1,5 @@
 //! Test utilities for allocating an address for the server and then spawning clients to connect to it.
+#![allow(dead_code)]
 
 mod choke;
 use choke::*;
