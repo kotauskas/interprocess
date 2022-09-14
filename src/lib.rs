@@ -25,6 +25,7 @@
 //! [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/ " "
 // TODO mailslots
 // TODO shared memory
+// TODO use standard library raw+owned FDs and handles
 // - **Mailslots** — Windows-specific interprocess communication primitive for short messages, potentially even across the network
 // - **Shared memory** — exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
