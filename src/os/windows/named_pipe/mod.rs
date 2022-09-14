@@ -27,6 +27,7 @@ pub use stream::*;
 
 #[cfg(any(doc, feature = "tokio_support"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio_support")))]
+#[cfg_attr(not(feature = "tokio_support"), allow(unused_imports))]
 pub mod tokio;
 
 use super::imports::*;
