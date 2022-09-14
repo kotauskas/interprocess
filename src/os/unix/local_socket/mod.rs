@@ -1,5 +1,8 @@
 //! Adapter module, implements local sockets under Unix.
 
+#[cfg(feature = "tokio_support")]
+pub mod tokio;
+
 mod listener;
 pub use listener::*;
 
