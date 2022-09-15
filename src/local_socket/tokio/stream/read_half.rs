@@ -8,9 +8,12 @@ use {
     },
 };
 
+#[cfg(feature = "tokio_support")]
 impmod! {local_socket::tokio,
     OwnedReadHalf as OwnedReadHalfImpl
 }
+#[cfg(not(feature = "tokio_support"))]
+struct OwnedReadHalfImpl;
 
 /// An owned read half of a Tokio-based local socket stream, obtained by splitting a [`LocalSocketStream`].
 ///

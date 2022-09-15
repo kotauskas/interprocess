@@ -15,9 +15,12 @@ use {
     },
 };
 
+#[cfg(feature = "tokio_support")]
 impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl
 }
+#[cfg(not(feature = "tokio_support"))]
+struct LocalSocketStreamImpl;
 
 /// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`] or by connecting to an existing local socket.
 ///
