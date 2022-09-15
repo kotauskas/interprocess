@@ -43,6 +43,7 @@ cfg_if! {
         pub(super) use libc::ucred;
     } else if #[cfg(uds_xucred)] {
         pub(super) use libc::xucred;
+        pub struct ucred {}
     } else {
         pub struct ucred {}
     }
