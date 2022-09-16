@@ -116,7 +116,7 @@ macro_rules! create_stream_type {
         create_stream_type_base!(
             $ty:
             extra_methods: {
-                /// Tries to connect to the specified named pipe (the `\\.\pipe\` prefix is added automatically), returning a named pipe stream of the stream type provided via generic parameters. If there is no available server, returns immediately.
+                /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
                 pub fn connect(name: impl AsRef<OsStr>) -> io::Result<Self> {
                     Self::_connect(name.as_ref())
                 }
@@ -130,7 +130,7 @@ macro_rules! create_stream_type {
                     )?;
                     Ok(Self { instance: Instance::create_non_taken(pipeops) })
                 }
-                /// Tries to connect to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), returning a named pipe stream of the stream type provided via generic parameters. If there is no available server, returns immediately.
+                /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
                 pub fn connect_to_remote(pipe_name: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
                     Self::_connect_to_remote(pipe_name.as_ref(), hostname.as_ref())
                 }
