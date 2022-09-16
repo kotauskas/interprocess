@@ -41,7 +41,8 @@ impl<Stream: TokioPipeStream> PipeListener<Stream> {
         // come up for.
         if Stream::READ_MODE.is_some() {
             instance.instance().dry_read().await;
-        } else {
+        }
+        if Stream::WRITE_MODE.is_some() {
             instance.instance().dry_write().await;
         }
         Ok(Stream::build(instance))
