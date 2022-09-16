@@ -509,3 +509,4 @@ fn _connect(
     let pipeops = PipeOps::Client(tnpclient);
     Ok(pipeops)
 }
+// TODO connect with wait
