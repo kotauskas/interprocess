@@ -9,18 +9,24 @@ use {
     super::super::thunk_broken_pipe_to_eof,
     crate::{
         local_socket::ToLocalSocketName,
-        os::windows::{imports::HANDLE, named_pipe::tokio::DuplexBytePipeStream as PipeStream},
+        os::windows::{
+            imports::{ERROR_PIPE_BUSY, HANDLE},
+            named_pipe::tokio::DuplexBytePipeStream as PipeStream,
+        },
     },
     futures_core::ready,
     futures_io::{AsyncRead, AsyncWrite},
     std::{
-        ffi::c_void,
+        ffi::{c_void, OsStr},
         fmt::{self, Debug, Formatter},
+        future::Future,
         io,
         os::windows::io::AsRawHandle,
         pin::Pin,
         task::{Context, Poll},
+        time::Duration,
     },
+    tokio::time::{sleep, Instant, Sleep},
 };
 
 pub struct LocalSocketStream {
@@ -29,7 +35,7 @@ pub struct LocalSocketStream {
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = PipeStream::connect(name.inner())?;
+        let inner = ConnectFuture::new(name.inner()).await?;
         Ok(Self { inner })
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
@@ -52,6 +58,42 @@ impl LocalSocketStream {
     }
     fn pinproj(&mut self) -> Pin<&mut PipeStream> {
         Pin::new(&mut self.inner)
+    }
+}
+
+pub struct ConnectFuture<'a> {
+    name: &'a OsStr,
+    timer: Sleep,
+}
+impl<'a> ConnectFuture<'a> {
+    const IDLE_TIME: Duration = Duration::from_millis(1);
+    fn new(name: &'a OsStr) -> Self {
+        Self {
+            name,
+            timer: sleep(Duration::ZERO),
+        }
+    }
+    fn reset_timer(self: Pin<&mut Self>) {
+        self.pinproj_timer().reset(Instant::now() + Self::IDLE_TIME);
+    }
+    fn pinproj_timer(self: Pin<&mut Self>) -> Pin<&mut Sleep> {
+        unsafe {
+            // SAFETY: requires self to be pinned
+            Pin::new_unchecked(&mut self.get_unchecked_mut().timer)
+        }
+    }
+}
+impl Future for ConnectFuture<'_> {
+    type Output = io::Result<PipeStream>;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match PipeStream::connect(self.as_ref().name) {
+            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
+                ready!(self.as_mut().pinproj_timer().poll(cx));
+                self.as_mut().reset_timer();
+                Poll::Pending
+            }
+            not_waiting => Poll::Ready(not_waiting),
+        }
     }
 }
 
