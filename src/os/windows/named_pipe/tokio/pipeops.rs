@@ -1,7 +1,10 @@
 #![allow(clippy::unnecessary_mut_passed)] // We get &mut with mutexes either way
 
 use {
-    crate::os::windows::named_pipe::{tokio::imports::*, Instance, PipeOps as SyncPipeOps},
+    crate::os::windows::named_pipe::{
+        tokio::{imports::*, stream::Instance},
+        PipeOps as SyncPipeOps,
+    },
     futures_core::ready,
     std::{
         fmt::{self, Debug, Formatter},
@@ -185,5 +188,5 @@ impl AsRawHandle for PipeOps {
 // Distinct from the non-async PipeStreamInternals which uses the non-async PipeOps.
 pub trait PipeStreamInternals {
     #[cfg(windows)]
-    fn build(instance: Instance<PipeOps>) -> Self;
+    fn build(instance: Instance) -> Self;
 }

@@ -1,4 +1,4 @@
-use crate::os::windows::{imports::*, named_pipe::Instance, FileHandleOps};
+use crate::os::windows::{imports::*, named_pipe::stream::Instance, FileHandleOps};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -129,6 +129,14 @@ impl PipeOps {
         let flags = self.get_flags()?;
         Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
     }
+    /// Retrieves whether the pipe is in nonblocking mode or not from the kernel directly.
+    pub fn is_nonblocking(&self) -> io::Result<bool> {
+        // Source: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipehandlestatew
+        const PIPE_IS_NONBLOCKING_BIT: u32 = 0x00000001;
+
+        let state = self.get_state()?;
+        Ok((state & PIPE_IS_NONBLOCKING_BIT) != 0)
+    }
     fn get_flags(&self) -> io::Result<u32> {
         let mut flags: u32 = 0;
         let success = unsafe {
@@ -142,6 +150,25 @@ impl PipeOps {
         };
         if success {
             Ok(flags)
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    fn get_state(&self) -> io::Result<u32> {
+        let mut state: u32 = 0;
+        let success = unsafe {
+            GetNamedPipeHandleStateW(
+                self.0 .0,
+                &mut state as *mut _,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                0,
+            ) != 0
+        };
+        if success {
+            Ok(state)
         } else {
             Err(io::Error::last_os_error())
         }
@@ -212,5 +239,5 @@ unsafe impl Send for PipeOps {}
 
 pub trait PipeStreamInternals {
     #[cfg(windows)]
-    fn build(instance: Instance<PipeOps>) -> Self;
+    fn build(instance: Instance) -> Self;
 }

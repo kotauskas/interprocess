@@ -1,12 +1,13 @@
 use {
     crate::os::windows::named_pipe::{
         convert_path,
+        instancer::Instance as InstanceImpl,
         tokio::{
             enums::{PipeMode, PipeStreamRole},
             imports::*,
             PipeOps, PipeStreamInternals,
         },
-        Instance, PipeOps as SyncPipeOps,
+        PipeOps as SyncPipeOps,
     },
     std::{
         ffi::{OsStr, OsString},
@@ -18,6 +19,8 @@ use {
         task::{Context, Poll},
     },
 };
+
+pub(super) type Instance = InstanceImpl<PipeOps>;
 
 /// Defines the properties of Tokio pipe stream types.
 ///

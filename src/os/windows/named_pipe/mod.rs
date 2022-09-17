@@ -30,12 +30,13 @@ pub use stream::*;
 #[cfg_attr(not(feature = "tokio_support"), allow(unused_imports))]
 pub mod tokio;
 
-use super::imports::*;
-use instancer::*;
 use pipeops::*;
-use std::{
-    ffi::{OsStr, OsString},
-    io, ptr,
+use {
+    super::imports::*,
+    std::{
+        ffi::{OsStr, OsString},
+        io, ptr,
+    },
 };
 
 fn convert_path(pipe_name: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {

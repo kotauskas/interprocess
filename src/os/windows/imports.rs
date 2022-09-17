@@ -11,7 +11,8 @@ pub(super) use {
             handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
             namedpipeapi::{
                 ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe,
-                GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState, WaitNamedPipeW,
+                GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState,
+                WaitNamedPipeW,
             },
             processthreadsapi::GetCurrentProcess,
             winbase::{

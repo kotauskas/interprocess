@@ -1,6 +1,6 @@
 use crate::os::windows::{
     imports::*,
-    named_pipe::{Instance, PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole},
+    named_pipe::{PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole},
     AsRawHandle, FromRawHandle, IntoRawHandle,
 };
 use crate::{PartialMsgWriteError, ReliableReadMsg};
@@ -12,6 +12,38 @@ use std::{
     ptr,
 };
 
+mod inst {
+    use super::*;
+    /// Wrapper for sync `PipeOps` to make the macro work. Will be gone soon once I redesign the API to use generics.
+    pub struct Instance(PipeOps);
+    impl Instance {
+        pub fn create_non_taken(ops: PipeOps) -> Self {
+            ops.into()
+        }
+        pub fn new(ops: PipeOps, _: bool) -> Self {
+            ops.into()
+        }
+        pub fn instance(&self) -> &PipeOps {
+            &self.0
+        }
+        pub fn is_server(&self) -> bool {
+            self.0
+                .is_server()
+                .expect("the API desperately needs a redesign")
+        }
+        pub fn is_split(&self) -> bool {
+            // sync pipes don't implement splitting yet
+            false
+        }
+    }
+    impl From<PipeOps> for Instance {
+        fn from(x: PipeOps) -> Self {
+            Self(x)
+        }
+    }
+}
+pub(super) use inst::*;
+
 macro_rules! create_stream_type_base {
     (
         $ty:ident:
@@ -20,7 +52,7 @@ macro_rules! create_stream_type_base {
     ) => {
         #[doc = $doc]
         pub struct $ty {
-            instance: Instance<PipeOps>,
+            instance: Instance,
         }
         impl $ty {
             // fn is_server(&self) -> bool and fn is_client(&self) -> bool
@@ -75,7 +107,7 @@ macro_rules! create_stream_type_base {
         #[doc(hidden)]
         impl PipeStreamInternals for $ty {
             #[cfg(windows)]
-            fn build(instance: Instance<PipeOps>) -> Self {
+            fn build(instance: Instance) -> Self {
                 Self { instance }
             }
         }

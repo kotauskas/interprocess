@@ -1,31 +1,29 @@
-use crate::os::windows::{
-    imports::*,
-    named_pipe::{Instance, Instancer, PipeMode, PipeOps, PipeStream, PipeStreamRole},
-};
-use std::{
-    borrow::Cow,
-    convert::TryInto,
-    ffi::OsStr,
-    fmt::{self, Debug, Formatter},
-    io,
-    marker::PhantomData,
-    num::{NonZeroU32, NonZeroU8},
-    ptr,
-    sync::{
-        atomic::{AtomicBool, Ordering::*},
-        RwLock,
+use {
+    crate::os::windows::{
+        imports::*,
+        named_pipe::{PipeMode, PipeOps, PipeStream, PipeStreamRole},
     },
+    std::{
+        borrow::Cow,
+        convert::TryInto,
+        ffi::OsStr,
+        fmt::{self, Debug, Formatter},
+        io,
+        marker::PhantomData,
+        mem::replace,
+        num::{NonZeroU32, NonZeroU8},
+        ptr,
+        sync::Mutex,
+    },
+    to_method::To,
 };
-use to_method::To;
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
-    // Store the nonblocking boolean separately to change it without mutable access
-    nonblocking: AtomicBool,
-    instancer: Instancer<PipeOps>,
+    stored_instance: Mutex<PipeOps>,
     _phantom: PhantomData<fn() -> Stream>,
 }
 /// An iterator that infinitely [`accept`]s connections on a [`PipeListener`].
@@ -55,13 +53,15 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     ///
     /// See `incoming` for an iterator version of this.
     pub fn accept(&self) -> io::Result<Stream> {
-        let instance = if let Some(instance) = self.instancer.allocate() {
-            instance
-        } else {
-            self.instancer.add_instance(self.create_instance()?)
+        let instance_to_hand_out = {
+            let mut stored_instance = self.stored_instance.lock().expect("unexpected lock poison");
+            let nonblocking = stored_instance.is_nonblocking()?;
+            stored_instance.connect_server()?;
+            let new_instance = self.create_instance(nonblocking)?;
+            replace(&mut *stored_instance, new_instance)
         };
-        instance.instance().connect_server()?;
-        Ok(Stream::build(instance))
+
+        Ok(Stream::build(instance_to_hand_out.into()))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
     pub fn incoming(&self) -> Incoming<'_, Stream> {
@@ -75,36 +75,23 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     ///
     /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        // Lock for write access to prevent concurrent `set_nonblocking()` calls from clashing with
-        // one another, leading to inconsistent state. Normally, this will only be called from one
-        // thread, so the lock isn't supposed to be contended.
-        let instances = self.instancer.0.write().expect("unexpected lock poison");
-
-        // Setting the non-blocking flag per-instance.
-        for instance in instances.iter() {
-            unsafe {
-                super::set_nonblocking_for_stream(
-                    instance.instance().as_raw_handle(),
-                    Stream::READ_MODE,
-                    nonblocking,
-                )?;
-            }
+        let instance = self.stored_instance.lock().expect("unexpected lock poison");
+        unsafe {
+            super::set_nonblocking_for_stream(
+                instance.as_raw_handle(),
+                Stream::READ_MODE,
+                nonblocking,
+            )?;
         }
-
-        // `Release` here suits us perfectly, because it ensures that the streams become
-        // non-blocking before we declare the whole thing non-blocking (or vice versa). Not sure if
-        // we actually rely on such a consistency for correct behavior, but it's good to keep
-        // around, and the cost isn't big anyway (free on x86, slight slowdown on other platforms).
-        self.nonblocking.store(nonblocking, Release);
         // Make it clear that the lock survives until this moment.
-        drop(instances);
+        drop(instance);
         Ok(())
     }
 
-    fn create_instance(&self) -> io::Result<PipeOps> {
+    fn create_instance(&self, nonblocking: bool) -> io::Result<PipeOps> {
         let handle = self.config.create_instance(
             false,
-            self.nonblocking.load(Acquire), // See `.set_nonblocking()`.
+            nonblocking,
             false,
             Stream::ROLE,
             Stream::READ_MODE,
@@ -117,7 +104,7 @@ impl<Stream: PipeStream> Debug for PipeListener<Stream> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
-            .field("instances", &self.instancer)
+            .field("instance", &self.stored_instance)
             .finish()
     }
 }
@@ -266,11 +253,10 @@ impl<'a> PipeListenerOptions<'a> {
     ///
     /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
     pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
-        let (owned_config, instancer) = self._create(Stream::ROLE, Stream::READ_MODE)?;
+        let (owned_config, instance) = self._create(Stream::ROLE, Stream::READ_MODE)?;
         Ok(PipeListener {
             config: owned_config,
-            nonblocking: AtomicBool::new(self.nonblocking),
-            instancer,
+            stored_instance: Mutex::new(instance),
             _phantom: PhantomData,
         })
     }
@@ -278,35 +264,18 @@ impl<'a> PipeListenerOptions<'a> {
         &self,
         role: PipeStreamRole,
         read_mode: Option<PipeMode>,
-    ) -> io::Result<(PipeListenerOptions<'static>, Instancer<PipeOps>)> {
+    ) -> io::Result<(PipeListenerOptions<'static>, PipeOps)> {
         let owned_config = self.to_owned();
 
-        // Conversion from `Option<NonZeroU8>` to `usize`, with the `None` case corresponding to
-        // the reasonable default of 8.
-        let instancer_capacity = self
-            .instance_limit
-            .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
-            .to::<usize>();
-
-        let first_instance = {
+        let instance = {
             let handle = self.create_instance(true, self.nonblocking, false, role, read_mode)?;
-            let ops = unsafe {
+            unsafe {
                 // SAFETY: we just created this handle, so we know it's unique (and we've checked
                 // that it's valid)
                 PipeOps::from_raw_handle(handle)
-            };
-            Instance::create_non_taken(ops)
+            }
         };
-
-        // Preallocate space for the instances. Actual instance creation will happen lazily.
-        let mut instance_vec = Vec::with_capacity(instancer_capacity);
-        // Except for the first instance, which we'll add right now.
-        instance_vec.push(first_instance);
-
-        // Assemble the instancer.
-        let instancer = Instancer(RwLock::new(instance_vec));
-        // Create the components that will be pieced together into the final generic object.
-        Ok((owned_config, instancer))
+        Ok((owned_config, instance))
     }
 
     fn to_open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> DWORD {
