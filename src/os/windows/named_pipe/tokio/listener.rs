@@ -1,38 +1,39 @@
-use crate::{
-    os::windows::named_pipe::{
-        enums::{PipeMode, PipeStreamRole},
-        instancer::{Instance, Instancer},
-        tokio::{PipeOps, TokioPipeStream},
-        PipeListenerOptions, INITIAL_INSTANCER_CAPACITY,
+use {
+    crate::{
+        os::windows::named_pipe::{
+            enums::{PipeMode, PipeStreamRole},
+            tokio::{PipeOps, TokioPipeStream},
+            PipeListenerOptions, 
+        },
+        Sealed,
     },
-    Sealed,
+    std::{
+        fmt::{self, Debug, Formatter},
+        io,
+        marker::PhantomData,
+        mem::replace,
+    },
+    tokio::sync::Mutex,
 };
-use std::{
-    fmt::{self, Debug, Formatter},
-    io,
-    marker::PhantomData,
-    num::NonZeroU8,
-    sync::RwLock,
-};
-use to_method::To;
 
 /// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing asynchronous pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 pub struct PipeListener<Stream: TokioPipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
-    instancer: Instancer<PipeOps>,
+    stored_instance: Mutex<PipeOps>,
     _phantom: PhantomData<fn() -> Stream>,
 }
 impl<Stream: TokioPipeStream> PipeListener<Stream> {
     /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
     pub async fn accept(&self) -> io::Result<Stream> {
-        let instance = if let Some(instance) = self.instancer.allocate() {
-            instance
-        } else {
-            self.instancer.add_instance(self.create_instance()?)
+        let instance_to_hand_out = {
+            let mut stored_instance = self.stored_instance.lock().await;
+            stored_instance.connect_server().await?;
+            let new_instance = self.create_instance()?;
+            replace(&mut *stored_instance, new_instance)
         };
-        instance.instance().connect_server().await?;
+
         // I have no idea why, but every time I run a minimal named pipe server example without
         // this code, the second client to connect causes a "no process on the other end of the
         // pipe" error, and for some reason, performing a read or write with a zero-sized
@@ -40,12 +41,12 @@ impl<Stream: TokioPipeStream> PipeListener<Stream> {
         // crazy bug of interprocess, Tokio or even Windows, but this is the best solution I've
         // come up for.
         if Stream::READ_MODE.is_some() {
-            instance.instance().dry_read().await;
+            instance_to_hand_out.dry_read().await;
         }
         if Stream::WRITE_MODE.is_some() {
-            instance.instance().dry_write().await;
+            instance_to_hand_out.dry_write().await;
         }
-        Ok(Stream::build(instance))
+        Ok(Stream::build(instance_to_hand_out.into()))
     }
 
     fn create_instance(&self) -> io::Result<PipeOps> {
@@ -60,7 +61,7 @@ impl<Stream: TokioPipeStream> Debug for PipeListener<Stream> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
-            .field("instances", &self.instancer)
+            .field("instance", &self.stored_instance)
             .finish()
     }
 }
@@ -74,10 +75,10 @@ pub trait PipeListenerOptionsExt: Sealed {
 }
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
     fn create_tokio<Stream: TokioPipeStream>(&self) -> io::Result<PipeListener<Stream>> {
-        let (owned_config, instancer) = _create_tokio(self, Stream::ROLE, Stream::READ_MODE)?;
+        let (owned_config, instance) = _create_tokio(self, Stream::ROLE, Stream::READ_MODE)?;
         Ok(PipeListener {
             config: owned_config,
-            instancer,
+            stored_instance: Mutex::new(instance),
             _phantom: PhantomData,
         })
     }
@@ -87,35 +88,21 @@ fn _create_tokio(
     config: &PipeListenerOptions<'_>,
     role: PipeStreamRole,
     read_mode: Option<PipeMode>,
-) -> io::Result<(PipeListenerOptions<'static>, Instancer<PipeOps>)> {
+) -> io::Result<(PipeListenerOptions<'static>, PipeOps)> {
     // Shadow to avoid mixing them up.
     let mut config = config.to_owned();
 
     // Tokio should ideally already set that, but let's do it just in case.
     config.nonblocking = false;
 
-    // Conversion from `Option<NonZeroU8>` to `usize`, with the `None` case corresponding to
-    // the reasonable default of 8.
-    let instancer_capacity = config
-        .instance_limit
-        .map_or(INITIAL_INSTANCER_CAPACITY, NonZeroU8::get)
-        .to::<usize>();
-
-    let first_instance = {
+    let instance = {
         let handle = config.create_instance(true, config.nonblocking, true, role, read_mode)?;
-        let ops = unsafe {
+        unsafe {
             // SAFETY: we just created this handle, so we know it's unique (and we've checked
             // that it's valid)
             PipeOps::from_raw_handle(handle, true)?
-        };
-        Instance::create_non_taken(ops)
+        }
     };
 
-    // Preallocate space for the instances. Actual instance creation will happen lazily.
-    let mut instance_vec = Vec::with_capacity(instancer_capacity);
-    // Except for the first instance, which we'll add right now.
-    instance_vec.push(first_instance);
-
-    let instancer = Instancer(RwLock::new(instance_vec));
-    Ok((config, instancer))
+    Ok((config, instance))
 }

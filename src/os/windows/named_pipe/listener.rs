@@ -136,13 +136,9 @@ pub struct PipeListenerOptions<'a> {
     /// Enables remote machines to connect to the named pipe over the network.
     pub accept_remote: bool,
     /// Specifies how big the input buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
-    ///
-    /// Not required for outbound pipes and required for inbound and duplex pipes. If debug assertions are enabled, setting this parameter on an outbound pipe will cause a panic when the pipe is created; in release builds, creation will successfully complete without any errors and the value will be completely ignored.
     // TODO change into DWORD, i.e. u32
     pub input_buffer_size_hint: usize,
     /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
-    ///
-    /// Not required for inbound pipes and required for outbound and duplex pipes. If debug assertions are enabled, setting this parameter on an inbound pipe will cause a panic when the pipe is created; in release builds, creation will successfully complete without any errors and the value will be completely ignored.
     pub output_buffer_size_hint: usize,
     /// The default timeout when waiting for a client to connect. Used unless another timeout is specified when waiting for a client.
     pub wait_timeout: NonZeroU32,
@@ -305,7 +301,6 @@ impl<'a> PipeListenerOptions<'a> {
         pipe_mode
     }
 }
-pub(super) const INITIAL_INSTANCER_CAPACITY: u8 = 8;
 impl Default for PipeListenerOptions<'_> {
     fn default() -> Self {
         Self::new()

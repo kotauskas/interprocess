@@ -16,7 +16,6 @@
 // actually write proper examples for this
 
 mod enums;
-mod instancer;
 mod listener;
 mod pipeops;
 #[macro_use]

@@ -1,7 +1,6 @@
 use {
     crate::os::windows::named_pipe::{
         convert_path,
-        instancer::Instance as InstanceImpl,
         tokio::{
             enums::{PipeMode, PipeStreamRole},
             imports::*,
@@ -20,7 +19,96 @@ use {
     },
 };
 
-pub(super) type Instance = InstanceImpl<PipeOps>;
+mod inst {
+    use {
+        super::*,
+        std::{
+            fmt::{self, Debug, Formatter},
+            ops::Deref,
+            sync::{
+                atomic::{AtomicBool, Ordering::*},
+                Arc,
+            },
+        },
+    };
+    #[repr(transparent)]
+    pub struct Instance(Arc<InstanceInner>);
+    struct InstanceInner {
+        instance: PipeOps,
+        split: AtomicBool,
+    }
+    impl InstanceInner {
+        pub fn new(instance: PipeOps) -> Self {
+            Self {
+                instance,
+                split: AtomicBool::new(false),
+            }
+        }
+    }
+    impl Instance {
+        pub fn new(instance: PipeOps) -> Self {
+            let ii = InstanceInner::new(instance);
+            Self(Arc::new(ii))
+        }
+        pub fn instance(&self) -> &PipeOps {
+            &self.0.deref().instance
+        }
+        pub fn is_server(&self) -> bool {
+            self.instance().is_server()
+        }
+        pub fn is_split(&self) -> bool {
+            // This can be `Relaxed`, because the other split half is either on the same thread and thus
+            // doesn't need synchronization to read the current value here, or it's on a different
+            // thread and all of the relevant synchronization is performed as part of sending it to
+            // another thread (same reasoning as above).
+            self.0.split.load(Relaxed)
+        }
+        pub fn split(&self) -> Self {
+            // This can be a relaxed load because a non-split instance won't ever be shared between
+            // threads. From a correctness standpoint, this could even be a non-atomic load, but because
+            // most architectures already guarantee well-aligned memory accesses to be atomic, there's
+            // no point to writing unsafe code to do that. (Also, this condition obviously signifies
+            // a bug in interprocess that can only lead to creation of excess instances at worst, so
+            // there isn't a real point to making sure it never happens in release mode.)
+            debug_assert!(
+                !self.0.split.load(Relaxed),
+                "cannot split an already split instance"
+            );
+            // Again, the store doesn't even need to be atomic because it won't happen concurrently.
+            self.0.split.store(true, Relaxed);
+
+            let refclone = Arc::clone(&self.0);
+            Self(refclone)
+        }
+    }
+
+    impl Drop for Instance {
+        fn drop(&mut self) {
+            self.0.split.store(false, Release);
+        }
+    }
+
+    impl From<PipeOps> for Instance {
+        fn from(x: PipeOps) -> Self {
+            Self::new(x)
+        }
+    }
+
+    impl Debug for InstanceInner {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Instance") // Not deriving to override struct name
+                .field("inner", &self.instance)
+                .field("split", &self.split)
+                .finish()
+        }
+    }
+    impl Debug for Instance {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            Debug::fmt(&self.0, f) // passthrough
+        }
+    }
+}
+pub(super) use inst::*;
 
 /// Defines the properties of Tokio pipe stream types.
 ///
@@ -62,7 +150,7 @@ macro_rules! create_stream_type {
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                     )?;
-                    let instance = Instance::create_non_taken(pipeops);
+                    let instance = Instance::new(pipeops);
                     Ok(Self { instance })
                 }
                 /// Tries to connect to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), returning a named pipe stream of the stream type provided via generic parameters. If there is no available server, returns immediately.
@@ -76,7 +164,7 @@ macro_rules! create_stream_type {
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                     )?;
-                    let instance = Instance::create_non_taken(pipeops);
+                    let instance = Instance::new(pipeops);
                     Ok(Self { instance })
                 }
                 /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (client-side).
@@ -110,9 +198,8 @@ message boundaries");
                     }
 
                     let pipeops = PipeOps::from_sync_pipeops(sync_pipeops)?;
-                    let is_server = pipeops.is_server();
 
-                    let instance = Instance::new(pipeops, is_server);
+                    let instance = Instance::new(pipeops);
                     Ok(Self { instance })
                 }
                 $($extra_methods)*
