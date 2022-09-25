@@ -1,12 +1,15 @@
 use {
-    crate::os::windows::named_pipe::{
-        convert_path,
-        tokio::{
-            enums::{PipeMode, PipeStreamRole},
-            imports::*,
-            PipeOps, PipeStreamInternals,
+    crate::os::windows::{
+        imports::ERROR_PIPE_BUSY,
+        named_pipe::{
+            convert_path,
+            tokio::{
+                enums::{PipeMode, PipeStreamRole},
+                imports::*,
+                PipeOps, PipeStreamInternals,
+            },
+            PipeOps as SyncPipeOps,
         },
-        PipeOps as SyncPipeOps,
     },
     std::{
         ffi::{OsStr, OsString},
@@ -139,7 +142,9 @@ macro_rules! create_stream_type {
         create_stream_type_base!(
             $ty:
             extra_methods: {
-                /// Tries to connect to the specified named pipe (the `\\.\pipe\` prefix is added automatically), returning a named pipe stream of the stream type provided via generic parameters. If there is no available server, returns immediately.
+                /// Tries to connect to the specified named pipe (the `\\.\pipe\` prefix is added automatically).
+                ///
+                /// If there is no available server, **returns immediately** with the [`WouldBlock`](io::ErrorKind::WouldBlock) error.
                 pub fn connect(name: impl AsRef<OsStr>) -> io::Result<Self> {
                     Self::_connect(name.as_ref())
                 }
@@ -153,7 +158,9 @@ macro_rules! create_stream_type {
                     let instance = Instance::new(pipeops);
                     Ok(Self { instance })
                 }
-                /// Tries to connect to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), returning a named pipe stream of the stream type provided via generic parameters. If there is no available server, returns immediately.
+                /// Tries to connect to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically).
+                ///
+                /// If there is no available server, **returns immediately** with the [`WouldBlock`](io::ErrorKind::WouldBlock) error.
                 pub fn connect_to_remote(pipe_name: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
                     Self::_connect_to_remote(pipe_name.as_ref(), hostname.as_ref())
                 }
@@ -592,11 +599,17 @@ fn _connect(
     let name = convert_path(pipe_name, hostname);
     let name = OsString::from_wide(&name[..]);
     let name_ref: &OsStr = name.as_ref();
-    let tnpclient = TokioNPClientOptions::new()
+    let result = TokioNPClientOptions::new()
         .read(read)
         .write(write)
-        .open(name_ref)?;
-    let pipeops = PipeOps::Client(tnpclient);
-    Ok(pipeops)
+        .open(name_ref);
+    let client = match result {
+        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
+            Err(io::ErrorKind::WouldBlock.into())
+        }
+        els => els,
+    }?;
+    let ops = PipeOps::Client(client);
+    Ok(ops)
 }
 // TODO connect with wait

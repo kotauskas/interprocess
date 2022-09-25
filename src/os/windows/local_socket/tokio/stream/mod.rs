@@ -9,10 +9,7 @@ use {
     super::super::thunk_broken_pipe_to_eof,
     crate::{
         local_socket::ToLocalSocketName,
-        os::windows::{
-            imports::{ERROR_PIPE_BUSY, HANDLE},
-            named_pipe::tokio::DuplexBytePipeStream as PipeStream,
-        },
+        os::windows::{imports::HANDLE, named_pipe::tokio::DuplexBytePipeStream as PipeStream},
     },
     futures_core::ready,
     futures_io::{AsyncRead, AsyncWrite},
@@ -87,7 +84,7 @@ impl Future for ConnectFuture<'_> {
     type Output = io::Result<PipeStream>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match PipeStream::connect(self.as_ref().name) {
-            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 ready!(self.as_mut().pinproj_timer().poll(cx));
                 self.as_mut().reset_timer();
                 Poll::Pending

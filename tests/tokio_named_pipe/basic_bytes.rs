@@ -8,7 +8,6 @@ use {
     },
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc, time::Duration},
     tokio::{sync::oneshot::Sender, task, time::sleep, try_join},
-    winapi::shared::winerror::ERROR_PIPE_BUSY,
 };
 
 static SERVER_MSG: &str = "Hello from server!\n";
@@ -83,7 +82,7 @@ pub async fn client(name: Arc<String>) -> TestResult {
 
     let (reader, mut writer) = loop {
         match DuplexBytePipeStream::connect(name.as_str()) {
-            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 sleep(Duration::from_millis(10)).await;
                 continue;
             }
