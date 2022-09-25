@@ -413,6 +413,12 @@ impl<'a> ToUdSocketPath<'a> for UdSocketPath<'a> {
         Ok(self)
     }
 }
+impl<'a> ToUdSocketPath<'a> for &'a UdSocketPath<'a> {
+    /// Reborrows an explicit `UdSocketPath` for a smaller lifetime.
+    fn to_socket_path(self) -> io::Result<UdSocketPath<'a>> {
+        Ok(self.borrow())
+    }
+}
 impl<'a> ToUdSocketPath<'a> for &'a CStr {
     /// Converts a borrowed [`CStr`] to a borrowed `UdSocketPath` with the same lifetime. On platforms which don't support [namespaced socket paths], the variant is always [`File`]; on Linux, which supports namespaced sockets, an extra check for the `@` character is performed. See the trait-level documentation for more.
     ///
