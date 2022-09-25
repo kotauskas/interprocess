@@ -1,21 +1,25 @@
 #[cfg(uds_supported)]
 use super::c_wrappers;
-use std::{
-    convert::TryFrom,
-    error::Error,
-    fmt::{self, Formatter},
-    io,
-    net::Shutdown,
-    pin::Pin,
-    task::{Context, Poll},
-};
 use {
-    crate::os::unix::{imports::*, udsocket},
-    udsocket::{ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
+    crate::os::unix::{
+        imports::*,
+        udsocket::{ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
+    },
+    std::{
+        convert::TryFrom,
+        error::Error,
+        fmt::{self, Formatter},
+        io,
+        net::Shutdown,
+        pin::Pin,
+        task::{Context, Poll},
+    },
 };
 
+mod connect_future;
 mod read_half;
 mod write_half;
+use connect_future::*;
 pub use {read_half::*, write_half::*};
 
 /// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by connecting to an existing server.
@@ -33,8 +37,8 @@ impl UdStream {
         Self::_connect(&path).await
     }
     async fn _connect(path: &UdSocketPath<'_>) -> io::Result<Self> {
-        let stream = TokioUdStream::connect(path.as_osstr()).await?;
-        Ok(Self(stream))
+        let stream = ConnectFuture { path }.await?;
+        Self::from_sync(stream)
     }
 
     /// Borrows a stream into a read half and a write half, which can be used to read and write the stream concurrently.

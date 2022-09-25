@@ -43,12 +43,18 @@ impl UdStream {
     /// - `socket`
     /// - `connect`
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_connect(path.to_socket_path()?)
+        Self::_connect(path.to_socket_path()?, false)
     }
-    fn _connect(path: UdSocketPath<'_>) -> io::Result<Self> {
+    pub(crate) fn connect_nonblocking<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_connect(path.to_socket_path()?, true)
+    }
+    fn _connect(path: UdSocketPath<'_>, nonblocking: bool) -> io::Result<Self> {
         let addr = path.try_to::<sockaddr_un>()?;
 
         let fd = c_wrappers::create_uds(SOCK_STREAM)?;
+        if nonblocking {
+            c_wrappers::set_nonblocking(&fd, true)?;
+        }
         unsafe {
             // SAFETY: addr is well-constructed
             c_wrappers::connect(&fd, &addr)?;
