@@ -15,7 +15,10 @@ use std::{
 mod inst {
     use super::*;
     /// Wrapper for sync `PipeOps` to make the macro work. Will be gone soon once I redesign the API to use generics.
-    pub struct Instance(PipeOps);
+    pub struct Instance {
+        ops: PipeOps,
+        is_server: bool,
+    }
     impl Instance {
         pub fn create_non_taken(ops: PipeOps) -> Self {
             ops.into()
@@ -24,12 +27,10 @@ mod inst {
             ops.into()
         }
         pub fn instance(&self) -> &PipeOps {
-            &self.0
+            &self.ops
         }
         pub fn is_server(&self) -> bool {
-            self.0
-                .is_server()
-                .expect("the API desperately needs a redesign")
+            self.is_server
         }
         pub fn is_split(&self) -> bool {
             // sync pipes don't implement splitting yet
@@ -37,8 +38,11 @@ mod inst {
         }
     }
     impl From<PipeOps> for Instance {
-        fn from(x: PipeOps) -> Self {
-            Self(x)
+        fn from(ops: PipeOps) -> Self {
+            let is_server = ops
+                .is_server()
+                .expect("oops, unconnected `PipeOps` came in");
+            Self { ops, is_server }
         }
     }
 }
