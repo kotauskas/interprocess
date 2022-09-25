@@ -34,13 +34,13 @@ mod inst {
     #[repr(transparent)]
     pub struct Instance(Arc<InstanceInner>);
     struct InstanceInner {
-        instance: PipeOps,
+        ops: PipeOps,
         split: AtomicBool,
     }
     impl InstanceInner {
-        pub fn new(instance: PipeOps) -> Self {
+        pub fn new(ops: PipeOps) -> Self {
             Self {
-                instance,
+                ops,
                 split: AtomicBool::new(false),
             }
         }
@@ -51,7 +51,7 @@ mod inst {
             Self(Arc::new(ii))
         }
         pub fn instance(&self) -> &PipeOps {
-            &self.0.deref().instance
+            &self.0.deref().ops
         }
         pub fn is_server(&self) -> bool {
             self.instance().is_server()
@@ -97,7 +97,7 @@ mod inst {
     impl Debug for InstanceInner {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("Instance") // Not deriving to override struct name
-                .field("inner", &self.instance)
+                .field("inner", &self.ops)
                 .field("split", &self.split)
                 .finish()
         }
