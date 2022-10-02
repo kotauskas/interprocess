@@ -27,12 +27,14 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
                 .await
                 .context("First pipe receive failed")?;
             assert_eq!(read, CLIENT_MSG_1.len());
+            assert_eq!(&buf1[0..read], CLIENT_MSG_1);
 
             let read = reader
                 .read(&mut buf2)
                 .await
                 .context("Second pipe receive failed")?;
             assert_eq!(read, CLIENT_MSG_2.len());
+            assert_eq!(&buf2[0..read], CLIENT_MSG_2);
 
             TestResult::Ok(())
         };
@@ -117,12 +119,14 @@ pub async fn client(name: Arc<String>) -> TestResult {
             .await
             .context("First pipe receive failed")?;
         assert_eq!(read, SERVER_MSG_1.len());
+        assert_eq!(&buf1[0..read], SERVER_MSG_1);
 
         let read = reader
             .read(&mut buf2)
             .await
             .context("Second pipe receive failed")?;
         assert_eq!(read, SERVER_MSG_2.len());
+        assert_eq!(&buf2[0..read], SERVER_MSG_2);
 
         TestResult::Ok(())
     };
