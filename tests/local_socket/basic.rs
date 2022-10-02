@@ -56,8 +56,9 @@ pub fn server(
 pub fn client(name: Arc<String>) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
-    let conn = LocalSocketStream::connect(name.as_str()).context("Connect failed")?;
-    let mut conn = BufReader::new(conn);
+    let mut conn = LocalSocketStream::connect(name.as_str())
+        .context("Connect failed")
+        .map(BufReader::new)?;
 
     conn.get_mut()
         .write_all(CLIENT_MSG.as_bytes())
