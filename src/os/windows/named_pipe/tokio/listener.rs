@@ -3,7 +3,7 @@ use {
         os::windows::named_pipe::{
             enums::{PipeMode, PipeStreamRole},
             tokio::{PipeOps, TokioPipeStream},
-            PipeListenerOptions, 
+            PipeListenerOptions,
         },
         Sealed,
     },
@@ -33,19 +33,6 @@ impl<Stream: TokioPipeStream> PipeListener<Stream> {
             let new_instance = self.create_instance()?;
             replace(&mut *stored_instance, new_instance)
         };
-
-        // I have no idea why, but every time I run a minimal named pipe server example without
-        // this code, the second client to connect causes a "no process on the other end of the
-        // pipe" error, and for some reason, performing a read or write with a zero-sized
-        // buffer and discarding its result fixes this problem entirely. I'm not sure if it's a
-        // crazy bug of interprocess, Tokio or even Windows, but this is the best solution I've
-        // come up for.
-        if Stream::READ_MODE.is_some() {
-            instance_to_hand_out.dry_read().await;
-        }
-        if Stream::WRITE_MODE.is_some() {
-            instance_to_hand_out.dry_write().await;
-        }
         Ok(Stream::build(instance_to_hand_out.into()))
     }
 
