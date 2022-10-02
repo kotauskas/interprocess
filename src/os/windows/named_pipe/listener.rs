@@ -217,6 +217,15 @@ impl<'a> PipeListenerOptions<'a> {
         role: PipeStreamRole,
         read_mode: Option<PipeMode>,
     ) -> io::Result<HANDLE> {
+        if read_mode == Some(PipeMode::Messages) && self.mode == PipeMode::Bytes {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "\
+cannot create pipe server that has byte type but reads messages – have you forgotten to set the \
+`mode` field in `PipeListenerOptions`?",
+            ));
+        }
+
         let path = super::convert_path(&self.name, None);
         let open_mode = self.to_open_mode(first, role, overlapped);
         let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
