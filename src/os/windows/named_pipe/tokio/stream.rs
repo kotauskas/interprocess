@@ -1,15 +1,14 @@
+#[cfg(windows)]
+use crate::os::windows::imports::ERROR_PIPE_BUSY;
 use {
-    crate::os::windows::{
-        imports::ERROR_PIPE_BUSY,
-        named_pipe::{
-            convert_path,
-            tokio::{
-                enums::{PipeMode, PipeStreamRole},
-                imports::*,
-                PipeOps, PipeStreamInternals,
-            },
-            PipeOps as SyncPipeOps,
+    crate::os::windows::named_pipe::{
+        convert_path,
+        tokio::{
+            enums::{PipeMode, PipeStreamRole},
+            imports::*,
+            PipeOps, PipeStreamInternals,
         },
+        PipeOps as SyncPipeOps,
     },
     std::{
         ffi::{OsStr, OsString},
