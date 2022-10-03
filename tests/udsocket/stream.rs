@@ -1,9 +1,5 @@
-#![cfg(unix)]
-
-mod util;
-use util::*;
-
 use {
+    super::util::*,
     anyhow::Context,
     interprocess::os::unix::udsocket::{UdStream, UdStreamListener},
     std::{
@@ -15,6 +11,17 @@ use {
 
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
+
+pub(super) fn run_with_namegen(namegen: NameGen) {
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, false),
+        |nm| client(nm, false),
+    );
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, true),
+        |nm| client(nm, true),
+    );
+}
 
 fn server(
     name_sender: Sender<String>,
@@ -94,22 +101,4 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     assert_eq!(buffer, SERVER_MSG);
 
     Ok(())
-}
-
-#[test]
-fn udstream_clsrv() {
-    run_with_namegen(NameGen::new(false));
-    if cfg!(target_os = "linux") {
-        run_with_namegen(NameGen::new(true));
-    }
-}
-fn run_with_namegen(namegen: NameGen) {
-    drive_server_and_multiple_clients(
-        move |snd, nc| server(snd, nc, namegen, false),
-        |nm| client(nm, false),
-    );
-    drive_server_and_multiple_clients(
-        move |snd, nc| server(snd, nc, namegen, true),
-        |nm| client(nm, true),
-    );
 }
