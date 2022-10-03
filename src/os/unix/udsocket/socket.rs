@@ -25,7 +25,7 @@ pub struct UdSocket {
     fd: FdOps,
 }
 impl UdSocket {
-    /// Creates a new socket at the specified address.
+    /// Creates a new socket that can be referred to by the specified path.
     ///
     /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
     ///
@@ -44,7 +44,7 @@ impl UdSocket {
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_bind(path.to_socket_path()?, false)
     }
-    /// Creates a new socket at the specified address, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
+    /// Creates a new socket that can be referred to by the specified path, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
     ///
     /// See the documentation of [`bind()`](Self::bind).
     pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
@@ -74,7 +74,7 @@ impl UdSocket {
             _drop_guard: dg,
         })
     }
-    /// Connect to a Unix domain socket server at the specified path.
+    /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead, but supplying the address to the kernel once is more efficient.
     ///
     /// # Example
     /// ```no_run
@@ -82,29 +82,40 @@ impl UdSocket {
     /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdSocket;
     ///
-    /// let conn = UdSocket::connect("/tmp/example.sock")?;
-    /// // Handle the connection to the server
+    /// let conn = UdSocket::bind("/tmp/side_a.sock")?;
+    /// conn.set_destination("/tmp/side_b.sock")?;
+    /// // Communicate with datagrams here!
     /// # }
     /// # Ok(()) }
     /// ```
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     ///
     /// # System calls
-    /// - `socket`
     /// - `connect`
-    ///
-    /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
-    pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_connect(path.to_socket_path()?, false)
+    pub fn set_destination<'a>(&self, path: impl ToUdSocketPath<'a>) -> io::Result<()> {
+        let path = path.to_socket_path()?;
+        self._set_destination(&path)
     }
-    fn _connect(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+    fn _set_destination(&self, path: &UdSocketPath<'_>) -> io::Result<()> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
         unsafe {
             // SAFETY: addr is well-constructed
-            c_wrappers::connect(&fd, &addr)?;
+            c_wrappers::connect(&self.fd, &addr)?;
         }
+
+        Ok(())
+    }
+    /// Incorrect API; do not use.
+    // TODO banish
+    #[deprecated = "\
+creates unusable socket that is not bound to any address, use `.set_destination()` instead"]
+    pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        let path = path.to_socket_path()?;
+        Self::_connect(&path, false)
+    }
+    fn _connect(path: &UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
         c_wrappers::set_passcred(&fd, true)?;
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
@@ -116,12 +127,16 @@ impl UdSocket {
             PathDropGuard::dummy()
         };
 
-        Ok(Self {
+        let socket = Self {
             fd,
             _drop_guard: dg,
-        })
+        };
+        socket._set_destination(path)?;
+
+        Ok(socket)
     }
 
+    // TODO banish
     fn add_fake_trunc_flag(x: usize) -> (usize, bool) {
         (x, false)
     }
