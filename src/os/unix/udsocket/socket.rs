@@ -53,7 +53,7 @@ impl UdSocket {
     fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let fd = c_wrappers::create_uds(SOCK_DGRAM)?;
+        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
         unsafe {
             // SAFETY: addr is well-constructed
             c_wrappers::bind(&fd, &addr)?;
@@ -100,7 +100,7 @@ impl UdSocket {
     fn _connect(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let fd = c_wrappers::create_uds(SOCK_DGRAM)?;
+        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
         unsafe {
             // SAFETY: addr is well-constructed
             c_wrappers::connect(&fd, &addr)?;

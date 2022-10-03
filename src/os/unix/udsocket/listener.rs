@@ -162,18 +162,22 @@ impl UdStreamListener {
     /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
     /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?, false)
+        Self::_bind(path.to_socket_path()?, false, false)
     }
     /// Creates a new listener socket at the specified address, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
     ///
     /// See the documentation of [`bind()`](Self::bind).
     pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?, true)
+        Self::_bind(path.to_socket_path()?, true, false)
     }
-    fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+    pub(crate) fn _bind(
+        path: UdSocketPath<'_>,
+        keep_drop_guard: bool,
+        nonblocking: bool,
+    ) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
-        let fd = c_wrappers::create_uds(SOCK_STREAM)?;
+        let fd = c_wrappers::create_uds(SOCK_STREAM, nonblocking)?;
         unsafe {
             // SAFETY: addr is well-constructed
             c_wrappers::bind(&fd, &addr)?;

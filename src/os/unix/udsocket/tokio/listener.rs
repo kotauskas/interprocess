@@ -34,8 +34,7 @@ impl UdStreamListener {
         Self::_bind(path.to_socket_path()?)
     }
     fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
-        let listener = SyncUdStreamListener::bind(path)?;
-        listener.set_nonblocking(true)?;
+        let listener = SyncUdStreamListener::_bind(path, false, true)?;
         Self::from_sync(listener)
     }
     /// Listens for incoming connections to the socket, asynchronously waiting a client is connected.

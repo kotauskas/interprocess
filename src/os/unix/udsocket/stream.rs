@@ -51,10 +51,7 @@ impl UdStream {
     fn _connect(path: UdSocketPath<'_>, nonblocking: bool) -> io::Result<Self> {
         let addr = path.try_to::<sockaddr_un>()?;
 
-        let fd = c_wrappers::create_uds(SOCK_STREAM)?;
-        if nonblocking {
-            c_wrappers::set_nonblocking(&fd, true)?;
-        }
+        let fd = c_wrappers::create_uds(SOCK_STREAM, nonblocking)?;
         unsafe {
             // SAFETY: addr is well-constructed
             c_wrappers::connect(&fd, &addr)?;
