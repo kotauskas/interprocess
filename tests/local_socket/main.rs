@@ -2,14 +2,14 @@
 mod util;
 use util::*;
 
-mod basic;
 mod no_server;
+mod stream;
 
 use interprocess::local_socket::NameTypeSupport;
 
 #[test]
-fn local_socket_basic() {
-    use basic::*;
+fn local_socket_stream() {
+    use stream::*;
     // If only one name type is supported, this one will choose the supported one. If both are
     // supported, this will try paths first.
     util::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);

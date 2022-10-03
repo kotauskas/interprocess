@@ -3,14 +3,14 @@
 mod util;
 use util::TestResult;
 
-mod basic;
 mod no_server;
+mod stream;
 
 use {interprocess::local_socket::NameTypeSupport, tokio::try_join};
 
 #[tokio::test]
-async fn tokio_local_socket_basic() -> TestResult {
-    use basic::*;
+async fn tokio_local_socket_stream() -> TestResult {
+    use stream::*;
     // If only one name type is supported, this one will choose the supported one. If both are
     // supported, this will try paths first.
     let f1 = util::tokio::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);
