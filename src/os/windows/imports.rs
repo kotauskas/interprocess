@@ -66,9 +66,8 @@ import_type_or_make_dummy!(types {tokio::net::windows::named_pipe}::(
 
 #[cfg(all(windows, feature = "signals"))]
 pub(super) use {intmap::IntMap, once_cell::sync::Lazy, spinning::RwLock, thiserror::Error};
-// FIXME this is not yet in libc, remove when PR #1626 on rust-lang/libc gets merged
-pub const SIG_DFL: libc::sighandler_t = 0;
 
 import_const_or_make_dummy!(i32: consts {libc}::(
+    SIG_DFL = 0,
     SIGABRT = 100, SIGFPE = 101, SIGILL = 102, SIGINT = 103, SIGSEGV = 104, SIGTERM = 105,
 ), cfg(windows));

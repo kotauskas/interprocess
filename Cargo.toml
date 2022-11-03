@@ -24,7 +24,7 @@ tokio_support = ["tokio", "futures-core", "futures-io"]
 doc_cfg = []
 
 [dependencies]
-libc = { version = "0.2", features = ["extra_traits"] }
+libc = { version = "0.2.137", features = ["extra_traits"] }
 tokio = { version = "1.8", features = [
     "net",
     "time",
