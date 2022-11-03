@@ -94,6 +94,7 @@ impl UnnamedPipeCreationOptions {
     /// The [`security_descriptor`] field is passed directly to Win32 which is then dereferenced there, resulting in undefined behavior if it was an invalid non-null pointer. For the default configuration, this should never be a concern.
     ///
     /// [`security_descriptor`]: #field.security_descriptor " "
+    // TODO have safe and unsafe versions, since most folks don't need security_attributes
     pub unsafe fn build(self) -> io::Result<(PubWriter, PubReader)> {
         let hint_raw = match self.buffer_size_hint {
             Some(num) => num.get(),
@@ -130,9 +131,8 @@ impl Default for UnnamedPipeCreationOptions {
         Self::new()
     }
 }
-// FIXME the Sync trait is also probably fine since those are just system calls, but I'm not sure
-// yet.
 unsafe impl Send for UnnamedPipeCreationOptions {}
+unsafe impl Sync for UnnamedPipeCreationOptions {}
 
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     unsafe { UnnamedPipeCreationOptions::default().build() }
