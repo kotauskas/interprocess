@@ -14,6 +14,7 @@
 // TODO add examples
 // TODO get rid of the dumbass autoflush, literally no reason for me to have added it now that i
 // actually write proper examples for this
+// FIXME message streams should have methods instead of I/O traits
 
 mod enums;
 mod listener;
