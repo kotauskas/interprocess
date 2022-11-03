@@ -4,9 +4,11 @@ use {
 };
 
 pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
+    #[allow(unused_mut)]
     let ty = {
         let mut ty = ty;
-        if cfg!(target_os = "linux") {
+        #[cfg(target_os = "linux")]
+        {
             ty |= libc::SOCK_CLOEXEC;
             if nonblocking {
                 ty |= libc::SOCK_NONBLOCK;
@@ -15,7 +17,8 @@ pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
         ty
     };
     let fd = create_uds_raw(ty)?;
-    if cfg!(not(target_os = "linux")) {
+    #[cfg(not(target_os = "linux"))]
+    {
         set_nonblocking(&fd, nonblocking)?;
         set_cloexec(&fd, true)?;
     }
@@ -189,30 +192,37 @@ pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
         Err(io::Error::last_os_error())
     }
 }
-pub(super) fn get_fdflags(fd: &FdOps) -> io::Result<i32> {
-    let (val, success) = unsafe {
-        let ret = libc::fcntl(fd.0, F_GETFD, 0);
-        (ret, ret != -1)
-    };
-    if success {
-        Ok(val)
-    } else {
-        Err(io::Error::last_os_error())
+
+#[cfg(not(target_os = "linux"))]
+mod non_linux {
+    use super::*;
+    pub(super) fn get_fdflags(fd: &FdOps) -> io::Result<i32> {
+        let (val, success) = unsafe {
+            let ret = libc::fcntl(fd.0, F_GETFD, 0);
+            (ret, ret != -1)
+        };
+        if success {
+            Ok(val)
+        } else {
+            Err(io::Error::last_os_error())
+        }
     }
-}
-pub(super) fn set_fdflags(fd: &FdOps, flags: i32) -> io::Result<()> {
-    let success = unsafe { libc::fcntl(fd.0, F_SETFD, flags) != -1 };
-    if success {
+    pub(super) fn set_fdflags(fd: &FdOps, flags: i32) -> io::Result<()> {
+        let success = unsafe { libc::fcntl(fd.0, F_SETFD, flags) != -1 };
+        if success {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    pub(super) fn set_cloexec(fd: &FdOps, cloexec: bool) -> io::Result<()> {
+        let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
+        if cloexec {
+            flags |= FD_CLOEXEC;
+        }
+        set_fdflags(fd, flags)?;
         Ok(())
-    } else {
-        Err(io::Error::last_os_error())
     }
 }
-pub(super) fn set_cloexec(fd: &FdOps, cloexec: bool) -> io::Result<()> {
-    let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
-    if cloexec {
-        flags |= FD_CLOEXEC;
-    }
-    set_fdflags(fd, flags)?;
-    Ok(())
-}
+#[cfg(not(target_os = "linux"))]
+use non_linux::*;
