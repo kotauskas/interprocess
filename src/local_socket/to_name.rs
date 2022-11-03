@@ -19,9 +19,9 @@ impmod! {local_socket,
 /// The difference between this trait and [`TryInto`]`<`[`LocalSocketName`]`>` is that the latter does not constrain the error type to be [`io::Error`] and thus is not compatible with many types from the standard library which are widely expected to be convertible to Unix domain socket paths. Additionally, this makes the special syntax for namespaced sockets possible (see below).
 ///
 /// ## `@` syntax for namespaced paths
-/// As mentioned in the [`LocalSocketName` documentation][`LocalSocketName`], there are two types of which local socket names can be: filesystem paths and namespaced names. Those are isolated from each other — there's no portable way to represent one using another, though certain OSes might provide ways to do so — Windows does, for example. To be able to represent both in a platform-independent fashion, a special syntax was implemented in implementations of this trait on types from the standard library: "@ syntax".
+/// As mentioned in the [`LocalSocketName` documentation][`LocalSocketName`], there are two types of which local socket names can be: filesystem paths and namespaced names. Those are isolated from each other – there's no portable way to represent one using another, though certain OSes might provide ways to do so – Windows does, for example. To be able to represent both in a platform-independent fashion, a special syntax was implemented in implementations of this trait on types from the standard library: "@ syntax".
 ///
-/// The feature, in its core, is extremely simple: if the first character in a string is the @ character, the value of the string is interpreted and stored as a namespaced name (otherwise, it's treated as a filesystem path); the @ character is then removed from the string (by taking a subslice which dosen't include it if a string slice is being used; for owned strings, it's simply removed from the string by shifting the entire string towards the beginning). **[`Path`] and [`PathBuf`] are not affected at all — those have explicit path semantics and therefore cannot logically represent namespaced names.**
+/// The feature, in its core, is extremely simple: if the first character in a string is the @ character, the value of the string is interpreted and stored as a namespaced name (otherwise, it's treated as a filesystem path); the @ character is then removed from the string (by taking a subslice which dosen't include it if a string slice is being used; for owned strings, it's simply removed from the string by shifting the entire string towards the beginning). **[`Path`] and [`PathBuf`] are not affected at all – those have explicit path semantics and therefore cannot logically represent namespaced names.**
 ///
 /// This feature is extremely useful both when using hardcoded literals and accepting user input for the path, but sometimes you might want to prevent this behavior. In such a case, you have the following possible approaches:
 /// - If the string is a [`OsStr`]/[`OsString`], it can be cheaply converted to a [`Path`]/[`PathBuf`], which do not support the @ syntax
@@ -41,7 +41,7 @@ impmod! {local_socket,
 /// ```
 /// Then, the method for [`str`]/[`String`] can be applied.
 ///
-/// None of the above conversions perform memory allocations — the only expensive one is [`CStr`]/[`CString`] which performs a check for valid UTF-8.
+/// None of the above conversions perform memory allocations – the only expensive one is [`CStr`]/[`CString`] which performs a check for valid UTF-8.
 ///
 /// [`LocalSocketName`]: struct.LocalSocketName.html " "
 /// [`TryInto`]: https://doc.rust-lang.org/std/convert/trait.TryInto.html " "

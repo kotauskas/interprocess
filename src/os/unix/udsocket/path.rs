@@ -16,7 +16,7 @@ use std::{
 
 /// Represents a name for a Unix domain socket.
 ///
-/// The main purpose for this enumeration is to conditionally support the dedicated socket namespace on systems which implement it — for that, the `Namespaced` variant is used. Depending on your system, you might not be seeing it, which is when you'd need the `File` fallback variant, which works on all POSIX-compliant systems.
+/// The main purpose for this enumeration is to conditionally support the dedicated socket namespace on systems which implement it – for that, the `Namespaced` variant is used. Depending on your system, you might not be seeing it, which is when you'd need the `File` fallback variant, which works on all POSIX-compliant systems.
 ///
 /// ## `Namespaced`
 /// This variant refers to sockets in a dedicated socket namespace, which is fully isolated from the main filesystem and closes sockets automatically when the server which opened the socket shuts down. **This variant is only implemented on Linux, which is why it is not available on other POSIX-conformant systems at compile time, resulting in a compile-time error if usage is attempted.**
@@ -25,7 +25,7 @@ use std::{
 /// All sockets identified this way are located on the main filesystem and exist as persistent files until deletion, preventing servers from using the same socket without deleting it from the filesystem first. This variant is available on all POSIX-compilant systems.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UdSocketPath<'a> {
-    /// An unnamed socket, identified only by its file descriptor. This is an invalid path value for creating sockets — all attempts to use such a value will result in an error.
+    /// An unnamed socket, identified only by its file descriptor. This is an invalid path value for creating sockets – all attempts to use such a value will result in an error.
     Unnamed,
     /// Identifies a socket which is located in the filesystem tree, existing as a file. See the [enum-level documentation] for more.
     ///
@@ -264,7 +264,7 @@ impl<'a> UdSocketPath<'a> {
     }
 }
 impl UdSocketPath<'static> {
-    /// Creates a buffer suitable for usage with [`recv_from`] ([`_ancillary`]/[`_vectored`]/[`_ancillary_vectored`]). The capacity is equal to the [`MAX_UDSOCKET_PATH_LEN`] constant (the nul terminator in the `CString` is included). **The contained value is unspecified — results of reading from the buffer should not be relied upon.**
+    /// Creates a buffer suitable for usage with [`recv_from`] ([`_ancillary`]/[`_vectored`]/[`_ancillary_vectored`]). The capacity is equal to the [`MAX_UDSOCKET_PATH_LEN`] constant (the nul terminator in the `CString` is included). **The contained value is unspecified – results of reading from the buffer should not be relied upon.**
     ///
     /// # Example
     /// ```

@@ -1,7 +1,7 @@
 use super::super::imports::*;
 use std::{convert::TryFrom, mem};
 
-/// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server — [`ClientToServer`] always means client → server, for example.
+/// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server – [`ClientToServer`] always means client → server, for example.
 ///
 /// [`ClientToServer`]: enum.PipeDirection.html#variant.ClientToServer " "
 // I had to type out both the link to the page and the name of the variant since the link can be clicked from module-level documentation so please don't touch it.
@@ -91,7 +91,7 @@ impl From<PipeDirection> for DWORD {
         unsafe { mem::transmute(op) }
     }
 }
-/// Describes the role of a named pipe stream. In constrast to [`PipeDirection`], the meaning of values here is relative — for example, [`Reader`] means [`ServerToClient`] if you're creating a server and [`ClientToServer`] if you're creating a client.
+/// Describes the role of a named pipe stream. In constrast to [`PipeDirection`], the meaning of values here is relative – for example, [`Reader`] means [`ServerToClient`] if you're creating a server and [`ClientToServer`] if you're creating a client.
 ///
 /// This enumeration is also not layout-compatible with the `PIPE_ACCESS_*` constants, in contrast to [`PipeDirection`].
 ///

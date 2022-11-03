@@ -73,7 +73,7 @@ impl UdSocket {
     }
     /// Asynchronously waits until readable data arrives to the socket.
     ///
-    /// May finish spuriously — *do not* perform a blocking read when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
+    /// May finish spuriously – *do not* perform a blocking read when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
     pub async fn recv_ready(&self) -> io::Result<()> {
         self.0.readable().await
     }
@@ -91,7 +91,7 @@ impl UdSocket {
     }
     /// Asynchronously waits until the socket becomes writable due to the other side freeing up space in its OS receive buffer.
     ///
-    /// May finish spuriously — *do not* perform a blocking write when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
+    /// May finish spuriously – *do not* perform a blocking write when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
     pub async fn send_ready(&self) -> io::Result<()> {
         self.0.writable().await
     }

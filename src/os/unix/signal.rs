@@ -1,6 +1,6 @@
 //! Signal support for Unix-like systems.
 //!
-//! Signals in Unix are much more functional and versatile than ANSI C signals — there is simply much, much more of them. In addition to that, there is a special group of signals called "real-time signals" (more on those below).
+//! Signals in Unix are much more functional and versatile than ANSI C signals – there is simply much, much more of them. In addition to that, there is a special group of signals called "real-time signals" (more on those below).
 //!
 //! # Main signals
 //! The [`SignalType`] enumeration provides all standard signals as defined in POSIX.1-2001. More signal types may be added later, which is why exhaustively matching on it is not possible. It can be cheaply converted to a 32-bit integer, though. See its documentation for more on conversions.
@@ -422,7 +422,7 @@ impl HandlerOptions {
     pub fn for_rtsignal(rtsignal: u32) -> Self {
         assert!(
             is_valid_rtsignal(rtsignal),
-            "invalid real-time signal value — check the NUM_REALTIME_SIGNALS constant to see how \
+            "invalid real-time signal value – check the NUM_REALTIME_SIGNALS constant to see how \
             many are supported"
         );
         Self {
@@ -482,7 +482,7 @@ impl HandlerOptions {
     /// # Safety
     /// The handler and all code that may or may not execute afterwards must be prepared for the aftermath of what might've caused the signal.
     ///
-    /// [`SegmentationFault`] or [`BusError`] are most likely caused by undefined behavior invoked from Rust (the former is caused by dereferencing invalid memory, the latter is caused by dereferencing an incorrectly aligned pointer on ISAs like ARM which do not tolerate misaligned pointers), which means that the program is unsound and the only meaningful thing to do is to capture as much information as possible in a safe way — preferably using OS services to create a dump, rather than trying to read the program's global state, which might be irreversibly corrupted — and write the crash dump to some on-disk location.
+    /// [`SegmentationFault`] or [`BusError`] are most likely caused by undefined behavior invoked from Rust (the former is caused by dereferencing invalid memory, the latter is caused by dereferencing an incorrectly aligned pointer on ISAs like ARM which do not tolerate misaligned pointers), which means that the program is unsound and the only meaningful thing to do is to capture as much information as possible in a safe way – preferably using OS services to create a dump, rather than trying to read the program's global state, which might be irreversibly corrupted – and write the crash dump to some on-disk location.
     ///
     /// [`SegmentationFault`]: enum.SignalType.html#variant.SegmentationFault " "
     /// [`BusError`]: enum.SignalType.html#variant.BusError " "
@@ -502,7 +502,7 @@ impl HandlerOptions {
         let mut need_to_upgrade_handle = false;
         let need_to_install_hook =
             if let Some((existing_handler, existing_flags)) = handlers.get(self.signal as u64) {
-                // This signal's handler was set before — check if we need to install new flags or if
+                // This signal's handler was set before – check if we need to install new flags or if
                 // one is default and another isn't, which would mean that either that no hook was
                 // installed and we have to install one or there was one installed but we need to
                 // install the default hook explicitly.
@@ -859,60 +859,60 @@ pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> 
 #[repr(i32)]
 #[non_exhaustive]
 pub enum SignalType {
-    /// `SIGHUP` — lost connection to controlling terminal. Opting out of this signal is recommended if the process does not need to stop after the user who started it logs out.
+    /// `SIGHUP` – lost connection to controlling terminal. Opting out of this signal is recommended if the process does not need to stop after the user who started it logs out.
     ///
     /// *Default handler: process termination.*
     #[cfg(any(doc, se_basic))]
     Hangup = SIGHUP,
-    /// `SIGINT` — keyboard interrupt, usually sent by pressing `Ctrl`+`C` by the terminal. This signal is typically set to be ignored if the program runs an interactive interface: GUI/TUI, interactive shell (the Python shell, for example) or any other kind of interface which runs in a loop, as opposed to a command-line invocation of the program which reads its standard input or command-line arguments, performs a task and exits. If the interactive interface is running a lengthy operation, a good idea is to temporarily re-enable the signal and abort the lengthy operation if the signal is received, then disable it again.
+    /// `SIGINT` – keyboard interrupt, usually sent by pressing `Ctrl`+`C` by the terminal. This signal is typically set to be ignored if the program runs an interactive interface: GUI/TUI, interactive shell (the Python shell, for example) or any other kind of interface which runs in a loop, as opposed to a command-line invocation of the program which reads its standard input or command-line arguments, performs a task and exits. If the interactive interface is running a lengthy operation, a good idea is to temporarily re-enable the signal and abort the lengthy operation if the signal is received, then disable it again.
     ///
     /// *Default handler: process termination.*
     #[cfg(any(doc, se_basic))]
     KeyboardInterrupt = SIGINT,
-    /// `SIGQUIT` — request to perform a core dump and quit, usually sent by pressing `Ctrl`+`\`. This signal normally should not be overriden or masked out — the core dump is performed automatically by the OS.
+    /// `SIGQUIT` – request to perform a core dump and quit, usually sent by pressing `Ctrl`+`\`. This signal normally should not be overriden or masked out – the core dump is performed automatically by the OS.
     ///
     /// *Default handler: process termination with a core dump.*
     #[cfg(any(doc, se_basic))]
     QuitAndDump = SIGQUIT,
-    /// `SIGILL` — illegal or malformed instruction exception, generated by the CPU whenever such an instruction is executed. This signal normally should not be overriden or masked out, since it likely means that the executable file or the memory of the process has been corrupted and further execution is a risk of invoking negative consequences.
+    /// `SIGILL` – illegal or malformed instruction exception, generated by the CPU whenever such an instruction is executed. This signal normally should not be overriden or masked out, since it likely means that the executable file or the memory of the process has been corrupted and further execution is a risk of invoking negative consequences.
     ///
-    /// For reasons described above, **this signal is considered unsafe** — handling it requires using `set_unsafe_handler`.
+    /// For reasons described above, **this signal is considered unsafe** – handling it requires using `set_unsafe_handler`.
     ///
     /// *Default handler: process termination with a core dump.*
     #[cfg(any(doc, se_basic))]
     IllegalInstruction = SIGILL,
-    /// `SIGABRT` — abnormal termination requested. This signal is typically invoked by the program itself, using [`std::process::abort`] or the equivalent C function; still, like any other signal, it can be sent from outside the process.
+    /// `SIGABRT` – abnormal termination requested. This signal is typically invoked by the program itself, using [`std::process::abort`] or the equivalent C function; still, like any other signal, it can be sent from outside the process.
     ///
     /// *Default handler: process termination with a core dump.*
     ///
     /// [`std::process::abort`]: https://doc.rust-lang.org/std/process/fn.abort.html " "
     #[cfg(any(doc, se_basic))]
     Abort = SIGABRT,
-    /// `SIGFPE` — mathematical exception. This signal is generated whenever an undefined mathematical operation is performed — mainly integer division by zero.
+    /// `SIGFPE` – mathematical exception. This signal is generated whenever an undefined mathematical operation is performed – mainly integer division by zero.
     ///
     /// *Default handler: process termination with a core dump.*
     #[cfg(any(doc, se_basic))]
     MathException = SIGFPE,
-    /// `SIGKILL` — forced termination. This signal can only be sent using the usual signal sending procedures and, unlike most other signals, cannot be masked out or handled at all. The main purpose for this signal is to stop a program which has masked out all other signals for malicious purposes or has stuck in such a state because of a bug.
+    /// `SIGKILL` – forced termination. This signal can only be sent using the usual signal sending procedures and, unlike most other signals, cannot be masked out or handled at all. The main purpose for this signal is to stop a program which has masked out all other signals for malicious purposes or has stuck in such a state because of a bug.
     ///
     /// *Default handler: process termination, **cannot be overriden or disabled**.*
     #[cfg(any(doc, se_basic))]
     Kill = SIGKILL,
-    /// `SIGSEGV` — invaid memory access. This signal is issued by the OS whenever the program tries to access an invalid memory location, such as the `NULL` pointer or simply an address outside the user-mode address space as established by the OS. The only case when this signal can be received by a Rust program is if memory unsafety occurs due to misuse of unsafe code. As such, it should normally not be masked out or handled, as it likely indicates a critical bug (soundness hole), executable file corruption or process memory corruption.
+    /// `SIGSEGV` – invaid memory access. This signal is issued by the OS whenever the program tries to access an invalid memory location, such as the `NULL` pointer or simply an address outside the user-mode address space as established by the OS. The only case when this signal can be received by a Rust program is if memory unsafety occurs due to misuse of unsafe code. As such, it should normally not be masked out or handled, as it likely indicates a critical bug (soundness hole), executable file corruption or process memory corruption.
     ///
-    /// For reasons described above, **this signal is considered unsafe** — handling it requires using `set_unsafe_handler`.
+    /// For reasons described above, **this signal is considered unsafe** – handling it requires using `set_unsafe_handler`.
     ///
     /// *Default handler: process termination with a core dump.*
     #[cfg(any(doc, se_basic))]
     SegmentationFault = SIGSEGV,
-    /// `SIGPIPE` — invalid access to an [unnamed pipe]. This signal is issued by the OS whenever a program attempts to write to an unnamed pipe which has no readers connected to it. If unexpected, this might mean abnormal termination of the process which the pipe was used to communicate with.
+    /// `SIGPIPE` – invalid access to an [unnamed pipe]. This signal is issued by the OS whenever a program attempts to write to an unnamed pipe which has no readers connected to it. If unexpected, this might mean abnormal termination of the process which the pipe was used to communicate with.
     ///
     /// *Default handler: process termination.*
     ///
     /// [unnamed pipe]: ../../../unnamed_pipe/index.html " "
     #[cfg(any(doc, se_basic))]
     BrokenPipe = SIGPIPE,
-    /// `SIGALRM` — "alarm clock" signal. This signal is issued by the OS when the arranged amount of real (wall clock) time expires. This clock can be set using the [`alarm`] and [`setitimer`] system calls.
+    /// `SIGALRM` – "alarm clock" signal. This signal is issued by the OS when the arranged amount of real (wall clock) time expires. This clock can be set using the [`alarm`] and [`setitimer`] system calls.
     ///
     /// *Default handler: process termination.*
     ///
@@ -920,14 +920,14 @@ pub enum SignalType {
     /// [`setitimer`]: https://www.man7.org/linux/man-pages/man2/setitimer.2.html " "
     #[cfg(any(doc, se_basic))]
     AlarmClock = SIGALRM,
-    /// `SIGTERM` — request for termination. This signal can only be sent using the usual signal sending procedures. Unlike [`KeyboardInterrupt`], this signal is not a request to break out of a lengthy operation, but rather to close the program as a whole. Signal handlers for this signal are expected to perform minimal cleanup and quick state save procedures and then exit.
+    /// `SIGTERM` – request for termination. This signal can only be sent using the usual signal sending procedures. Unlike [`KeyboardInterrupt`], this signal is not a request to break out of a lengthy operation, but rather to close the program as a whole. Signal handlers for this signal are expected to perform minimal cleanup and quick state save procedures and then exit.
     ///
     /// *Default handler: process termination.*
     ///
     /// [`KeyboardInterrupt`]: #variant.KeyboardInterrupt " "
     #[cfg(any(doc, se_basic))]
     Termination = SIGTERM,
-    /// `SIGUSR1` — user-defined signal 1. This signal, like [`UserSignal2`], does not have a predefined meaning and is not produced by the OS. For this reason, it is typically used for interprocess communication between two programs familiar with each other, or in language runtimes to signal certain events, such as externally activated immediate garbage collection.
+    /// `SIGUSR1` – user-defined signal 1. This signal, like [`UserSignal2`], does not have a predefined meaning and is not produced by the OS. For this reason, it is typically used for interprocess communication between two programs familiar with each other, or in language runtimes to signal certain events, such as externally activated immediate garbage collection.
     ///
     /// *Default handler: process termination.*
     ///
@@ -938,7 +938,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     UserSignal1 = SIGUSR1,
-    /// `SIGUSR2` — user-defined signal 2. This signal is similar to [`UserSignal1`] and has the same properties, but is a distinct signal nonetheless.
+    /// `SIGUSR2` – user-defined signal 2. This signal is similar to [`UserSignal1`] and has the same properties, but is a distinct signal nonetheless.
     ///
     /// *Default handler: process termination.*
     ///
@@ -949,7 +949,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     UserSignal2 = SIGUSR2,
-    /// `SIGCHLD` — child process suspended, resumed or terminated. This signal is issued by the OS whenever a child process is suspended/resumed or terminated by a signal or otherwise.
+    /// `SIGCHLD` – child process suspended, resumed or terminated. This signal is issued by the OS whenever a child process is suspended/resumed or terminated by a signal or otherwise.
     ///
     /// *Default handler: ignore.*
     #[cfg(any(doc, se_full_posix_1990))]
@@ -958,7 +958,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     ChildProcessEvent = SIGCHLD,
-    /// `SIGCONT` — resume the process after being suspended. This signal can be sent to a process by an external program when it wishes to resume that process after it being suspended in a stopped state.
+    /// `SIGCONT` – resume the process after being suspended. This signal can be sent to a process by an external program when it wishes to resume that process after it being suspended in a stopped state.
     ///
     /// *Default handler: continue execution.*
     #[cfg(any(doc, se_full_posix_1990))]
@@ -967,7 +967,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     Continue = SIGCONT,
-    /// `SIGSTOP` — forcefully stop a process temporarily. This signal can only be sent to a process by an external program. Unlike [`Suspend`], this signal cannot be masked out or handled, i.e. it is guaranteed to be able to temporarily stop a process from executing without [forcefully terminating it]. The process can then be restarted using [`Continue`].
+    /// `SIGSTOP` – forcefully stop a process temporarily. This signal can only be sent to a process by an external program. Unlike [`Suspend`], this signal cannot be masked out or handled, i.e. it is guaranteed to be able to temporarily stop a process from executing without [forcefully terminating it]. The process can then be restarted using [`Continue`].
     ///
     /// *Default handler: temporarily stop process, **cannot be overriden or disabled**.*
     ///
@@ -980,7 +980,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     ForceSuspend = SIGSTOP,
-    /// `SIGTSTP` — temporarily stop a process. This signal can only be sent to a process by an external program. Unlike [`ForceSuspend`], this signal can be masked out or handled by the process which is requested to stop. The process can then be restarted using [`Continue`].
+    /// `SIGTSTP` – temporarily stop a process. This signal can only be sent to a process by an external program. Unlike [`ForceSuspend`], this signal can be masked out or handled by the process which is requested to stop. The process can then be restarted using [`Continue`].
     ///
     /// *Default handler: temporarily stop process.*
     ///
@@ -992,7 +992,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     Suspend = SIGTSTP,
-    /// `SIGTTIN` — attempt to read from standard input while in the background. This signal is issued by the OS whenever a process which is under [job control] tries to read from standard input but is in the background, i.e. temporarily detached from the terminal.
+    /// `SIGTTIN` – attempt to read from standard input while in the background. This signal is issued by the OS whenever a process which is under [job control] tries to read from standard input but is in the background, i.e. temporarily detached from the terminal.
     ///
     /// *Default handler: temporarily stop process.*
     ///
@@ -1003,7 +1003,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     TerminalInputWhileInBackground = SIGTTIN,
-    /// `SIGTTOU` — attempt to write to standard output while in the background. This signal is issued by the OS whenever a process which is under [job control] tries to write to standard input but is in the background, i.e. temporarily detached from the terminal.
+    /// `SIGTTOU` – attempt to write to standard output while in the background. This signal is issued by the OS whenever a process which is under [job control] tries to write to standard input but is in the background, i.e. temporarily detached from the terminal.
     ///
     /// *Default handler: temporarily stop process.*
     ///
@@ -1014,7 +1014,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     TerminalOutputWhileInBackground = SIGTTOU,
-    /// `SIGPOLL` — watched file descriptor event. This signal is issued by the OS when a file descriptor which has been enabled to interact with this signal has a state update.
+    /// `SIGPOLL` – watched file descriptor event. This signal is issued by the OS when a file descriptor which has been enabled to interact with this signal has a state update.
     ///
     /// *Default handler: process termination.*
     // TODO more on this
@@ -1032,12 +1032,12 @@ pub enum SignalType {
         )))
     )]
     PollNotification = SIGPOLL,
-    /// `SIGBUS` — [bus error]. This signal is issued by the OS when a process does one of the following:
-    /// - **Tries to access an invalid physical address**. Normally, this should never happen — attempts to access invalid *virtual* memory are handled as [segmentation faults], and invalid phyiscal addresses are typically not present in the address space of a program in user-mode.
+    /// `SIGBUS` – [bus error]. This signal is issued by the OS when a process does one of the following:
+    /// - **Tries to access an invalid physical address**. Normally, this should never happen – attempts to access invalid *virtual* memory are handled as [segmentation faults], and invalid phyiscal addresses are typically not present in the address space of a program in user-mode.
     /// - **Performs an incorrectly aligned memory access**. In Rust, this can only happen if unsafe code is misused to construct an incorrectly aligned pointer to a type which requires alignment which is more strict than simple one byte alignment. This is a direct sign of memory unsafety being invoked.
     /// - **Incorrect x86 segment register**. This can only be acheieved using inline assembly or FFI (calling an external function written in assembly language or with usage of C/C++ inline assembly), and only on the x86 architecture. If an invalid value is loaded into the segment registers, the CPU generates this exception. This is either a sign of a failed advanced unsafe operation or a deliberate attempt to cryptically crash the program.
     ///
-    /// For reasons described above, **this signal is considered unsafe** — handling it requires using `set_unsafe_handler`.
+    /// For reasons described above, **this signal is considered unsafe** – handling it requires using `set_unsafe_handler`.
     ///
     /// *Default handler: process termination with a core dump.*
     ///
@@ -1049,7 +1049,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     MemoryBusError = SIGBUS,
-    /// `SIGPROF` — profiler clock signal. This signal is issued by the OS when the arranged amount of CPU time expires. The time includes not only user-mode CPU time spent in the process, but also kernel-mode CPU time which the OS associates with the process. This is different from [`UserModeProfilerClock`]'s behavior, which counts only user-mode CPU time. This clock can be set using the [`setitimer`] system call.
+    /// `SIGPROF` – profiler clock signal. This signal is issued by the OS when the arranged amount of CPU time expires. The time includes not only user-mode CPU time spent in the process, but also kernel-mode CPU time which the OS associates with the process. This is different from [`UserModeProfilerClock`]'s behavior, which counts only user-mode CPU time. This clock can be set using the [`setitimer`] system call.
     ///
     /// *Default handler: process termination.*
     ///
@@ -1061,7 +1061,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     ProfilerClock = SIGPROF,
-    /// `SIGVTALRM` — user-mode profiler clock signal. This signal is issued by the OS when the arranged amount of CPU time expires. Only user-mode CPU time is counted, in contrast to `ProfilerClock`, which counts kernel-mode time associated by the system with the process as well. This clock can be set using the [`setitimer`] system call.
+    /// `SIGVTALRM` – user-mode profiler clock signal. This signal is issued by the OS when the arranged amount of CPU time expires. Only user-mode CPU time is counted, in contrast to `ProfilerClock`, which counts kernel-mode time associated by the system with the process as well. This clock can be set using the [`setitimer`] system call.
     ///
     /// *Default handler: process termination.*
     ///
@@ -1073,7 +1073,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     UserModeProfilerClock = SIGVTALRM,
-    /// `SIGSYS` — attempt to perform an invalid system call. This signal is issued by the OS when a system call receives invalid arguments. Normally, the C library functions used to perform system calls in Rust programs do not generate this signal — the only way to generate it is to send it to a process explicitly, use raw system call instructions or violate [`seccomp`] rules if it is enabled.
+    /// `SIGSYS` – attempt to perform an invalid system call. This signal is issued by the OS when a system call receives invalid arguments. Normally, the C library functions used to perform system calls in Rust programs do not generate this signal – the only way to generate it is to send it to a process explicitly, use raw system call instructions or violate [`seccomp`] rules if it is enabled.
     ///
     /// *Default handler: process termination with a core dump.*
     ///
@@ -1084,7 +1084,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     InvalidSystemCall = SIGSYS,
-    /// `SIGTRAP` — software breakpoint. This signal is issued by the OS when a breakpoint instruction is executed. On x86, the instruction to do so is `int 3`. This instruction is typically inserted by debuggers and code injection utilities.
+    /// `SIGTRAP` – software breakpoint. This signal is issued by the OS when a breakpoint instruction is executed. On x86, the instruction to do so is `int 3`. This instruction is typically inserted by debuggers and code injection utilities.
     ///
     /// *Default handler: process termination with a core dump.*
     #[cfg(any(doc, se_base_posix_2001))]
@@ -1093,7 +1093,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     Breakpoint = SIGTRAP,
-    /// `SIGURG` — [out-of-band data] received on a socket. This signal is issued by the OS when a socket owned by the process receives urgent out-of-band data.
+    /// `SIGURG` – [out-of-band data] received on a socket. This signal is issued by the OS when a socket owned by the process receives urgent out-of-band data.
     ///
     /// *Default handler: ignore.*
     ///
@@ -1104,7 +1104,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     OutOfBandDataAvailable = SIGURG,
-    /// `SIGXCPU` — assigned CPU time limit for the process was exceeded. This signal is issued by the OS if a CPU time limit for the process was set, when that limit expires. If not handled quickly, the system will issue a [`Kill`] signal to shut down the process forcefully, i.e. ignoring this signal won't lead to bypassing the limit. The [`setrlimit`] system call is used to set the soft limit for this signal and the hard limit, which invokes [`Kill`].
+    /// `SIGXCPU` – assigned CPU time limit for the process was exceeded. This signal is issued by the OS if a CPU time limit for the process was set, when that limit expires. If not handled quickly, the system will issue a [`Kill`] signal to shut down the process forcefully, i.e. ignoring this signal won't lead to bypassing the limit. The [`setrlimit`] system call is used to set the soft limit for this signal and the hard limit, which invokes [`Kill`].
     ///
     /// *Default handler: process termination with a core dump.*
     ///
@@ -1116,7 +1116,7 @@ pub enum SignalType {
         doc(cfg(not(target_os = "hermit"))),
     )]
     CpuTimeLimitExceeded = SIGXCPU,
-    /// `SIGXFSZ` — assigned file size limit for the process was exceeded. This signal is issued by the OS if a limit on the size of files which are written to by the process was set, when that limit is exceeded by the process. If ignored/handled, the offending system call fails with an error regardless of the handling method. The [`setrlimit`] system call is used to set the limit.
+    /// `SIGXFSZ` – assigned file size limit for the process was exceeded. This signal is issued by the OS if a limit on the size of files which are written to by the process was set, when that limit is exceeded by the process. If ignored/handled, the offending system call fails with an error regardless of the handling method. The [`setrlimit`] system call is used to set the limit.
     ///
     /// *Default handler: process termination with a core dump.*
     ///

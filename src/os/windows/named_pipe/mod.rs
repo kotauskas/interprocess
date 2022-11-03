@@ -2,7 +2,7 @@
 //!
 //! ## Windows named pipes are not Unix named pipes
 //! The term "named pipe" refers to completely different things in Unix and Windows. For this reason, Unix named pipes are referred to as "FIFO files" to avoid confusion with the more powerful Windows named pipes. In fact, the only common features for those two is that they both can be located using filesystem paths and they both use a stream interface. The differences can be summed up like this:
-//! - Windows named pipes are located on a separate filesystem (NPFS — **N**amed **P**ipe **F**ile**s**ystem), while Unix FIFO files live in the shared filesystem tree together with all other files
+//! - Windows named pipes are located on a separate filesystem (NPFS – **N**amed **P**ipe **F**ile**s**ystem), while Unix FIFO files live in the shared filesystem tree together with all other files
 //!     - On Linux, the implementation of Unix domain sockets exposes a similar feature: by setting the first byte in the socket file path to `NULL` (`\0`), the socket is placed into a separate namespace instead of being placed on the filesystem; this is a non-standard extension to POSIX and is not available on other Unix systems
 //! - Windows named pipes have a server and an arbitrary number of clients, meaning that the separate processes connecting to a named pipe have separate connections to the server, while Unix FIFO files don't have the notion of a server or client and thus mix all data written into one sink from which the data is read by one process
 //! - Windows named pipes can be used over the network, while a Unix FIFO file is still local even if created in a directory which is a mounted network filesystem

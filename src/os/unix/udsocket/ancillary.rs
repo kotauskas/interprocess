@@ -13,7 +13,7 @@ use std::{
 pub enum AncillaryData<'a> {
     /// One or more file descriptors to be sent.
     FileDescriptors(Cow<'a, [c_int]>),
-    /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser — for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
+    /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser – for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
     ///
     /// [`credentials`]: #method.credentials " "
     #[cfg(any(doc, uds_ucred))]
@@ -224,7 +224,7 @@ impl<'a> AncillaryDataBuf<'a> {
     }
     /// Creates a decoder which decodes the ancillary data buffer into a friendly representation of its contents.
     ///
-    /// All invalid ancillary data blocks are skipped — if there was garbage data in the buffer to begin with, the resulting buffer will either be empty or contain invalid credentials/file descriptors. This should normally never happen if the data is actually received from a Unix domain socket.
+    /// All invalid ancillary data blocks are skipped – if there was garbage data in the buffer to begin with, the resulting buffer will either be empty or contain invalid credentials/file descriptors. This should normally never happen if the data is actually received from a Unix domain socket.
     pub fn decode(&'a self) -> AncillaryDataDecoder<'a> {
         AncillaryDataDecoder {
             buffer: self.as_ref(),
@@ -269,7 +269,7 @@ impl<'a> AsMut<[u8]> for AncillaryDataBuf<'a> {
 
 /// An iterator which decodes ancillary data from an ancillary data buffer.
 ///
-/// This iterator is created by the [`decode`] method on [`AncillaryDataBuf`] — see its documentation for more.
+/// This iterator is created by the [`decode`] method on [`AncillaryDataBuf`] – see its documentation for more.
 ///
 /// [`AncillaryDataBuf`]: struct.AncillaryDataBuf.html " "
 /// [`decode`]: struct.AncillaryDataBuf.html#method.decode " "
@@ -319,7 +319,7 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
             }
             u32_from_slice(&bytes[self.i..self.i + 4]) as usize
         };
-        // The cmsg_level field is always SOL_SOCKET — we don't need it, let's get the
+        // The cmsg_level field is always SOL_SOCKET – we don't need it, let's get the
         // cmsg_type field right away by first getting the offset at which it's
         // located:
         #[cfg(target_pointer_width = "64")]
@@ -340,7 +340,7 @@ impl<'a> Iterator for AncillaryDataDecoder<'a> {
         match element_type as i32 {
             SCM_RIGHTS => {
                 // We're reading one or multiple descriptors from the ancillary data payload.
-                // All descriptors are 4 bytes in size — leftover bytes are discarded thanks
+                // All descriptors are 4 bytes in size – leftover bytes are discarded thanks
                 // to integer division rules
                 let amount_of_descriptors = element_size / 4;
                 let mut descriptors = Vec::<c_int>::with_capacity(amount_of_descriptors);

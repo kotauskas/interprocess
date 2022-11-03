@@ -30,7 +30,7 @@ impl NameTypeSupport {
     pub const ALWAYS_AVAILABLE: Self = NAME_TYPE_ALWAYS_SUPPORTED_REAL;
     /// Returns the types of local socket names supported on the current platform with the current environment.
     ///
-    /// On most platforms, the value is known at compile time, i.e. the support for one of the types wasn't introduced in an update to the OS or isn't known to be supported at all. **Currently, this includes all supported OSes.** For compatibility with OSes which might add the functionality in the future starting with a specific version, this function isn't a `const fn` — see [`ALWAYS_AVAILABLE`] if you need a constant expression.
+    /// On most platforms, the value is known at compile time, i.e. the support for one of the types wasn't introduced in an update to the OS or isn't known to be supported at all. **Currently, this includes all supported OSes.** For compatibility with OSes which might add the functionality in the future starting with a specific version, this function isn't a `const fn` – see [`ALWAYS_AVAILABLE`] if you need a constant expression.
     ///
     /// [`ALWAYS_AVAILABLE`]: #associatedconstant.ALWAYS_AVAILABLE " "
     pub fn query() -> Self {

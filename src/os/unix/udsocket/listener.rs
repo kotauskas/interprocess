@@ -119,7 +119,7 @@ use to_method::To;
 ///     }
 ///     let mut files = Vec::new();
 ///     if let Some(fds) = file_descriptors {
-///         // There is a possibility that zero file descriptors were sent — let's account for that.
+///         // There is a possibility that zero file descriptors were sent – let's account for that.
 ///         for fd in fds.iter().copied() {
 ///             // This is normally unsafe, but since we know that the descriptor is not owned somewhere
 ///             // else in the current process, it's fine to do this:
@@ -321,7 +321,7 @@ impl FromRawFd for UdStreamListener {
 
 /// An infinite iterator over incoming client connections of a [`UdStreamListener`].
 ///
-/// This iterator is created by the [`incoming`] method on [`UdStreamListener`] — see its documentation for more.
+/// This iterator is created by the [`incoming`] method on [`UdStreamListener`] – see its documentation for more.
 ///
 /// [`UdStreamListener`]: struct.UdStreamListener.html " "
 /// [`incoming`]: struct.UdStreamListener.html#method.incoming " "

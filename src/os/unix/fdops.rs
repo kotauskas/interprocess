@@ -119,7 +119,7 @@ pub(super) unsafe fn close_fd(fd: i32) {
         while libc::close(fd) != 0 {
             let current_error = io::Error::last_os_error();
             if current_error.kind() != io::ErrorKind::Interrupted {
-                // An actual close error happened — return early now
+                // An actual close error happened – return early now
                 error = Some(current_error);
                 break;
             }

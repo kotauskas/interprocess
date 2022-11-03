@@ -10,9 +10,9 @@ use {
 /// Reading from named pipes with message boundaries reliably, without truncation.
 ///
 /// ## The problem
-/// Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by the operating system — instead, all messages read from a named pipe stream are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
+/// Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by the operating system – instead, all messages read from a named pipe stream are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
 ///
-/// There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully read a message. With byte streams, that always works — there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually reading it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
+/// There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully read a message. With byte streams, that always works – there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually reading it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
 ///
 /// This brings the discussion specifically to the signature of the `read_msg` method:
 /// ```no_run
@@ -30,7 +30,7 @@ use {
 /// fn try_read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>>;
 /// # }
 /// ```
-/// While it may seem strange how the nested `Result` returns the same type in `Ok` and `Err`, it does this for a semantic reason: the `Ok` variant means that the message was successfully read into the buffer while `Err` means the opposite — that the message was too big — and returns the size which the buffer needs to have.
+/// While it may seem strange how the nested `Result` returns the same type in `Ok` and `Err`, it does this for a semantic reason: the `Ok` variant means that the message was successfully read into the buffer while `Err` means the opposite – that the message was too big – and returns the size which the buffer needs to have.
 ///
 /// ## Platform support
 /// The trait is implemented for:

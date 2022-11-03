@@ -1,6 +1,6 @@
 //! Local sockets, an IPC primitive featuring a server and multiple clients connecting to that server using a filesystem path inside a special namespace, each having a private connection to that server.
 //!
-//! Local sockets are not a real IPC method implemented by the OS — they were introduced because of the difference between named pipes on Windows and Unix: named pipes on Windows are almost the same as Unix domain sockets on Linux while Unix named pipes (which are referred to as FIFO files in this crate to avoid confusion) are like unnamed pipes but identifiable with a filesystem path: there's no distinction between writers and the first reader takes all. **Simply put, local sockets use named pipes on Windows and Unix domain sockets on Unix.**
+//! Local sockets are not a real IPC method implemented by the OS – they were introduced because of the difference between named pipes on Windows and Unix: named pipes on Windows are almost the same as Unix domain sockets on Linux while Unix named pipes (which are referred to as FIFO files in this crate to avoid confusion) are like unnamed pipes but identifiable with a filesystem path: there's no distinction between writers and the first reader takes all. **Simply put, local sockets use named pipes on Windows and Unix domain sockets on Unix.**
 //!
 //! ## Differences from regular sockets
 //! A few missing features, primarily on Windows, require local sockets to omit some important functionality, because code relying on it wouldn't be portable. Some notable differences are:

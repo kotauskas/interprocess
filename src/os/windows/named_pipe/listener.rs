@@ -178,7 +178,7 @@ impl<'a> PipeListenerOptions<'a> {
     }
     /// Clones configuration options which are not owned by value and returns a copy of the original option table which is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
     ///
-    /// This is used instead of the `ToOwned` trait for backwards compatibility — this will be fixed in the next breaking release.
+    /// This is used instead of the `ToOwned` trait for backwards compatibility – this will be fixed in the next breaking release.
     pub fn to_owned(&self) -> PipeListenerOptions<'static> {
         // We need this ugliness because the compiler does not understand that
         // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually

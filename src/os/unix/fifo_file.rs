@@ -1,6 +1,6 @@
 //! Creating and using FIFO files, which are also known as "named pipes" but totally different from named pipes on Windows.
 //!
-//! On Windows, named pipes can be compared to Unix domain sockets: they can have multiple duplex connections on a single path, and the data can be chosen to either preserve or erase the message boundaries, resulting in a reliable performant implementation of TCP and UDP working in the bounds of a single machine. Those Unix domain sockets are also implemented by `interprocess` — see the [`udsocket`] module for that.
+//! On Windows, named pipes can be compared to Unix domain sockets: they can have multiple duplex connections on a single path, and the data can be chosen to either preserve or erase the message boundaries, resulting in a reliable performant implementation of TCP and UDP working in the bounds of a single machine. Those Unix domain sockets are also implemented by `interprocess` – see the [`udsocket`] module for that.
 //!
 //! On Linux, named pipes, referred to as "FIFO files" in this crate, are just files which can have a writer and a reader communicating with each other in one direction without message boundaries. If further readers try to open the file, they will simply read nothing at all; if further writers are connected, the data mixes in an unpredictable way, making it unusable. Therefore, FIFOs are to be used specifically to conveniently connect two applications through a known path which works like a pipe and nothing else.
 //!

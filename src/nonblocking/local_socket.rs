@@ -55,7 +55,7 @@ impl LocalSocketListener {
 
 /// An infinite asynchronous stream over incoming client connections of a [`LocalSocketListener`].
 ///
-/// This stream is created by the [`incoming`] method on [`LocalSocketListener`] — see its documentation for more.
+/// This stream is created by the [`incoming`] method on [`LocalSocketListener`] – see its documentation for more.
 ///
 /// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
 /// [`incoming`]: struct.LocalSocketListener.html#method.incoming " "

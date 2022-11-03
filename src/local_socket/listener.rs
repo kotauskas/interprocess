@@ -62,7 +62,7 @@ impl Debug for LocalSocketListener {
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
 ///
-/// This iterator is created by the [`incoming`] method on [`LocalSocketListener`] — see its documentation for more.
+/// This iterator is created by the [`incoming`] method on [`LocalSocketListener`] – see its documentation for more.
 ///
 /// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
 /// [`incoming`]: struct.LocalSocketListener.html#method.incoming " "
