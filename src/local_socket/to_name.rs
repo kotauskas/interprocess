@@ -58,7 +58,8 @@ pub trait ToLocalSocketName<'a> {
     #[allow(clippy::wrong_self_convention)] // shut the fuck up
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>>;
 }
-// TODO document inpls for symmetry with ud-sockets
+
+/// Converts a borrowed [`Path`] to a borrowed file-type [`LocalSocketName`] with the same lifetime.
 impl<'a> ToLocalSocketName<'a> for &'a Path {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         Ok(LocalSocketName::from_raw_parts(
@@ -67,6 +68,7 @@ impl<'a> ToLocalSocketName<'a> for &'a Path {
         ))
     }
 }
+/// Converts an owned [`PathBuf`] to an owned file-type [`LocalSocketName`].
 impl ToLocalSocketName<'static> for PathBuf {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         Ok(LocalSocketName::from_raw_parts(
@@ -75,28 +77,32 @@ impl ToLocalSocketName<'static> for PathBuf {
         ))
     }
 }
+/// Converts a borrowed [`OsStr`] to a borrowed [`LocalSocketName`] with the same lifetime. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a OsStr {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         Ok(to_local_socket_name_osstr(self))
     }
 }
+/// Converts an owned [`OsString`] to an owned [`LocalSocketName`]. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl ToLocalSocketName<'static> for OsString {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         Ok(to_local_socket_name_osstring(self))
     }
 }
+/// Converts a borrowed [`str`] to a borrowed [`LocalSocketName`] with the same lifetime. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a str {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         OsStr::new(self).to_local_socket_name()
     }
 }
+/// Converts an owned [`String`] to an owned [`LocalSocketName`]. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl ToLocalSocketName<'static> for String {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        // OsString docs misleadingly state that a conversion from String requires reallocating
-        // and copying, but, according to the std sources, that is not true on any platforms.
         OsString::from(self).to_local_socket_name()
     }
 }
+/// Converts a borrowed [`CStr`] to a borrowed [`LocalSocketName`] with the same lifetime. **UTF-8 is assumed and the nul terminator is preserved during conversion**. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
+// FIXME chop off the nul
 impl<'a> ToLocalSocketName<'a> for &'a CStr {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         str::from_utf8(self.to_bytes_with_nul())
@@ -104,6 +110,7 @@ impl<'a> ToLocalSocketName<'a> for &'a CStr {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
 }
+/// Converts an owned [`CString`] to an owned [`LocalSocketName`]. **UTF-8 is assumed and the nul terminator is preserved during conversion**. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl ToLocalSocketName<'static> for CString {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         String::from_utf8(self.into_bytes_with_nul())
