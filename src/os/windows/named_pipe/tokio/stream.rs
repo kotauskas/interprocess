@@ -349,6 +349,7 @@ Byte stream [reader] and [writer] for a Tokio-based named pipe.
 Created either by using `PipeListener` or by connecting to a named pipe server.
 
 [reader]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
+[writer]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
 "
     DuplexMsgPipeStream:
         corresponding_reader: MsgReaderPipeStream,

@@ -89,7 +89,7 @@ impl ToLocalSocketName<'static> for OsString {
         Ok(to_local_socket_name_osstring(self))
     }
 }
-/// Converts a borrowed [`str`] to a borrowed [`LocalSocketName`] with the same lifetime. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
+/// Converts a borrowed [`str`](prim@str) to a borrowed [`LocalSocketName`] with the same lifetime. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a str {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         OsStr::new(self).to_local_socket_name()
