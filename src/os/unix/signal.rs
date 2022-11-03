@@ -1194,7 +1194,7 @@ impl TryFrom<i32> for SignalType {
 impl TryFrom<u32> for SignalType {
     type Error = UnknownSignalError;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        (value as u32).try_into()
+        value.try_into()
     }
 }
 

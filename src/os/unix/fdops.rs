@@ -46,7 +46,7 @@ impl FdOps {
             (size_or_err >= 0, size_or_err as usize)
         };
         if success {
-            Ok(bytes_written as usize)
+            Ok(bytes_written)
         } else {
             Err(io::Error::last_os_error())
         }
