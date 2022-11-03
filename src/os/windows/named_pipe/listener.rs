@@ -230,7 +230,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         let open_mode = self.to_open_mode(first, role, overlapped);
         let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
         let (handle, success) = unsafe {
-            // FIXME doesn't actually pass all parameters
+            // TODO security attributes
             let handle = CreateNamedPipeW(
                 path.as_ptr(),
                 open_mode,
