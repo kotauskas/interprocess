@@ -4,7 +4,7 @@ use {
 };
 
 pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
-    #[allow(unused_mut)]
+    #[allow(unused_mut, clippy::let_and_return)]
     let ty = {
         let mut ty = ty;
         #[cfg(target_os = "linux")]
