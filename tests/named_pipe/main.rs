@@ -3,9 +3,11 @@
 mod util;
 
 mod bytes;
-mod bytes_unidir;
+mod bytes_unidir_client_to_server;
+mod bytes_unidir_server_to_client;
 mod msg;
-mod msg_unidir;
+mod msg_unidir_client_to_server;
+mod msg_unidir_server_to_client;
 
 #[test]
 fn named_pipe_bytes() {
@@ -13,8 +15,18 @@ fn named_pipe_bytes() {
 }
 
 #[test]
-fn named_pipe_bytes_unidir() {
-    util::drive_server_and_multiple_clients(bytes_unidir::server, bytes_unidir::client)
+fn named_pipe_bytes_unidir_client_to_server() {
+    util::drive_server_and_multiple_clients(
+        bytes_unidir_client_to_server::server,
+        bytes_unidir_client_to_server::client,
+    )
+}
+#[test]
+fn named_pipe_bytes_unidir_server_to_client() {
+    util::drive_server_and_multiple_clients(
+        bytes_unidir_server_to_client::server,
+        bytes_unidir_server_to_client::client,
+    )
 }
 
 #[test]
@@ -23,6 +35,16 @@ fn named_pipe_msg() {
 }
 
 #[test]
-fn named_pipe_msg_unidir() {
-    util::drive_server_and_multiple_clients(msg_unidir::server, msg_unidir::client)
+fn named_pipe_msg_unidir_client_to_server() {
+    util::drive_server_and_multiple_clients(
+        msg_unidir_client_to_server::server,
+        msg_unidir_client_to_server::client,
+    )
+}
+#[test]
+fn named_pipe_msg_unidir_server_to_client() {
+    util::drive_server_and_multiple_clients(
+        msg_unidir_server_to_client::server,
+        msg_unidir_server_to_client::client,
+    )
 }

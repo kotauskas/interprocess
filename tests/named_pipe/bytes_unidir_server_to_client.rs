@@ -11,7 +11,7 @@ use {
     },
 };
 
-static MSG: &str = "Hello from client!\n";
+static MSG: &str = "Hello from server!\n";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     let (name, listener) = NameGen::new(true)
@@ -19,7 +19,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new()
                 .name(rnm)
-                .create::<ByteReaderPipeStream>()
+                .create::<ByteWriterPipeStream>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
@@ -32,30 +32,30 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
     let _ = name_sender.send(name);
 
-    let mut buffer = String::with_capacity(128);
-
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
-            Ok(c) => BufReader::new(c),
+            Ok(c) => c,
             Err(e) => {
                 eprintln!("Incoming connection failed: {}", e);
                 continue;
             }
         };
 
-        conn.read_line(&mut buffer).context("Pipe receive failed")?;
-        assert_eq!(buffer, MSG);
-
-        buffer.clear();
+        conn.write_all(MSG.as_bytes()).context("Pipe send failed")?;
+        conn.flush()?;
     }
 
     Ok(())
 }
 pub fn client(name: Arc<String>) -> TestResult {
-    let mut conn = ByteWriterPipeStream::connect(name.as_str()).context("Connect failed")?;
+    let mut buffer = String::with_capacity(128);
 
-    conn.write_all(MSG.as_bytes())?;
-    conn.flush()?;
+    let mut conn = ByteReaderPipeStream::connect(name.as_str())
+        .context("Connect failed")
+        .map(BufReader::new)?;
+
+    conn.read_line(&mut buffer).context("Pipe receive failed")?;
+    assert_eq!(buffer, MSG);
 
     Ok(())
 }
