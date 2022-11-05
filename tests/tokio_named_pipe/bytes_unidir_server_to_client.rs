@@ -3,7 +3,7 @@ use {
     anyhow::Context,
     futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     interprocess::os::windows::named_pipe::{
-        tokio::{ByteReaderPipeStream, ByteWriterPipeStream, PipeListenerOptionsExt},
+        tokio::{ByteReaderPipeStream, DuplexBytePipeStream, PipeListenerOptionsExt},
         PipeListenerOptions,
     },
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc, time::Duration},
@@ -13,7 +13,7 @@ use {
 static MSG: &str = "Hello from server!\n";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    async fn handle_conn(mut conn: ByteWriterPipeStream) -> TestResult {
+    async fn handle_conn(mut conn: DuplexBytePipeStream) -> TestResult {
         conn.write_all(MSG.as_bytes())
             .await
             .context("Pipe send failed")?;
@@ -27,7 +27,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new()
                 .name(rnm)
-                .create_tokio::<ByteWriterPipeStream>()
+                .create_tokio::<DuplexBytePipeStream>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
