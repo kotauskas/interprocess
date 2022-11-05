@@ -3,7 +3,7 @@ use {
     anyhow::Context,
     futures::io::{AsyncReadExt, AsyncWriteExt},
     interprocess::os::windows::named_pipe::{
-        tokio::{MsgReaderPipeStream, MsgWriterPipeStream, PipeListenerOptionsExt},
+        tokio::{DuplexMsgPipeStream, MsgReaderPipeStream, PipeListenerOptionsExt},
         PipeListenerOptions, PipeMode,
     },
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc, time::Duration},
@@ -13,7 +13,7 @@ const MSG_1: &[u8] = b"Server message 1";
 const MSG_2: &[u8] = b"Server message 2";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    async fn handle_conn(mut conn: MsgWriterPipeStream) -> TestResult {
+    async fn handle_conn(mut conn: DuplexMsgPipeStream) -> TestResult {
         let written = conn.write(MSG_1).await.context("First pipe send failed")?;
         assert_eq!(written, MSG_1.len());
 
@@ -29,7 +29,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             let l = match PipeListenerOptions::new()
                 .name(rnm)
                 .mode(PipeMode::Messages)
-                .create_tokio::<MsgWriterPipeStream>()
+                .create_tokio::<DuplexMsgPipeStream>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
