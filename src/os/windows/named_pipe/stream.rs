@@ -21,10 +21,10 @@ mod inst {
     }
     impl Instance {
         pub fn create_non_taken(ops: PipeOps) -> Self {
-            ops.into()
+            Self::new(ops, false)
         }
-        pub fn new(ops: PipeOps, _: bool) -> Self {
-            ops.into()
+        pub fn new(ops: PipeOps, is_server: bool) -> Self {
+            Self { ops, is_server }
         }
         pub fn instance(&self) -> &PipeOps {
             &self.ops
@@ -35,14 +35,6 @@ mod inst {
         pub fn is_split(&self) -> bool {
             // sync pipes don't implement splitting yet
             false
-        }
-    }
-    impl From<PipeOps> for Instance {
-        fn from(ops: PipeOps) -> Self {
-            let is_server = ops
-                .is_server()
-                .expect("oops, unconnected `PipeOps` came in");
-            Self { ops, is_server }
         }
     }
 }

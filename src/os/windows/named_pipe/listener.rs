@@ -67,7 +67,10 @@ impl<Stream: PipeStream> PipeListener<Stream> {
             replace(&mut *stored_instance, new_instance)
         };
 
-        Ok(Stream::build(instance_to_hand_out.into()))
+        Ok(Stream::build(super::stream::Instance::new(
+            instance_to_hand_out,
+            true,
+        )))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
     pub fn incoming(&self) -> Incoming<'_, Stream> {
