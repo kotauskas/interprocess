@@ -129,6 +129,7 @@ impl PipeOps {
         let flags = self.get_flags()?;
         Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
     }
+    /* // Disabled because .get_state() is disabled.
     /// Retrieves whether the pipe is in nonblocking mode or not from the kernel directly.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
         // Source: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipehandlestatew
@@ -137,6 +138,7 @@ impl PipeOps {
         let state = self.get_state()?;
         Ok((state & PIPE_IS_NONBLOCKING_BIT) != 0)
     }
+    */
     fn get_flags(&self) -> io::Result<u32> {
         let mut flags: u32 = 0;
         let success = unsafe {
@@ -154,7 +156,9 @@ impl PipeOps {
             Err(io::Error::last_os_error())
         }
     }
-    fn get_state(&self) -> io::Result<u32> {
+    // Doesn't work for server-write-only pipes, requires FILE_READ_ATTRIBUTES which I can't get
+    // from CreateNamedPipe.
+    /*fn get_state(&self) -> io::Result<u32> {
         let mut state: u32 = 0;
         let success = unsafe {
             GetNamedPipeHandleStateW(
@@ -172,7 +176,7 @@ impl PipeOps {
         } else {
             Err(io::Error::last_os_error())
         }
-    }
+    }*/
 
     /// Blocks until connected. If connected, does not do anything.
     pub fn connect_server(&self) -> io::Result<()> {
