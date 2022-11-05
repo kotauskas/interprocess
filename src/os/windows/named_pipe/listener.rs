@@ -13,7 +13,10 @@ use {
         mem::replace,
         num::{NonZeroU32, NonZeroU8},
         ptr,
-        sync::Mutex,
+        sync::{
+            atomic::{AtomicBool, Ordering::Relaxed},
+            Mutex,
+        },
     },
     to_method::To,
 };
@@ -23,6 +26,7 @@ use {
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 pub struct PipeListener<Stream: PipeStream> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
+    nonblocking: AtomicBool,
     stored_instance: Mutex<PipeOps>,
     _phantom: PhantomData<fn() -> Stream>,
 }
@@ -55,7 +59,9 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     pub fn accept(&self) -> io::Result<Stream> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().expect("unexpected lock poison");
-            let nonblocking = stored_instance.is_nonblocking()?;
+            // Doesn't actually even need to be atomic to begin with, but it's simpler and more
+            // convenient to do this instead. The mutex takes care of ordering.
+            let nonblocking = self.nonblocking.load(Relaxed);
             stored_instance.connect_server()?;
             let new_instance = self.create_instance(nonblocking)?;
             replace(&mut *stored_instance, new_instance)
@@ -69,13 +75,16 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     }
     /// Enables or disables the nonblocking mode for all existing instances of the listener and future ones. By default, it is disabled.
     ///
-    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation options, unless there's a good reason not to: this method has O(n) complexity, since it has to iterate through all instances, and it may leave the instances in an inconsistent state where some are nonblocking and some are not if the operation fails for one of them (which will be reported as failure, even though some may have successfully been reconfigured).
+    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation options, unless there's a good reason not to. This allows making one less system call during creation.
     ///
     /// See the documentation of the aforementioned field for the exact effects of enabling this mode.
     ///
     /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let instance = self.stored_instance.lock().expect("unexpected lock poison");
+        // Doesn't actually even need to be atomic to begin with, but it's simpler and more
+        // convenient to do this instead. The mutex takes care of ordering.
+        self.nonblocking.store(nonblocking, Relaxed);
         unsafe {
             super::set_nonblocking_for_stream(
                 instance.as_raw_handle(),
@@ -105,6 +114,7 @@ impl<Stream: PipeStream> Debug for PipeListener<Stream> {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
             .field("instance", &self.stored_instance)
+            .field("nonblocking", &self.nonblocking.load(Relaxed))
             .finish()
     }
 }
@@ -259,8 +269,10 @@ cannot create pipe server that has byte type but reads messages – have you for
     /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
     pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
         let (owned_config, instance) = self._create(Stream::ROLE, Stream::READ_MODE)?;
+        let nonblocking = owned_config.nonblocking.into();
         Ok(PipeListener {
             config: owned_config,
+            nonblocking,
             stored_instance: Mutex::new(instance),
             _phantom: PhantomData,
         })
