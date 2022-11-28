@@ -7,7 +7,7 @@
 // TODO add examples
 
 use super::imports::*;
-use super::FileHandleOps;
+use super::FileHandle;
 use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -138,7 +138,7 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
     unsafe { UnnamedPipeCreationOptions::default().build() }
 }
 
-pub(crate) struct UnnamedPipeReader(FileHandleOps);
+pub(crate) struct UnnamedPipeReader(FileHandle);
 impl Read for UnnamedPipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(buf)
@@ -162,7 +162,7 @@ impl FromRawHandle for UnnamedPipeReader {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         let fho = unsafe {
             // SAFETY: validity guaranteed by safety contract
-            FileHandleOps::from_raw_handle(handle)
+            FileHandle::from_raw_handle(handle)
         };
         Self(fho)
     }
@@ -175,7 +175,7 @@ impl Debug for UnnamedPipeReader {
     }
 }
 
-pub(crate) struct UnnamedPipeWriter(FileHandleOps);
+pub(crate) struct UnnamedPipeWriter(FileHandle);
 impl Write for UnnamedPipeWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
@@ -200,7 +200,7 @@ impl IntoRawHandle for UnnamedPipeWriter {
 #[cfg(windows)]
 impl FromRawHandle for UnnamedPipeWriter {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        Self(FileHandleOps(handle))
+        Self(FileHandle(handle))
     }
 }
 impl Debug for UnnamedPipeWriter {

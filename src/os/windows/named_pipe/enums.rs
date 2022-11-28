@@ -1,4 +1,4 @@
-use super::super::imports::*;
+use crate::os::windows::imports::*;
 use std::{convert::TryFrom, mem};
 
 /// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server – [`ClientToServer`] always means client → server, for example.
@@ -11,11 +11,11 @@ use std::{convert::TryFrom, mem};
 // #[repr(u32)] means that we can transmute this enumeration to the Windows DWORD type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PipeDirection {
-    /// Represents a server ← client data flow: clients write data, the server reads it.
+    /// Represents server ← client data flow: clients write data, the server reads it.
     ClientToServer = PIPE_ACCESS_INBOUND,
-    /// Represents a server → client data flow: the server writes data, clients read it.
+    /// Represents server → client data flow: the server writes data, clients read it.
     ServerToClient = PIPE_ACCESS_OUTBOUND,
-    /// Represents a server ⇄ client data flow: the server can write data which then is read by the client, while the client writes data which is read by the server.
+    /// Represents server ⇄ client data flow: the server can write data which then is read by the client, while the client writes data which is read by the server.
     Duplex = PIPE_ACCESS_DUPLEX,
 }
 impl PipeDirection {

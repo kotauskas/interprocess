@@ -62,8 +62,8 @@ impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
 #[repr(transparent)]
 #[derive(Debug)]
-pub(crate) struct FileHandleOps(pub(crate) HANDLE);
-impl FileHandleOps {
+pub(crate) struct FileHandle(pub(crate) HANDLE);
+impl FileHandle {
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         debug_assert!(
             buf.len() <= DWORD::max_value() as usize,
@@ -117,7 +117,7 @@ impl FileHandleOps {
         }
     }
 }
-impl Drop for FileHandleOps {
+impl Drop for FileHandle {
     fn drop(&mut self) {
         let _success = unsafe { CloseHandle(self.0) != 0 };
         debug_assert!(
@@ -128,23 +128,23 @@ impl Drop for FileHandleOps {
     }
 }
 #[cfg(windows)]
-impl AsRawHandle for FileHandleOps {
+impl AsRawHandle for FileHandle {
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
 #[cfg(windows)]
-impl IntoRawHandle for FileHandleOps {
+impl IntoRawHandle for FileHandle {
     fn into_raw_handle(self) -> HANDLE {
         let self_ = ManuallyDrop::new(self);
         self_.as_raw_handle()
     }
 }
 #[cfg(windows)]
-impl FromRawHandle for FileHandleOps {
+impl FromRawHandle for FileHandle {
     unsafe fn from_raw_handle(op: HANDLE) -> Self {
         Self(op)
     }
 }
-unsafe impl Send for FileHandleOps {}
-unsafe impl Sync for FileHandleOps {} // WriteFile and ReadFile are thread-safe, apparently
+unsafe impl Send for FileHandle {}
+unsafe impl Sync for FileHandle {} // WriteFile and ReadFile are thread-safe, apparently

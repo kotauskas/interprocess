@@ -1,4 +1,4 @@
-use crate::os::windows::{imports::*, named_pipe::stream::Instance, FileHandleOps};
+use crate::os::windows::{imports::*, named_pipe::stream::Instance, FileHandle};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -8,7 +8,7 @@ use std::{
 
 /// The actual implementation of a named pipe server or client.
 #[repr(transparent)]
-pub struct PipeOps(pub(crate) FileHandleOps);
+pub struct PipeOps(pub(crate) FileHandle);
 impl PipeOps {
     /// Reads a message from the pipe instance into the specified buffer, returning the size of the message written as `Ok(Ok(...))`. If the buffer is too small to fit the message, a bigger buffer is allocated and returned as `Ok(Err(...))`, with the exact size and capacity to hold the message. Errors are returned as `Err(Err(...))`.
     pub fn read_msg(&self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
@@ -233,7 +233,7 @@ impl IntoRawHandle for PipeOps {
 #[cfg(windows)]
 impl FromRawHandle for PipeOps {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        let fho = unsafe { FileHandleOps::from_raw_handle(handle) };
+        let fho = unsafe { FileHandle::from_raw_handle(handle) };
         Self(fho)
     }
 }
