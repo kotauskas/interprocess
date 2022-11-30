@@ -54,11 +54,7 @@ pub(super) unsafe fn bind(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
             size_of::<sockaddr_un>() as u32,
         ) != -1
     };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 /// Connects the specified Ud-socket file descriptor to the given address.
@@ -73,20 +69,12 @@ pub(super) unsafe fn connect(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
             size_of::<sockaddr_un>() as u32,
         ) != -1
     };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 pub(super) fn listen(fd: &FdOps, backlog: c_int) -> io::Result<()> {
     let success = unsafe { libc::listen(fd.0, backlog) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
@@ -104,11 +92,7 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
                 size_of_val(&passcred) as u32,
             ) != -1
         };
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => ())
     }
     #[cfg(not(uds_scm_credentials))]
     {
@@ -135,22 +119,26 @@ pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<ucred> {
             &mut cred_len as *mut _,
         )
     } != -1;
-    if success {
-        Ok(cred)
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => cred)
 }
-pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
-    let (old_flags, success) = unsafe {
+fn get_status_flags(fd: &FdOps) -> io::Result<c_int> {
+    let (flags, success) = unsafe {
         // SAFETY: nothing too unsafe about this function. One thing to note is that we're passing
         // it a null pointer, which is, for some reason, required yet ignored for F_GETFL.
         let result = libc::fcntl(fd.0, F_GETFL, ptr::null::<c_void>());
         (result, result != -1)
     };
-    if !success {
-        return Err(io::Error::last_os_error());
-    }
+    ok_or_ret_errno!(success => flags)
+}
+fn set_status_flags(fd: &FdOps, new_flags: c_int) -> io::Result<()> {
+    let success = unsafe {
+        // SAFETY: new_flags is a c_int, as documented in the manpage.
+        libc::fcntl(fd.0, F_SETFL, new_flags)
+    } != -1;
+    ok_or_ret_errno!(success => ())
+}
+pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
+    let (old_flags, success) = get_status_flags(fd)?;
     let new_flags = if nonblocking {
         old_flags | O_NONBLOCK
     } else {
@@ -158,26 +146,11 @@ pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
         // nonblocking flag, which clears the flag when ANDed.
         old_flags & !O_NONBLOCK
     };
-    let success = unsafe {
-        // SAFETY: new_flags is a c_int, as documented in the manpage.
-        libc::fcntl(fd.0, F_SETFL, new_flags)
-    } != -1;
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    set_status_flags(fd, new_flags)
 }
 pub(super) fn get_nonblocking(fd: &FdOps) -> io::Result<bool> {
-    let flags = unsafe {
-        // SAFETY: exactly the same as above.
-        libc::fcntl(fd.0, F_GETFL, ptr::null::<c_void>())
-    };
-    if flags != -1 {
-        Ok(flags & O_NONBLOCK != 0)
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    let flags = get_status_flags(fd)?;
+    Ok(flags & O_NONBLOCK != 0)
 }
 pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
     let how = match how {
@@ -186,11 +159,7 @@ pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
         Shutdown::Both => SHUT_RDWR,
     };
     let success = unsafe { libc::shutdown(fd.0, how) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -201,19 +170,11 @@ mod non_linux {
             let ret = libc::fcntl(fd.0, F_GETFD, 0);
             (ret, ret != -1)
         };
-        if success {
-            Ok(val)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => val)
     }
     pub(super) fn set_fdflags(fd: &FdOps, flags: i32) -> io::Result<()> {
         let success = unsafe { libc::fcntl(fd.0, F_SETFD, flags) != -1 };
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => ())
     }
     pub(super) fn set_cloexec(fd: &FdOps, cloexec: bool) -> io::Result<()> {
         let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
