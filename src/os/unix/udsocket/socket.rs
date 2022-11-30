@@ -208,11 +208,7 @@ creates unusable socket that is not bound to any address, use `.set_destination(
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
         };
-        if success {
-            Ok((bytes_read, false, hdr.msg_controllen as _, false))
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => (bytes_read, false, hdr.msg_controllen as _, false))
     }
 
     /// Receives a single datagram and the source address from the socket, returning how much of the buffer was filled out and whether a part of the datagram was discarded because the buffer was too small.
@@ -327,11 +323,7 @@ creates unusable socket that is not bound to any address, use `.set_destination(
             );
             (size != -1, size as usize)
         };
-        if success {
-            Ok(size)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => size)
     }
 
     /// Sends a datagram into the socket.
@@ -390,11 +382,7 @@ creates unusable socket that is not bound to any address, use `.set_destination(
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)
         };
-        if success {
-            Ok((bytes_written, hdr.msg_controllen as _))
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => (bytes_written, hdr.msg_controllen as _))
     }
 
     /// Enables or disables the nonblocking mode for the socket. By default, it is disabled.

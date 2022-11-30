@@ -43,11 +43,7 @@ pub trait ShareHandle: AsRawHandle {
             );
             (success != 0, new_handle)
         };
-        if success {
-            Ok(new_handle)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => new_handle)
     }
 }
 #[cfg(windows)]
@@ -80,11 +76,7 @@ impl FileHandle {
             );
             (result != 0, num_bytes_read as usize)
         };
-        if success {
-            Ok(num_bytes_read)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => num_bytes_read)
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         debug_assert!(
@@ -102,19 +94,11 @@ impl FileHandle {
             );
             (result != 0, number_of_bytes_written as usize)
         };
-        if success {
-            Ok(bytes_written)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => bytes_written)
     }
     pub fn flush(&self) -> io::Result<()> {
         let success = unsafe { FlushFileBuffers(self.0) != 0 };
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => ())
     }
 }
 impl Drop for FileHandle {

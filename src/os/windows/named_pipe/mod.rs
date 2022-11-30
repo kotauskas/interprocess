@@ -75,9 +75,5 @@ unsafe fn set_nonblocking_for_stream(
             ptr::null_mut(),
         )
     } != 0;
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }

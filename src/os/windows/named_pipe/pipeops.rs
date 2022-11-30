@@ -26,11 +26,7 @@ impl PipeOps {
                         ptr::null_mut(),
                     ) != 0
                 };
-                if success {
-                    Ok(Err(new_buffer))
-                } else {
-                    Err(io::Error::last_os_error())
-                }
+                ok_or_ret_errno!(success => Err(new_buffer))
             }
         }
     }
@@ -66,11 +62,7 @@ impl PipeOps {
                     ptr::null_mut(),
                 ) != 0
             };
-            if success {
-                Ok(Ok(bytes_left_in_message))
-            } else {
-                Err(io::Error::last_os_error())
-            }
+            ok_or_ret_errno!(success => Ok(bytes_left_in_message))
         } else {
             Ok(Err(bytes_left_in_message))
         }
@@ -106,11 +98,7 @@ impl PipeOps {
     ) -> io::Result<u32> {
         let mut x: u32 = 0;
         let success = unsafe { f(self.0 .0, &mut x as *mut _) != 0 };
-        if success {
-            Ok(x)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => x)
     }
 
     /// Retrieves whether the pipe is a server or not from the kernel directly.
@@ -150,11 +138,7 @@ impl PipeOps {
                 ptr::null_mut(),
             ) != 0
         };
-        if success {
-            Ok(flags)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => flags)
     }
     // Doesn't work for server-write-only pipes, requires FILE_READ_ATTRIBUTES which I can't get
     // from CreateNamedPipe.
@@ -171,11 +155,7 @@ impl PipeOps {
                 0,
             ) != 0
         };
-        if success {
-            Ok(state)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => state)
     }*/
 
     /// Blocks until connected. If connected, does not do anything.
@@ -201,11 +181,7 @@ impl PipeOps {
     /// Disconnects without flushing. Drops all data which has been sent but not yet received on the other side, if any.
     pub fn disconnect(&self) -> io::Result<()> {
         let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => ())
     }
     /// Called by pipe streams when dropped, used to abstract over the fact that non-async streams flush before returning the pipe to the server while async ones don't.
     pub fn server_drop_disconnect(&self) {

@@ -31,9 +31,5 @@ pub fn create_fifo<P: AsRef<Path>>(path: P, mode: mode_t) -> io::Result<()> {
 fn _create_fifo(path: &Path, mode: mode_t) -> io::Result<()> {
     let path = CString::new(path.as_os_str().as_bytes())?;
     let success = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }

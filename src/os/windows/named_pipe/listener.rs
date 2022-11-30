@@ -261,11 +261,7 @@ cannot create pipe server that has byte type but reads messages – have you for
             );
             (handle, handle != INVALID_HANDLE_VALUE)
         };
-        if success {
-            Ok(handle)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => handle)
     }
     /// Creates the pipe listener from the builder. The `Stream` generic argument specifies the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
     ///

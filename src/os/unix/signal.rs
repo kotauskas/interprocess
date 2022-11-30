@@ -328,11 +328,7 @@ unsafe fn install_hook(signum: i32, hook: usize, flags: i32) -> io::Result<()> {
             libc::sigaction(signum, &new_handler as *const _, &mut old_handler as *mut _) != -1
         }
     };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 /// Options for installing a signal handler.
@@ -744,11 +740,7 @@ pub fn send(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>) -> io::R
         "to send the signal to the process group of the calling process, use send_to_group instead"
     );
     let success = unsafe { libc::kill(signal.into().map_or(0, Into::into), pid) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 /// Sends the specified real-time signal to the specified process. If the specified signal is `None`, no signal is sent and only a privilege check is performed instead.
 ///
@@ -778,11 +770,7 @@ pub fn send_rt(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> io::Resul
         val
     }) as i32;
     let success = unsafe { libc::kill(signal, pid) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 /// Sends the specified signal to the specified process group. If the specified signal is `None`, no signal is sent and only a privilege check is performed instead.
 ///
@@ -806,11 +794,7 @@ pub fn send_to_group(signal: impl Into<Option<SignalType>>, pid: impl Into<u32>)
         .unwrap_or_else(|_| panic!("process group identifier out of range"))
         * -1;
     let success = unsafe { libc::kill(signal.into().map_or(0, Into::into), pid) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 /// Sends the specified real-time signal to the specified process. If the specified signal is `None`, no signal is sent and only a privilege check is performed instead.
 ///
@@ -842,11 +826,7 @@ pub fn send_rt_to_group(signal: impl Into<Option<u32>>, pid: impl Into<u32>) -> 
         val
     }) as i32;
     let success = unsafe { libc::kill(signal, pid) != -1 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }
 
 /// All standard signal types as defined in POSIX.1-2001.

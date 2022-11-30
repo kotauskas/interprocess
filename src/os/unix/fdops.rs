@@ -19,11 +19,7 @@ impl FdOps {
                 libc::read(self.as_raw_fd(), buf.as_mut_ptr() as *mut _, length_to_read);
             (size_or_err >= 0, size_or_err as usize)
         };
-        if success {
-            Ok(bytes_read)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => bytes_read)
     }
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let (success, bytes_read) = unsafe {
@@ -32,11 +28,7 @@ impl FdOps {
                 libc::readv(self.as_raw_fd(), bufs.as_mut_ptr() as *const _, num_bufs);
             (size_or_err >= 0, size_or_err as usize)
         };
-        if success {
-            Ok(bytes_read)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => bytes_read)
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let (success, bytes_written) = unsafe {
@@ -45,11 +37,7 @@ impl FdOps {
                 libc::write(self.as_raw_fd(), buf.as_ptr() as *const _, length_to_write);
             (size_or_err >= 0, size_or_err as usize)
         };
-        if success {
-            Ok(bytes_written)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => bytes_written)
     }
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let (success, bytes_written) = unsafe {
@@ -57,19 +45,11 @@ impl FdOps {
             let size_or_err = libc::writev(self.as_raw_fd(), bufs.as_ptr() as *const _, num_bufs);
             (size_or_err >= 0, size_or_err as usize)
         };
-        if success {
-            Ok(bytes_written)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => bytes_written)
     }
     pub fn flush(&self) -> io::Result<()> {
         let success = unsafe { libc::fsync(self.as_raw_fd()) >= 0 };
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => ())
     }
 }
 impl AsRef<c_int> for FdOps {

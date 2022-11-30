@@ -111,11 +111,7 @@ impl UdStream {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
         };
-        if success {
-            Ok((bytes_read, hdr.msg_controllen as _))
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => (bytes_read, hdr.msg_controllen as _))
     }
 
     /// Sends bytes into the socket stream.
@@ -172,11 +168,7 @@ impl UdStream {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)
         };
-        if success {
-            Ok((bytes_written, hdr.msg_controllen as _))
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => (bytes_written, hdr.msg_controllen as _))
     }
 
     /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].

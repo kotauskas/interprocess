@@ -526,9 +526,5 @@ impl Default for WaitTimeout {
 }
 fn wait_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
     let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    ok_or_ret_errno!(success => ())
 }

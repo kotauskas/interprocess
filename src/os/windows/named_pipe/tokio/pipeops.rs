@@ -120,11 +120,7 @@ impl PipeOps {
     ) -> io::Result<u32> {
         let mut x: u32 = 0;
         let success = unsafe { f(self.as_raw_handle(), &mut x as *mut _) != 0 };
-        if success {
-            Ok(x)
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        ok_or_ret_errno!(success => x)
     }
 
     pub async fn connect_server(&self) -> io::Result<()> {
