@@ -153,7 +153,8 @@ pub struct PipeListenerOptions<'a> {
     pub input_buffer_size_hint: usize,
     /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
     pub output_buffer_size_hint: usize,
-    /// The default timeout when waiting for a client to connect. Used unless another timeout is specified when waiting for a client.
+    /// The default timeout clients use when connecting. Used unless another timeout is specified when waiting by a client.
+    // TODO use WaitTimeout struct
     pub wait_timeout: NonZeroU32,
 }
 macro_rules! genset {
