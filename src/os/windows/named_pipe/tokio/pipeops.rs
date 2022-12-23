@@ -88,7 +88,7 @@ impl PipeOps {
             loop { // For as long as the read fails...
                 // Check if the failure is because the buffer isn't empty enough yet...
                 match s.try_write(buf) {
-                    Err(e) if e.kind() == ErrorKind::WouldBlock => ready!(s.poll_read_ready(ctx))?,
+                    Err(e) if e.kind() == ErrorKind::WouldBlock => ready!(s.poll_write_ready(ctx))?,
                     // If it's not or we're not failing anymore, return verbatim.
                     els => return Poll::Ready(els),
                 }
