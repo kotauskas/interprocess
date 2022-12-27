@@ -8,8 +8,7 @@ mod listener;
 mod pipeops;
 mod stream;
 
-pub use listener::*;
-pub use stream::*;
+pub use {listener::*, stream::*};
 
 use super::{super::imports, enums};
 use pipeops::*;

@@ -1,24 +1,22 @@
 #[cfg(windows)]
 use crate::os::windows::imports::ERROR_PIPE_BUSY;
-use {
-    crate::os::windows::named_pipe::{
-        convert_path,
-        tokio::{
-            enums::{PipeMode, PipeStreamRole},
-            imports::*,
-            PipeOps, PipeStreamInternals,
-        },
-        PipeOps as SyncPipeOps,
+use crate::os::windows::named_pipe::{
+    convert_path,
+    tokio::{
+        enums::{PipeMode, PipeStreamRole},
+        imports::*,
+        PipeOps, PipeStreamInternals,
     },
-    std::{
-        ffi::{OsStr, OsString},
-        fmt::{self, Debug, Formatter},
-        io,
-        mem::ManuallyDrop,
-        pin::Pin,
-        ptr,
-        task::{Context, Poll},
-    },
+    PipeOps as SyncPipeOps,
+};
+use std::{
+    ffi::OsStr,
+    fmt::{self, Debug, Formatter},
+    io,
+    mem::ManuallyDrop,
+    pin::Pin,
+    ptr,
+    task::{Context, Poll},
 };
 
 mod inst {
@@ -148,29 +146,29 @@ macro_rules! create_stream_type {
                     Self::_connect(name.as_ref())
                 }
                 fn _connect(name: &OsStr) -> io::Result<Self> {
-                    let pipeops = _connect(
-                        name,
-                        None,
+                    let path = convert_path(name, None);
+                    let client = _connect(
+                        &path,
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                     )?;
-                    let instance = Instance::new(pipeops);
+                    let instance = Instance::new(PipeOps::Client(client));
                     Ok(Self { instance })
                 }
                 /// Tries to connect to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically).
                 ///
                 /// If there is no available server, **returns immediately** with the [`WouldBlock`](io::ErrorKind::WouldBlock) error.
-                pub fn connect_to_remote(pipe_name: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
-                    Self::_connect_to_remote(pipe_name.as_ref(), hostname.as_ref())
+                pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
+                    Self::_connect_to_remote(pipename.as_ref(), hostname.as_ref())
                 }
-                fn _connect_to_remote(pipe_name: &OsStr, hostname: &OsStr) -> io::Result<Self> {
-                    let pipeops = _connect(
-                        pipe_name,
-                        Some(hostname),
+                fn _connect_to_remote(pipename: &OsStr, hostname: &OsStr) -> io::Result<Self> {
+                    let path = convert_path(pipename, Some(hostname));
+                    let client = _connect(
+                        &path,
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                     )?;
-                    let instance = Instance::new(pipeops);
+                    let instance = Instance::new(PipeOps::Client(client));
                     Ok(Self { instance })
                 }
                 /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (client-side).
@@ -591,18 +589,14 @@ impl AsyncWrite for &DuplexMsgPipeStream {
 }
 
 fn _connect(
-    pipe_name: &OsStr,
-    hostname: Option<&OsStr>,
+    path: &OsStr,
     read: bool,
     write: bool,
 ) -> io::Result<PipeOps> {
-    let name = convert_path(pipe_name, hostname);
-    let name = OsString::from_wide(&name[..]);
-    let name_ref: &OsStr = name.as_ref();
     let result = TokioNPClientOptions::new()
         .read(read)
         .write(write)
-        .open(name_ref);
+        .open(path);
     let client = match result {
         Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
             Err(io::ErrorKind::WouldBlock.into())

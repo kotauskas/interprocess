@@ -240,7 +240,7 @@ cannot create pipe server that has byte type but reads messages – have you for
             ));
         }
 
-        let path = super::convert_path(&self.name, None);
+        let path = super::convert_and_encode_path(&self.name, None);
         let open_mode = self.to_open_mode(first, role, overlapped);
         let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
         let (handle, success) = unsafe {

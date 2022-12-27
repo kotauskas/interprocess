@@ -1,9 +1,8 @@
-use crate::os::windows::{
-    imports::*,
-    named_pipe::{PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole},
-    AsRawHandle, FromRawHandle, IntoRawHandle,
+use super::{convert_and_encode_path, PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole};
+use crate::{
+    os::windows::{imports::*, AsRawHandle, FromRawHandle, IntoRawHandle},
+    PartialMsgWriteError, ReliableReadMsg,
 };
-use crate::{PartialMsgWriteError, ReliableReadMsg};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, Formatter},
@@ -149,28 +148,28 @@ macro_rules! create_stream_type {
                     Self::_connect(name.as_ref())
                 }
                 fn _connect(name: &OsStr) -> io::Result<Self> {
-                    let pipeops = _connect(
-                        name,
-                        None,
+                    let path = convert_and_encode_path(name, None);
+                    let handle = _connect(
+                        &path,
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                         WaitTimeout::DEFAULT,
                     )?;
-                    Ok(Self { instance: Instance::create_non_taken(pipeops) })
+                    Ok(Self { instance: Instance::create_non_taken(handle) })
                 }
                 /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
-                pub fn connect_to_remote(pipe_name: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
-                    Self::_connect_to_remote(pipe_name.as_ref(), hostname.as_ref())
+                pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
+                    Self::_connect_to_remote(pipename.as_ref(), hostname.as_ref())
                 }
-                fn _connect_to_remote(pipe_name: &OsStr, hostname: &OsStr) -> io::Result<Self> {
-                    let pipeops = _connect(
-                        pipe_name,
-                        Some(hostname),
+                fn _connect_to_remote(pipename: &OsStr, hostname: &OsStr) -> io::Result<Self> {
+                    let path = convert_and_encode_path(pipename, Some(hostname));
+                    let handle = _connect(
+                        &path,
                         Self::READ_MODE.is_some(),
                         Self::WRITE_MODE.is_some(),
                         WaitTimeout::DEFAULT,
                     )?;
-                    Ok(Self { instance: Instance::create_non_taken(pipeops) })
+                    Ok(Self { instance: Instance::create_non_taken(handle) })
                 }
                 /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
                 ///
@@ -442,32 +441,25 @@ pub trait PipeStream: AsRawHandle + IntoRawHandle + FromRawHandle + PipeStreamIn
 poor ergonomics: you can't use turbofish syntax due to `impl AsRef<OsStr>` parameters and you \
 have to use `None::<&OsStr>` instead of just `None` to provide an empty hostname")]
 pub fn connect<Stream: PipeStream>(
-    pipe_name: impl AsRef<OsStr>,
+    pipename: impl AsRef<OsStr>,
     hostname: Option<impl AsRef<OsStr>>,
 ) -> io::Result<Stream> {
-    let pipeops = _connect(
-        pipe_name.as_ref(),
-        hostname.as_ref().map(AsRef::as_ref),
+    let path = convert_and_encode_path(pipename.as_ref(), hostname.as_ref().map(AsRef::as_ref));
+    let handle = _connect(
+        &path,
         Stream::READ_MODE.is_some(),
         Stream::WRITE_MODE.is_some(),
         WaitTimeout::DEFAULT,
     )?;
-    let instance = Instance::create_non_taken(pipeops);
+    let instance = Instance::create_non_taken(handle);
     Ok(Stream::build(instance))
 }
 
-fn _connect(
-    pipe_name: &OsStr,
-    hostname: Option<&OsStr>,
-    read: bool,
-    write: bool,
-    timeout: WaitTimeout,
-) -> io::Result<PipeOps> {
-    let path = super::convert_path(pipe_name, hostname);
+fn _connect(path: &[u16], read: bool, write: bool, timeout: WaitTimeout) -> io::Result<PipeOps> {
     loop {
-        match connect_without_waiting(&path, read, write) {
+        match connect_without_waiting(path, read, write) {
             Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
-                wait_for_server(&path, timeout)?;
+                wait_for_server(path, timeout)?;
                 continue;
             }
             els => return els,
