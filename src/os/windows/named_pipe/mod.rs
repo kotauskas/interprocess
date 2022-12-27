@@ -18,6 +18,7 @@
 
 mod enums;
 mod listener;
+mod new_stream;
 mod pipeops;
 #[macro_use]
 mod stream;

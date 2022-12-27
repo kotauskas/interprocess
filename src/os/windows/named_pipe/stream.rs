@@ -1,4 +1,8 @@
-use super::{convert_and_encode_path, PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole};
+use super::{
+    convert_and_encode_path,
+    new_stream::{WaitTimeout, _connect},
+    PipeMode, PipeOps, PipeStreamInternals, PipeStreamRole,
+};
 use crate::{
     os::windows::{imports::*, AsRawHandle, FromRawHandle, IntoRawHandle},
     PartialMsgWriteError, ReliableReadMsg,
@@ -155,7 +159,7 @@ macro_rules! create_stream_type {
                         Self::WRITE_MODE.is_some(),
                         WaitTimeout::DEFAULT,
                     )?;
-                    Ok(Self { instance: Instance::create_non_taken(handle) })
+                    Ok(Self { instance: Instance::create_non_taken(PipeOps(handle)) })
                 }
                 /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
                 pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
@@ -169,7 +173,7 @@ macro_rules! create_stream_type {
                         Self::WRITE_MODE.is_some(),
                         WaitTimeout::DEFAULT,
                     )?;
-                    Ok(Self { instance: Instance::create_non_taken(handle) })
+                    Ok(Self { instance: Instance::create_non_taken(PipeOps(handle)) })
                 }
                 /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
                 ///
@@ -451,72 +455,6 @@ pub fn connect<Stream: PipeStream>(
         Stream::WRITE_MODE.is_some(),
         WaitTimeout::DEFAULT,
     )?;
-    let instance = Instance::create_non_taken(handle);
+    let instance = Instance::create_non_taken(PipeOps(handle));
     Ok(Stream::build(instance))
-}
-
-fn _connect(path: &[u16], read: bool, write: bool, timeout: WaitTimeout) -> io::Result<PipeOps> {
-    loop {
-        match connect_without_waiting(path, read, write) {
-            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
-                wait_for_server(path, timeout)?;
-                continue;
-            }
-            els => return els,
-        }
-    }
-}
-
-fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<PipeOps> {
-    let (success, handle) = unsafe {
-        let handle = CreateFileW(
-            path.as_ptr() as *mut _,
-            {
-                let mut access_flags: DWORD = 0;
-                if read {
-                    access_flags |= GENERIC_READ;
-                }
-                if write {
-                    access_flags |= GENERIC_WRITE;
-                }
-                access_flags
-            },
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            ptr::null_mut(),
-            OPEN_EXISTING,
-            0,
-            ptr::null_mut(),
-        );
-        (handle != INVALID_HANDLE_VALUE, handle)
-    };
-    if success {
-        unsafe {
-            // SAFETY: we just created this handle
-            Ok(PipeOps::from_raw_handle(handle))
-        }
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-#[repr(transparent)] // #[repr(DWORD)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct WaitTimeout(u32);
-impl WaitTimeout {
-    const DEFAULT: Self = Self(0x00000000);
-    //const FOREVER: Self = Self(0xffffffff);
-}
-impl From<WaitTimeout> for u32 {
-    fn from(x: WaitTimeout) -> Self {
-        x.0
-    }
-}
-impl Default for WaitTimeout {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-fn wait_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
-    let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
-    ok_or_ret_errno!(success => ())
 }

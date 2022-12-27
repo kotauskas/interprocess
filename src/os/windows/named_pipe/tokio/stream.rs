@@ -1,10 +1,9 @@
-#[cfg(windows)]
-use crate::os::windows::imports::ERROR_PIPE_BUSY;
 use crate::os::windows::named_pipe::{
     convert_path,
     tokio::{
         enums::{PipeMode, PipeStreamRole},
         imports::*,
+        new_stream::_connect,
         PipeOps, PipeStreamInternals,
     },
     PipeOps as SyncPipeOps,
@@ -587,23 +586,3 @@ impl AsyncWrite for &DuplexMsgPipeStream {
         self.ops().poll_shutdown(ctx)
     }
 }
-
-fn _connect(
-    path: &OsStr,
-    read: bool,
-    write: bool,
-) -> io::Result<PipeOps> {
-    let result = TokioNPClientOptions::new()
-        .read(read)
-        .write(write)
-        .open(path);
-    let client = match result {
-        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
-            Err(io::ErrorKind::WouldBlock.into())
-        }
-        els => els,
-    }?;
-    let ops = PipeOps::Client(client);
-    Ok(ops)
-}
-// TODO connect with wait
