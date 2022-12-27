@@ -6,8 +6,7 @@
 
 // TODO add examples
 
-use super::imports::*;
-use super::FileHandle;
+use super::{imports::*, weaken_buf_init, FileHandle};
 use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -141,7 +140,7 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
 pub(crate) struct UnnamedPipeReader(FileHandle);
 impl Read for UnnamedPipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+        self.0.read(weaken_buf_init(buf))
     }
 }
 #[cfg(windows)]

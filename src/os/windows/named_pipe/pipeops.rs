@@ -1,4 +1,4 @@
-use crate::os::windows::{imports::*, named_pipe::stream::Instance, FileHandle};
+use crate::os::windows::{imports::*, named_pipe::stream::Instance, weaken_buf_init, FileHandle};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -69,7 +69,7 @@ impl PipeOps {
     }
     /// Reads bytes from the named pipe. Mirrors `std::io::Read`.
     pub fn read_bytes(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+        self.0.read(weaken_buf_init(buf))
     }
     /// Writes data to the named pipe. There is no way to check/ensure that the message boundaries will be preserved which is why there's only one function to do this.
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {

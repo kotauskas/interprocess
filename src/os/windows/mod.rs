@@ -14,7 +14,11 @@ pub(crate) mod local_socket;
 pub(crate) mod imports;
 use imports::*;
 
-use std::{io, mem::ManuallyDrop, ptr};
+use std::{
+    io,
+    mem::{transmute, ManuallyDrop, MaybeUninit},
+    ptr,
+};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -55,12 +59,21 @@ impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
 #[cfg(windows)]
 impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 
+#[inline(always)]
+fn weaken_buf_init(buf: &mut [u8]) -> &mut [MaybeUninit<u8>] {
+    unsafe {
+        // SAFETY: types are layout-compatible, only difference
+        // is a relaxation of the init guarantee.
+        transmute(buf)
+    }
+}
+
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
 #[repr(transparent)]
 #[derive(Debug)]
 pub(crate) struct FileHandle(pub(crate) HANDLE);
 impl FileHandle {
-    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         debug_assert!(
             buf.len() <= DWORD::max_value() as usize,
             "buffer is bigger than maximum buffer size for ReadFile",
