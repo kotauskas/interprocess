@@ -1,5 +1,8 @@
 //! Methods and trait implementations for `PipeStream`.
 
+mod split_owned;
+pub(crate) use split_owned::UNWRAP_FAIL_MSG;
+
 use super::{super::set_nonblocking_for_stream, *};
 use crate::os::windows::{
     imports::*,
@@ -8,7 +11,7 @@ use crate::os::windows::{
 };
 use std::{
     ffi::OsStr,
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Debug, DebugStruct, Formatter},
     io::{self, prelude::*},
     marker::PhantomData,
     mem::MaybeUninit,
@@ -17,7 +20,8 @@ use std::{
 };
 
 /// Helper, used because `spare_capacity_mut()` on `Vec` is 1.60+. Borrows whole `Vec`, not just spare capacity.
-pub fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
+#[inline]
+pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
     let cap = vec.capacity();
     unsafe { slice::from_raw_parts_mut(vec.as_mut_ptr() as *mut MaybeUninit<u8>, cap) }
 }
@@ -73,6 +77,22 @@ impl RawPipeStream {
             is_server,
         })
     }
+
+    fn fill_fields<'a, 'b, 'c>(
+        &self,
+        dbst: &'a mut DebugStruct<'b, 'c>,
+        readmode: Option<PipeMode>,
+        writemode: Option<PipeMode>,
+    ) -> &'a mut DebugStruct<'b, 'c> {
+        if let Some(readmode) = readmode {
+            dbst.field("read_mode", &readmode);
+        }
+        if let Some(writemode) = writemode {
+            dbst.field("write_mode", &writemode);
+        }
+        dbst.field("handle", &self.handle)
+            .field("is_server", &self.is_server)
+    }
 }
 impl AsRawHandle for RawPipeStream {
     #[inline(always)]
@@ -81,6 +101,7 @@ impl AsRawHandle for RawPipeStream {
     }
 }
 impl IntoRawHandle for RawPipeStream {
+    #[inline]
     fn into_raw_handle(self) -> HANDLE {
         self.handle.into_raw_handle()
     }
@@ -122,7 +143,7 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
     #[inline]
-    pub fn read_to_uninit(&mut self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+    pub fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         self.raw.handle.read(buf)
     }
 }
@@ -223,13 +244,19 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         })
     }
 }
-impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
+impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.raw.handle.read(weaken_buf_init(buf))
     }
 }
-impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
+impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline(always)]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (self as &PipeStream<_, _>).read(buf)
+    }
+}
+impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.raw.handle.write(buf)
@@ -239,14 +266,20 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
         self.raw.handle.flush()
     }
 }
+impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline(always)]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (self as &PipeStream<_, _>).write(buf)
+    }
+    #[inline(always)]
+    fn flush(&mut self) -> io::Result<()> {
+        (self as &PipeStream<_, _>).flush()
+    }
+}
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PipeStream")
-            .field("read_mode", &Rm::MODE)
-            .field("write_mode", &Sm::MODE)
-            .field("handle", &self.raw.handle)
-            .field("is_server", &self.raw.is_server)
-            .finish()
+        let mut dbst = f.debug_struct("PipeStream");
+        self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE).finish()
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeStream<Rm, Sm> {

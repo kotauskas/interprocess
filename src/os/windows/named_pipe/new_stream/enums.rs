@@ -16,7 +16,7 @@ pub mod pipe_mode {
 
     mod seal {
         use super::*;
-        pub trait PipeModeTag: Send + Sync + Unpin {
+        pub trait PipeModeTag: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin {
             const MODE: Option<PipeMode>;
         }
     }
@@ -26,6 +26,7 @@ pub mod pipe_mode {
         ($($(#[$attr:meta])* $tag:ident is $mode:expr),+ $(,)?) => {
             $(
                 $( #[$attr] )*
+                #[derive(Copy, Clone, Debug, PartialEq, Eq)]
                 pub enum $tag {}
                 impl PipeModeTag for $tag {
                     const MODE: Option<PipeMode> = $mode;

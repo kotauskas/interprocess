@@ -1,25 +1,26 @@
+mod split_owned;
+
 use crate::os::windows::{
     imports::*,
     named_pipe::{
         convert_path, encode_to_utf16,
         new_stream::{
             block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len,
-            WaitTimeout,
+            WaitTimeout, UNWRAP_FAIL_MSG,
         },
         tokio::new_stream::*,
         PipeMode,
     },
 };
-use futures_core::ready;
 use std::{
     ffi::OsStr,
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Debug, DebugStruct, Formatter},
     future::Future,
     mem::MaybeUninit,
+    ops::Deref,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::io::AsyncReadExt;
 
 macro_rules! same_clsrv {
     ($nm:ident in $var:expr => $e:expr) => {
@@ -154,6 +155,26 @@ impl RawPipeStream {
             Ok(sz) => Ok(RecvResult::Fit(sz)),
         }
     }
+
+    fn fill_fields<'a, 'b, 'c>(
+        &self,
+        dbst: &'a mut DebugStruct<'b, 'c>,
+        readmode: Option<PipeMode>,
+        writemode: Option<PipeMode>,
+    ) -> &'a mut DebugStruct<'b, 'c> {
+        let (tokio_object, is_server) = match self {
+            RawPipeStream::Server(s) => (s as _, true),
+            RawPipeStream::Client(c) => (c as _, false),
+        };
+        if let Some(readmode) = readmode {
+            dbst.field("read_mode", &readmode);
+        }
+        if let Some(writemode) = writemode {
+            dbst.field("write_mode", &writemode);
+        }
+        dbst.field("tokio_object", tokio_object)
+            .field("is_server", &is_server)
+    }
 }
 impl AsRawHandle for RawPipeStream {
     fn as_raw_handle(&self) -> HANDLE {
@@ -235,7 +256,7 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
         &self,
         buf: &mut [MaybeUninit<u8>],
     ) -> io::Result<TryRecvResult> {
-        self.raw.try_recv_msg(buf)
+        self.raw.try_recv_msg(buf).await
     }
     */
 }
@@ -341,6 +362,27 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         })
     }
 }
+
+impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline]
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        self.raw.poll_read_init(cx, buf)
+    }
+}
+impl<Sm: PipeModeTag> AsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline]
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.deref()).poll_read(cx, buf)
+    }
+}
 impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn poll_read(
@@ -349,6 +391,42 @@ impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
         buf: &mut TokioReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         self.get_mut().raw.poll_read_readbuf(cx, buf)
+    }
+}
+impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline]
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        self.raw.poll_write(cx, buf)
+    }
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+    #[inline(always)]
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+}
+impl<Rm: PipeModeTag> AsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline]
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.deref()).poll_write(cx, buf)
+    }
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.deref()).poll_flush(cx)
+    }
+    #[inline]
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.deref()).poll_close(cx)
     }
 }
 impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
@@ -371,16 +449,8 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let (tokio_object, is_server) = match &self.raw {
-            RawPipeStream::Server(s) => (s as _, true),
-            RawPipeStream::Client(c) => (c as _, false),
-        };
-        f.debug_struct("PipeStream")
-            .field("read_mode", &Rm::MODE)
-            .field("write_mode", &Sm::MODE)
-            .field("tokio_object", tokio_object)
-            .field("is_server", &is_server)
-            .finish()
+        let mut dbst = f.debug_struct("PipeStream");
+        self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE).finish()
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeStream<Rm, Sm> {

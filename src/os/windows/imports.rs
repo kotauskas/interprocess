@@ -71,3 +71,6 @@ import_const_or_make_dummy!(i32: consts {libc}::(
     SIG_DFL = 0,
     SIGABRT = 100, SIGFPE = 101, SIGILL = 102, SIGINT = 103, SIGSEGV = 104, SIGTERM = 105,
 ), cfg(windows));
+
+#[cfg(feature = "tokio_support")]
+pub(super) use futures_core::ready;
