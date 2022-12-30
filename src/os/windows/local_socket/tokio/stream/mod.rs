@@ -67,7 +67,7 @@ impl<'a> ConnectFuture<'a> {
     fn new(name: &'a OsStr) -> Self {
         Self {
             name,
-            timer: sleep(Duration::new(0, 0)), // FIXME use Duration::ZERO
+            timer: sleep(Duration::ZERO),
         }
     }
     fn reset_timer(self: Pin<&mut Self>) {
