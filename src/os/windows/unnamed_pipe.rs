@@ -89,12 +89,25 @@ impl UnnamedPipeCreationOptions {
 
     /// Creates the pipe and returns its writing and reading ends, or the error if one occurred.
     ///
-    /// # Safety
-    /// The [`security_descriptor`] field is passed directly to Win32 which is then dereferenced there, resulting in undefined behavior if it was an invalid non-null pointer. For the default configuration, this should never be a concern.
+    /// This will fail if the [`security_descriptor`](Self.security_descriptor) field is non-null. See [`.build_with_security_descriptor()`](Self::build_with_security_descriptor) for an unsafe version that allows the pointer to be passed.
+    pub fn build(self) -> io::Result<(PubWriter, PubReader)> {
+        if !self.security_descriptor.is_null() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot use safe .build() with security descriptor pointer",
+            ));
+        }
+        unsafe {
+            // SAFETY: we just checked for null
+            self.build_with_security_descriptor()
+        }
+    }
+
+    /// Creates the pipe and returns its writing and reading ends, or the error if one occurred. Allows for a security descriptor pointer to be passed.
     ///
-    /// [`security_descriptor`]: #field.security_descriptor " "
-    // TODO have safe and unsafe versions, since most folks don't need security_attributes
-    pub unsafe fn build(self) -> io::Result<(PubWriter, PubReader)> {
+    /// # Safety
+    /// The [`security_descriptor`](Self.security_descriptor) field is passed directly to Win32 which is then dereferenced there, resulting in undefined behavior if it was an invalid non-null pointer. For the default configuration, this should never be a concern.
+    pub unsafe fn build_with_security_descriptor(self) -> io::Result<(PubWriter, PubReader)> {
         let hint_raw = match self.buffer_size_hint {
             Some(num) => num.get(),
             None => 0,
@@ -134,7 +147,7 @@ unsafe impl Send for UnnamedPipeCreationOptions {}
 unsafe impl Sync for UnnamedPipeCreationOptions {}
 
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
-    unsafe { UnnamedPipeCreationOptions::default().build() }
+    UnnamedPipeCreationOptions::default().build()
 }
 
 pub(crate) struct UnnamedPipeReader(FileHandle);
