@@ -26,7 +26,6 @@
 //! # Feature gates
 //! - **`signals`**, *on* by default – enables support for POSIX signals and C signals. Pulls in additional dependencies.
 //! - **`tokio_support`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC. Cannot simply be named `tokio` because of Cargo limitations.
-//! - **`nonblocking`**, *on* by default – deprecated and will be removed, do not use.
 //!
 //! # License
 //! This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].
@@ -86,13 +85,6 @@ compile_error!("Platforms with exotic pointer widths (neither 32-bit nor 64-bit)
 mod macros;
 
 pub mod local_socket;
-#[cfg(any(doc, feature = "nonblocking"))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "nonblocking")))]
-#[deprecated(note = "\
-does not integrate with async runtimes, leading to poor performance and bugs related to reading \
-and writing at the same time (you can't) – see the `tokio` modules for relevant IPC primitives \
-or open an issue if you want more async runtimes to be supported as well")]
-pub mod nonblocking;
 pub mod unnamed_pipe;
 //pub mod shared_memory;
 
