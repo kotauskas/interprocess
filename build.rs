@@ -1,22 +1,12 @@
-use rustc_version::{version, Version};
 use std::{
     env::{var as env_var, var_os as env_var_os},
     io::{self, Write},
 };
 
 fn main() {
-    let version = version().expect("Rust version detection failed");
     if is_unix() {
         let target = TargetTriplet::fetch();
         collect_uds_features(&target);
-        #[cfg(feature = "signals")]
-        collect_signals(&target);
-    }
-    if checkver(&version, 52) {
-        define("unsafe_op_in_unsafe_fn_stable");
-    }
-    if checkver(&version, 53) {
-        define("io_error_kind_unsupported_stable");
     }
 }
 
@@ -142,12 +132,6 @@ fn collect_signals(target: &TargetTriplet) {
     } else if target.os("hermit") {
         define("se_basic");
     }
-}
-
-fn checkver(version: &Version, m: u64) -> bool {
-    // A build script is needed for this because the `rustversion` crate has some weird problems
-    // around being used as a crate-level inner attribute.
-    *version >= Version::new(1, m, 0)
 }
 
 fn define(cfg: &str) {

@@ -4,7 +4,9 @@
 name = "interprocess"
 version = "2.0.0"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.66"
+resolver = "2"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 documentation = "https://docs.rs/interprocess"

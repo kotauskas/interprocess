@@ -1,3 +1,5 @@
+//! [![Rust version: 1.66+](https://img.shields.io/badge/rust%20version-1.66+-orange)](https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html)
+//!
 //! Interprocess communication toolkit for Rust programs. The crate aims to expose as many platform-specific features as possible while maintaining a uniform interface for all platforms.
 //!
 //! # Features
@@ -42,11 +44,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![allow(clippy::nonstandard_macro_braces)]
-#![cfg_attr(
-    unsafe_op_in_unsafe_fn_stable, // This is set by the build script on Rust 1.52+
-    forbid(unsafe_op_in_unsafe_fn),
-)]
-#![cfg_attr(not(unsafe_op_in_unsafe_fn_stable), allow(unused_unsafe))]
+#![forbid(unsafe_op_in_unsafe_fn)]
 
 // If an operating system is not listed here, the `compile_error!` is invoked
 #[cfg(not(any(
