@@ -97,22 +97,14 @@ impl Future for ConnectFuture<'_> {
 /// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
 /// reader, but Windows shoehorns both into the former.
 impl AsyncRead for LocalSocketStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let rslt = self.pinproj().poll_read(cx, buf);
         let thunked = thunk_broken_pipe_to_eof(ready!(rslt));
         Poll::Ready(thunked)
     }
 }
 impl AsyncWrite for LocalSocketStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
     // Those two do nothing

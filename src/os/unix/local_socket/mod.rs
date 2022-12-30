@@ -41,13 +41,9 @@ fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<
     }
     #[cfg(uds_linux_namespace)]
     if name.is_namespaced() {
-        return Ok(UdSocketPath::Namespaced(cow_osstr_to_cstr(
-            name.into_inner_cow(),
-        )?));
+        return Ok(UdSocketPath::Namespaced(cow_osstr_to_cstr(name.into_inner_cow())?));
     }
-    Ok(UdSocketPath::File(cow_osstr_to_cstr(
-        name.into_inner_cow(),
-    )?))
+    Ok(UdSocketPath::File(cow_osstr_to_cstr(name.into_inner_cow())?))
 }
 
 pub fn name_type_support_query() -> NameTypeSupport {

@@ -150,16 +150,12 @@ impl<'a> UdSocketPath<'a> {
                 #[cfg(uds_linux_namespace)]
                 let (src_ptr, path_length) = if addr.sun_path[0] == 0 {
                     _namespaced = true;
-                    (
-                        addr.sun_path.as_ptr().offset(1) as *const u8,
-                        sun_path_length - 1,
-                    )
+                    (addr.sun_path.as_ptr().offset(1) as *const u8, sun_path_length - 1)
                 } else {
                     (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
                 #[cfg(not(uds_linux_namespace))]
-                let (src_ptr, path_length) =
-                    { (addr.sun_path.as_ptr() as *const u8, sun_path_length) };
+                let (src_ptr, path_length) = { (addr.sun_path.as_ptr() as *const u8, sun_path_length) };
                 // Fill the space for the name and the nul terminator with nuls
                 vec.resize(path_length, 0);
                 ptr::copy_nonoverlapping(src_ptr, vec.as_mut_ptr(), path_length);
@@ -183,10 +179,7 @@ impl<'a> UdSocketPath<'a> {
             let mut _namespaced = false;
             let mut vec = unsafe {
                 let (src_ptr, path_length) = if addr.sun_path[0] == 0 {
-                    (
-                        addr.sun_path.as_ptr().offset(1) as *const u8,
-                        sun_path_length - 1,
-                    )
+                    (addr.sun_path.as_ptr().offset(1) as *const u8, sun_path_length - 1)
                 } else {
                     (addr.sun_path.as_ptr() as *const u8, sun_path_length)
                 };
@@ -221,10 +214,7 @@ impl<'a> UdSocketPath<'a> {
                 if len_of_self > MAX_UDSOCKET_PATH_LEN {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        format!(
-                            "socket path should not be longer than {} bytes",
-                            MAX_UDSOCKET_PATH_LEN
-                        ),
+                        format!("socket path should not be longer than {} bytes", MAX_UDSOCKET_PATH_LEN),
                     ));
                 }
             }
@@ -510,13 +500,9 @@ impl ToUdSocketPath<'static> for OsString {
         if self.as_os_str().as_bytes().first() == Some(&0x40) {
             let mut without_at_sign = self.into_vec();
             without_at_sign.remove(0);
-            return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(
-                without_at_sign,
-            )?)));
+            return Ok(UdSocketPath::Namespaced(Cow::Owned(CString::new(without_at_sign)?)));
         }
-        Ok(UdSocketPath::File(Cow::Owned(CString::new(
-            self.into_vec(),
-        )?)))
+        Ok(UdSocketPath::File(Cow::Owned(CString::new(self.into_vec())?)))
     }
 }
 impl<'a> ToUdSocketPath<'a> for &'a Path {
@@ -574,9 +560,7 @@ impl<'a> ToUdSocketPath<'a> for &'a str {
             }
         }
         if !self.ends_with('\0') {
-            Ok(UdSocketPath::File(Cow::Owned(CString::new(
-                self.to_owned(),
-            )?)))
+            Ok(UdSocketPath::File(Cow::Owned(CString::new(self.to_owned())?)))
         } else {
             let cstr = CStr::from_bytes_with_nul(self.as_bytes())
                 .map_err(|x| io::Error::new(io::ErrorKind::InvalidInput, x))?;
@@ -601,8 +585,6 @@ impl ToUdSocketPath<'static> for String {
                 without_at_sign.into_bytes(),
             )?)));
         }
-        Ok(UdSocketPath::File(Cow::Owned(CString::new(
-            self.into_bytes(),
-        )?)))
+        Ok(UdSocketPath::File(Cow::Owned(CString::new(self.into_bytes())?)))
     }
 }

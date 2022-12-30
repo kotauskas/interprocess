@@ -34,8 +34,8 @@ pub(super) const _MAX_UDSOCKET_PATH_LEN: usize = 0;
 
 #[cfg(uds_supported)]
 pub(super) use libc::{
-    iovec, sockaddr, socklen_t, AF_UNIX, FD_CLOEXEC, F_GETFD, F_GETFL, F_SETFD, F_SETFL,
-    O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET,
+    iovec, sockaddr, socklen_t, AF_UNIX, FD_CLOEXEC, F_GETFD, F_GETFL, F_SETFD, F_SETFL, O_NONBLOCK, SHUT_RD,
+    SHUT_RDWR, SHUT_WR, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET,
 };
 
 cfg_if! {

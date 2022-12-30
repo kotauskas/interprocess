@@ -67,10 +67,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
             replace(&mut *stored_instance, new_instance)
         };
 
-        Ok(Stream::build(super::stream::Instance::new(
-            instance_to_hand_out,
-            true,
-        )))
+        Ok(Stream::build(super::stream::Instance::new(instance_to_hand_out, true)))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
     pub fn incoming(&self) -> Incoming<'_, Stream> {
@@ -89,11 +86,7 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         // convenient to do this instead. The mutex takes care of ordering.
         self.nonblocking.store(nonblocking, Relaxed);
         unsafe {
-            super::set_nonblocking_for_stream(
-                instance.as_raw_handle(),
-                Stream::READ_MODE,
-                nonblocking,
-            )?;
+            super::set_nonblocking_for_stream(instance.as_raw_handle(), Stream::READ_MODE, nonblocking)?;
         }
         // Make it clear that the lock survives until this moment.
         drop(instance);
@@ -101,13 +94,9 @@ impl<Stream: PipeStream> PipeListener<Stream> {
     }
 
     fn create_instance(&self, nonblocking: bool) -> io::Result<PipeOps> {
-        let handle = self.config.create_instance(
-            false,
-            nonblocking,
-            false,
-            Stream::ROLE,
-            Stream::READ_MODE,
-        )?;
+        let handle = self
+            .config
+            .create_instance(false, nonblocking, false, Stream::ROLE, Stream::READ_MODE)?;
         // SAFETY: we just created this handle
         Ok(unsafe { PipeOps::from_raw_handle(handle) })
     }

@@ -114,11 +114,7 @@ impl FileHandle {
 impl Drop for FileHandle {
     fn drop(&mut self) {
         let _success = unsafe { CloseHandle(self.0) != 0 };
-        debug_assert!(
-            _success,
-            "failed to close file handle: {}",
-            io::Error::last_os_error()
-        );
+        debug_assert!(_success, "failed to close file handle: {}", io::Error::last_os_error());
     }
 }
 #[cfg(windows)]

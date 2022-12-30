@@ -39,11 +39,7 @@ impl OwnedReadHalf {
 }
 
 impl AsyncRead for OwnedReadHalf {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
     }
     fn poll_read_vectored(

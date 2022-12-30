@@ -62,10 +62,7 @@ pub trait ToLocalSocketName<'a> {
 /// Converts a borrowed [`Path`] to a borrowed file-type [`LocalSocketName`] with the same lifetime.
 impl<'a> ToLocalSocketName<'a> for &'a Path {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Borrowed(self.as_os_str()),
-            false,
-        ))
+        Ok(LocalSocketName::from_raw_parts(Cow::Borrowed(self.as_os_str()), false))
     }
 }
 /// Converts an owned [`PathBuf`] to an owned file-type [`LocalSocketName`].

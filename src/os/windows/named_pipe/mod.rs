@@ -36,10 +36,7 @@ use std::{
     io, iter, ptr,
 };
 
-fn pathcvt<'a>(
-    pipe_name: &'a OsStr,
-    hostname: Option<&'a OsStr>,
-) -> (impl Iterator<Item = &'a OsStr>, usize) {
+fn pathcvt<'a>(pipe_name: &'a OsStr, hostname: Option<&'a OsStr>) -> (impl Iterator<Item = &'a OsStr>, usize) {
     use iter::once as i;
 
     static PREFIX_LITERAL: &str = r"\\";
@@ -52,8 +49,7 @@ fn pathcvt<'a>(
         .chain(i(hostname))
         .chain(i(OsStr::new(PIPEFS_LITERAL)))
         .chain(i(pipe_name));
-    let capacity_hint =
-        PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len();
+    let capacity_hint = PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len();
     (iterator, capacity_hint)
 }
 fn convert_path(pipename: &OsStr, hostname: Option<&OsStr>) -> OsString {
@@ -75,22 +71,12 @@ fn encode_to_utf16(s: &OsStr) -> Vec<u16> {
     path
 }
 #[cfg(windows)]
-unsafe fn set_nonblocking_for_stream(
-    handle: HANDLE,
-    read_mode: Option<PipeMode>,
-    nonblocking: bool,
-) -> io::Result<()> {
+unsafe fn set_nonblocking_for_stream(handle: HANDLE, read_mode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
     let read_mode: u32 = read_mode.map_or(0, PipeMode::to_readmode);
     // Bitcast the boolean without additional transformations since
     // the flag is in the first bit.
     let mut mode: u32 = read_mode | nonblocking as u32;
-    let success = unsafe {
-        SetNamedPipeHandleState(
-            handle,
-            &mut mode as *mut _,
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    } != 0;
+    let success =
+        unsafe { SetNamedPipeHandleState(handle, &mut mode as *mut _, ptr::null_mut(), ptr::null_mut()) } != 0;
     ok_or_ret_errno!(success => ())
 }

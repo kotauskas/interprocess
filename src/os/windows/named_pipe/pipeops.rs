@@ -92,10 +92,7 @@ impl PipeOps {
     pub fn get_server_session_id(&self) -> io::Result<u32> {
         unsafe { self.hget(GetNamedPipeServerSessionId) }
     }
-    unsafe fn hget(
-        &self,
-        f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
-    ) -> io::Result<u32> {
+    unsafe fn hget(&self, f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL) -> io::Result<u32> {
         let mut x: u32 = 0;
         let success = unsafe { f(self.0 .0, &mut x as *mut _) != 0 };
         ok_or_ret_errno!(success => x)

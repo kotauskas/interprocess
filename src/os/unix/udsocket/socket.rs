@@ -3,8 +3,7 @@ use super::c_wrappers;
 use super::{
     imports::*,
     util::{check_ancillary_unsound, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w},
-    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath,
-    UdSocketPath,
+    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
 #[cfg(any(doc, target_os = "linux"))]
 use crate::{ReliableReadMsg, Sealed};
@@ -69,10 +68,7 @@ impl UdSocket {
             PathDropGuard::dummy()
         };
 
-        Ok(Self {
-            fd,
-            _drop_guard: dg,
-        })
+        Ok(Self { fd, _drop_guard: dg })
     }
     /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead, but supplying the address to the kernel once is more efficient.
     ///
@@ -343,8 +339,7 @@ creates unusable socket that is not bound to any address, use `.set_destination(
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_ancillary_vectored(bufs, iter::empty())
-            .map(|x| x.0)
+        self.send_ancillary_vectored(bufs, iter::empty()).map(|x| x.0)
     }
     /// Sends a datagram and ancillary data into the socket.
     ///
@@ -374,9 +369,7 @@ creates unusable socket that is not bound to any address, use `.set_destination(
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
         check_ancillary_unsound()?;
-        let abuf = ancillary_data
-            .into_iter()
-            .collect::<EncodedAncillaryData<'_>>();
+        let abuf = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
         let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
