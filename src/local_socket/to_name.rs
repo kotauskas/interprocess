@@ -99,10 +99,9 @@ impl ToLocalSocketName<'static> for String {
     }
 }
 /// Converts a borrowed [`CStr`] to a borrowed [`LocalSocketName`] with the same lifetime. **UTF-8 is assumed and the nul terminator is preserved during conversion**. On platforms which don't support namespaced socket names, the result is always a file-type name; on platforms that do, prefixing the name with the `@` character will trim it away and yield a namespaced name instead. See the trait-level documentation for more.
-// FIXME chop off the nul
 impl<'a> ToLocalSocketName<'a> for &'a CStr {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        str::from_utf8(self.to_bytes_with_nul())
+        str::from_utf8(self.to_bytes())
             .map(|x| to_local_socket_name_osstr(OsStr::new(x)))
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
