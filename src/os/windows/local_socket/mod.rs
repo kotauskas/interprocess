@@ -8,7 +8,7 @@ use {
     },
 };
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 pub mod tokio;
 
 mod listener;

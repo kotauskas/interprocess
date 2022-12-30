@@ -1,4 +1,4 @@
-#![cfg(all(windows, feature = "tokio_support"))]
+#![cfg(all(windows, feature = "tokio"))]
 #[path = "../util/mod.rs"]
 mod util;
 

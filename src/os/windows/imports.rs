@@ -48,21 +48,21 @@ import_trait_or_make_dummy!(traits {std::os::windows::io}::(
 
 import_trait_or_make_dummy!(traits {futures_io}::(
     AsyncRead, AsyncWrite,
-), cfg(feature = "tokio_support"));
+), cfg(feature = "tokio"));
 import_trait_or_make_dummy!(traits {tokio::io}::(
     AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite,
-), cfg(feature = "tokio_support"));
+), cfg(feature = "tokio"));
 import_type_or_make_dummy!(
-    type {tokio::io}::ReadBuf as TokioReadBuf<'a>, cfg(feature = "tokio_support"),
+    type {tokio::io}::ReadBuf as TokioReadBuf<'a>, cfg(feature = "tokio"),
 );
 
-#[cfg(all(windows, feature = "tokio_support"))]
+#[cfg(all(windows, feature = "tokio"))]
 pub(super) use tokio::net::windows::named_pipe::ClientOptions as TokioNPClientOptions;
 
 import_type_or_make_dummy!(types {tokio::net::windows::named_pipe}::(
     NamedPipeClient as TokioNPClient,
     NamedPipeServer as TokioNPServer,
-), cfg(all(windows, feature = "tokio_support")));
+), cfg(all(windows, feature = "tokio")));
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 pub(super) use futures_core::ready;

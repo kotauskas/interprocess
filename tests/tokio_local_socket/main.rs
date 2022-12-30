@@ -1,4 +1,4 @@
-#![cfg(feature = "tokio_support")]
+#![cfg(feature = "tokio")]
 #[path = "../util/mod.rs"]
 mod util;
 use util::TestResult;

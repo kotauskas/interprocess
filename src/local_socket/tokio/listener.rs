@@ -6,11 +6,11 @@ use {
     },
 };
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impmod! {local_socket::tokio,
     LocalSocketListener as LocalSocketListenerImpl
 }
-#[cfg(not(feature = "tokio_support"))]
+#[cfg(not(feature = "tokio"))]
 struct LocalSocketListenerImpl;
 
 /// A Tokio-based local socket server, listening for connections.

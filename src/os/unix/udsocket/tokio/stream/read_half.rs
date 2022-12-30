@@ -56,23 +56,15 @@ impl<'a> BorrowedReadHalf<'a> {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamReadHalf<'a>);
 }
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl TokioAsyncRead for BorrowedReadHalf<'_> {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for BorrowedReadHalf<'_> {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
@@ -137,23 +129,15 @@ impl OwnedReadHalf {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamOwnedReadHalf);
 }
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl TokioAsyncRead for OwnedReadHalf {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for OwnedReadHalf {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),

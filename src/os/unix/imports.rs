@@ -59,27 +59,27 @@ import_type_or_make_dummy!(types {tokio::net}::(
     UnixListener as TokioUdStreamListener,
     UnixStream as TokioUdStream,
     UnixDatagram as TokioUdSocket,
-), cfg(all(uds_supported, feature = "tokio_support")));
+), cfg(all(uds_supported, feature = "tokio")));
 import_type_or_make_dummy!(types {tokio::net::unix}::(
     ReadHalf as TokioUdStreamReadHalf<'a>,
     OwnedReadHalf as TokioUdStreamOwnedReadHalf,
     WriteHalf as TokioUdStreamWriteHalf<'a>,
     OwnedWriteHalf as TokioUdStreamOwnedWriteHalf,
-), cfg(all(unix, feature = "tokio_support")));
+), cfg(all(unix, feature = "tokio")));
 
-#[cfg(all(unix, feature = "tokio_support"))]
+#[cfg(all(unix, feature = "tokio"))]
 pub use tokio::net::unix::ReuniteError as TokioReuniteError;
-#[cfg(not(all(unix, feature = "tokio_support")))]
+#[cfg(not(all(unix, feature = "tokio")))]
 pub struct TokioReuniteError(pub (), pub ());
 
-import_type_or_make_dummy!(type {tokio::io}::ReadBuf<'a>, cfg(feature = "tokio_support"));
+import_type_or_make_dummy!(type {tokio::io}::ReadBuf<'a>, cfg(feature = "tokio"));
 
 import_trait_or_make_dummy!(traits {tokio::io}::(
     AsyncRead as TokioAsyncRead,
     AsyncWrite as TokioAsyncWrite,
-), cfg(feature = "tokio_support"));
+), cfg(feature = "tokio"));
 
 import_trait_or_make_dummy!(traits {futures_io}::(
     AsyncRead as FuturesAsyncRead,
     AsyncWrite as FuturesAsyncWrite,
-), cfg(feature = "tokio_support"));
+), cfg(feature = "tokio"));

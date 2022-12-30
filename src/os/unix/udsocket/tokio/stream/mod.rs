@@ -106,23 +106,15 @@ tokio_wrapper_trait_impls!(
     std StdUdStream,
     tokio TokioUdStream);
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl TokioAsyncRead for UdStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for UdStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
@@ -131,13 +123,9 @@ impl FuturesAsyncRead for UdStream {
         }
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl TokioAsyncWrite for UdStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
@@ -148,13 +136,9 @@ impl TokioAsyncWrite for UdStream {
         self.pinproject().poll_shutdown(cx)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl FuturesAsyncWrite for UdStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {

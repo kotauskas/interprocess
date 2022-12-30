@@ -10,7 +10,7 @@ pub use xorshift::*;
 mod namegen;
 pub use namegen::*;
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 pub mod tokio;
 
 const NUM_CLIENTS: u32 = 20;

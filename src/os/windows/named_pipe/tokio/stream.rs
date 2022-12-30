@@ -69,10 +69,7 @@ mod inst {
             // no point to writing unsafe code to do that. (Also, this condition obviously signifies
             // a bug in interprocess that can only lead to creation of excess instances at worst, so
             // there isn't a real point to making sure it never happens in release mode.)
-            debug_assert!(
-                !self.0.split.load(Relaxed),
-                "cannot split an already split instance"
-            );
+            debug_assert!(!self.0.split.load(Relaxed), "cannot split an already split instance");
             // Again, the store doesn't even need to be atomic because it won't happen concurrently.
             self.0.split.store(true, Relaxed);
 
@@ -361,34 +358,22 @@ Created either by using `PipeListener` or by connecting to a named pipe server.
 "
 }
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl AsyncRead for ByteReaderPipeStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl AsyncRead for &ByteReaderPipeStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl AsyncWrite for ByteWriterPipeStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -398,13 +383,9 @@ impl AsyncWrite for ByteWriterPipeStream {
         self.ops().poll_shutdown(ctx)
     }
 }
-#[cfg(feature = "tokio_support")]
+#[cfg(feature = "tokio")]
 impl AsyncWrite for &ByteWriterPipeStream {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -416,172 +397,124 @@ impl AsyncWrite for &ByteWriterPipeStream {
 }
 
 impl AsyncRead for DuplexBytePipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 impl AsyncWrite for DuplexBytePipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }
 }
 impl AsyncRead for &DuplexBytePipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 impl AsyncWrite for &DuplexBytePipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }
 }
 
 impl AsyncRead for MsgReaderPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 impl AsyncRead for &MsgReaderPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 
 impl AsyncWrite for MsgWriterPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }
 }
 impl AsyncWrite for &MsgWriterPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }
 }
 
 impl AsyncRead for DuplexMsgPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 impl AsyncWrite for DuplexMsgPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }
 }
 impl AsyncRead for &DuplexMsgPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_read(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_read(ctx, buf)
     }
 }
 impl AsyncWrite for &DuplexMsgPipeStream {
-    #[cfg(feature = "tokio_support")]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[cfg(feature = "tokio")]
+    fn poll_write(self: Pin<&mut Self>, ctx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.ops().poll_write(ctx, buf)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_flush(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_flush(ctx)
     }
-    #[cfg(feature = "tokio_support")]
+    #[cfg(feature = "tokio")]
     fn poll_close(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.ops().poll_shutdown(ctx)
     }

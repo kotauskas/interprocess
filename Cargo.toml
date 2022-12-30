@@ -16,29 +16,35 @@ description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
 keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
 
-exclude = ["/.github/", "/README.tpl", "/Cargo.lock", "/.gitignore"]
+exclude = [
+    "/.github/",
+    "/README.tpl",
+    "/Cargo.lock",
+    "/.gitignore",
+    "interprocess.code-workspace",
+]
 
 [features]
 default = []
-tokio_support = ["tokio", "futures-core", "futures-io"]
+tokio = ["dep:tokio", "futures-core", "futures-io"]
 doc_cfg = []
 
 [dependencies]
-tokio = { version = "1.8", features = [
+tokio = { version = "1.23.0", features = [
     "net",
     "time",
     "io-util",
 ], optional = true }
-futures-core = { version = "0.3", optional = true }
-futures-io = { version = "0.3", optional = true }
+futures-core = { version = "0.3.25", optional = true }
+futures-io = { version = "0.3.25", optional = true }
 to_method = "1.1"
-cfg-if = "1.0"
+cfg-if = "1.0.0"
 
 [build-dependencies]
 rustc_version = "0.4"
 
 [dev-dependencies]
-tokio = { version = "1.8", features = [
+tokio = { version = "1.23.0", features = [
     "rt-multi-thread",
     "io-util",
     "sync",
@@ -62,4 +68,4 @@ winapi = { version = "0.3", features = [
 libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [package.metadata.docs.rs]
-features = ["doc_cfg", "tokio_support"]
+features = ["doc_cfg", "tokio"]

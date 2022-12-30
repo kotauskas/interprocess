@@ -11,8 +11,8 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
-#[cfg(any(doc, feature = "tokio_support"))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio_support")))]
+#[cfg(any(doc, feature = "tokio"))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
 mod ancillary;
