@@ -102,35 +102,6 @@ impl UdSocket {
 
         Ok(())
     }
-    /// Incorrect API; do not use.
-    // TODO banish
-    #[deprecated = "\
-creates unusable socket that is not bound to any address, use `.set_destination()` instead"]
-    pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        let path = path.to_socket_path()?;
-        Self::_connect(&path, false)
-    }
-    fn _connect(path: &UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
-        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
-        c_wrappers::set_passcred(&fd, true)?;
-
-        let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
-            PathDropGuard {
-                path: path.to_owned(),
-                enabled: true,
-            }
-        } else {
-            PathDropGuard::dummy()
-        };
-
-        let socket = Self {
-            fd,
-            _drop_guard: dg,
-        };
-        socket._set_destination(path)?;
-
-        Ok(socket)
-    }
 
     // TODO banish
     fn add_fake_trunc_flag(x: usize) -> (usize, bool) {
