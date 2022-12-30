@@ -11,7 +11,6 @@
 //!
 //! ### Platform-specific, but present on both Unix-like systems and Windows
 //! - **Unnamed pipes** – anonymous file-like objects for communicating privately in one direction, most commonly used to communicate between a child process and its parent
-//! - **Signals** – C signals on Windows, POSIX signals on Unix-like OSes *(deprecated)*
 //!
 //! ### Unix-only
 //! - **FIFO files** – special type of file which is similar to unnamed pipes but exists on the filesystem, often referred to as "named pipes" but completely different from Windows named pipes
@@ -24,8 +23,7 @@
 //! Currently, only Tokio for local sockets, Unix domain sockets and Windows named pipes is supported. Support for `async-std` is planned.
 //!
 //! # Feature gates
-//! - **`signals`**, *on* by default – enables support for POSIX signals and C signals. Pulls in additional dependencies.
-//! - **`tokio_support`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC. Cannot simply be named `tokio` because of Cargo limitations.
+//! - **`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
 //!
 //! # License
 //! This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].

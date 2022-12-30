@@ -4,6 +4,8 @@
 [![Build Status](https://github.com/kotauskas/interprocess/workflows/Checks%20and%20tests/badge.svg)](https://github.com/kotauskas/interprocess/actions "GitHub Actions page for Interprocess")
 ![maintenance-status](https://img.shields.io/badge/maintenance-actively%20developed-brightgreen)
 
+[![Rust version: 1.66+](https://img.shields.io/badge/rust%20version-1.66+-orange)](https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html)
+
 Interprocess communication toolkit for Rust programs. The crate aims to expose as many platform-specific features as possible while maintaining a uniform interface for all platforms.
 
 ## Features
@@ -15,7 +17,6 @@ Interprocess communication toolkit for Rust programs. The crate aims to expose a
 
 #### Platform-specific, but present on both Unix-like systems and Windows
 - **Unnamed pipes** – anonymous file-like objects for communicating privately in one direction, most commonly used to communicate between a child process and its parent
-- **Signals** – C signals on Windows, POSIX signals on Unix-like OSes *(deprecated)*
 
 #### Unix-only
 - **FIFO files** – special type of file which is similar to unnamed pipes but exists on the filesystem, often referred to as "named pipes" but completely different from Windows named pipes
@@ -28,9 +29,7 @@ Interprocess communication toolkit for Rust programs. The crate aims to expose a
 Currently, only Tokio for local sockets, Unix domain sockets and Windows named pipes is supported. Support for `async-std` is planned.
 
 ## Feature gates
-- **`signals`**, *on* by default – enables support for POSIX signals and C signals. Pulls in additional dependencies.
-- **`tokio_support`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC. Cannot simply be named `tokio` because of Cargo limitations.
-- **`nonblocking`**, *on* by default – deprecated and will be removed, do not use.
+- **`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
 
 ## License
 This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].
