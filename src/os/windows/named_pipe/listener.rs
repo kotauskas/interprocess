@@ -138,10 +138,9 @@ pub struct PipeListenerOptions<'a> {
     /// Enables remote machines to connect to the named pipe over the network.
     pub accept_remote: bool,
     /// Specifies how big the input buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
-    // TODO change into DWORD, i.e. u32
-    pub input_buffer_size_hint: usize,
+    pub input_buffer_size_hint: DWORD,
     /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
-    pub output_buffer_size_hint: usize,
+    pub output_buffer_size_hint: DWORD,
     /// The default timeout clients use when connecting. Used unless another timeout is specified when waiting by a client.
     // TODO use WaitTimeout struct
     pub wait_timeout: NonZeroU32,
@@ -207,8 +206,8 @@ impl<'a> PipeListenerOptions<'a> {
         instance_limit "instance_limit": Option<NonZeroU8>,
         write_through "write_through": bool,
         accept_remote "accept_remote": bool,
-        input_buffer_size_hint "input_buffer_size_hint": usize,
-        output_buffer_size_hint "output_buffer_size_hint": usize,
+        input_buffer_size_hint "input_buffer_size_hint": DWORD,
+        output_buffer_size_hint "output_buffer_size_hint": DWORD,
         wait_timeout "wait_timeout": NonZeroU32,
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
@@ -239,13 +238,14 @@ cannot create pipe server that has byte type but reads messages – have you for
                 open_mode,
                 pipe_mode,
                 self.instance_limit.map_or(255, |x| {
-                    assert!(x.get() != 255, "cannot set 255 as the named pipe instance limit due to 255 being a reserved value");
+                    assert!(
+                        x.get() != 255,
+                        "cannot set 255 as the named pipe instance limit due to 255 being a reserved value"
+                    );
                     x.get().to::<DWORD>()
                 }),
-                self.output_buffer_size_hint.try_into()
-                    .expect("output buffer size hint overflowed DWORD"),
-                self.input_buffer_size_hint.try_into()
-                    .expect("input buffer size hint overflowed DWORD"),
+                self.output_buffer_size_hint,
+                self.input_buffer_size_hint,
                 self.wait_timeout.get(),
                 ptr::null_mut(),
             );
