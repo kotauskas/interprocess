@@ -78,16 +78,6 @@ impl<'a> UdSocketPath<'a> {
         *self = self.to_owned();
         required_cloning
     }
-    /// Converts to a `UdSocketPath<'static>` which stores the path as an owned `CString`, cloning if necessary.
-    // TODO implement ToOwned instead of Clone in 2.0.0
-    pub fn to_owned(&self) -> UdSocketPath<'static> {
-        match self {
-            Self::File(f) => UdSocketPath::File(Cow::Owned(f.as_ref().to_owned())),
-            #[cfg(uds_linux_namespace)]
-            Self::Namespaced(n) => UdSocketPath::Namespaced(Cow::Owned(n.as_ref().to_owned())),
-            Self::Unnamed => UdSocketPath::Unnamed,
-        }
-    }
     /// Borrows into another `UdSocketPath<'_>` instance. If borrowed here, reborrows; if owned here, returns a fresh borrow.
     pub fn borrow(&self) -> UdSocketPath<'_> {
         match self {
@@ -328,6 +318,17 @@ impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
             addr.sun_family = AF_UNIX as _;
             path.write_self_to_sockaddr_un(&mut addr)?;
             Ok(addr)
+        }
+    }
+}
+impl ToOwned for UdSocketPath<'_> {
+    type Owned = UdSocketPath<'static>;
+    fn to_owned(&self) -> UdSocketPath<'static> {
+        match self {
+            Self::File(f) => UdSocketPath::File(Cow::Owned(f.as_ref().to_owned())),
+            #[cfg(uds_linux_namespace)]
+            Self::Namespaced(n) => UdSocketPath::Namespaced(Cow::Owned(n.as_ref().to_owned())),
+            Self::Unnamed => UdSocketPath::Unnamed,
         }
     }
 }
