@@ -64,13 +64,5 @@ import_type_or_make_dummy!(types {tokio::net::windows::named_pipe}::(
     NamedPipeServer as TokioNPServer,
 ), cfg(all(windows, feature = "tokio_support")));
 
-#[cfg(all(windows, feature = "signals"))]
-pub(super) use {intmap::IntMap, once_cell::sync::Lazy, spinning::RwLock, thiserror::Error};
-
-import_const_or_make_dummy!(i32: consts {libc}::(
-    SIG_DFL = 0,
-    SIGABRT = 100, SIGFPE = 101, SIGILL = 102, SIGINT = 103, SIGSEGV = 104, SIGTERM = 105,
-), cfg(windows));
-
 #[cfg(feature = "tokio_support")]
 pub(super) use futures_core::ready;

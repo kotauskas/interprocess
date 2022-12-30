@@ -2,9 +2,6 @@
 #![cfg_attr(not(windows), allow(warnings))]
 
 pub mod named_pipe;
-#[cfg(any(doc, feature = "signals"))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "signals")))]
-pub mod signal;
 pub mod unnamed_pipe;
 // TODO mailslots
 //pub mod mailslot;

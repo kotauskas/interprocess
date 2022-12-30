@@ -23,9 +23,6 @@ mod fdops;
 pub(self) use fdops::*;
 
 pub mod fifo_file;
-#[cfg(any(doc, all(feature = "signals", se_basic)))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "signals")))]
-pub mod signal;
 
 #[cfg(any(doc, uds_supported))]
 pub mod udsocket;

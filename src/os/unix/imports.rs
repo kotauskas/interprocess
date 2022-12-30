@@ -55,39 +55,6 @@ pub(super) use libc::SO_PEERCRED;
 #[cfg(uds_scm_credentials)]
 pub(super) use libc::{SCM_CREDENTIALS, SO_PASSCRED};
 
-#[cfg(feature = "signals")]
-pub(super) use {intmap::IntMap, once_cell::sync::Lazy, spinning::RwLock, thiserror::Error};
-
-#[cfg(se_basic)]
-pub(super) use libc::{sigaction, SA_NOCLDSTOP, SA_NODEFER, SA_RESETHAND, SA_RESTART, SIG_DFL};
-
-import_const_or_make_dummy!(i32: consts {libc}::(
-    SIGHUP  = 0, SIGINT  = 1, SIGQUIT = 2, SIGILL  = 3,
-    SIGABRT = 4, SIGFPE  = 5, SIGKILL = 6, SIGSEGV = 7,
-    SIGPIPE = 8, SIGALRM = 9, SIGTERM = 10,
-), cfg(se_basic));
-
-import_const_or_make_dummy!(i32: consts {libc}::(
-    SIGUSR1 = 11, SIGUSR2 = 12, SIGCHLD = 13, SIGCONT = 14,
-    SIGSTOP = 15, SIGTSTP = 16, SIGTTIN = 17, SIGTTOU = 18,
-), cfg(se_full_posix_1990));
-
-import_const_or_make_dummy!(i32: consts {libc}::(
-    SIGBUS    = 19, SIGURG  = 20,
-    SIGPROF   = 21, SIGSYS  = 22, SIGTRAP = 23,
-    SIGVTALRM = 24, SIGXCPU = 25, SIGXFSZ = 26,
-), cfg(se_base_posix_2001));
-
-cfg_if! {
-    if #[cfg(se_sigpoll)] {
-        pub(super) use libc::SIGPOLL;
-    } else if #[cfg(se_sigpoll_is_sigio)] {
-        pub(super) use libc::SIGIO as SIGPOLL;
-    } else {
-        const SIGPOLL: i32 = 27;
-    }
-}
-
 import_type_or_make_dummy!(types {tokio::net}::(
     UnixListener as TokioUdStreamListener,
     UnixStream as TokioUdStream,

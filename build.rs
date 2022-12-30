@@ -105,34 +105,6 @@ fn collect_uds_features(target: &TargetTriplet) {
         define("uds_supported");
     }
 }
-/// This can define the following:
-/// - `se_basic` (`SIGHUP`, `SIGINT`, `SIGQUIT`, `SIGILL`, `SIGABRT`, `SIGFPE`, `SIGKILL`, `SIGSEGV`, `SIGPIPE`, `SIGALRM`, `SIGTERM`), supported everywhere
-/// - `se_full_posix_1990` (implies `se_basic`, includes `SIGUSR1`, `SIGUSR2`, `SIGCHLD`, `SIGCONT`, `SIGSTOP`, `SIGTSTP`, `SIGTTIN`, `SIGTTOU`), supported everywhere other than HermitCore
-/// - `se_base_posix_2001` (implies `se_full_posix_1990`, includes `SIGBUS`, `SIGPROF`, `SIGSYS`, `SIGTRAP`, `SIGVTALRM`, `SIGXCPU`, SIGXFSZ), supported everywhere other than HermitCore
-/// - Either:
-///     - `se_sigpoll`
-///     - `se_sigpoll_is_sigio`
-/// - `se_sigwinch`, supported everywhere other than HermitCore
-/// - `se_sigpwr`, supported everywhere other than HermitCore and the BSD family
-#[rustfmt::skip]
-#[cfg(feature = "signals")]
-fn collect_signals(target: &TargetTriplet) {
-    if !is_unix() { return };
-    if target.os_any(
-        &["linux", "android", "emscripten", "fuchsia", "redox", "haiku", "solaris", "illumos"]
-    ) {
-        ldefine(&["se_basic", "se_full_posix_1990", "se_base_posix_2001", "se_sigwinch", "se_sigpwr"]);
-        if target.os("redox") {
-            define("se_sigpoll_is_sigio");
-        } else {
-            define("se_sigpoll");
-        }
-    } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
-        ldefine(&["se_basic", "se_full_posix_1990", "se_base_posix_2001", "se_sigwinch"]);
-    } else if target.os("hermit") {
-        define("se_basic");
-    }
-}
 
 fn define(cfg: &str) {
     ldefine(&[cfg]);
@@ -153,7 +125,6 @@ struct TargetTriplet {
     env: Option<String>,
 }
 #[rustfmt::skip]
-#[allow(dead_code)] // when signals are disabled, some of those are unused
 impl TargetTriplet {
     fn fetch() -> Self {
         Self {

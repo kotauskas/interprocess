@@ -41,22 +41,4 @@
     )))
 )]
 
-#[cfg_attr( // any(se_sigpoll, se_sigpoll_is_sigio) template
-    feature = "doc_cfg",
-    doc(cfg(any(
-        target_os = "linux",
-        target_os = "android",
-        target_os = "emscripten",
-        target_os = "redox",
-        target_os = "haiku",
-        target_os = "solaris",
-        target_os = "illumos"
-    )))
-)]
-
-#[cfg_attr( // se_full_posix_1990/se_base_posix_2001 template
-    feature = "doc_cfg",
-    doc(cfg(not(target_os = "hermit"))),
-)]
-
 */
