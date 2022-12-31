@@ -1,10 +1,7 @@
-use {
-    super::Sealed,
-    std::{
-        error::Error,
-        fmt::{self, Display, Formatter},
-        io,
-    },
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    io,
 };
 
 /// Receiving from IPC channels with message boundaries reliably, without truncation.
@@ -37,7 +34,7 @@ use {
 /// - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
 /// - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
 ///     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
-pub trait ReliableRecvMsg: Sealed {
+pub trait ReliableRecvMsg {
     /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
     fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
 
