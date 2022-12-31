@@ -58,77 +58,14 @@ pub enum FromRawHandleErrorKind {
 /// Error type for `from_raw_handle()` constructors.
 pub type FromRawHandleError = (FromRawHandleErrorKind, io::Error);
 
-/// Result type for `.recv()` methods.
-///
-/// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it didn't fit and contains a new, bigger buffer which it was written to instead.
-#[derive(Clone, Debug)]
-pub enum RecvResult {
-    Fit(usize),
-    Alloc(Vec<u8>),
-}
-impl RecvResult {
-    /// Returns the size of the message.
-    #[inline]
-    pub fn size(&self) -> usize {
-        match self {
-            Self::Fit(s) => *s,
-            Self::Alloc(v) => v.len(),
-        }
-    }
-    /// Returns whether the message was written to the buffer and taken off the OS queue or not
-    #[inline]
-    pub fn fit(&self) -> bool {
-        matches!(self, Self::Fit(..))
-    }
-    /// Converts to a `Result<usize, Vec<u8>>`, where `Ok` represents `Fit` and `Err` represents `Alloc`.
-    #[inline]
-    pub fn into_result(self) -> Result<usize, Vec<u8>> {
-        match self {
-            Self::Fit(f) => Ok(f),
-            Self::Alloc(a) => Err(a),
-        }
-    }
-}
-impl From<RecvResult> for Result<usize, Vec<u8>> {
-    /// See `.into_result()`.
-    fn from(x: RecvResult) -> Self {
-        x.into_result()
-    }
-}
-
-/// Result type for `.try_recv()` methods.
-///
-/// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it doesn't and hence wasn't written into the buffer. Both variants' payload is the total size of the message.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TryRecvResult {
-    /// The size of the message.
-    pub size: usize,
-    /// Whether the message was written to the buffer and taken off the OS queue or not.
-    pub fit: bool,
-}
-impl TryRecvResult {
-    /// Converts to a `Result<usize, usize>`, where `Ok` represents `fit = true` and `Err` represents `fit = false`.
-    #[inline(always)]
-    pub fn to_result(self) -> Result<usize, usize> {
-        match (self.size, self.fit) {
-            (s, true) => Ok(s),
-            (s, false) => Err(s),
-        }
-    }
-}
-impl From<TryRecvResult> for Result<usize, usize> {
-    /// See `.into_result()`.
-    fn from(x: TryRecvResult) -> Self {
-        x.to_result()
-    }
-}
-
 /// Error type for `.reunite()` on split receive and send halves.
 ///
 /// The error indicates that the halves belong to different streams and allows to recover both of them.
 #[derive(Debug)]
 pub struct ReuniteError<Rm: PipeModeTag, Sm: PipeModeTag> {
+    /// The receive half that didn't go anywhere, in case you still need it.
     pub recv_half: RecvHalf<Rm>,
+    /// The send half that didn't go anywhere, in case you still need it.
     pub send_half: SendHalf<Sm>,
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Display for ReuniteError<Rm, Sm> {

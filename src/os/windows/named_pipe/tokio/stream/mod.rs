@@ -3,9 +3,10 @@ mod wrapper_fns;
 pub(crate) use wrapper_fns::*;
 
 use super::{
-    super::stream::{pipe_mode, PipeModeTag, RecvResult, TryRecvResult, REUNITE_ERROR_MSG},
+    super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
     imports::*,
 };
+use crate::{RecvResult, TryRecvResult};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -67,7 +68,9 @@ pub type FromRawHandleError = (FromRawHandleErrorKind, io::Error);
 /// The error indicates that the halves belong to different streams and allows to recover both of them.
 #[derive(Debug)]
 pub struct ReuniteError<Rm: PipeModeTag, Sm: PipeModeTag> {
+    /// The receive half that didn't go anywhere, in case you still need it.
     pub recv_half: RecvHalf<Rm>,
+    /// The send half that didn't go anywhere, in case you still need it.
     pub send_half: SendHalf<Sm>,
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Display for ReuniteError<Rm, Sm> {

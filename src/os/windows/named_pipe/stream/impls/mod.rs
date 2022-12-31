@@ -4,10 +4,13 @@ mod split_owned;
 pub(crate) use split_owned::UNWRAP_FAIL_MSG;
 
 use super::{super::set_nonblocking_for_stream, *};
-use crate::os::windows::{
-    imports::*,
-    named_pipe::{convert_and_encode_path, PipeMode},
-    weaken_buf_init, FileHandle,
+use crate::{
+    os::windows::{
+        imports::*,
+        named_pipe::{convert_and_encode_path, PipeMode},
+        weaken_buf_init, FileHandle,
+    },
+    RecvResult, TryRecvResult,
 };
 use std::{
     ffi::OsStr,
