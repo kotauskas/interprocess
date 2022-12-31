@@ -1,16 +1,11 @@
-use {
-    super::LocalSocketStream,
-    crate::{
-        local_socket::ToLocalSocketName,
-        os::windows::named_pipe::{
-            DuplexBytePipeStream as PipeStream, PipeListener as GenericPipeListener,
-            PipeListenerOptions, PipeMode,
-        },
-    },
-    std::io,
+use super::LocalSocketStream;
+use crate::{
+    local_socket::ToLocalSocketName,
+    os::windows::named_pipe::{pipe_mode, PipeListener as GenericPipeListener, PipeListenerOptions, PipeMode},
 };
+use std::io;
 
-type PipeListener = GenericPipeListener<PipeStream>;
+type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
 #[derive(Debug)]
 pub struct LocalSocketListener {

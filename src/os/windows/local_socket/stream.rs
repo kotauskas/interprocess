@@ -2,7 +2,7 @@ use {
     super::thunk_broken_pipe_to_eof,
     crate::{
         local_socket::ToLocalSocketName,
-        os::windows::named_pipe::DuplexBytePipeStream as PipeStream,
+        os::windows::named_pipe::{pipe_mode, DuplexPipeStream},
     },
     std::{
         ffi::c_void,
@@ -13,12 +13,12 @@ use {
 };
 
 pub struct LocalSocketStream {
-    pub(super) inner: PipeStream,
+    pub(super) inner: DuplexPipeStream<pipe_mode::Bytes>,
 }
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = PipeStream::connect(name.inner())?;
+        let inner = DuplexPipeStream::connect(name.inner())?;
         Ok(Self { inner })
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
@@ -74,7 +74,7 @@ impl FromRawHandle for LocalSocketStream {
     unsafe fn from_raw_handle(handle: *mut c_void) -> Self {
         let inner = unsafe {
             // SAFETY: guaranteed via safety contract
-            PipeStream::from_raw_handle(handle)
+            DuplexPipeStream::from_raw_handle(handle).expect("creation from raw handle failed")
         };
         Self { inner }
     }

@@ -1,7 +1,5 @@
 use {
-    crate::os::windows::{
-        imports::HANDLE, named_pipe::tokio::ByteWriterPipeStream as WriteHalfImpl,
-    },
+    crate::os::windows::named_pipe::{pipe_mode, tokio::SendHalf},
     futures_io::AsyncWrite,
     std::{
         ffi::c_void,
@@ -13,6 +11,8 @@ use {
     },
 };
 
+type WriteHalfImpl = SendHalf<pipe_mode::Bytes>;
+
 pub struct OwnedWriteHalf {
     pub(super) inner: WriteHalfImpl,
 }
@@ -23,24 +23,12 @@ impl OwnedWriteHalf {
             false => self.inner.server_process_id(),
         }
     }
-    // TODO use this
-    pub unsafe fn _from_raw_handle(handle: HANDLE) -> io::Result<Self> {
-        let inner = unsafe {
-            // SAFETY: as per safety contract
-            WriteHalfImpl::from_raw_handle(handle)?
-        };
-        Ok(Self { inner })
-    }
     fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
         Pin::new(&mut self.inner)
     }
 }
 impl AsyncWrite for OwnedWriteHalf {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
     // Those two do nothing

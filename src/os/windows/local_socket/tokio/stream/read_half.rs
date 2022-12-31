@@ -1,8 +1,6 @@
 use {
     super::thunk_broken_pipe_to_eof,
-    crate::os::windows::{
-        imports::HANDLE, named_pipe::tokio::ByteReaderPipeStream as ReadHalfImpl,
-    },
+    crate::os::windows::named_pipe::{pipe_mode, tokio::RecvHalf},
     futures_core::ready,
     futures_io::AsyncRead,
     std::{
@@ -15,6 +13,8 @@ use {
     },
 };
 
+type ReadHalfImpl = RecvHalf<pipe_mode::Bytes>;
+
 pub struct OwnedReadHalf {
     pub(super) inner: ReadHalfImpl,
 }
@@ -25,14 +25,6 @@ impl OwnedReadHalf {
             false => self.inner.server_process_id(),
         }
     }
-    // TODO use this
-    pub unsafe fn _from_raw_handle(handle: HANDLE) -> io::Result<Self> {
-        let inner = unsafe {
-            // SAFETY: as per safety contract
-            ReadHalfImpl::from_raw_handle(handle)?
-        };
-        Ok(Self { inner })
-    }
     fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
         Pin::new(&mut self.inner)
     }
@@ -41,11 +33,7 @@ impl OwnedReadHalf {
 /// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
 /// reader, but Windows shoehorns both into the former.
 impl AsyncRead for OwnedReadHalf {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let rslt = self.pinproj().poll_read(cx, buf);
         let thunked = thunk_broken_pipe_to_eof(ready!(rslt));
         Poll::Ready(thunked)
