@@ -14,9 +14,9 @@ use std::{
     fmt::{self, Debug, DebugStruct, Formatter},
     io::{self, prelude::*},
     marker::PhantomData,
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
     os::windows::prelude::*,
-    slice,
+    ptr, slice,
 };
 
 /// Helper, used because `spare_capacity_mut()` on `Vec` is 1.60+. Borrows whole `Vec`, not just spare capacity.
@@ -226,12 +226,16 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     ///
     /// [`nonblocking`]: super::super::PipeListenerOptions::nonblocking
     /// [`set_nonblocking`]: super::super::PipeListenerOptions::set_nonblocking
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.raw.set_nonblocking(Rm::MODE, nonblocking)
     }
     /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
     ///
     /// For more on why this can fail, see [`FromRawHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+    ///
+    /// # Safety
+    /// See equivalent safety notes on [`FromRawHandle`].
     pub unsafe fn from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
         let raw = unsafe {
             // SAFETY: safety contract is propagated.
@@ -249,10 +253,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
                 ));
             }
         }
-        Ok(Self {
-            raw,
-            _phantom: PhantomData,
-        })
+        Ok(Self::new(raw))
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.

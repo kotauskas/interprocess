@@ -340,6 +340,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
     ///
     /// For more on why this can fail, see [`FromRawHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+    ///
+    /// # Safety
+    /// See equivalent safety notes on [`FromRawHandle`].
     pub unsafe fn from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
         let raw = unsafe {
             // SAFETY: safety contract is propagated.
