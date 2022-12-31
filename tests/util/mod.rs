@@ -43,18 +43,18 @@ where
         .name(ltname)
         .spawn(move || leader(sender))
         // Lazy .expect()
-        .unwrap_or_else(|e| panic!("{} thread launch failed: {}", leader_name, e));
+        .unwrap_or_else(|e| panic!("{leader_name} thread launch failed: {e}"));
 
     if let Ok(msg) = receiver.recv() {
         // If the leader reached the send point, proceed with the follower code
         let fres = follower(msg);
         if let Err(e) = fres {
-            panic!("{} exited early with error: {:#}", follower_name, e);
+            panic!("{follower_name} exited early with error: {e:#}");
         }
     }
     match leading_thread.join() {
-        Err(_) => panic!("{} panicked", leader_name),
-        Ok(Err(error)) => panic!("{} exited early with error: {:#}", leader_name, error),
+        Err(_) => panic!("{leader_name} panicked"),
+        Ok(Err(error)) => panic!("{leader_name} exited early with error: {error:#}"),
         _ => (),
     }
 }

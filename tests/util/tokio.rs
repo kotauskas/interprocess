@@ -29,21 +29,18 @@ where
     let leading_task = async {
         leader(sender)
             .await
-            .with_context(|| format!("{} exited early with error", leader_name))
+            .with_context(|| format!("{leader_name} exited early with error"))
     };
     let following_task = async {
         let msg = receiver.await?;
         follower(msg)
             .await
-            .with_context(|| format!("{} exited early with error", follower_name))
+            .with_context(|| format!("{follower_name} exited early with error"))
     };
     try_join!(leading_task, following_task).map(|((), ())| ())
 }
 
-pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(
-    server: Srv,
-    client: Clt,
-) -> TestResult
+pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(server: Srv, client: Clt) -> TestResult
 where
     T: Send + Sync + 'static,
     Srv: FnOnce(Sender<T>, u32) -> Srvf + Send + 'static,
