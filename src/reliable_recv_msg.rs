@@ -18,19 +18,19 @@ use {
 /// ```no_run
 /// # use std::io;
 /// # trait Tr {
-/// fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>>;
+/// fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
 /// # }
 /// ```
-/// Setting aside from the `io::Result` part, the "true return value" is `Result<usize, Vec<u8>>`. The `Ok(...)` variant here means that the message has been successfully received into the buffer and contains the actual size of the message which has been received. The `Err(...)` variant means that the buffer was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message. The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv_msg` function, see if it fits inside the buffer, and if it does not, replace the stored buffer with the new one.
+/// Notice the nested result that's going on here. Setting aside from the `io::Result` part, the "true return value" is [`RecvResult`]. The `Fit(...)` variant here means that the message has been successfully received into the buffer and contains the actual size of the message which has been received. The `Alloc(...)` variant means that the buffer was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message. The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv_msg` function, see if it fits inside the buffer, and if it does not, replace the stored buffer with the new one.
 ///
-/// The `try_recv_msg` method is a convenience function used mainly by implementations of `recv_msg` to determine whether it's required to allocate a new buffer or not. It has the following signature:
+/// The `try_recv_msg` method is used mainly by implementations of `recv_msg`, but can also be called directly. It has the following signature:
 /// ```no_run
 /// # use std::io;
 /// # trait Tr {
-/// fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>>;
+/// fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
 /// # }
 /// ```
-/// While it may seem strange how the nested `Result` returns the same type in `Ok` and `Err`, it does this for a semantic reason: the `Ok` variant means that the message was successfully received into the buffer while `Err` means the opposite – that the message was too big – and returns the size which the buffer needs to have.
+/// The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it didn't fit, the buffer is unaffected (unlike with `RecvResult`).
 ///
 /// ## Platform support
 /// The trait is implemented for:
@@ -39,10 +39,10 @@ use {
 ///     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
 pub trait ReliableRecvMsg: Sealed {
     /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
-    fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>>;
+    fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
 
     /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
-    fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>>;
+    fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
 }
 
 /// Marker error indicating that a datagram write operation failed because the amount of bytes which were actually written as reported by the operating system was smaller than the size of the message which was requested to be written.
