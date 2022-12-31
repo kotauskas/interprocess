@@ -121,12 +121,12 @@ impl IntoRawHandle for RawPipeStream {
 }
 
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
-    /// Same as [`.recv_msg()`](Self::recv_msg), but accepts an uninitialized buffer.
+    /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
     #[inline]
     pub fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf)
     }
-    /// Same as [`.try_recv_msg()`](Self::try_recv_msg), but accepts an uninitialized buffer.
+    /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
     #[inline]
     pub fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf)
@@ -286,10 +286,10 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
     }
 }
 impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
-    fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
         self.recv_to_uninit(weaken_buf_init(buf))
     }
-    fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
         self.try_recv_to_uninit(weaken_buf_init(buf))
     }
 }
