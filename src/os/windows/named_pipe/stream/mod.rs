@@ -1,7 +1,9 @@
 mod enums;
+pub use enums::*;
+
 mod impls;
 mod wrapper_fns;
-pub(crate) use {enums::*, impls::*, wrapper_fns::*};
+pub(crate) use {impls::*, wrapper_fns::*};
 
 use crate::os::windows::FileHandle;
 use std::{
