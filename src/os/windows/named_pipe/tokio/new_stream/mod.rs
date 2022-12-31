@@ -25,6 +25,9 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     _phantom: PhantomData<(Rm, Sm)>,
 }
 
+/// Type alias for a Tokio-based pipe stream with the same read mode and write mode.
+pub type DuplexPipeStream<M> = PipeStream<M, M>;
+
 /// The receiving half of a [`PipeStream`] as produced via `.split()`.
 pub struct RecvHalf<Rm: PipeModeTag> {
     raw: Arc<RawPipeStream>,
@@ -37,7 +40,7 @@ pub struct SendHalf<Sm: PipeModeTag> {
     _phantom: PhantomData<Sm>,
 }
 
-enum RawPipeStream {
+pub(crate) enum RawPipeStream {
     Server(TokioNPServer),
     Client(TokioNPClient),
 }

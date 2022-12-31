@@ -6,10 +6,7 @@
 
 mod listener;
 mod new_stream;
-mod pipeops;
-mod stream;
 
-pub use {listener::*, stream::*};
+pub use {listener::*, new_stream::*};
 
-use super::{super::imports, enums};
-use pipeops::*;
+use super::super::imports;

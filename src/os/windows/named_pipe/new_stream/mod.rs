@@ -12,8 +12,7 @@ use std::{
     sync::Arc,
 };
 
-pub(crate) static REUNITE_ERROR_MSG: &str =
-    "the receive and self halves belong to different pipe stream objects";
+pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong to different pipe stream objects";
 
 /// A named pipe stream, created by a server-side listener or by connecting to a server.
 ///
@@ -25,6 +24,9 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,
     _phantom: PhantomData<(Rm, Sm)>,
 }
+
+/// Type alias for a pipe stream with the same read mode and write mode.
+pub type DuplexPipeStream<M> = PipeStream<M, M>;
 
 /// The receiving half of a [`PipeStream`] as produced via `.split()`.
 pub struct RecvHalf<Rm: PipeModeTag> {
@@ -38,9 +40,9 @@ pub struct SendHalf<Sm: PipeModeTag> {
     _phantom: PhantomData<Sm>,
 }
 
-struct RawPipeStream {
-    handle: FileHandle,
-    is_server: bool,
+pub(crate) struct RawPipeStream {
+    pub(crate) handle: FileHandle,
+    pub(crate) is_server: bool,
 }
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.

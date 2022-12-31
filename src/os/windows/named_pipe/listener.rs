@@ -1,34 +1,29 @@
-use {
-    crate::os::windows::{
-        imports::*,
-        named_pipe::{PipeMode, PipeOps, PipeStream, PipeStreamRole},
+use super::{PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
+use crate::os::windows::{imports::*, FileHandle};
+use std::{
+    borrow::Cow,
+    ffi::OsStr,
+    fmt::{self, Debug, Formatter},
+    io,
+    marker::PhantomData,
+    mem::replace,
+    num::{NonZeroU32, NonZeroU8},
+    ptr,
+    sync::{
+        atomic::{AtomicBool, Ordering::Relaxed},
+        Mutex,
     },
-    std::{
-        borrow::Cow,
-        convert::TryInto,
-        ffi::OsStr,
-        fmt::{self, Debug, Formatter},
-        io,
-        marker::PhantomData,
-        mem::replace,
-        num::{NonZeroU32, NonZeroU8},
-        ptr,
-        sync::{
-            atomic::{AtomicBool, Ordering::Relaxed},
-            Mutex,
-        },
-    },
-    to_method::To,
 };
+use to_method::To;
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
-pub struct PipeListener<Stream: PipeStream> {
+pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     nonblocking: AtomicBool,
-    stored_instance: Mutex<PipeOps>,
-    _phantom: PhantomData<fn() -> Stream>,
+    stored_instance: Mutex<FileHandle>,
+    _phantom: PhantomData<(Rm, Sm)>,
 }
 /// An iterator that infinitely [`accept`]s connections on a [`PipeListener`].
 ///
@@ -36,41 +31,48 @@ pub struct PipeListener<Stream: PipeStream> {
 ///
 /// [`accept`]: struct.PipeListener.html#method.accept " "
 /// [`incoming`]: struct.PipeListener.html#method.incoming " "
-pub struct Incoming<'a, Stream: PipeStream> {
-    listener: &'a PipeListener<Stream>,
+pub struct Incoming<'a, Rm: PipeModeTag, Sm: PipeModeTag> {
+    listener: &'a PipeListener<Rm, Sm>,
 }
-impl<'a, Stream: PipeStream> Iterator for Incoming<'a, Stream> {
-    type Item = io::Result<Stream>;
+impl<'a, Rm: PipeModeTag, Sm: PipeModeTag> Iterator for Incoming<'a, Rm, Sm> {
+    type Item = io::Result<PipeStream<Rm, Sm>>;
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.listener.accept())
     }
 }
-impl<'a, Stream: PipeStream> IntoIterator for &'a PipeListener<Stream> {
-    type IntoIter = Incoming<'a, Stream>;
-    type Item = <Incoming<'a, Stream> as Iterator>::Item;
+impl<'a, Rm: PipeModeTag, Sm: PipeModeTag> IntoIterator for &'a PipeListener<Rm, Sm> {
+    type IntoIter = Incoming<'a, Rm, Sm>;
+    type Item = <Incoming<'a, Rm, Sm> as Iterator>::Item;
     fn into_iter(self) -> Self::IntoIter {
         self.incoming()
     }
 }
-impl<Stream: PipeStream> PipeListener<Stream> {
+impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
+    const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
+
     /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
     ///
     /// See `incoming` for an iterator version of this.
-    pub fn accept(&self) -> io::Result<Stream> {
+    pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().expect("unexpected lock poison");
             // Doesn't actually even need to be atomic to begin with, but it's simpler and more
             // convenient to do this instead. The mutex takes care of ordering.
             let nonblocking = self.nonblocking.load(Relaxed);
-            stored_instance.connect_server()?;
+            block_on_connect(&stored_instance)?;
             let new_instance = self.create_instance(nonblocking)?;
             replace(&mut *stored_instance, new_instance)
         };
 
-        Ok(Stream::build(super::stream::Instance::new(instance_to_hand_out, true)))
+        let raw = RawPipeStream {
+            handle: instance_to_hand_out,
+            is_server: true,
+        };
+
+        Ok(PipeStream::new(raw))
     }
     /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
-    pub fn incoming(&self) -> Incoming<'_, Stream> {
+    pub fn incoming(&self) -> Incoming<'_, Rm, Sm> {
         Incoming { listener: self }
     }
     /// Enables or disables the nonblocking mode for all existing instances of the listener and future ones. By default, it is disabled.
@@ -86,22 +88,22 @@ impl<Stream: PipeStream> PipeListener<Stream> {
         // convenient to do this instead. The mutex takes care of ordering.
         self.nonblocking.store(nonblocking, Relaxed);
         unsafe {
-            super::set_nonblocking_for_stream(instance.as_raw_handle(), Stream::READ_MODE, nonblocking)?;
+            super::set_nonblocking_for_stream(instance.as_raw_handle(), Rm::MODE, nonblocking)?;
         }
         // Make it clear that the lock survives until this moment.
         drop(instance);
         Ok(())
     }
 
-    fn create_instance(&self, nonblocking: bool) -> io::Result<PipeOps> {
+    fn create_instance(&self, nonblocking: bool) -> io::Result<FileHandle> {
         let handle = self
             .config
-            .create_instance(false, nonblocking, false, Stream::ROLE, Stream::READ_MODE)?;
+            .create_instance(false, nonblocking, false, Self::STREAM_ROLE, Rm::MODE)?;
         // SAFETY: we just created this handle
-        Ok(unsafe { PipeOps::from_raw_handle(handle) })
+        Ok(unsafe { FileHandle::from_raw_handle(handle) })
     }
 }
-impl<Stream: PipeStream> Debug for PipeListener<Stream> {
+impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
@@ -253,11 +255,11 @@ cannot create pipe server that has byte type but reads messages – have you for
         };
         ok_or_ret_errno!(success => handle)
     }
-    /// Creates the pipe listener from the builder. The `Stream` generic argument specifies the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
+    /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
     ///
-    /// For outbound or duplex pipes, the `mode` parameter must agree with the `Stream`'s `WRITE_MODE`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
-    pub fn create<Stream: PipeStream>(&self) -> io::Result<PipeListener<Stream>> {
-        let (owned_config, instance) = self._create(Stream::ROLE, Stream::READ_MODE)?;
+    /// For outbound or duplex pipes, the `mode` parameter must agree with the given `Sm`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
+    pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
+        let (owned_config, instance) = self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         let nonblocking = owned_config.nonblocking.into();
         Ok(PipeListener {
             config: owned_config,
@@ -270,7 +272,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         &self,
         role: PipeStreamRole,
         read_mode: Option<PipeMode>,
-    ) -> io::Result<(PipeListenerOptions<'static>, PipeOps)> {
+    ) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
         let owned_config = self.to_owned();
 
         let instance = {
@@ -278,7 +280,7 @@ cannot create pipe server that has byte type but reads messages – have you for
             unsafe {
                 // SAFETY: we just created this handle, so we know it's unique (and we've checked
                 // that it's valid)
-                PipeOps::from_raw_handle(handle)
+                FileHandle::from_raw_handle(handle)
             }
         };
         Ok((owned_config, instance))
@@ -314,5 +316,19 @@ cannot create pipe server that has byte type but reads messages – have you for
 impl Default for PipeListenerOptions<'_> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn block_on_connect(handle: &FileHandle) -> io::Result<()> {
+    let success = unsafe { ConnectNamedPipe(handle.as_raw_handle(), ptr::null_mut()) != 0 };
+    if success {
+        Ok(())
+    } else {
+        let last_error = io::Error::last_os_error();
+        if last_error.raw_os_error() == Some(ERROR_PIPE_CONNECTED as i32) {
+            Ok(())
+        } else {
+            Err(last_error)
+        }
     }
 }

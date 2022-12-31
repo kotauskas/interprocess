@@ -1,4 +1,5 @@
 //! Methods and trait implementations for `PipeStream`.
+// TODO disconnect, as in PipeOps
 
 mod split_owned;
 pub(crate) use split_owned::UNWRAP_FAIL_MSG;
@@ -27,12 +28,7 @@ pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
 }
 
 impl RawPipeStream {
-    fn connect(
-        pipename: &OsStr,
-        hostname: Option<&OsStr>,
-        read: bool,
-        write: bool,
-    ) -> io::Result<Self> {
+    fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
         let path = convert_and_encode_path(pipename, hostname);
         let handle = _connect(&path, read, write, WaitTimeout::DEFAULT)?;
         Ok(Self {
@@ -70,8 +66,7 @@ impl RawPipeStream {
         unsafe { set_nonblocking_for_stream(self.handle.0, readmode, nonblocking) }
     }
     unsafe fn try_from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let is_server = is_server_from_sys(handle)
-            .map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
+        let is_server = is_server_from_sys(handle).map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
         Ok(Self {
             handle: FileHandle(handle),
             is_server,
@@ -90,8 +85,7 @@ impl RawPipeStream {
         if let Some(writemode) = writemode {
             dbst.field("write_mode", &writemode);
         }
-        dbst.field("handle", &self.handle)
-            .field("is_server", &self.is_server)
+        dbst.field("handle", &self.handle).field("is_server", &self.is_server)
     }
 }
 impl AsRawHandle for RawPipeStream {
@@ -150,32 +144,33 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
     pub fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(
-            pipename.as_ref(),
-            None,
-            Rm::MODE.is_some(),
-            Sm::MODE.is_some(),
-        )?;
-        Ok(Self {
-            raw,
-            _phantom: PhantomData,
-        })
+        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some())?;
+        Ok(Self::new(raw))
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
-    pub fn connect_to_remote(
-        pipename: impl AsRef<OsStr>,
-        hostname: impl AsRef<OsStr>,
-    ) -> io::Result<Self> {
+    pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(
             pipename.as_ref(),
             Some(hostname.as_ref()),
             Rm::MODE.is_some(),
             Sm::MODE.is_some(),
         )?;
-        Ok(Self {
-            raw,
-            _phantom: PhantomData,
-        })
+        Ok(Self::new(raw))
+    }
+    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
+    pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
+        let raw_a = Arc::new(self.raw);
+        let raw_ac = Arc::clone(&raw_a);
+        (
+            RecvHalf {
+                raw: raw_a,
+                _phantom: PhantomData,
+            },
+            SendHalf {
+                raw: raw_ac,
+                _phantom: PhantomData,
+            },
+        )
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
@@ -242,6 +237,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             raw,
             _phantom: PhantomData,
         })
+    }
+
+    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
+    pub(crate) fn new(raw: RawPipeStream) -> Self {
+        Self {
+            raw,
+            _phantom: PhantomData,
+        }
     }
 }
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {

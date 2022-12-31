@@ -1,6 +1,8 @@
 use crate::os::windows::imports::*;
 use std::{convert::TryFrom, mem};
 
+use super::PipeModeTag;
+
 /// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server – [`ClientToServer`] always means client → server, for example.
 ///
 /// [`ClientToServer`]: enum.PipeDirection.html#variant.ClientToServer " "
@@ -162,6 +164,15 @@ impl PipeStreamRole {
             Self::Reader => PipeDirection::ServerToClient,
             Self::Writer => PipeDirection::ClientToServer,
             Self::ReaderAndWriter => PipeDirection::Duplex,
+        }
+    }
+
+    pub(crate) const fn get_for_rm_sm<Rm: PipeModeTag, Sm: PipeModeTag>() -> Self {
+        match (Rm::MODE, Sm::MODE) {
+            (Some(..), Some(..)) => Self::ReaderAndWriter,
+            (Some(..), None) => Self::Reader,
+            (None, Some(..)) => Self::Writer,
+            (None, None) => unimplemented!(),
         }
     }
 }

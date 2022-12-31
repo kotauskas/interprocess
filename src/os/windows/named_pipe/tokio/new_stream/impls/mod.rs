@@ -1,3 +1,6 @@
+//! Methods and trait implementations for `PipeStream`.
+// TODO disconnect, as in PipeOps
+
 mod split_owned;
 
 use crate::os::windows::{
@@ -5,8 +8,8 @@ use crate::os::windows::{
     named_pipe::{
         convert_path, encode_to_utf16,
         new_stream::{
-            block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len,
-            WaitTimeout, UNWRAP_FAIL_MSG,
+            block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
+            UNWRAP_FAIL_MSG,
         },
         tokio::new_stream::*,
         PipeMode,
@@ -31,10 +34,6 @@ macro_rules! same_clsrv {
     };
 }
 
-#[rustfmt::skip]
-impl From<TokioNPServer> for RawPipeStream {
-    fn from(s: TokioNPServer) -> Self { Self::Server(s) } }
-
 impl RawPipeStream {
     async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
         tokio::task::spawn_blocking(move || {
@@ -44,12 +43,7 @@ impl RawPipeStream {
         .await
         .expect("waiting for server panicked")
     }
-    async fn connect(
-        pipename: &OsStr,
-        hostname: Option<&OsStr>,
-        read: bool,
-        write: bool,
-    ) -> io::Result<Self> {
+    async fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
         let path = convert_path(pipename, hostname);
         let mut path16 = None::<Vec<u16>>;
         let client = loop {
@@ -68,8 +62,7 @@ impl RawPipeStream {
         Ok(Self::Client(client))
     }
     unsafe fn try_from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let is_server = is_server_from_sys(handle)
-            .map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
+        let is_server = is_server_from_sys(handle).map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
 
         unsafe {
             match is_server {
@@ -80,21 +73,13 @@ impl RawPipeStream {
         }
     }
 
-    fn poll_read_readbuf(
-        &mut self,
-        cx: &mut Context<'_>,
-        buf: &mut TokioReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read_readbuf(&mut self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf))
     }
 
     // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
     // has to be `&mut self`.
-    fn poll_read_uninit(
-        &mut self,
-        cx: &mut Context<'_>,
-        buf: &mut [MaybeUninit<u8>],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read_uninit(&mut self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
         let mut readbuf = TokioReadBuf::uninit(buf);
         ready!(self.poll_read_readbuf(cx, &mut readbuf))?;
         Poll::Ready(Ok(readbuf.filled().len()))
@@ -172,8 +157,7 @@ impl RawPipeStream {
         if let Some(writemode) = writemode {
             dbst.field("write_mode", &writemode);
         }
-        dbst.field("tokio_object", tokio_object)
-            .field("is_server", &is_server)
+        dbst.field("tokio_object", tokio_object).field("is_server", &is_server)
     }
 }
 impl AsRawHandle for RawPipeStream {
@@ -277,23 +261,14 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
     pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(
-            pipename.as_ref(),
-            None,
-            Rm::MODE.is_some(),
-            Sm::MODE.is_some(),
-        )
-        .await?;
+        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some()).await?;
         Ok(Self {
             raw,
             _phantom: PhantomData,
         })
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
-    pub async fn connect_to_remote(
-        pipename: impl AsRef<OsStr>,
-        hostname: impl AsRef<OsStr>,
-    ) -> io::Result<Self> {
+    pub async fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(
             pipename.as_ref(),
             Some(hostname.as_ref()),
@@ -305,6 +280,21 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             raw,
             _phantom: PhantomData,
         })
+    }
+    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
+    pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
+        let raw_a = Arc::new(self.raw);
+        let raw_ac = Arc::clone(&raw_a);
+        (
+            RecvHalf {
+                raw: raw_a,
+                _phantom: PhantomData,
+            },
+            SendHalf {
+                raw: raw_ac,
+                _phantom: PhantomData,
+            },
+        )
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
@@ -356,50 +346,39 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
                 ));
             }
         }
-        Ok(Self {
+        Ok(Self::new(raw))
+    }
+
+    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
+    pub(crate) fn new(raw: RawPipeStream) -> Self {
+        Self {
             raw,
             _phantom: PhantomData,
-        })
+        }
     }
 }
 
 impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.raw.poll_read_init(cx, buf)
     }
 }
 impl<Sm: PipeModeTag> AsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.deref()).poll_read(cx, buf)
     }
 }
 impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut TokioReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.get_mut().raw.poll_read_readbuf(cx, buf)
     }
 }
 impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.raw.poll_write(cx, buf)
     }
     #[inline(always)]
@@ -413,11 +392,7 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
 }
 impl<Rm: PipeModeTag> AsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.deref()).poll_write(cx, buf)
     }
     #[inline]
@@ -431,11 +406,7 @@ impl<Rm: PipeModeTag> AsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
 }
 impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.get_mut().raw.poll_write(cx, buf)
     }
     #[inline]

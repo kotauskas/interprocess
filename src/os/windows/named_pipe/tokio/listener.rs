@@ -1,50 +1,55 @@
-use {
-    crate::{
-        os::windows::named_pipe::{
+use crate::{
+    os::windows::{
+        imports::*,
+        named_pipe::{
             enums::{PipeMode, PipeStreamRole},
-            tokio::{PipeOps, TokioPipeStream},
-            PipeListenerOptions,
+            tokio::{PipeStream, RawPipeStream},
+            PipeListenerOptions, PipeModeTag,
         },
-        Sealed,
     },
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-        marker::PhantomData,
-        mem::replace,
-    },
-    tokio::sync::Mutex,
+    Sealed,
 };
+use std::{
+    fmt::{self, Debug, Formatter},
+    io,
+    marker::PhantomData,
+    mem::replace,
+};
+use tokio::sync::Mutex;
 
 /// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing asynchronous pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
-pub struct PipeListener<Stream: TokioPipeStream> {
+pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
-    stored_instance: Mutex<PipeOps>,
-    _phantom: PhantomData<fn() -> Stream>,
+    stored_instance: Mutex<TokioNPServer>,
+    _phantom: PhantomData<(Rm, Sm)>,
 }
-impl<Stream: TokioPipeStream> PipeListener<Stream> {
+impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
+    const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
+
     /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
-    pub async fn accept(&self) -> io::Result<Stream> {
+    pub async fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().await;
-            stored_instance.connect_server().await?;
+            stored_instance.connect().await?;
             let new_instance = self.create_instance()?;
             replace(&mut *stored_instance, new_instance)
         };
-        Ok(Stream::build(instance_to_hand_out.into()))
+
+        let raw = RawPipeStream::Server(instance_to_hand_out);
+        Ok(PipeStream::new(raw))
     }
 
-    fn create_instance(&self) -> io::Result<PipeOps> {
-        let handle =
-            self.config
-                .create_instance(false, false, true, Stream::ROLE, Stream::READ_MODE)?;
+    fn create_instance(&self) -> io::Result<TokioNPServer> {
+        let handle = self
+            .config
+            .create_instance(false, false, true, Self::STREAM_ROLE, Rm::MODE)?;
         // SAFETY: we just created this handle
-        Ok(unsafe { PipeOps::from_raw_handle(handle, true)? })
+        Ok(unsafe { TokioNPServer::from_raw_handle(handle)? })
     }
 }
-impl<Stream: TokioPipeStream> Debug for PipeListener<Stream> {
+impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("PipeListener")
             .field("config", &self.config)
@@ -58,11 +63,11 @@ pub trait PipeListenerOptionsExt: Sealed {
     /// Creates a Tokio pipe listener from the builder. See the [non-async `create` method on `PipeListenerOptions`](PipeListenerOptions::create) for more.
     ///
     /// The `nonblocking` parameter is ignored and forced to be enabled.
-    fn create_tokio<Stream: TokioPipeStream>(&self) -> io::Result<PipeListener<Stream>>;
+    fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>>;
 }
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
-    fn create_tokio<Stream: TokioPipeStream>(&self) -> io::Result<PipeListener<Stream>> {
-        let (owned_config, instance) = _create_tokio(self, Stream::ROLE, Stream::READ_MODE)?;
+    fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
+        let (owned_config, instance) = _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         Ok(PipeListener {
             config: owned_config,
             stored_instance: Mutex::new(instance),
@@ -75,7 +80,7 @@ fn _create_tokio(
     config: &PipeListenerOptions<'_>,
     role: PipeStreamRole,
     read_mode: Option<PipeMode>,
-) -> io::Result<(PipeListenerOptions<'static>, PipeOps)> {
+) -> io::Result<(PipeListenerOptions<'static>, TokioNPServer)> {
     // Shadow to avoid mixing them up.
     let mut config = config.to_owned();
 
@@ -87,7 +92,7 @@ fn _create_tokio(
         unsafe {
             // SAFETY: we just created this handle, so we know it's unique (and we've checked
             // that it's valid)
-            PipeOps::from_raw_handle(handle, true)?
+            TokioNPServer::from_raw_handle(handle)?
         }
     };
 

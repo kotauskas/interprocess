@@ -19,11 +19,7 @@
 mod enums;
 mod listener;
 mod new_stream;
-mod pipeops;
-#[macro_use]
-mod stream;
-use pipeops::*;
-pub use {enums::*, listener::*, stream::*};
+pub use {enums::*, listener::*, new_stream::*};
 
 #[cfg(any(doc, feature = "tokio"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
