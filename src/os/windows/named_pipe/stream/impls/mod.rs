@@ -10,7 +10,7 @@ use crate::{
         named_pipe::{convert_and_encode_path, PipeMode},
         weaken_buf_init, FileHandle,
     },
-    RecvResult, TryRecvResult,
+    RecvResult, ReliableRecvMsg, TryRecvResult,
 };
 use std::{
     ffi::OsStr,
@@ -121,26 +121,12 @@ impl IntoRawHandle for RawPipeStream {
 }
 
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
-    /// Receives a message from the pipe into the specified buffer, returning either the size of the message or a new buffer tailored to its size if it didn't fit into the buffer.
-    ///
-    /// See [`RecvResult`] for more on how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.recv_to_uninit(weaken_buf_init(buf))
-    }
-    /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
+    /// Same as [`.recv_msg()`](Self::recv_msg), but accepts an uninitialized buffer.
     #[inline]
     pub fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf)
     }
-    /// Attempts to receive a message from the pipe into the specified buffer. If it fits, it's written into the buffer, and if it doesn't, the buffer is unaffected. The return value indicates which of those two things happened and also contains the size of the message regardless of whether it was read or not.
-    ///
-    /// See [`TryRecvResult`] for a summary of how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.try_recv_to_uninit(weaken_buf_init(buf))
-    }
-    /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
+    /// Same as [`.try_recv_msg()`](Self::try_recv_msg), but accepts an uninitialized buffer.
     #[inline]
     pub fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf)
@@ -297,6 +283,14 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline(always)]
     fn flush(&mut self) -> io::Result<()> {
         (self as &PipeStream<_, _>).flush()
+    }
+}
+impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+    fn recv_msg(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+        self.recv_to_uninit(weaken_buf_init(buf))
+    }
+    fn try_recv_msg(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+        self.try_recv_to_uninit(weaken_buf_init(buf))
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
