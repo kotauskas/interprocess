@@ -91,5 +91,5 @@ pub mod os;
 mod sealed;
 pub(crate) use sealed::Sealed;
 
-mod reliable_read_msg;
-pub use reliable_read_msg::*;
+mod reliable_recv_msg;
+pub use reliable_recv_msg::*;
