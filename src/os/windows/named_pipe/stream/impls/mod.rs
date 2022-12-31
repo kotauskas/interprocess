@@ -1,5 +1,4 @@
 //! Methods and trait implementations for `PipeStream`.
-// TODO disconnect, as in PipeOps
 
 mod split_owned;
 pub(crate) use split_owned::UNWRAP_FAIL_MSG;
@@ -73,6 +72,11 @@ impl RawPipeStream {
         })
     }
 
+    fn disconnect(&self) -> io::Result<()> {
+        let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
+        ok_or_ret_errno!(success => ())
+    }
+
     fn fill_fields<'a, 'b, 'c>(
         &self,
         dbst: &'a mut DebugStruct<'b, 'c>,
@@ -88,6 +92,13 @@ impl RawPipeStream {
         dbst.field("handle", &self.handle).field("is_server", &self.is_server)
     }
 }
+impl Drop for RawPipeStream {
+    fn drop(&mut self) {
+        if self.is_server {
+            self.disconnect().expect("failed to disconnect server from client");
+        }
+    }
+}
 impl AsRawHandle for RawPipeStream {
     #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
@@ -97,7 +108,12 @@ impl AsRawHandle for RawPipeStream {
 impl IntoRawHandle for RawPipeStream {
     #[inline]
     fn into_raw_handle(self) -> HANDLE {
-        self.handle.into_raw_handle()
+        let slf = ManuallyDrop::new(self);
+        let handle = unsafe {
+            // SAFETY: `slf` is never dropped
+            ptr::read(&slf.handle)
+        };
+        handle.into_raw_handle()
     }
 }
 

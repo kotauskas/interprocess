@@ -1,5 +1,4 @@
 //! Methods and trait implementations for `PipeStream`.
-// TODO disconnect, as in PipeOps
 
 mod split_owned;
 
@@ -141,6 +140,13 @@ impl RawPipeStream {
         }
     }
 
+    fn disconnect(&self) -> io::Result<()> {
+        match self {
+            Self::Server(s) => s.disconnect(),
+            Self::Client(_) => Ok(()),
+        }
+    }
+
     fn fill_fields<'a, 'b, 'c>(
         &self,
         dbst: &'a mut DebugStruct<'b, 'c>,
@@ -158,6 +164,11 @@ impl RawPipeStream {
             dbst.field("write_mode", &writemode);
         }
         dbst.field("tokio_object", tokio_object).field("is_server", &is_server)
+    }
+}
+impl Drop for RawPipeStream {
+    fn drop(&mut self) {
+        self.disconnect().expect("failed to disconnect server from client");
     }
 }
 impl AsRawHandle for RawPipeStream {
