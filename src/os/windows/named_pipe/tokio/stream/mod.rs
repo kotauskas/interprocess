@@ -3,7 +3,7 @@ mod wrapper_fns;
 pub(crate) use wrapper_fns::*;
 
 use super::{
-    super::new_stream::{pipe_mode, PipeModeTag, RecvResult, TryRecvResult, REUNITE_ERROR_MSG},
+    super::stream::{pipe_mode, PipeModeTag, RecvResult, TryRecvResult, REUNITE_ERROR_MSG},
     imports::*,
 };
 use std::{

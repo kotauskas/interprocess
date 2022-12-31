@@ -7,11 +7,11 @@ use crate::os::windows::{
     imports::*,
     named_pipe::{
         convert_path, encode_to_utf16,
-        new_stream::{
+        stream::{
             block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
             UNWRAP_FAIL_MSG,
         },
-        tokio::new_stream::*,
+        tokio::stream::*,
         PipeMode,
     },
 };

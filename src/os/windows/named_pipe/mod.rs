@@ -18,8 +18,8 @@
 
 mod enums;
 mod listener;
-mod new_stream;
-pub use {enums::*, listener::*, new_stream::*};
+mod stream;
+pub use {enums::*, listener::*, stream::*};
 
 #[cfg(any(doc, feature = "tokio"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
