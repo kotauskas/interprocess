@@ -11,11 +11,7 @@ use {
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
-pub fn server(
-    name_sender: Sender<String>,
-    num_clients: u32,
-    prefer_namespaced: bool,
-) -> TestResult {
+pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
     let (name, listener) = NameGen::new_auto(prefer_namespaced)
         .find_map(|nm| {
             let l = match LocalSocketListener::bind(&*nm) {
@@ -36,13 +32,12 @@ pub fn server(
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
 
-        conn.read_line(&mut buffer)
-            .context("Socket receive failed")?;
+        conn.read_line(&mut buffer).context("Socket receive failed")?;
 
         conn.get_mut()
             .write_all(SERVER_MSG.as_bytes())
@@ -64,8 +59,7 @@ pub fn client(name: Arc<String>) -> TestResult {
         .write_all(CLIENT_MSG.as_bytes())
         .context("Socket send failed")?;
 
-    conn.read_line(&mut buffer)
-        .context("Socket receive failed")?;
+    conn.read_line(&mut buffer).context("Socket receive failed")?;
 
     assert_eq!(buffer, SERVER_MSG);
 
