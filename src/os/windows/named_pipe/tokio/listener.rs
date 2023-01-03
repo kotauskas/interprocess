@@ -3,6 +3,7 @@ use crate::{
         imports::*,
         named_pipe::{
             enums::{PipeMode, PipeStreamRole},
+            pipe_mode,
             tokio::{PipeStream, RawPipeStream},
             PipeListenerOptions, PipeModeTag,
         },
@@ -64,6 +65,21 @@ pub trait PipeListenerOptionsExt: Sealed {
     ///
     /// The `nonblocking` parameter is ignored and forced to be enabled.
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>>;
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with the same `Rm` and `Sm`.
+    #[inline]
+    fn create_tokio_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
+        self.create_tokio::<M, M>()
+    }
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Sm` of [`pipe_mode::None`].
+    #[inline]
+    fn create_tokio_recv_only<Rm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+        self.create_tokio::<Rm, pipe_mode::None>()
+    }
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Rm` of [`pipe_mode::None`].
+    #[inline]
+    fn create_tokio_send_only<Sm: PipeModeTag>(&self) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+        self.create_tokio::<pipe_mode::None, Sm>()
+    }
 }
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {

@@ -1,4 +1,4 @@
-use super::{PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
+use super::{pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
 use crate::os::windows::{imports::*, FileHandle};
 use std::{
     borrow::Cow,
@@ -257,7 +257,8 @@ cannot create pipe server that has byte type but reads messages – have you for
     }
     /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
     ///
-    /// For outbound or duplex pipes, the `mode` parameter must agree with the given `Sm`. Otherwise, the call will panic in debug builds or, in release builds, the `WRITE_MODE` will take priority.
+    /// # Errors
+    /// In addition to regular OS errors, an error will be returned if the given `Rm` is [`pipe_mode::Messages`], but the `mode` field isn't also [`pipe_mode::Messages`].
     pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
         let (owned_config, instance) = self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         let nonblocking = owned_config.nonblocking.into();
@@ -267,6 +268,21 @@ cannot create pipe server that has byte type but reads messages – have you for
             stored_instance: Mutex::new(instance),
             _phantom: PhantomData,
         })
+    }
+    /// Alias for [`.create()`](Self::create) with the same `Rm` and `Sm`.
+    #[inline]
+    pub fn create_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
+        self.create::<M, M>()
+    }
+    /// Alias for [`.create()`](Self::create) with an `Sm` of [`pipe_mode::None`].
+    #[inline]
+    pub fn create_recv_only<Rm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+        self.create::<Rm, pipe_mode::None>()
+    }
+    /// Alias for [`.create()`](Self::create) with an `Rm` of [`pipe_mode::None`].
+    #[inline]
+    pub fn create_send_only<Sm: PipeModeTag>(&self) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+        self.create::<pipe_mode::None, Sm>()
     }
     fn _create(
         &self,
