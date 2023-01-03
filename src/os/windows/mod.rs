@@ -106,12 +106,18 @@ impl FileHandle {
         };
         ok_or_ret_errno!(success => bytes_written)
     }
+    #[inline(always)]
     pub fn flush(&self) -> io::Result<()> {
-        let success = unsafe { FlushFileBuffers(self.0) != 0 };
+        Self::flush_hndl(self.0)
+    }
+    #[inline]
+    pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
+        let success = unsafe { FlushFileBuffers(handle) != 0 };
         ok_or_ret_errno!(success => ())
     }
 }
 impl Drop for FileHandle {
+    #[inline]
     fn drop(&mut self) {
         let _success = unsafe { CloseHandle(self.0) != 0 };
         debug_assert!(_success, "failed to close file handle: {}", io::Error::last_os_error());
@@ -119,12 +125,14 @@ impl Drop for FileHandle {
 }
 #[cfg(windows)]
 impl AsRawHandle for FileHandle {
+    #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
 #[cfg(windows)]
 impl IntoRawHandle for FileHandle {
+    #[inline(always)]
     fn into_raw_handle(self) -> HANDLE {
         let self_ = ManuallyDrop::new(self);
         self_.as_raw_handle()
@@ -132,6 +140,7 @@ impl IntoRawHandle for FileHandle {
 }
 #[cfg(windows)]
 impl FromRawHandle for FileHandle {
+    #[inline(always)]
     unsafe fn from_raw_handle(op: HANDLE) -> Self {
         Self(op)
     }
