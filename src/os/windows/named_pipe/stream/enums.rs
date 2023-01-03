@@ -19,6 +19,7 @@ pub mod pipe_mode {
         pub trait PipeModeTag: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin {
             const MODE: Option<PipeMode>;
         }
+        pub trait NotNone: PipeModeTag {}
     }
     pub(crate) use seal::*;
 
@@ -43,5 +44,7 @@ pub mod pipe_mode {
         /// Tags a direction of a [`PipeStream`] to be present with message-wise semantics.
         Messages is Some(PipeMode::Messages),
     }
+    impl NotNone for Bytes {}
+    impl NotNone for Messages {}
 }
-pub(crate) use pipe_mode::PipeModeTag;
+pub(crate) use pipe_mode::{NotNone as PmtNotNone, PipeModeTag};

@@ -12,19 +12,13 @@ fn reunite<Rm: PipeModeTag, Sm: PipeModeTag>(
     }
     drop(sh);
     let raw = Arc::try_unwrap(rh.raw).unwrap_or_else(|_| unreachable!("{}", UNWRAP_FAIL_MSG));
-    Ok(PipeStream {
-        raw,
-        _phantom: PhantomData,
-    })
+    Ok(PipeStream::new(raw))
 }
 
 impl<Rm: PipeModeTag> RecvHalf<Rm> {
     /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
-    pub fn reunite<Sm: PipeModeTag>(
-        self,
-        other: SendHalf<Sm>,
-    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+    pub fn reunite<Sm: PipeModeTag>(self, other: SendHalf<Sm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(self, other)
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
@@ -93,21 +87,13 @@ impl RecvHalf<pipe_mode::Messages> {
 }
 impl AsyncRead for &RecvHalf<pipe_mode::Bytes> {
     #[inline]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.raw.poll_read_init(cx, buf)
     }
 }
 impl AsyncRead for RecvHalf<pipe_mode::Bytes> {
     #[inline]
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.deref()).poll_read(cx, buf)
     }
 }
@@ -125,12 +111,34 @@ impl<Rm: PipeModeTag> AsRawHandle for RecvHalf<Rm> {
 }
 
 impl<Sm: PipeModeTag> SendHalf<Sm> {
+    fn ensure_flush_start(&self, slf_flush: &mut TokioMutexGuard<'_, Option<FlushJH>>) {
+        if slf_flush.is_some() {
+            return;
+        }
+
+        let handle = AssertHandleSyncSend(self.as_raw_handle());
+        let task = tokio::task::spawn_blocking(move || {
+            let handle = handle;
+            FileHandle::flush_hndl(handle.0)
+        });
+
+        **slf_flush = Some(task);
+    }
+    /// Flushes the stream, waiting until the send buffer is empty (has been received by the other end in its entirety).
+    pub async fn flush(&self) -> io::Result<()> {
+        let mut slf_flush = self.flush.lock().await;
+        let rslt = loop {
+            match slf_flush.as_mut() {
+                Some(fl) => break fl.await.unwrap(),
+                None => self.ensure_flush_start(&mut slf_flush),
+            }
+        };
+        *slf_flush = None;
+        rslt
+    }
     /// Attempts to reunite this send half with the given recieve half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
-    pub fn reunite<Rm: PipeModeTag>(
-        self,
-        other: RecvHalf<Rm>,
-    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+    pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(other, self)
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
@@ -173,16 +181,24 @@ impl SendHalf<pipe_mode::Messages> {
 }
 impl AsyncWrite for &SendHalf<pipe_mode::Bytes> {
     #[inline]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.raw.poll_write(cx, buf)
     }
-    #[inline(always)]
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let mut lockfut = self.flush.lock();
+        let lfpin = unsafe {
+            // SAFETY: i promise,,,
+            Pin::new_unchecked(&mut lockfut)
+        };
+        let mut slf_flush = ready!(lfpin.poll(cx));
+        let rslt = loop {
+            match slf_flush.as_mut() {
+                Some(fl) => break ready!(Pin::new(fl).poll(cx)).unwrap(),
+                None => self.ensure_flush_start(&mut slf_flush),
+            }
+        };
+        *slf_flush = None;
+        Poll::Ready(rslt)
     }
     #[inline(always)]
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -191,11 +207,7 @@ impl AsyncWrite for &SendHalf<pipe_mode::Bytes> {
 }
 impl AsyncWrite for SendHalf<pipe_mode::Bytes> {
     #[inline]
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.deref()).poll_write(cx, buf)
     }
     #[inline]
@@ -210,7 +222,10 @@ impl AsyncWrite for SendHalf<pipe_mode::Bytes> {
 impl<Sm: PipeModeTag> Debug for SendHalf<Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("SendHalf");
-        self.raw.fill_fields(&mut dbst, None, Sm::MODE).finish()
+        self.raw
+            .fill_fields(&mut dbst, None, Sm::MODE)
+            .field("flush", &self.flush)
+            .finish()
     }
 }
 impl<Sm: PipeModeTag> AsRawHandle for SendHalf<Sm> {

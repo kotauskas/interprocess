@@ -23,8 +23,10 @@ use std::{
 // TODO examples
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,
+    flush: TokioMutex<Option<FlushJH>>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
+type FlushJH = TokioJoinHandle<io::Result<()>>;
 
 /// Type alias for a Tokio-based pipe stream with the same read mode and write mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
@@ -43,6 +45,7 @@ pub struct RecvHalf<Rm: PipeModeTag> {
 /// The sending half of a [`PipeStream`] as produced via `.split()`.
 pub struct SendHalf<Sm: PipeModeTag> {
     raw: Arc<RawPipeStream>,
+    flush: TokioMutex<Option<FlushJH>>,
     _phantom: PhantomData<Sm>,
 }
 

@@ -11,8 +11,9 @@ use crate::os::windows::{
             UNWRAP_FAIL_MSG,
         },
         tokio::stream::*,
-        PipeMode,
+        PipeMode, PmtNotNone,
     },
+    FileHandle,
 };
 use std::{
     ffi::OsStr,
@@ -32,6 +33,11 @@ macro_rules! same_clsrv {
         }
     };
 }
+
+#[repr(transparent)]
+struct AssertHandleSyncSend(HANDLE);
+unsafe impl Sync for AssertHandleSyncSend {}
+unsafe impl Send for AssertHandleSyncSend {}
 
 impl RawPipeStream {
     async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
@@ -110,13 +116,6 @@ impl RawPipeStream {
     #[inline]
     fn write<'a>(&'a self, buf: &'a [u8]) -> Write<'a> {
         Write(self, buf)
-    }
-
-    fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        same_clsrv!(x in self => Pin::new(x).poll_flush(cx))
-    }
-    fn poll_shutdown(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        same_clsrv!(x in self => Pin::new(x).poll_shutdown(cx))
     }
 
     #[inline]
@@ -273,10 +272,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
     pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some()).await?;
-        Ok(Self {
-            raw,
-            _phantom: PhantomData,
-        })
+        Ok(Self::new(raw))
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
     pub async fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
@@ -287,10 +283,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             Sm::MODE.is_some(),
         )
         .await?;
-        Ok(Self {
-            raw,
-            _phantom: PhantomData,
-        })
+        Ok(Self::new(raw))
     }
     /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
     pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
@@ -303,6 +296,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             },
             SendHalf {
                 raw: raw_ac,
+                flush: TokioMutex::new(None),
                 _phantom: PhantomData,
             },
         )
@@ -367,8 +361,38 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
             raw,
+            flush: TokioMutex::new(None),
             _phantom: PhantomData,
         }
+    }
+}
+impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
+    fn ensure_flush_start(&self, slf_flush: &mut TokioMutexGuard<'_, Option<FlushJH>>) {
+        if slf_flush.is_some() {
+            return;
+        }
+
+        let handle = AssertHandleSyncSend(self.as_raw_handle());
+        let task = tokio::task::spawn_blocking(move || {
+            let handle = handle;
+            FileHandle::flush_hndl(handle.0)
+        });
+
+        **slf_flush = Some(task);
+    }
+    /// Flushes the stream, waiting until the send buffer is empty (has been received by the other end in its entirety).
+    ///
+    /// Only available on streams that have a send mode.
+    pub async fn flush(&self) -> io::Result<()> {
+        let mut slf_flush = self.flush.lock().await;
+        let rslt = loop {
+            match slf_flush.as_mut() {
+                Some(fl) => break fl.await.unwrap(),
+                None => self.ensure_flush_start(&mut slf_flush),
+            }
+        };
+        *slf_flush = None;
+        rslt
     }
 }
 
@@ -395,9 +419,21 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.raw.poll_write(cx, buf)
     }
-    #[inline(always)]
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let mut lockfut = self.flush.lock();
+        let lfpin = unsafe {
+            // SAFETY: i promise,,,
+            Pin::new_unchecked(&mut lockfut)
+        };
+        let mut slf_flush = ready!(lfpin.poll(cx));
+        let rslt = loop {
+            match slf_flush.as_mut() {
+                Some(fl) => break ready!(Pin::new(fl).poll(cx)).unwrap(),
+                None => self.ensure_flush_start(&mut slf_flush),
+            }
+        };
+        *slf_flush = None;
+        Poll::Ready(rslt)
     }
     #[inline(always)]
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -425,17 +461,21 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     }
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.get_mut().raw.poll_flush(cx)
+        <&Self as AsyncWrite>::poll_flush(Pin::new(&mut &*self), cx)
     }
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.get_mut().raw.poll_shutdown(cx)
+        <Self as TokioAsyncWrite>::poll_flush(self, cx)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("PipeStream");
-        self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE).finish()
+        self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE);
+        if Sm::MODE.is_some() {
+            dbst.field("flush", &self.flush);
+        }
+        dbst.finish()
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeStream<Rm, Sm> {

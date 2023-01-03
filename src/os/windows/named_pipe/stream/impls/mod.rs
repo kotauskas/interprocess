@@ -253,6 +253,15 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         }
     }
 }
+impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
+    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its entirety).
+    ///
+    /// Only available on streams that have a send mode.
+    #[inline]
+    pub fn flush(&self) -> io::Result<()> {
+        self.raw.handle.flush()
+    }
+}
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -272,7 +281,7 @@ impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
     }
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.raw.handle.flush()
+        (*self).flush()
     }
 }
 impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {

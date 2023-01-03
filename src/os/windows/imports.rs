@@ -62,6 +62,13 @@ import_type_or_make_dummy!(types {tokio::net::windows::named_pipe}::(
     NamedPipeClient as TokioNPClient,
     NamedPipeServer as TokioNPServer,
 ), cfg(all(windows, feature = "tokio")));
+import_type_or_make_dummy!(types {tokio::task}::(
+    JoinHandle as TokioJoinHandle,
+), cfg(all(windows, feature = "tokio")));
+import_type_or_make_dummy!(types {tokio::sync}::(
+    Mutex as TokioMutex,
+    MutexGuard as TokioMutexGuard,
+), cfg(all(windows, feature = "tokio")));
 
 #[cfg(feature = "tokio")]
 pub(super) use futures_core::ready;
