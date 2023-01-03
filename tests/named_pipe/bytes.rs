@@ -1,7 +1,7 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    interprocess::os::windows::named_pipe::{DuplexBytePipeStream, PipeListenerOptions},
+    interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions},
     std::{
         ffi::OsStr,
         io::{self, prelude::*, BufReader},
@@ -16,10 +16,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     let (name, listener) = NameGen::new(true)
         .find_map(|nm| {
             let rnm: &OsStr = nm.as_ref();
-            let l = match PipeListenerOptions::new()
-                .name(rnm)
-                .create::<DuplexBytePipeStream>()
-            {
+            let l = match PipeListenerOptions::new().name(rnm).create_duplex::<pipe_mode::Bytes>() {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
                 Err(e) => return Some(Err(e)),
@@ -35,7 +32,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
@@ -55,7 +52,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 pub fn client(name: Arc<String>) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
-    let mut conn = DuplexBytePipeStream::connect(name.as_str())
+    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
         .context("Connect failed")
         .map(BufReader::new)?;
 

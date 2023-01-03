@@ -1,10 +1,13 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    interprocess::os::windows::named_pipe::{DuplexMsgPipeStream, PipeListenerOptions, PipeMode},
+    interprocess::{
+        os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions, PipeMode},
+        ReliableRecvMsg,
+    },
     std::{
         ffi::OsStr,
-        io::{self, prelude::*},
+        io,
         sync::{mpsc::Sender, Arc},
     },
 };
@@ -22,7 +25,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             let l = match PipeListenerOptions::new()
                 .name(rnm)
                 .mode(PipeMode::Messages)
-                .create::<DuplexMsgPipeStream>()
+                .create_duplex::<pipe_mode::Messages>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
@@ -39,27 +42,25 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
         let mut conn = match listener.accept() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
 
         let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
-        let read = conn.read(&mut buf1).context("First pipe receive failed")?;
-        assert_eq!(read, CLIENT_MSG_1.len());
-        assert_eq!(&buf1[0..read], CLIENT_MSG_1);
+        let size = conn.recv(&mut buf1).context("First pipe receive failed")?.size();
+        assert_eq!(size, CLIENT_MSG_1.len());
+        assert_eq!(&buf1[0..size], CLIENT_MSG_1);
 
-        let read = conn.read(&mut buf2).context("Second pipe receive failed")?;
-        assert_eq!(read, CLIENT_MSG_1.len());
-        assert_eq!(&buf1[0..read], CLIENT_MSG_1);
+        let size = conn.recv(&mut buf2).context("Second pipe receive failed")?.size();
+        assert_eq!(size, CLIENT_MSG_2.len());
+        assert_eq!(&buf2[0..size], CLIENT_MSG_2);
 
-        let written = conn.write(SERVER_MSG_1).context("First pipe send failed")?;
+        let written = conn.send(SERVER_MSG_1).context("First pipe send failed")?;
         assert_eq!(written, SERVER_MSG_1.len());
 
-        let written = conn
-            .write(SERVER_MSG_2)
-            .context("Second pipe send failed")?;
+        let written = conn.send(SERVER_MSG_2).context("Second pipe send failed")?;
         assert_eq!(written, SERVER_MSG_2.len());
     }
 
@@ -68,23 +69,21 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 pub fn client(name: Arc<String>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
-    let mut conn = DuplexMsgPipeStream::connect(name.as_str()).context("Connect failed")?;
+    let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect(name.as_str()).context("Connect failed")?;
 
-    let written = conn.write(CLIENT_MSG_1).context("First pipe send failed")?;
+    let written = conn.send(CLIENT_MSG_1).context("First pipe send failed")?;
     assert_eq!(written, CLIENT_MSG_1.len());
 
-    let written = conn
-        .write(CLIENT_MSG_2)
-        .context("Second pipe send failed")?;
+    let written = conn.send(CLIENT_MSG_2).context("Second pipe send failed")?;
     assert_eq!(written, CLIENT_MSG_2.len());
 
-    let read = conn.read(&mut buf1).context("First pipe receive failed")?;
-    assert_eq!(read, SERVER_MSG_1.len());
-    assert_eq!(&buf1[0..read], SERVER_MSG_1);
+    let size = conn.recv(&mut buf1).context("First pipe receive failed")?.size();
+    assert_eq!(size, SERVER_MSG_1.len());
+    assert_eq!(&buf1[0..size], SERVER_MSG_1);
 
-    let read = conn.read(&mut buf2).context("Second pipe receive failed")?;
-    assert_eq!(read, SERVER_MSG_1.len());
-    assert_eq!(&buf1[0..read], SERVER_MSG_1);
+    let size = conn.recv(&mut buf2).context("Second pipe receive failed")?.size();
+    assert_eq!(size, SERVER_MSG_1.len());
+    assert_eq!(&buf2[0..size], SERVER_MSG_2);
 
     Ok(())
 }

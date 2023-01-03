@@ -1,34 +1,28 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    futures::io::{AsyncReadExt, AsyncWriteExt},
     interprocess::os::windows::named_pipe::{
-        tokio::{MsgReaderPipeStream, MsgWriterPipeStream, PipeListenerOptionsExt},
+        pipe_mode,
+        tokio::{PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
         PipeListenerOptions, PipeMode,
     },
-    std::{convert::TryInto, ffi::OsStr, io, sync::Arc, time::Duration},
-    tokio::{sync::oneshot::Sender, task, time::sleep},
+    std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
+    tokio::{sync::oneshot::Sender, task},
 };
 const MSG_1: &[u8] = b"Client message 1";
 const MSG_2: &[u8] = b"Client message 2";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    async fn handle_conn(mut conn: MsgReaderPipeStream) -> TestResult {
+    async fn handle_conn(conn: RecvPipeStream<pipe_mode::Messages>) -> TestResult {
         let (mut buf1, mut buf2) = ([0; MSG_1.len()], [0; MSG_2.len()]);
 
-        let read = conn
-            .read(&mut buf1)
-            .await
-            .context("First pipe receive failed")?;
-        assert_eq!(read, MSG_1.len());
-        assert_eq!(&buf1[0..read], MSG_1);
+        let size = conn.recv(&mut buf1).await.context("First pipe receive failed")?.size();
+        assert_eq!(size, MSG_1.len());
+        assert_eq!(&buf1[0..size], MSG_1);
 
-        let read = conn
-            .read(&mut buf2)
-            .await
-            .context("Second pipe receive failed")?;
-        assert_eq!(read, MSG_2.len());
-        assert_eq!(&buf2[0..read], MSG_2);
+        let size = conn.recv(&mut buf2).await.context("Second pipe receive failed")?.size();
+        assert_eq!(size, MSG_2.len());
+        assert_eq!(&buf2[0..size], MSG_2);
 
         Ok(())
     }
@@ -39,7 +33,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             let l = match PipeListenerOptions::new()
                 .name(rnm)
                 .mode(PipeMode::Messages)
-                .create_tokio::<MsgReaderPipeStream>()
+                .create_tokio_recv_only::<pipe_mode::Messages>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
@@ -58,7 +52,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         let conn = match listener.accept().await {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
@@ -74,22 +68,15 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
     Ok(())
 }
 pub async fn client(name: Arc<String>) -> TestResult {
-    let mut conn = loop {
-        match MsgWriterPipeStream::connect(name.as_str()) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                sleep(Duration::from_millis(10)).await;
-                continue;
-            }
-            not_busy => break not_busy,
-        }
-    }
-    .context("Connect failed")?;
+    let conn = SendPipeStream::<pipe_mode::Messages>::connect(name.as_str())
+        .await
+        .context("Connect failed")?;
 
-    let written = conn.write(MSG_1).await.context("First pipe send failed")?;
-    assert_eq!(written, MSG_1.len());
+    let sent = conn.send(MSG_1).await.context("First pipe send failed")?;
+    assert_eq!(sent, MSG_1.len());
 
-    let written = conn.write(MSG_2).await.context("Second pipe send failed")?;
-    assert_eq!(written, MSG_2.len());
+    let sent = conn.send(MSG_2).await.context("Second pipe send failed")?;
+    assert_eq!(sent, MSG_2.len());
 
     Ok(())
 }

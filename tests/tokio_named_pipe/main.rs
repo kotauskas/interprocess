@@ -7,7 +7,7 @@ mod bytes_unidir_client_to_server;
 mod bytes_unidir_server_to_client;
 mod msg;
 mod msg_unidir_client_to_server;
-/*mod msg_unidir_server_to_client;*/
+mod msg_unidir_server_to_client;
 
 use util::TestResult;
 
@@ -46,11 +46,11 @@ async fn tokio_named_pipe_msg_unidir_client_to_server() -> TestResult {
     )
     .await
 }
-/*#[tokio::test]
+#[tokio::test]
 async fn tokio_named_pipe_msg_unidir_server_to_client() -> TestResult {
     util::tokio::drive_server_and_multiple_clients(
         msg_unidir_server_to_client::server,
         msg_unidir_server_to_client::client,
     )
     .await
-}*/
+}

@@ -1,9 +1,7 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    interprocess::os::windows::named_pipe::{
-        ByteReaderPipeStream, ByteWriterPipeStream, PipeListenerOptions,
-    },
+    interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, SendPipeStream},
     std::{
         ffi::OsStr,
         io::{self, prelude::*, BufReader},
@@ -19,7 +17,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new()
                 .name(rnm)
-                .create::<ByteReaderPipeStream>()
+                .create_recv_only::<pipe_mode::Bytes>()
             {
                 Ok(l) => l,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
@@ -38,7 +36,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
@@ -52,7 +50,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     Ok(())
 }
 pub fn client(name: Arc<String>) -> TestResult {
-    let mut conn = ByteWriterPipeStream::connect(name.as_str()).context("Connect failed")?;
+    let mut conn = SendPipeStream::<pipe_mode::Bytes>::connect(name.as_str()).context("Connect failed")?;
 
     conn.write_all(MSG.as_bytes()).context("Pipe send failed")?;
     conn.flush()?;
