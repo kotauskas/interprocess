@@ -13,22 +13,11 @@ static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
 pub(super) fn run_with_namegen(namegen: NameGen) {
-    drive_server_and_multiple_clients(
-        move |snd, nc| server(snd, nc, namegen, false),
-        |nm| client(nm, false),
-    );
-    drive_server_and_multiple_clients(
-        move |snd, nc| server(snd, nc, namegen, true),
-        |nm| client(nm, true),
-    );
+    drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, false), |nm| client(nm, false));
+    drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, true), |nm| client(nm, true));
 }
 
-fn server(
-    name_sender: Sender<String>,
-    num_clients: u32,
-    mut namegen: NameGen,
-    shutdown: bool,
-) -> TestResult {
+fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, shutdown: bool) -> TestResult {
     let (name, listener) = namegen
         .find_map(|nm| {
             let l = match UdStreamListener::bind(&*nm) {
@@ -49,7 +38,7 @@ fn server(
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };

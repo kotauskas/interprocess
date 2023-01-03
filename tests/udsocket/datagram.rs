@@ -37,33 +37,25 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen) -
         let conn = match listener.accept() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 continue;
             }
         };
 
         let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
-        let read = conn
-            .recv(&mut buf1)
-            .context("First socket receive failed")?;
+        let read = conn.recv(&mut buf1).context("First socket receive failed")?;
         assert_eq!(read, CLIENT_MSG_1.len());
         assert_eq!(&buf1[0..read], CLIENT_MSG_1);
 
-        let read = conn
-            .recv(&mut buf2)
-            .context("Second socket receive failed")?;
+        let read = conn.recv(&mut buf2).context("Second socket receive failed")?;
         assert_eq!(read, CLIENT_MSG_2.len());
         assert_eq!(&buf2[0..read], CLIENT_MSG_2);
 
-        let written = conn
-            .send(SERVER_MSG_1)
-            .context("First socket send failed")?;
+        let written = conn.send(SERVER_MSG_1).context("First socket send failed")?;
         assert_eq!(written, SERVER_MSG_1.len());
 
-        let written = conn
-            .send(SERVER_MSG_2)
-            .context("Second socket send failed")?;
+        let written = conn.send(SERVER_MSG_2).context("Second socket send failed")?;
         assert_eq!(written, SERVER_MSG_2.len());
     }
     Ok(())
@@ -73,25 +65,17 @@ fn client(name: Arc<String>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
     let conn = UdStream::connect(name.as_str()).context("Connect failed")?;
 
-    let written = conn
-        .send(CLIENT_MSG_1)
-        .context("First socket send failed")?;
+    let written = conn.send(CLIENT_MSG_1).context("First socket send failed")?;
     assert_eq!(written, CLIENT_MSG_1.len());
 
-    let written = conn
-        .send(CLIENT_MSG_2)
-        .context("Second socket send failed")?;
+    let written = conn.send(CLIENT_MSG_2).context("Second socket send failed")?;
     assert_eq!(written, CLIENT_MSG_2.len());
 
-    let read = conn
-        .recv(&mut buf1)
-        .context("First socket receive failed")?;
+    let read = conn.recv(&mut buf1).context("First socket receive failed")?;
     assert_eq!(read, SERVER_MSG_1.len());
     assert_eq!(&buf1[0..read], SERVER_MSG_1);
 
-    let read = conn
-        .recv(&mut buf2)
-        .context("Second socket receive failed")?;
+    let read = conn.recv(&mut buf2).context("Second socket receive failed")?;
     assert_eq!(read, SERVER_MSG_2.len());
     assert_eq!(&buf2[0..read], SERVER_MSG_2);
 

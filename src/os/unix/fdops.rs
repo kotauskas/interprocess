@@ -15,8 +15,7 @@ impl FdOps {
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let (success, bytes_read) = unsafe {
             let length_to_read = buf.len();
-            let size_or_err =
-                libc::read(self.as_raw_fd(), buf.as_mut_ptr() as *mut _, length_to_read);
+            let size_or_err = libc::read(self.as_raw_fd(), buf.as_mut_ptr() as *mut _, length_to_read);
             (size_or_err >= 0, size_or_err as usize)
         };
         ok_or_ret_errno!(success => bytes_read)
@@ -24,8 +23,7 @@ impl FdOps {
     pub fn read_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let (success, bytes_read) = unsafe {
             let num_bufs = bufs.len().try_to::<c_int>().unwrap_or(c_int::MAX);
-            let size_or_err =
-                libc::readv(self.as_raw_fd(), bufs.as_mut_ptr() as *const _, num_bufs);
+            let size_or_err = libc::readv(self.as_raw_fd(), bufs.as_mut_ptr() as *const _, num_bufs);
             (size_or_err >= 0, size_or_err as usize)
         };
         ok_or_ret_errno!(success => bytes_read)
@@ -33,8 +31,7 @@ impl FdOps {
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let (success, bytes_written) = unsafe {
             let length_to_write = buf.len();
-            let size_or_err =
-                libc::write(self.as_raw_fd(), buf.as_ptr() as *const _, length_to_write);
+            let size_or_err = libc::write(self.as_raw_fd(), buf.as_ptr() as *const _, length_to_write);
             (size_or_err >= 0, size_or_err as usize)
         };
         ok_or_ret_errno!(success => bytes_written)
@@ -107,6 +104,6 @@ pub(super) unsafe fn close_fd(fd: i32) {
         error
     };
     if let Some(e) = error {
-        panic!("failed to close file descriptor: {}", e);
+        panic!("failed to close file descriptor: {e}");
     }
 }

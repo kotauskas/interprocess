@@ -12,7 +12,7 @@ pub fn main(notify: Sender<()>) -> anyhow::Result<()> {
         match conn {
             Ok(c) => Some(c),
             Err(e) => {
-                eprintln!("Incoming connection failed: {}", e);
+                eprintln!("Incoming connection failed: {e}");
                 None
             }
         }
@@ -44,16 +44,15 @@ pub fn main(notify: Sender<()>) -> anyhow::Result<()> {
             // that.
             eprintln!(
                 "\
-Error: could not start server because the socket file is occupied. Please check if {} is in use by \
-another process and try again.",
-                name,
+Error: could not start server because the socket file is occupied. Please check if {name} is in \
+use by another process and try again."
             );
             return Err(e.into());
         }
         x => x?,
     };
 
-    println!("Server running at {}", name);
+    println!("Server running at {name}");
     // Stand-in for the syncronization used, if any, between the client and the server.
     let _ = notify.send(());
 
@@ -72,8 +71,7 @@ another process and try again.",
         // response. Otherwise, because reading and writing on a connection cannot be simultaneous
         // without threads or async, we can deadlock the two processes by having both sides wait for
         // the write buffer to be emptied by the other.
-        conn.read_line(&mut buffer)
-            .context("Socket receive failed")?;
+        conn.read_line(&mut buffer).context("Socket receive failed")?;
 
         // Now that the read has come through and the client is waiting on the server's write, do
         // it. (`.get_mut()` is to get the writer, `BufReader` doesn't implement a pass-through
@@ -81,7 +79,7 @@ another process and try again.",
         conn.get_mut().write_all(b"Hello from server!\n")?;
 
         // Print out the result, getting the newline for free!
-        print!("Client answered: {}", buffer);
+        print!("Client answered: {buffer}");
 
         // Let's add an exit condition to shut the server down gracefully.
         if buffer == "stop\n" {

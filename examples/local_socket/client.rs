@@ -37,11 +37,10 @@ pub fn main() -> anyhow::Result<()> {
 
     // We now employ the buffer we allocated prior and read until EOF, which the server will
     // similarly invoke with `.shutdown()`, verifying validity of UTF-8 on the fly.
-    conn.read_line(&mut buffer)
-        .context("Socket receive failed")?;
+    conn.read_line(&mut buffer).context("Socket receive failed")?;
 
     // Print out the result, getting the newline for free!
-    print!("Server answered: {}", buffer);
+    print!("Server answered: {buffer}");
 
     Ok(())
 }

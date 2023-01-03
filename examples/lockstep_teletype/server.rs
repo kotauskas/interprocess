@@ -10,7 +10,7 @@ pub fn main(notify: Sender<()>) -> anyhow::Result<()> {
             Ok(val) => val,
             Err(error) => {
                 eprintln!("\n");
-                panic!("Incoming connection failed: {}", error);
+                panic!("Incoming connection failed: {error}");
             }
         }
     }
