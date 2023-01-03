@@ -3,7 +3,7 @@ use {
     anyhow::Context,
     interprocess::{
         os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode, RecvPipeStream},
-        ReliableRecvMsg,
+        reliable_recv_msg::*,
     },
     std::{
         ffi::OsStr,

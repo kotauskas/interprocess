@@ -1,3 +1,7 @@
+//! Traits for receiving from IPC channels with message boundaries reliably, without truncation.
+
+// TODO same thing but async
+
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},

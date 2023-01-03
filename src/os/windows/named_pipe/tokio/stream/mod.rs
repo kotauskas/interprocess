@@ -6,7 +6,7 @@ use super::{
     super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
     imports::*,
 };
-use crate::{RecvResult, TryRecvResult};
+use crate::reliable_recv_msg::{RecvResult, TryRecvResult};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},

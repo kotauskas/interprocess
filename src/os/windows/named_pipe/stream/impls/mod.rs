@@ -10,7 +10,7 @@ use crate::{
         named_pipe::{convert_and_encode_path, PipeMode},
         weaken_buf_init, FileHandle,
     },
-    RecvResult, ReliableRecvMsg, TryRecvResult,
+    reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
 };
 use std::{
     ffi::OsStr,
