@@ -55,7 +55,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
     let listener = LocalSocketListener::bind(name)?;
     // Stand-in for the syncronization used, if any, between the client and the server.
     let _ = notify.send(());
-    println!("Server running at {}", name);
+    println!("Server running at {name}");
 
     // Set up our loop boilerplate that processes our incoming connections.
     loop {
@@ -63,7 +63,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
         let conn = match listener.accept().await {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("There was an error with an incoming connection: {}", e);
+                eprintln!("There was an error with an incoming connection: {e}");
                 continue;
             }
         };
@@ -76,7 +76,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
             // connecting to something. The inner if-let processes errors that
             // happen during the connection.
             if let Err(e) = handle_conn(conn).await {
-                eprintln!("Error while handling connection: {}", e);
+                eprintln!("Error while handling connection: {e}");
             }
         });
     }

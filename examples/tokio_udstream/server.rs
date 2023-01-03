@@ -2,8 +2,8 @@ use interprocess::os::unix::udsocket::tokio::{UdStream, UdStreamListener};
 use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    try_join,
     sync::oneshot::Sender,
+    try_join,
 };
 
 pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
@@ -56,7 +56,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
         let conn = match listener.accept().await {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("There was an error with an incoming connection: {}", e);
+                eprintln!("There was an error with an incoming connection: {e}");
                 continue;
             }
         };
@@ -69,7 +69,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
             // connecting to something. The inner if-let processes errors that
             // happen during the connection.
             if let Err(e) = handle_conn(conn).await {
-                eprintln!("error while handling connection: {}", e);
+                eprintln!("error while handling connection: {e}");
             }
         });
     }

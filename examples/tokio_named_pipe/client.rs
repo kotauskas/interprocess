@@ -1,13 +1,10 @@
-use futures::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    try_join,
-};
-use interprocess::os::windows::named_pipe::tokio::*;
+use futures::{prelude::*, try_join};
+use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 use std::error::Error;
 
 pub async fn main() -> Result<(), Box<dyn Error>> {
     // Await this here since we can't do a whole lot without a connection.
-    let conn = DuplexBytePipeStream::connect("Example")?;
+    let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example").await?;
 
     // This consumes our connection and splits it into two owned halves, so that we could
     // concurrently act on both. Take care not to use the .split() method from the futures crate's

@@ -1,14 +1,11 @@
-use futures::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    try_join,
-};
-use interprocess::os::windows::named_pipe::{tokio::*, PipeListenerOptions};
+use futures::{prelude::*, try_join};
+use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
 use std::{error::Error, ffi::OsStr, io};
 use tokio::sync::oneshot::Sender;
 
 pub async fn main(notify: Sender<()>) -> Result<(), Box<dyn Error>> {
     // Describe the things we do when we've got a connection ready.
-    async fn handle_conn(conn: DuplexBytePipeStream) -> io::Result<()> {
+    async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
         // Split the connection into two halves to process
         // received and sent data concurrently.
         let (mut reader, mut writer) = conn.split();
@@ -47,11 +44,11 @@ pub async fn main(notify: Sender<()>) -> Result<(), Box<dyn Error>> {
     // ensure it's a socket file and not a normal file, and delete it.
     let listener = PipeListenerOptions::new()
         .name(OsStr::new(PIPE_NAME))
-        .create_tokio::<DuplexBytePipeStream>()?;
+        .create_tokio_duplex::<pipe_mode::Bytes>()?;
 
     // Stand-in for the syncronization used, if any, between the client and the server.
     let _ = notify.send(());
-    println!(r"Server running at \\.\pipe\{}", PIPE_NAME);
+    println!(r"Server running at \\.\pipe\{PIPE_NAME}");
 
     // Set up our loop boilerplate that processes our incoming connections.
     loop {
@@ -59,7 +56,7 @@ pub async fn main(notify: Sender<()>) -> Result<(), Box<dyn Error>> {
         let conn = match listener.accept().await {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("There was an error with an incoming connection: {}", e);
+                eprintln!("There was an error with an incoming connection: {e}");
                 continue;
             }
         };
@@ -72,7 +69,7 @@ pub async fn main(notify: Sender<()>) -> Result<(), Box<dyn Error>> {
             // connecting to something. The inner if-let processes errors that
             // happen during the connection.
             if let Err(e) = handle_conn(conn).await {
-                eprintln!("error while handling connection: {}", e);
+                eprintln!("error while handling connection: {e}");
             }
         });
     }
