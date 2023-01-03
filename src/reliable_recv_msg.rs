@@ -1,16 +1,6 @@
 //! Traits for receiving from IPC channels with message boundaries reliably, without truncation.
-
-// TODO same thing but async
-
-use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    io,
-};
-
-/// Receiving from IPC channels with message boundaries reliably, without truncation.
-///
-/// ## The problem
+//!
+//! ## The problem
 /// Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by any OS – instead, all messages received from message IPC channels are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
 ///
 /// There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully receive a message. With byte streams, that always works – there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually receiving it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
@@ -34,16 +24,82 @@ use std::{
 /// The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it didn't fit, the buffer is unaffected (unlike with `RecvResult`).
 ///
 /// ## Platform support
-/// The trait is implemented for:
+/// The traits are implemented for:
 /// - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
 /// - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
 ///     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
+use std::{
+    error::Error,
+    fmt::{self, Display, Formatter},
+    future::Future,
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+/// Receiving from IPC channels with message boundaries reliably, without truncation.
+///
+/// See the [module-level documentation](self) for more.
 pub trait ReliableRecvMsg {
     /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
     fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
 
     /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
+}
+
+/// Implementation of asynchronously receiving from IPC channels with message boundaries reliably, without truncation.
+///
+/// See the [module-level documentation](self) for more.
+pub trait AsyncReliableRecvMsg {
+    /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    fn poll_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>>;
+
+    /// Polls a future that attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
+    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>>;
+}
+
+/// Futures for asynchronously receiving from IPC channels with message boundaries reliably, without truncation.
+///
+/// See the [module-level documentation](self) for more.
+pub trait AsyncReliableRecvMsgExt: AsyncReliableRecvMsg {
+    /// Asynchronously receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b, Self>
+    where
+        Self: Unpin,
+    {
+        Recv(self, buf)
+    }
+
+    /// Asynchronously attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
+    fn try_recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> TryRecv<'a, 'b, Self>
+    where
+        Self: Unpin,
+    {
+        TryRecv(self, buf)
+    }
+}
+impl<T: AsyncReliableRecvMsg> AsyncReliableRecvMsgExt for T {}
+
+/// Future type returned by [`.recv()`](AsyncReliableRecvMsgExt::recv).
+#[derive(Debug)]
+pub struct Recv<'a, 'b, T: ?Sized>(&'a mut T, &'b mut [u8]);
+impl<T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for Recv<'_, '_, T> {
+    type Output = io::Result<RecvResult>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let Recv(slf, buf) = self.get_mut();
+        Pin::new(&mut **slf).poll_recv(cx, buf)
+    }
+}
+/// Future type returned by [`.try_recv()`](AsyncReliableRecvMsgExt::try_recv).
+#[derive(Debug)]
+pub struct TryRecv<'a, 'b, T: ?Sized>(&'a mut T, &'b mut [u8]);
+impl<T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for TryRecv<'_, '_, T> {
+    type Output = io::Result<TryRecvResult>;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let TryRecv(slf, buf) = self.get_mut();
+        Pin::new(&mut **slf).poll_try_recv(cx, buf)
+    }
 }
 
 /// Marker error indicating that a datagram write operation failed because the amount of bytes which were actually written as reported by the operating system was smaller than the size of the message which was requested to be written.
