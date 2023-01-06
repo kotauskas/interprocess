@@ -78,11 +78,7 @@ impl UdStreamListener {
     pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_bind(path.to_socket_path()?, true, false)
     }
-    pub(crate) fn _bind(
-        path: UdSocketPath<'_>,
-        keep_drop_guard: bool,
-        nonblocking: bool,
-    ) -> io::Result<Self> {
+    pub(crate) fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool, nonblocking: bool) -> io::Result<Self> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
 
         let fd = c_wrappers::create_uds(SOCK_STREAM, nonblocking)?;
@@ -99,17 +95,14 @@ impl UdStreamListener {
 
         let dg = if keep_drop_guard {
             PathDropGuard {
-                path: path.to_owned(),
+                path: path.upgrade(),
                 enabled: true,
             }
         } else {
             PathDropGuard::dummy()
         };
 
-        Ok(Self {
-            fd,
-            _drop_guard: dg,
-        })
+        Ok(Self { fd, _drop_guard: dg })
     }
 
     /// Listens for incoming connections to the socket, blocking until a client is connected.

@@ -23,7 +23,7 @@ use std::{
 ///
 /// ## `File`
 /// All sockets identified this way are located on the main filesystem and exist as persistent files until deletion, preventing servers from using the same socket without deleting it from the filesystem first. This variant is available on all POSIX-compilant systems.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum UdSocketPath<'a> {
     /// An unnamed socket, identified only by its file descriptor. This is an invalid path value for creating sockets – all attempts to use such a value will result in an error.
     Unnamed,
@@ -42,6 +42,24 @@ pub enum UdSocketPath<'a> {
     Namespaced(Cow<'a, CStr>),
 }
 impl<'a> UdSocketPath<'a> {
+    /// Attempts to upgrade lifetime to `'static` (which is only possible when the path is owned). Borrowed paths return `Err(…)`, allowing you to get the original path back.
+    pub fn try_upgrade(self) -> Result<UdSocketPath<'static>, UdSocketPath<'a>> {
+        let ok = match self {
+            Self::Unnamed => UdSocketPath::Unnamed,
+            Self::File(Cow::Owned(p)) => UdSocketPath::File(Cow::Owned(p)),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Self::Namespaced(Cow::Owned(p)) => UdSocketPath::Namespaced(Cow::Owned(p)),
+            Self::File(Cow::Borrowed(..)) => return Err(self),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Self::Namespaced(Cow::Borrowed(..)) => return Err(self),
+        };
+        Ok(ok)
+    }
+    /// Upgrades lifetime to `'static` by ensuring that the path is owned. May require an allocation.
+    pub fn upgrade(mut self) -> UdSocketPath<'static> {
+        self.make_owned();
+        self.try_upgrade().unwrap()
+    }
     /// Returns the path as a [`CStr`]. The resulting value does not include any indication of whether it's a namespaced socket name or a filesystem path.
     pub fn as_cstr(&'a self) -> &'a CStr {
         match self {
@@ -321,9 +339,9 @@ impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
         }
     }
 }
-impl ToOwned for UdSocketPath<'_> {
-    type Owned = UdSocketPath<'static>;
-    fn to_owned(&self) -> UdSocketPath<'static> {
+impl<'a> ToOwned for UdSocketPath<'a> {
+    type Owned = Self;
+    fn to_owned(&self) -> UdSocketPath<'a> {
         match self {
             Self::File(f) => UdSocketPath::File(Cow::Owned(f.as_ref().to_owned())),
             #[cfg(uds_linux_namespace)]
