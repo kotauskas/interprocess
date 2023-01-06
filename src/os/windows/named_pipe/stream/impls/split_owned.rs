@@ -24,10 +24,7 @@ fn reunite<Rm: PipeModeTag, Sm: PipeModeTag>(
 impl<Rm: PipeModeTag> RecvHalf<Rm> {
     /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
-    pub fn reunite<Sm: PipeModeTag>(
-        self,
-        other: SendHalf<Sm>,
-    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+    pub fn reunite<Sm: PipeModeTag>(self, other: SendHalf<Sm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(self, other)
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
@@ -73,26 +70,12 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
     }
 }
 impl RecvHalf<pipe_mode::Messages> {
-    /// Receives a message from the pipe into the specified buffer, returning either the size of the message or a new buffer tailored to its size if it didn't fit into the buffer.
-    ///
-    /// See [`RecvResult`] for more on how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.recv_to_uninit(weaken_buf_init(buf))
-    }
-    /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
+    /// Same as [`.recv()`](ReliableRecvMsg::recv), but accepts an uninitialized buffer.
     #[inline]
     pub fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf)
     }
-    /// Attempts to receive a message from the pipe into the specified buffer. If it fits, it's written into the buffer, and if it doesn't, the buffer is unaffected. The return value indicates which of those two things happened and also contains the size of the message regardless of whether it was read or not.
-    ///
-    /// See [`TryRecvResult`] for a summary of how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.try_recv_to_uninit(weaken_buf_init(buf))
-    }
-    /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
+    /// Same as [`.try_recv()`](ReliableRecvMsg::try_recv), but accepts an uninitialized buffer.
     #[inline]
     pub fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf)
@@ -117,6 +100,22 @@ impl Read for RecvHalf<pipe_mode::Bytes> {
         (self as &RecvHalf<_>).read(buf)
     }
 }
+impl ReliableRecvMsg for &RecvHalf<pipe_mode::Messages> {
+    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+        self.recv_to_uninit(weaken_buf_init(buf))
+    }
+    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+        self.try_recv_to_uninit(weaken_buf_init(buf))
+    }
+}
+impl ReliableRecvMsg for RecvHalf<pipe_mode::Messages> {
+    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+        (self as &RecvHalf<_>).recv(buf)
+    }
+    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+        (self as &RecvHalf<_>).try_recv(buf)
+    }
+}
 impl<Rm: PipeModeTag> Debug for RecvHalf<Rm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("RecvHalf");
@@ -133,10 +132,7 @@ impl<Rm: PipeModeTag> AsRawHandle for RecvHalf<Rm> {
 impl<Sm: PipeModeTag> SendHalf<Sm> {
     /// Attempts to reunite this send half with the given recieve half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
-    pub fn reunite<Rm: PipeModeTag>(
-        self,
-        other: RecvHalf<Rm>,
-    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+    pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(other, self)
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
