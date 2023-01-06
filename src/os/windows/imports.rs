@@ -5,7 +5,7 @@ use std::ffi::c_void;
 pub(super) use {
     std::os::windows::ffi::{OsStrExt, OsStringExt},
     winapi::{
-        shared::winerror::{ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED},
+        shared::winerror::{ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED, ERROR_MORE_DATA},
         um::{
             fileapi::{CreateFileW, FlushFileBuffers, ReadFile, WriteFile, OPEN_EXISTING},
             handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},

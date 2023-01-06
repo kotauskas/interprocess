@@ -40,10 +40,25 @@ impl RawPipeStream {
     }
 
     fn try_recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
-        let size = peek_msg_len(self.handle.0)?;
-        let fit = buf.len() >= size;
-        if fit {
-            self.handle.read(buf)?;
+        let mut size = 0;
+        let mut fit = false;
+        while size == 0 {
+            size = peek_msg_len(self.handle.0)?;
+            fit = buf.len() >= size;
+            if fit {
+                match self.handle.read(&mut buf[0..size]) {
+                    // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the `.read()`
+                    // to block until a message arrives, so that we could figure out for real if it fits or not.
+                    // It doesn't mean that the message gets torn, as it normally does if the buffer given to the
+                    // ReadFile call is non-zero in size.
+                    Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
+                    Err(e) => return Err(e),
+                    Ok(nsz) => {
+                        size = nsz;
+                        break;
+                    }
+                }
+            }
         }
         Ok(TryRecvResult { size, fit })
     }
