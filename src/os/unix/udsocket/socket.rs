@@ -6,7 +6,10 @@ use super::{
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
 #[cfg(any(doc, target_os = "linux"))]
-use crate::{ReliableReadMsg, Sealed};
+use crate::{
+    reliable_recv_msg::{ReliableRecvMsg, TryRecvResult},
+    Sealed,
+};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut},
@@ -61,7 +64,7 @@ impl UdSocket {
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
             PathDropGuard {
-                path: path.to_owned(),
+                path: path.upgrade(),
                 enabled: true,
             }
         } else {
@@ -185,6 +188,7 @@ impl UdSocket {
         addr_buf: &'b mut UdSocketPath<'a>,
     ) -> io::Result<usize> {
         self.recv_from_ancillary_vectored(bufs, &mut AncillaryDataBuf::Owned(Vec::new()), addr_buf)
+            .map(|x| x.0)
     }
 
     /// Receives a single datagram, ancillary data and the source address from the socket. The return value is in the following order:
@@ -371,25 +375,14 @@ impl Debug for UdSocket {
 
 #[cfg(any(doc, target_os = "linux"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
-impl ReliableReadMsg for UdSocket {
-    fn read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, Vec<u8>>> {
-        let msg_size = self.peek_msg_size()?;
-        if msg_size > buf.len() {
-            let mut new_buffer = vec![0; msg_size];
-            let len = self.recv(&mut new_buffer)?.0;
-            new_buffer.truncate(len);
-            Ok(Err(new_buffer))
-        } else {
-            Ok(Ok(self.recv(buf)?.0))
+impl ReliableRecvMsg for UdSocket {
+    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+        let mut size = self.peek_msg_size()?;
+        let fit = size > buf.len();
+        if fit {
+            size = UdSocket::recv(self, buf)?;
         }
-    }
-    fn try_read_msg(&mut self, buf: &mut [u8]) -> io::Result<Result<usize, usize>> {
-        let msg_size = self.peek_msg_size()?;
-        if msg_size > buf.len() {
-            Ok(Err(msg_size))
-        } else {
-            Ok(Ok(self.recv(buf)?.0))
-        }
+        Ok(TryRecvResult { size, fit })
     }
 }
 #[cfg(any(doc, target_os = "linux"))]
