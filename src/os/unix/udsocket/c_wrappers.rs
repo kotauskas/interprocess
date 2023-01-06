@@ -62,13 +62,7 @@ pub(super) unsafe fn bind(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
 /// # Safety
 /// `addr` must be properly null-terminated.
 pub(super) unsafe fn connect(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
-    let success = unsafe {
-        libc::connect(
-            fd.0,
-            addr as *const _ as *const _,
-            size_of::<sockaddr_un>() as u32,
-        ) != -1
-    };
+    let success = unsafe { libc::connect(fd.0, addr as *const _ as *const _, size_of::<sockaddr_un>() as u32) != -1 };
     ok_or_ret_errno!(success => ())
 }
 
@@ -138,7 +132,7 @@ fn set_status_flags(fd: &FdOps, new_flags: c_int) -> io::Result<()> {
     ok_or_ret_errno!(success => ())
 }
 pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
-    let (old_flags, success) = get_status_flags(fd)?;
+    let old_flags = get_status_flags(fd)?;
     let new_flags = if nonblocking {
         old_flags | O_NONBLOCK
     } else {
