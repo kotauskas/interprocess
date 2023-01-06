@@ -41,22 +41,57 @@ use std::{
 ///
 /// See the [module-level documentation](self) for more.
 pub trait ReliableRecvMsg {
-    /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
-    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
-
     /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
+
+    /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+        let TryRecvResult { size, fit } = self.try_recv(buf)?;
+        if fit {
+            Ok(RecvResult::Fit(size))
+        } else {
+            let mut new_buf = vec![0; size];
+            let TryRecvResult { size, fit } = self.try_recv(&mut new_buf)?;
+            assert!(
+                fit,
+                "try_recv() returned fit = false for a buffer of a size that it reported was sufficient"
+            );
+            new_buf.truncate(size);
+            Ok(RecvResult::Alloc(new_buf))
+        }
+    }
 }
 
 /// Implementation of asynchronously receiving from IPC channels with message boundaries reliably, without truncation.
 ///
 /// See the [module-level documentation](self) for more.
 pub trait AsyncReliableRecvMsg {
-    /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
-    fn poll_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>>;
-
     /// Polls a future that attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
     fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>>;
+
+    /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    fn poll_recv(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
+        let TryRecvResult { size, fit } = match self.as_mut().poll_try_recv(cx, buf) {
+            Poll::Ready(r) => r?,
+            Poll::Pending => return Poll::Pending,
+        };
+        if fit {
+            Poll::Ready(Ok(RecvResult::Fit(size)))
+        } else {
+            let mut new_buf = vec![0; size];
+            let TryRecvResult { size, fit } = match self.poll_try_recv(cx, &mut new_buf) {
+                Poll::Ready(r) => r?,
+                // This isn't supposed to be hit normally, since the buffer would be wasted then.
+                Poll::Pending => return Poll::Pending,
+            };
+            assert!(
+                fit,
+                "try_recv() returned fit = false for a buffer of a size that it reported was sufficient"
+            );
+            new_buf.truncate(size);
+            Poll::Ready(Ok(RecvResult::Alloc(new_buf)))
+        }
+    }
 }
 
 /// Futures for asynchronously receiving from IPC channels with message boundaries reliably, without truncation.
