@@ -222,20 +222,18 @@ impl<'a> UdSocketPath<'a> {
                 if len_of_self > MAX_UDSOCKET_PATH_LEN {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        format!("socket path should not be longer than {} bytes", MAX_UDSOCKET_PATH_LEN),
+                        format!("socket path should not be longer than {MAX_UDSOCKET_PATH_LEN} bytes"),
                     ));
                 }
             }
             #[cfg(uds_linux_namespace)]
             UdSocketPath::Namespaced(..) => {
                 is_namespaced = true;
-                if len_of_self > (MAX_UDSOCKET_PATH_LEN - 1) {
+                const MAX_NAMESPACED_LEN: usize = MAX_UDSOCKET_PATH_LEN - 1;
+                if len_of_self > MAX_NAMESPACED_LEN {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        format!(
-                            "namespaced socket name should not be longer than {} bytes",
-                            MAX_UDSOCKET_PATH_LEN - 1
-                        ),
+                        format!("namespaced socket name should not be longer than {MAX_NAMESPACED_LEN} bytes"),
                     ));
                 }
             }

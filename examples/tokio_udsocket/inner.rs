@@ -3,7 +3,7 @@ use std::{io, mem::MaybeUninit};
 use tokio::{io::ReadBuf, sync::oneshot::Sender, try_join};
 
 pub async fn main(src: &str, dst: &str, notify: Option<Sender<()>>) -> io::Result<()> {
-    let socket_path = format!("/tmp/{}", src);
+    let socket_path = format!("/tmp/{src}");
     // Socket creation happens immediately, no futures here.
     let socket = UdSocket::bind(socket_path)?;
     if let Some(n) = notify {
@@ -16,7 +16,7 @@ pub async fn main(src: &str, dst: &str, notify: Option<Sender<()>>) -> io::Resul
     let mut buffer = [MaybeUninit::<u8>::uninit(); 128];
     let mut readbuf = ReadBuf::uninit(&mut buffer);
 
-    let message = format!("Hello from {}!", src);
+    let message = format!("Hello from {src}!");
 
     // Describe the write operation, but don't run it yet.
     // We'll launch it concurrently with the read operation.

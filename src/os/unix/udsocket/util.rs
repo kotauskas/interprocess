@@ -42,10 +42,7 @@ pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
     iovlen.try_to::<MsghdrIovlen>().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!(
-                "number of scatter-gather buffers overflowed {}",
-                MSGHDR_IOVLEN_NAME,
-            ),
+            format!("number of scatter-gather buffers overflowed {MSGHDR_IOVLEN_NAME}"),
         )
     })
 }
@@ -54,10 +51,7 @@ pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
     controllen.try_to::<MsghdrControllen>().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!(
-                "ancillary data buffer length overflowed {}",
-                MSGHDR_CONTROLLEN_NAME,
-            ),
+            format!("ancillary data buffer length overflowed {MSGHDR_CONTROLLEN_NAME}"),
         )
     })
 }
@@ -75,11 +69,7 @@ pub fn empty_cstr() -> &'static CStr {
     }
 }
 
-pub fn fill_out_msghdr_r(
-    hdr: &mut msghdr,
-    iov: &mut [IoSliceMut<'_>],
-    anc: &mut [u8],
-) -> io::Result<()> {
+pub fn fill_out_msghdr_r(hdr: &mut msghdr, iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<()> {
     _fill_out_msghdr(
         hdr,
         iov.as_ptr() as *mut _,

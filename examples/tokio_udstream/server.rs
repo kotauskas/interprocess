@@ -48,7 +48,7 @@ pub async fn main(notify: Sender<()>) -> anyhow::Result<()> {
     let listener = UdStreamListener::bind(SOCKET_PATH)?;
     // Stand-in for the syncronization used, if any, between the client and the server.
     let _ = notify.send(());
-    println!("Server running at {}", SOCKET_PATH);
+    println!("Server running at {SOCKET_PATH}");
 
     // Set up our loop boilerplate that processes our incoming connections.
     loop {
