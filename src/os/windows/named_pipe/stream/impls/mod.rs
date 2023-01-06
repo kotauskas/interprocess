@@ -309,12 +309,20 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
         (self as &PipeStream<_, _>).flush()
     }
 }
-impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+impl<Sm: PipeModeTag> ReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
         self.recv_to_uninit(weaken_buf_init(buf))
     }
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
         self.try_recv_to_uninit(weaken_buf_init(buf))
+    }
+}
+impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+        (self as &PipeStream<_, _>).recv(buf)
+    }
+    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+        (self as &PipeStream<_, _>).try_recv(buf)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
