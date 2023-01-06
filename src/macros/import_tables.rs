@@ -1,3 +1,5 @@
+#![allow(unused_macros)]
+
 macro_rules! import_type_or_make_dummy {
     (
         types {$path:path} :: (
