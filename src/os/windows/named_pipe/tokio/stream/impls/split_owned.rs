@@ -52,29 +52,13 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
         !self.is_server()
     }
 }
+/* FIXME: currently impossible due to Tokio limitations.
 impl RecvHalf<pipe_mode::Messages> {
-    /// Receives a message from the pipe into the specified buffer, returning either the size of the message or a new buffer tailored to its size if it didn't fit into the buffer.
-    ///
-    /// See [`RecvResult`] for more on how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub async fn recv(&self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.raw.recv_msg(buf).await
-    }
-    /* // FIXME: currently impossible due to Tokio limitations.
     /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
     #[inline]
     pub async fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf).await
     }
-    */
-    /// Attempts to receive a message from the pipe into the specified buffer. If it fits, it's written into the buffer, and if it doesn't, the buffer is unaffected. The return value indicates which of those two things happened and also contains the size of the message regardless of whether it was read or not.
-    ///
-    /// See [`TryRecvResult`] for a summary of how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub async fn try_recv(&self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.raw.try_recv_msg(buf).await
-    }
-    /* // FIXME: currently impossible due to Tokio limitations.
     /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
     #[inline]
     pub async fn try_recv_to_uninit(
@@ -83,8 +67,8 @@ impl RecvHalf<pipe_mode::Messages> {
     ) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf).await
     }
-    */
 }
+*/
 impl AsyncRead for &RecvHalf<pipe_mode::Bytes> {
     #[inline]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
@@ -95,6 +79,22 @@ impl AsyncRead for RecvHalf<pipe_mode::Bytes> {
     #[inline]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.deref()).poll_read(cx, buf)
+    }
+}
+impl AsyncReliableRecvMsg for &RecvHalf<pipe_mode::Messages> {
+    #[inline]
+    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+        self.raw.poll_try_recv_msg(cx, buf)
+    }
+}
+impl AsyncReliableRecvMsg for RecvHalf<pipe_mode::Messages> {
+    #[inline]
+    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+        Pin::new(&mut self.deref()).poll_try_recv(cx, buf)
+    }
+    #[inline]
+    fn poll_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
+        Pin::new(&mut self.deref()).poll_recv(cx, buf)
     }
 }
 impl<Rm: PipeModeTag> Debug for RecvHalf<Rm> {

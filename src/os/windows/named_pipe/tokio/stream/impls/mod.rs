@@ -2,18 +2,21 @@
 
 mod split_owned;
 
-use crate::os::windows::{
-    imports::*,
-    named_pipe::{
-        convert_path, encode_to_utf16,
-        stream::{
-            block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
-            UNWRAP_FAIL_MSG,
+use crate::{
+    os::windows::{
+        imports::*,
+        named_pipe::{
+            convert_path, encode_to_utf16,
+            stream::{
+                block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
+                UNWRAP_FAIL_MSG,
+            },
+            tokio::stream::*,
+            PipeMode, PmtNotNone,
         },
-        tokio::stream::*,
-        PipeMode, PmtNotNone,
+        FileHandle,
     },
-    FileHandle,
+    reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
 };
 use std::{
     ffi::OsStr,
@@ -101,10 +104,6 @@ impl RawPipeStream {
             els => Poll::Ready(els),
         }
     }
-    #[inline]
-    fn read_init<'a, 'b>(&'a self, buf: &'b mut [u8]) -> ReadInit<'a, 'b> {
-        ReadInit(self, buf)
-    }
 
     fn poll_write(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         ready!(same_clsrv!(x in self => x.poll_write_ready(cx)))?;
@@ -118,25 +117,17 @@ impl RawPipeStream {
         Write(self, buf)
     }
 
-    #[inline]
-    fn try_recv_msg<'a, 'b>(&'a self, buf: &'b mut [u8]) -> TryRecvMsg<'a, 'b> {
-        TryRecvMsg(self, buf)
-    }
-    async fn recv_msg(&self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        match self.try_recv_msg(buf).await?.to_result() {
-            Err(sz) => {
-                let mut buf = vec![0; sz];
-
-                // FIXME: use read_uninit, see above.
-                let len = self.read_init(&mut buf).await?;
-                unsafe {
-                    // SAFETY: Tokio's ReadBuf guarantees that at least this much is initialized.
-                    buf.set_len(len)
-                };
-                Ok(RecvResult::Alloc(buf))
-            }
-            Ok(sz) => Ok(RecvResult::Fit(sz)),
+    fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+        let size = peek_msg_len(self.as_raw_handle())?;
+        if size == 0 {
+            return Poll::Pending;
         }
+        let fit = buf.len() >= size;
+        if fit {
+            ready!(self.poll_read_init(cx, buf))?;
+        }
+
+        Poll::Ready(Ok(TryRecvResult { size, fit }))
     }
 
     fn disconnect(&self) -> io::Result<()> {
@@ -196,54 +187,14 @@ impl Future for ReadUninit<'_, '_> {
     }
 }
 
-struct ReadInit<'a, 'b>(&'a RawPipeStream, &'b mut [u8]);
-impl Future for ReadInit<'_, '_> {
-    type Output = io::Result<usize>;
-    #[inline]
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let slf = self.get_mut();
-        slf.0.poll_read_init(cx, slf.1)
-    }
-}
-
-struct TryRecvMsg<'a, 'b>(&'a RawPipeStream, &'b mut [u8]);
-impl Future for TryRecvMsg<'_, '_> {
-    type Output = io::Result<TryRecvResult>;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let slf = self.get_mut();
-        let (raw, buf) = (&mut slf.0, &mut slf.1);
-        let size = peek_msg_len(raw.as_raw_handle())?;
-        let fit = buf.len() >= size;
-        if fit {
-            ready!(Pin::new(raw).poll_read_init(cx, buf))?;
-        }
-        Poll::Ready(Ok(TryRecvResult { size, fit }))
-    }
-}
-
+// FIXME: currently impossible due to Tokio limitations.
+/*
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
-    /// Receives a message from the pipe into the specified buffer, returning either the size of the message or a new buffer tailored to its size if it didn't fit into the buffer.
-    ///
-    /// See [`RecvResult`] for more on how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub async fn recv(&self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.raw.recv_msg(buf).await
-    }
-    /* // FIXME: currently impossible due to Tokio limitations.
     /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
     #[inline]
     pub async fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf).await
     }
-    */
-    /// Attempts to receive a message from the pipe into the specified buffer. If it fits, it's written into the buffer, and if it doesn't, the buffer is unaffected. The return value indicates which of those two things happened and also contains the size of the message regardless of whether it was read or not.
-    ///
-    /// See [`TryRecvResult`] for a summary of how the return value works. (Note that it's wrapped in `io::Result` – there's two levels of structures at play.)
-    #[inline]
-    pub async fn try_recv(&self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.raw.try_recv_msg(buf).await
-    }
-    /* // FIXME: currently impossible due to Tokio limitations.
     /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
     #[inline]
     pub async fn try_recv_to_uninit(
@@ -252,8 +203,8 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     ) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf).await
     }
-    */
 }
+*/
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
     #[inline]
@@ -466,6 +417,22 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         <Self as TokioAsyncWrite>::poll_flush(self, cx)
+    }
+}
+impl<Sm: PipeModeTag> AsyncReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
+    #[inline]
+    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+        self.raw.poll_try_recv_msg(cx, buf)
+    }
+}
+impl<Sm: PipeModeTag> AsyncReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+    #[inline]
+    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+        Pin::new(&mut self.deref()).poll_try_recv(cx, buf)
+    }
+    #[inline]
+    fn poll_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
+        Pin::new(&mut self.deref()).poll_recv(cx, buf)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
