@@ -58,6 +58,8 @@ impl RawPipeStream {
                         break;
                     }
                 }
+            } else {
+                break;
             }
         }
         Ok(TryRecvResult { size, fit })
