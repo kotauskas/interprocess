@@ -1,10 +1,13 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    interprocess::os::windows::named_pipe::{
-        pipe_mode,
-        tokio::{PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
-        PipeListenerOptions, PipeMode,
+    interprocess::{
+        os::windows::named_pipe::{
+            pipe_mode,
+            tokio::{PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+            PipeListenerOptions, PipeMode,
+        },
+        reliable_recv_msg::AsyncReliableRecvMsgExt,
     },
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task},
@@ -70,11 +73,19 @@ pub async fn client(name: Arc<String>) -> TestResult {
 
     let (mut buf1, mut buf2) = ([0; MSG_1.len()], [0; MSG_2.len()]);
 
-    let size = conn.recv(&mut buf1).await.context("First pipe receive failed")?.size();
+    let size = (&conn)
+        .recv(&mut buf1)
+        .await
+        .context("First pipe receive failed")?
+        .size();
     assert_eq!(size, MSG_1.len());
     assert_eq!(&buf1[0..size], MSG_1);
 
-    let size = conn.recv(&mut buf2).await.context("Second pipe receive failed")?.size();
+    let size = (&conn)
+        .recv(&mut buf2)
+        .await
+        .context("Second pipe receive failed")?
+        .size();
     assert_eq!(size, MSG_2.len());
     assert_eq!(&buf2[0..size], MSG_2);
 

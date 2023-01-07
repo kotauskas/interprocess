@@ -1,10 +1,13 @@
 use {
     super::util::{NameGen, TestResult},
     anyhow::Context,
-    interprocess::os::windows::named_pipe::{
-        pipe_mode,
-        tokio::{DuplexPipeStream, PipeListenerOptionsExt},
-        PipeListenerOptions, PipeMode,
+    interprocess::{
+        os::windows::named_pipe::{
+            pipe_mode,
+            tokio::{DuplexPipeStream, PipeListenerOptionsExt},
+            PipeListenerOptions, PipeMode,
+        },
+        reliable_recv_msg::AsyncReliableRecvMsgExt,
     },
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task, try_join},
@@ -22,7 +25,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
         let recv = async {
-            let size = reader
+            let size = (&reader)
                 .recv(&mut buf1)
                 .await
                 .context("First pipe receive failed")?
@@ -30,7 +33,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             assert_eq!(size, CLIENT_MSG_1.len());
             assert_eq!(&buf1[0..size], CLIENT_MSG_1);
 
-            let size = reader
+            let size = (&reader)
                 .recv(&mut buf2)
                 .await
                 .context("Second pipe receive failed")?
@@ -103,7 +106,7 @@ pub async fn client(name: Arc<String>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; SERVER_MSG_1.len()], [0; SERVER_MSG_2.len()]);
 
     let recv = async {
-        let size = reader
+        let size = (&reader)
             .recv(&mut buf1)
             .await
             .context("First pipe receive failed")?
@@ -111,7 +114,7 @@ pub async fn client(name: Arc<String>) -> TestResult {
         assert_eq!(size, SERVER_MSG_1.len());
         assert_eq!(&buf1[0..size], SERVER_MSG_1);
 
-        let size = reader
+        let size = (&reader)
             .recv(&mut buf2)
             .await
             .context("Second pipe receive failed")?
