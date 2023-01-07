@@ -17,10 +17,7 @@ impmod! {local_socket,
 /// Basic server:
 /// ```no_run
 /// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport};
-/// use std::{
-///     io::{self, prelude::*, BufReader},
-///     sync::mpsc::Sender,
-/// };
+/// use std::io::{self, prelude::*, BufReader};
 ///
 /// // Define a function that checks for errors in incoming connections. We'll use this to filter
 /// // through connections that fail on initialization for one reason or another.
@@ -67,9 +64,8 @@ impmod! {local_socket,
 ///     x => x?,
 /// };
 ///
-/// println!("Server running at {name}");
-/// // Stand-in for the syncronization used, if any, between the client and the server.
-/// let _ = notify.send(());
+/// // The syncronization between the server and client, if any is used, goes here.
+/// eprintln!("Server running at {name}");
 ///
 /// // Preemptively allocate a sizeable buffer for reading at a later moment. This size should be
 /// // enough and should be easy to find for the allocator. Since we only have one concurrent
