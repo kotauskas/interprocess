@@ -19,6 +19,7 @@ use to_method::To;
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
+// TODO examples
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     nonblocking: AtomicBool,

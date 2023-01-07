@@ -19,7 +19,51 @@ use std::{
 /// This type combines in itself all possible combinations of receive modes and send modes, plugged into it using the `Rm` and `Sm` generic parameters respectively.
 ///
 /// Pipe streams can be split by reference and by value for concurrent receive and send operations. Splitting by reference is ephemeral and can be achieved by simply borrowing the stream, since both `PipeStream` and `&PipeStream` implement I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a [`RecvHalf`] and a [`SendHalf`], and can be reverted via the `.reunite()` method defined on the halves.
-// TODO examples
+///
+/// # Examples
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # #[cfg(all(windows, feature = "tokio"))] {
+/// use futures::{prelude::*, try_join};
+/// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
+/// use std::error::Error;
+///
+/// // Await this here since we can't do a whole lot without a connection.
+/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example").await?;
+///
+/// // This consumes our connection and splits it into two owned halves, so that we could
+/// // concurrently act on both. Take care not to use the .split() method from the futures crate's
+/// // AsyncReadExt.
+/// let (mut reader, mut writer) = conn.split();
+///
+/// // Preemptively allocate a sizeable buffer for reading.
+/// // This size should be enough and should be easy to find for the allocator.
+/// let mut buffer = String::with_capacity(128);
+///
+/// // Describe the write operation as writing our whole string, waiting for
+/// // that to complete, and then shutting down the write half, which sends
+/// // an EOF to the other end to help it determine where the message ends.
+/// let write = async {
+///     writer.write_all(b"Hello from client!").await?;
+///     // Because only the trait from futures is implemented for now, it's "close" instead of
+///     // "shutdown".
+///     writer.close().await?;
+///     Ok(())
+/// };
+///
+/// // Describe the read operation as reading until EOF into our big buffer.
+/// let read = reader.read_to_string(&mut buffer);
+///
+/// // Concurrently perform both operations: write-and-send-EOF and read.
+/// try_join!(write, read)?;
+///
+/// // Get rid of those here to close the read half too.
+/// drop((reader, writer));
+///
+/// // Display the results when we're done!
+/// println!("Server answered: {}", buffer.trim());
+/// # } Ok(()) }
+/// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,
     flush: TokioMutex<Option<FlushJH>>,

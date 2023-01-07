@@ -21,6 +21,86 @@ use tokio::sync::Mutex;
 /// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing asynchronous pipe streams.
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
+///
+/// # Examples
+/// Basic server:
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # #[cfg(all(windows, feature = "tokio"))] {
+/// use futures::{prelude::*, try_join};
+/// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
+/// use std::{error::Error, ffi::OsStr, io};
+///
+/// // Describe the things we do when we've got a connection ready.
+/// async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
+///     // Split the connection into two halves to process
+///     // received and sent data concurrently.
+///     let (mut reader, mut writer) = conn.split();
+///
+///     // Allocate a sizeable buffer for reading.
+///     // This size should be enough and should be easy to find for the allocator.
+///     let mut buffer = String::with_capacity(128);
+///
+///     // Describe the write operation as first writing our whole message, and
+///     // then shutting down the write half to send an EOF to help the other
+///     // side determine the end of the transmission.
+///     let write = async {
+///         writer.write_all(b"Hello from server!").await?;
+///         writer.close().await?;
+///         Ok(())
+///     };
+///
+///     // Describe the read operation as reading into our big buffer.
+///     let read = reader.read_to_string(&mut buffer);
+///
+///     // Run both the write-and-send-EOF operation and the read operation concurrently.
+///     try_join!(read, write)?;
+///
+///     // Dispose of our connection right now and not a moment later because I want to!
+///     drop((reader, writer));
+///
+///     // Produce our output!
+///     println!("Client answered: {}", buffer.trim());
+///     Ok(())
+/// }
+///
+/// static PIPE_NAME: &str = "Example";
+///
+/// // Create our listener. In a more robust program, we'd check for an
+/// // existing socket file that has not been deleted for whatever reason,
+/// // ensure it's a socket file and not a normal file, and delete it.
+/// let listener = PipeListenerOptions::new()
+///     .name(OsStr::new(PIPE_NAME))
+///     .create_tokio_duplex::<pipe_mode::Bytes>()?;
+///
+/// // The syncronization between the server and client, if any is used, goes here.
+/// eprintln!(r"Server running at \\.\pipe\{PIPE_NAME}");
+///
+/// // Set up our loop boilerplate that processes our incoming connections.
+/// loop {
+///     // Sort out situations when establishing an incoming connection caused an error.
+///     let conn = match listener.accept().await {
+///         Ok(c) => c,
+///         Err(e) => {
+///             eprintln!("There was an error with an incoming connection: {e}");
+///             continue;
+///         }
+///     };
+///
+///     // Spawn new parallel asynchronous tasks onto the Tokio runtime
+///     // and hand the connection over to them so that multiple clients
+///     // could be processed simultaneously in a lightweight fashion.
+///     tokio::spawn(async move {
+///         // The outer match processes errors that happen when we're
+///         // connecting to something. The inner if-let processes errors that
+///         // happen during the connection.
+///         if let Err(e) = handle_conn(conn).await {
+///             eprintln!("error while handling connection: {e}");
+///         }
+///     });
+/// }
+/// # } Ok(()) }
+/// ```
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     stored_instance: Mutex<TokioNPServer>,
