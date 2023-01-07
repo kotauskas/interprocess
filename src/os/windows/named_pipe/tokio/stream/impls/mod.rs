@@ -118,13 +118,14 @@ impl RawPipeStream {
     }
 
     fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
-        let size = peek_msg_len(self.as_raw_handle())?;
-        if size == 0 {
-            return Poll::Pending;
-        }
+        let mut size = peek_msg_len(self.as_raw_handle())?;
         let fit = buf.len() >= size;
         if fit {
-            ready!(self.poll_read_init(cx, buf))?;
+            match ready!(self.poll_read_init(cx, buf)) {
+                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => return Poll::Pending,
+                Err(e) => return Poll::Ready(Err(e)),
+                Ok(nsz) => size = nsz,
+            }
         }
 
         Poll::Ready(Ok(TryRecvResult { size, fit }))
