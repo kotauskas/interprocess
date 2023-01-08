@@ -25,7 +25,7 @@ use tokio::sync::Mutex;
 /// # Examples
 /// Basic server:
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(all(windows, feature = "tokio"))] {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};

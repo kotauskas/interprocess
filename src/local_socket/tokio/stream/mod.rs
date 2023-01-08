@@ -27,7 +27,7 @@ struct LocalSocketStreamImpl;
 /// # Examples
 /// Basic client:
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(feature = "tokio")] {
 /// use futures::{
 ///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
