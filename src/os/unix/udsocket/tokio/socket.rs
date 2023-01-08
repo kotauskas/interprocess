@@ -16,7 +16,50 @@ use {
 /// A Unix domain datagram socket, obtained either from [`UdSocketListener`](super::UdSocketListener) or by connecting to an existing server.
 ///
 /// # Examples
-/// - [Basic packet exchange](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_udsocket/inner.rs)
+/// Basic packet exchange:
+/// ```no_run
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # #[cfg(all(unix, feature = "tokio"))] {
+/// use interprocess::os::unix::udsocket::tokio::*;
+/// use std::{io, mem::MaybeUninit};
+/// use tokio::{io::ReadBuf, try_join};
+///
+/// // Socket creation happens immediately, no futures here.
+/// let socket = UdSocket::bind("/tmp/example_side_a.sock")?;
+///
+/// // This is the part where you tell the other side
+/// // that you've spun up a socket, if you need to.
+///
+/// // So does destination assignment.
+/// socket.set_destination("/tmp/example/side_b.sock")?;
+///
+/// // Allocate a stack buffer for reading at a later moment.
+/// let mut buffer = [MaybeUninit::<u8>::uninit(); 128];
+/// let mut readbuf = ReadBuf::uninit(&mut buffer);
+///
+/// // Describe the send operation, but don't run it yet.
+/// // We'll launch it concurrently with the read operation.
+/// let send = socket.send("Hello from side A!");
+///
+/// // Describe the receive operation, and also don't run it yet.
+/// let recv = socket.recv(&mut readbuf);
+///
+/// // Perform both operations concurrently: the send and the receive.
+/// try_join!(send, recv)?;
+///
+/// // Clean up early. Good riddance!
+/// drop(socket);
+///
+/// // Convert the data that's been read into a string. This checks for UTF-8
+/// // validity, and if invalid characters are found, a new buffer is
+/// // allocated to house a modified version of the received data, where
+/// // decoding errors are replaced with those diamond-shaped question mark
+/// // U+FFFD REPLACEMENT CHARACTER thingies: �.
+/// let received_string = String::from_utf8_lossy(readbuf.filled());
+///
+/// println!("Other side answered: {}", &received_string);
+/// # } Ok() }
+/// ```
 #[derive(Debug)]
 pub struct UdSocket(TokioUdSocket);
 impl UdSocket {
@@ -118,12 +161,7 @@ impl UdSocket {
         let path = path.to_socket_path()?;
         self._poll_send_to(cx, buf, &path)
     }
-    fn _poll_send_to(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-        path: &UdSocketPath<'_>,
-    ) -> Poll<io::Result<usize>> {
+    fn _poll_send_to(&self, cx: &mut Context<'_>, buf: &[u8], path: &UdSocketPath<'_>) -> Poll<io::Result<usize>> {
         self.0.poll_send_to(cx, buf, path.as_osstr())
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
