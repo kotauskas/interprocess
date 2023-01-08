@@ -98,18 +98,22 @@ impl RawPipeStream {
     }
 
     fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        ready!(same_clsrv!(x in self => x.poll_read_ready(cx)))?;
-        match same_clsrv!(x in self => x.try_read(buf)) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
-            els => Poll::Ready(els),
+        loop {
+            ready!(same_clsrv!(x in self => x.poll_read_ready(cx)))?;
+            match same_clsrv!(x in self => x.try_read(buf)) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                els => return Poll::Ready(els),
+            }
         }
     }
 
     fn poll_write(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        ready!(same_clsrv!(x in self => x.poll_write_ready(cx)))?;
-        match same_clsrv!(x in self => x.try_write(buf)) {
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
-            els => Poll::Ready(els),
+        loop {
+            ready!(same_clsrv!(x in self => x.poll_write_ready(cx)))?;
+            match same_clsrv!(x in self => x.try_write(buf)) {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                els => return Poll::Ready(els),
+            }
         }
     }
     #[inline]
@@ -118,13 +122,26 @@ impl RawPipeStream {
     }
 
     fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
-        let mut size = peek_msg_len(self.as_raw_handle())?;
-        let fit = buf.len() >= size;
-        if fit {
-            match ready!(self.poll_read_init(cx, buf)) {
-                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => return Poll::Pending,
-                Err(e) => return Poll::Ready(Err(e)),
-                Ok(nsz) => size = nsz,
+        let mut size = 0;
+        let mut fit = false;
+        while size == 0 {
+            size = peek_msg_len(self.as_raw_handle())?;
+            fit = buf.len() >= size;
+            if fit {
+                match ready!(self.poll_read_init(cx, buf)) {
+                    // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the
+                    // `.poll_read()` to wait until a message arrives, so that we could figure out for real if it fits
+                    // or not. It doesn't mean that the message gets torn, as it normally does if the buffer given to
+                    // the ReadFile call is non-zero in size.
+                    Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
+                    Err(e) => return Poll::Ready(Err(e)),
+                    Ok(nsz) => {
+                        size = nsz;
+                        break;
+                    }
+                }
+            } else {
+                break;
             }
         }
 
