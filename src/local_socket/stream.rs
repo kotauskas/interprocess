@@ -10,7 +10,7 @@ impmod! {local_socket,
     LocalSocketStream as LocalSocketStreamImpl
 }
 
-/// A local socket byte stream, obtained eiter from [`LocalSocketListener`] or by connecting to an existing local socket.
+/// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
 ///
 /// # Examples
 /// Basic client:
@@ -48,16 +48,15 @@ impmod! {local_socket,
 /// // `BufReader` doesn't implement a pass-through `Write`.)
 /// conn.get_mut().write_all(b"Hello from client!\n")?;
 ///
-/// // We now employ the buffer we allocated prior and read until EOF, which the server will
-/// // similarly invoke with `.shutdown()`, verifying validity of UTF-8 on the fly.
+/// // We now employ the buffer we allocated prior and read a single line, interpreting a newline
+/// // character as an end-of-file (because local sockets cannot be portably shut down), verifying
+/// // validity of UTF-8 on the fly.
 /// conn.read_line(&mut buffer)?;
 ///
 /// // Print out the result, getting the newline for free!
 /// print!("Server answered: {buffer}");
 /// # std::io::Result::<()>::Ok(())
 /// ```
-///
-/// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
 pub struct LocalSocketStream {
     pub(super) inner: LocalSocketStreamImpl,
 }

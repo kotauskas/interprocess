@@ -27,7 +27,6 @@ use std::{
 /// # #[cfg(all(windows, feature = "tokio"))] {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
-/// use std::error::Error;
 ///
 /// // Await this here since we can't do a whole lot without a connection.
 /// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example").await?;

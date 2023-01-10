@@ -29,7 +29,7 @@ use tokio::sync::Mutex;
 /// # #[cfg(all(windows, feature = "tokio"))] {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
-/// use std::{error::Error, ffi::OsStr, io};
+/// use std::{ffi::OsStr, io};
 ///
 /// // Describe the things we do when we've got a connection ready.
 /// async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
@@ -66,9 +66,7 @@ use tokio::sync::Mutex;
 ///
 /// static PIPE_NAME: &str = "Example";
 ///
-/// // Create our listener. In a more robust program, we'd check for an
-/// // existing socket file that has not been deleted for whatever reason,
-/// // ensure it's a socket file and not a normal file, and delete it.
+/// // Create our listener.
 /// let listener = PipeListenerOptions::new()
 ///     .name(OsStr::new(PIPE_NAME))
 ///     .create_tokio_duplex::<pipe_mode::Bytes>()?;
