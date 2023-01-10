@@ -13,7 +13,8 @@ impmod! {local_socket,
 /// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
 ///
 /// # Examples
-/// Basic client:
+///
+/// ## Basic client
 /// ```no_run
 /// use interprocess::local_socket::{LocalSocketStream, NameTypeSupport};
 /// use std::io::{prelude::*, BufReader};

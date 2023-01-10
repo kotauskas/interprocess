@@ -23,7 +23,8 @@ use tokio::sync::Mutex;
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 ///
 /// # Examples
-/// Basic server:
+///
+/// ## Basic server
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(all(windows, feature = "tokio"))] {

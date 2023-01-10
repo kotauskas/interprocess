@@ -14,7 +14,8 @@ use to_method::To;
 /// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP server.
 ///
 /// # Examples
-/// Basic server:
+///
+/// ## Basic server
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(unix)] {
@@ -47,6 +48,7 @@ use to_method::To;
 /// # }
 /// # Ok(()) }
 /// ```
+// TODO update..?
 pub struct UdStreamListener {
     // TODO make this not 'static
     _drop_guard: PathDropGuard<'static>,

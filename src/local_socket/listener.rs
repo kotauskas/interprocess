@@ -14,7 +14,8 @@ impmod! {local_socket,
 /// A local socket server, listening for connections.
 ///
 /// # Examples
-/// Basic server:
+///
+/// ## Basic server
 /// ```no_run
 /// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport};
 /// use std::io::{self, prelude::*, BufReader};

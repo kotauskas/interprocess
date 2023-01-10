@@ -16,7 +16,8 @@ use to_method::To;
 /// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by connecting to an existing server.
 ///
 /// # Examples
-/// Basic example:
+///
+/// ## Basic client
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(unix)] {
@@ -31,6 +32,7 @@ use to_method::To;
 /// # }
 /// # Ok(()) }
 /// ```
+// TODO update with comments and stuff
 pub struct UdStream {
     fd: FdOps,
 }
@@ -160,9 +162,7 @@ impl UdStream {
         ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
     ) -> io::Result<(usize, usize)> {
         check_ancillary_unsound()?;
-        let abuf = ancillary_data
-            .into_iter()
-            .collect::<EncodedAncillaryData<'_>>();
+        let abuf = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
         let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
@@ -231,8 +231,7 @@ impl Write for UdStream {
         self.fd.write(buf)
     }
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_ancillary_vectored(bufs, iter::empty())
-            .map(|x| x.0)
+        self.send_ancillary_vectored(bufs, iter::empty()).map(|x| x.0)
     }
     fn flush(&mut self) -> io::Result<()> {
         // You cannot flush a socket
@@ -242,9 +241,7 @@ impl Write for UdStream {
 
 impl Debug for UdStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UdStream")
-            .field("fd", &self.as_raw_fd())
-            .finish()
+        f.debug_struct("UdStream").field("fd", &self.as_raw_fd()).finish()
     }
 }
 

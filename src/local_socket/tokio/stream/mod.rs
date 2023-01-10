@@ -25,7 +25,8 @@ struct LocalSocketStreamImpl;
 /// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
 ///
 /// # Examples
-/// Basic client:
+///
+/// ## Basic client
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(feature = "tokio")] {

@@ -16,7 +16,8 @@ struct LocalSocketListenerImpl;
 /// A Tokio-based local socket server, listening for connections.
 ///
 /// # Examples
-/// Basic server:
+///
+/// ## Basic server
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(feature = "tokio")] {

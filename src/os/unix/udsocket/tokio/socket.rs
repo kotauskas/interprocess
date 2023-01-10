@@ -16,7 +16,8 @@ use {
 /// A Unix domain datagram socket, obtained either from [`UdSocketListener`](super::UdSocketListener) or by connecting to an existing server.
 ///
 /// # Examples
-/// Basic packet exchange:
+///
+/// ## Basic packet exchange
 /// ```no_run
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # #[cfg(all(unix, feature = "tokio"))] {
@@ -60,6 +61,7 @@ use {
 /// println!("Other side answered: {}", &received_string);
 /// # } Ok() }
 /// ```
+// TODO update..?
 #[derive(Debug)]
 pub struct UdSocket(TokioUdSocket);
 impl UdSocket {
