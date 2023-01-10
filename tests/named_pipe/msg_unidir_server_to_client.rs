@@ -12,8 +12,8 @@ use {
     },
 };
 
-const MSG_1: &[u8] = b"Server message 1";
-const MSG_2: &[u8] = b"Server message 2";
+const MSG_1: &[u8] = b"First server message";
+const MSG_2: &[u8] = b"Second server message";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     let (name, listener) = NameGen::new(true)

@@ -12,8 +12,8 @@ use {
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task},
 };
-const MSG_1: &[u8] = b"Server message 1";
-const MSG_2: &[u8] = b"Server message 2";
+const MSG_1: &[u8] = b"First server message";
+const MSG_2: &[u8] = b"Second server message";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     async fn handle_conn(conn: SendPipeStream<pipe_mode::Messages>) -> TestResult {

@@ -13,11 +13,11 @@ use {
     tokio::{sync::oneshot::Sender, task, try_join},
 };
 
-const SERVER_MSG_1: &[u8] = b"Server message 1";
-const SERVER_MSG_2: &[u8] = b"Server message 2";
+const SERVER_MSG_1: &[u8] = b"First server message";
+const SERVER_MSG_2: &[u8] = b"Second server message";
 
-const CLIENT_MSG_1: &[u8] = b"Client message 1";
-const CLIENT_MSG_2: &[u8] = b"Client message 2";
+const CLIENT_MSG_1: &[u8] = b"First client message";
+const CLIENT_MSG_2: &[u8] = b"Second client message";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Messages>) -> TestResult {
