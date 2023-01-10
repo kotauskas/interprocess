@@ -171,6 +171,35 @@ impl RecvResult {
     pub fn fit(&self) -> bool {
         matches!(self, Self::Fit(..))
     }
+    /// If `Fit`, subslices `buf` to length; if `Alloc`, borrows own buffer.
+    ///
+    /// This is intended to be used right after `.recv()` to access the message, kinda like this:
+    /// ```no_run
+    /// # use interprocess::reliable_recv_msg::*;
+    /// # fn _swag(conn: &mut dyn ReliableRecvMsg) -> Result<(), std::error::Error> {
+    /// let buf = [0_u8; 32];
+    /// let rslt = conn.recv(&mut buf)?;
+    /// let msg = rslt.borrow_to_size(&buf);
+    /// // do stuff with the message
+    /// # let _ = msg;
+    /// # let _ = rslt;
+    /// # Ok(())}
+    /// ```
+    #[inline]
+    pub fn borrow_to_size<'a>(&'a self, buf: &'a [u8]) -> &'a [u8] {
+        match self {
+            Self::Fit(sz) => &buf[0..*sz],
+            Self::Alloc(buf) => buf,
+        }
+    }
+    /// Same as [`.borrow_to_size()`](Self::borrow_to_size), but with mutable references.
+    #[inline]
+    pub fn borrow_to_size_mut<'a>(&'a mut self, buf: &'a mut [u8]) -> &'a mut [u8] {
+        match self {
+            Self::Fit(sz) => &mut buf[0..*sz],
+            Self::Alloc(buf) => buf,
+        }
+    }
     /// Converts to a `Result<usize, Vec<u8>>`, where `Ok` represents `Fit` and `Err` represents `Alloc`.
     #[inline]
     pub fn into_result(self) -> Result<usize, Vec<u8>> {

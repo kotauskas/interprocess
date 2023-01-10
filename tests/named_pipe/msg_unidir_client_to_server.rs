@@ -46,13 +46,13 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
         let (mut buf1, mut buf2) = ([0; MSG_1.len()], [0; MSG_2.len()]);
 
-        let size = conn.recv(&mut buf1).context("First pipe receive failed")?.size();
-        assert_eq!(size, MSG_1.len());
-        assert_eq!(&buf1[0..size], MSG_1);
+        let rslt = conn.recv(&mut buf1).context("First pipe receive failed")?;
+        assert_eq!(rslt.size(), MSG_1.len());
+        assert_eq!(rslt.borrow_to_size(&buf1), MSG_1);
 
-        let size = conn.recv(&mut buf2).context("Second pipe receive failed")?.size();
-        assert_eq!(size, MSG_2.len());
-        assert_eq!(&buf2[0..size], MSG_2);
+        let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
+        assert_eq!(rslt.size(), MSG_2.len());
+        assert_eq!(rslt.borrow_to_size(&buf1), MSG_2);
     }
 
     Ok(())
