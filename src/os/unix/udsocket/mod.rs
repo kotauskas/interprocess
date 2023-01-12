@@ -11,7 +11,7 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
-#[cfg(any(doc, feature = "tokio"))]
+#[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
@@ -26,16 +26,13 @@ pub use {ancillary::*, listener::*, path::*, socket::*, stream::*};
 mod path_drop_guard;
 use path_drop_guard::*;
 
-#[cfg(uds_supported)]
 mod c_wrappers;
 
 use super::imports;
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(not(unix))] {
-        const _MAX_UDSOCKET_PATH_LEN: usize = 0;
-    } else if #[cfg(uds_sockaddr_un_len_108)] {
+    if #[cfg(uds_sockaddr_un_len_108)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 108;
     } else if #[cfg(uds_sockaddr_un_len_104)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 104;

@@ -21,9 +21,8 @@ mod listener;
 mod stream;
 pub use {enums::*, listener::*, stream::*};
 
-#[cfg(any(doc, feature = "tokio"))]
+#[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
-#[cfg_attr(not(feature = "tokio"), allow(unused_imports))]
 pub mod tokio;
 
 use super::imports::*;
@@ -66,7 +65,6 @@ fn encode_to_utf16(s: &OsStr) -> Vec<u16> {
     path.push(0);
     path
 }
-#[cfg(windows)]
 unsafe fn set_nonblocking_for_stream(handle: HANDLE, read_mode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
     let read_mode: u32 = read_mode.map_or(0, PipeMode::to_readmode);
     // Bitcast the boolean without additional transformations since

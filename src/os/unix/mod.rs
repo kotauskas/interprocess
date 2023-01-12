@@ -10,13 +10,9 @@
 //!
 //! Unix domain sockets are not available on ARM Newlib, but are supported on all other Unix-like systems.
 
-#![cfg_attr(not(unix), allow(warnings))]
-
 pub(crate) mod imports;
 
-#[cfg(unix)]
 mod fdops;
-#[cfg(unix)]
 // pub(self) is just a fancy way of saying priv (i.e. no access modifier), but
 // we want to make it clear that we're exporting to child modules here rather
 // than importing for use within this module.
@@ -24,10 +20,8 @@ pub(self) use fdops::*;
 
 pub mod fifo_file;
 
-#[cfg(any(doc, uds_supported))]
+#[cfg(uds_supported)]
 pub mod udsocket;
 
-#[cfg(unix)]
 pub(crate) mod local_socket;
-#[cfg(unix)]
 pub(crate) mod unnamed_pipe;

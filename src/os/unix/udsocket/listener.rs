@@ -1,6 +1,4 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
-use super::{imports::*, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
+use super::{c_wrappers, imports::*, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -17,8 +15,6 @@ use to_method::To;
 ///
 /// ## Basic server
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
 /// use std::{io::{self, prelude::*}, net::Shutdown};
 ///
@@ -45,8 +41,7 @@ use to_method::To;
 ///     println!("Client answered: {}", input_string);
 ///     input_string.clear();
 /// }
-/// # }
-/// # Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 // TODO update..?
 pub struct UdStreamListener {
@@ -113,8 +108,6 @@ impl UdStreamListener {
     ///
     /// # Example
     /// ```no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # #[cfg(uds_scm_credentials)] {
     /// use interprocess::os::unix::udsocket::UdStreamListener;
     ///
     /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
@@ -128,8 +121,7 @@ impl UdStreamListener {
     ///         },
     ///     }
     /// }
-    /// # }
-    /// # Ok(()) }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
     /// # System calls
@@ -156,8 +148,6 @@ impl UdStreamListener {
     ///
     /// # Example
     /// ```no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdStreamListener;
     ///
     /// let listener = UdStreamListener::bind("/tmp/example.sock")?;
@@ -169,8 +159,7 @@ impl UdStreamListener {
     ///     eprintln!("New client!");
     /// #   drop(connection);
     /// }
-    /// # }
-    /// # Ok(()) }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
@@ -200,19 +189,16 @@ impl Debug for UdStreamListener {
     }
 }
 impl AsRawFd for UdStreamListener {
-    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 impl IntoRawFd for UdStreamListener {
-    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 impl FromRawFd for UdStreamListener {
-    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         let fd = unsafe { FdOps::from_raw_fd(fd) };
         Self {

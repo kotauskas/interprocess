@@ -1,6 +1,4 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
-use super::{OwnedReadHalf, ReuniteError, UdStream};
+use super::{c_wrappers, OwnedReadHalf, ReuniteError, UdStream};
 use crate::os::unix::imports::*;
 use std::{
     io,
@@ -15,7 +13,7 @@ pub struct BorrowedWriteHalf<'a>(pub(super) TokioUdStreamWriteHalf<'a>);
 
 impl<'a> BorrowedWriteHalf<'a> {
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -56,7 +54,6 @@ impl<'a> BorrowedWriteHalf<'a> {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamWriteHalf<'a>);
 }
 
-#[cfg(feature = "tokio")]
 impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
@@ -69,7 +66,6 @@ impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
         self.pinproject().poll_shutdown(cx)
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncWrite for BorrowedWriteHalf<'_> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
@@ -97,7 +93,7 @@ impl OwnedWriteHalf {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -139,7 +135,6 @@ impl OwnedWriteHalf {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamOwnedWriteHalf);
 }
 
-#[cfg(feature = "tokio")]
 impl TokioAsyncWrite for OwnedWriteHalf {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)
@@ -154,7 +149,6 @@ impl TokioAsyncWrite for OwnedWriteHalf {
         Poll::Ready(Ok(()))
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncWrite for OwnedWriteHalf {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)

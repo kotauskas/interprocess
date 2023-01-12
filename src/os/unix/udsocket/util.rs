@@ -8,7 +8,6 @@ use std::{
 };
 use to_method::To;
 
-#[cfg(unix)]
 #[allow(dead_code)]
 mod tname {
     pub static SOCKLEN_T: &str = "`socklen_t`";
@@ -16,7 +15,6 @@ mod tname {
     pub static C_INT: &str = "`c_int`";
 }
 
-#[cfg(unix)]
 cfg_if! {
     if #[cfg(uds_msghdr_iovlen_c_int)] {
         pub type MsghdrIovlen = c_int;
@@ -26,7 +24,6 @@ cfg_if! {
         static MSGHDR_IOVLEN_NAME: &str = tname::SIZE_T;
     }
 }
-#[cfg(unix)]
 cfg_if! {
     if #[cfg(uds_msghdr_controllen_socklen_t)] {
         pub type MsghdrControllen = socklen_t;
@@ -37,7 +34,6 @@ cfg_if! {
     }
 }
 
-#[cfg(unix)]
 pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
     iovlen.try_to::<MsghdrIovlen>().map_err(|_| {
         io::Error::new(
@@ -46,7 +42,6 @@ pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
         )
     })
 }
-#[cfg(unix)]
 pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
     controllen.try_to::<MsghdrControllen>().map_err(|_| {
         io::Error::new(
@@ -87,7 +82,6 @@ pub fn fill_out_msghdr_w(hdr: &mut msghdr, iov: &[IoSlice<'_>], anc: &[u8]) -> i
         to_msghdr_controllen(anc.len())?,
     )
 }
-#[cfg(unix)]
 fn _fill_out_msghdr(
     hdr: &mut msghdr,
     iov: *mut iovec,
@@ -119,18 +113,8 @@ pub fn mk_msghdr_w(iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<msghdr> {
 }
 pub fn check_ancillary_unsound() -> io::Result<()> {
     if cfg!(uds_ancillary_unsound) {
-        let error_kind = {
-            #[cfg(io_error_kind_unsupported_stable)]
-            {
-                io::ErrorKind::Unsupported
-            }
-            #[cfg(not(io_error_kind_unsupported_stable))]
-            {
-                io::ErrorKind::Other
-            }
-        };
         Err(io::Error::new(
-            error_kind,
+            io::ErrorKind::Unsupported,
             "\
 ancillary data has been disabled for non-x86 ISAs in a hotfix because it \
 doesn't account for alignment",

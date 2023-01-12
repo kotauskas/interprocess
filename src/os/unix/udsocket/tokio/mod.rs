@@ -13,5 +13,4 @@ mod socket;
 mod stream;
 pub use {listener::*, socket::*, stream::*};
 
-#[cfg(uds_supported)]
 use super::c_wrappers;

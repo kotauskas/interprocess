@@ -140,7 +140,6 @@ impl<'a> UdSocketPath<'a> {
         }
     }
 
-    #[cfg(unix)]
     pub(super) fn write_sockaddr_un_to_self(&mut self, addr: &sockaddr_un, addrlen: usize) {
         let sun_path_length = (addrlen as isize) - (size_of_val(&addr.sun_family) as isize);
         let sun_path_length = match usize::try_from(sun_path_length) {
@@ -212,7 +211,6 @@ impl<'a> UdSocketPath<'a> {
         }
     }
     /// Returns `addr_len` to pass to `bind`/`connect`.
-    #[cfg(unix)]
     pub(super) fn write_self_to_sockaddr_un(&self, addr: &mut sockaddr_un) -> io::Result<()> {
         let is_namespaced;
         let len_of_self = self.as_cstr().to_bytes_with_nul().len();
@@ -264,7 +262,6 @@ impl UdSocketPath<'static> {
     ///
     /// # Example
     /// ```
-    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::{UdSocketPath, MAX_UDSOCKET_PATH_LEN};
     /// use std::borrow::Cow;
     ///
@@ -277,7 +274,6 @@ impl UdSocketPath<'static> {
     ///     }
     ///     _ => unreachable!(),
     /// }
-    /// # }
     /// ```
     ///
     /// [`recv_from`]: struct.UdSocket.html#method.recv_from " "
@@ -362,8 +358,6 @@ impl<'a> ToOwned for UdSocketPath<'a> {
 /// # Example
 /// The following example uses the `UdStreamListener::bind` method, but `UdStream::connect` and `UdSocket::bind`/`UdSocket::connect` accept the same argument types too.
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::{UdStreamListener, UdSocketPath};
 /// use std::{ffi::{CStr, CString}, path::{Path, PathBuf}, borrow::Cow};
 ///
@@ -393,8 +387,7 @@ impl<'a> ToOwned for UdSocketPath<'a> {
 /// let cstr = CStr::from_bytes_with_nul("/tmp/example4b.sock\0".as_bytes())?;
 /// let path_to_socket = UdSocketPath::File(Cow::Borrowed(cstr));
 /// let listener = UdStreamListener::bind(path_to_socket);
-/// # }
-/// # Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// [`UdSocketPath`]: enum.UdSocketPath.html " "

@@ -1,6 +1,5 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
 use super::{
+    c_wrappers,
     imports::*,
     util::{check_ancillary_unsound, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
@@ -19,8 +18,6 @@ use to_method::To;
 ///
 /// ## Basic client
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(unix)] {
 /// use interprocess::os::unix::udsocket::UdStream;
 /// use std::io::prelude::*;
 ///
@@ -29,8 +26,7 @@ use to_method::To;
 /// let mut string_buffer = String::new();
 /// conn.read_to_string(&mut string_buffer)?;
 /// println!("Server answered: {}", string_buffer);
-/// # }
-/// # Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 // TODO update with comments and stuff
 pub struct UdStream {
@@ -194,7 +190,7 @@ impl UdStream {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -246,19 +242,16 @@ impl Debug for UdStream {
 }
 
 impl AsRawFd for UdStream {
-    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 impl IntoRawFd for UdStream {
-    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 impl FromRawFd for UdStream {
-    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self { fd: FdOps::new(fd) }
     }

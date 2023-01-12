@@ -26,8 +26,6 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 ///
 /// ## Basic bytestream client
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(windows)] {
 /// use interprocess::os::windows::named_pipe::*;
 /// use std::io::{BufReader, prelude::*};
 ///
@@ -55,13 +53,11 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 ///
 /// // Print out the result, getting the newline for free!
 /// print!("Server answered: {buffer}");
-/// # } Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// ## Basic message stream client
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(windows)] {
 /// use interprocess::{reliable_recv_msg::*, os::windows::named_pipe::*};
 /// use std::io::{BufReader, prelude::*};
 ///
@@ -90,7 +86,7 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 ///
 /// // Print out the result!
 /// println!("Server answered: {msg}");
-/// # } Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,

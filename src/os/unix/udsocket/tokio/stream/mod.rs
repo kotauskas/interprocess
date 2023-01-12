@@ -1,9 +1,7 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
 use {
     crate::os::unix::{
         imports::*,
-        udsocket::{ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
+        udsocket::{c_wrappers, ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
     },
     std::{
         convert::TryFrom,
@@ -71,7 +69,7 @@ impl UdStream {
         c_wrappers::shutdown(self.as_raw_fd().as_ref(), how)
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -106,13 +104,11 @@ tokio_wrapper_trait_impls!(
     std StdUdStream,
     tokio TokioUdStream);
 
-#[cfg(feature = "tokio")]
 impl TokioAsyncRead for UdStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for UdStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
@@ -123,7 +119,6 @@ impl FuturesAsyncRead for UdStream {
         }
     }
 }
-#[cfg(feature = "tokio")]
 impl TokioAsyncWrite for UdStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
@@ -136,7 +131,6 @@ impl TokioAsyncWrite for UdStream {
         self.pinproject().poll_shutdown(cx)
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncWrite for UdStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)

@@ -77,7 +77,6 @@ macro_rules! tokio_wrapper_trait_impls {
         tokio_wrapper_trait_impls!(for $slf, tokio_norawfd $tok);
 
         impl AsRawFd for $slf {
-            #[cfg(unix)]
             fn as_raw_fd(&self) -> c_int {
                 self.0.as_raw_fd()
             }

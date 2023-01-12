@@ -1,11 +1,10 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
 use super::{
+    c_wrappers,
     imports::*,
     util::{check_ancillary_unsound, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
-#[cfg(any(doc, target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use crate::{
     reliable_recv_msg::{ReliableRecvMsg, TryRecvResult},
     Sealed,
@@ -77,15 +76,12 @@ impl UdSocket {
     ///
     /// # Example
     /// ```no_run
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # #[cfg(unix)] {
     /// use interprocess::os::unix::udsocket::UdSocket;
     ///
     /// let conn = UdSocket::bind("/tmp/side_a.sock")?;
     /// conn.set_destination("/tmp/side_b.sock")?;
     /// // Communicate with datagrams here!
-    /// # }
-    /// # Ok(()) }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     ///
@@ -253,7 +249,7 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `recv`
-    #[cfg(any(doc, target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
     pub fn peek_msg_size(&self) -> io::Result<usize> {
         let mut buffer = [0_u8; 0];
@@ -341,7 +337,7 @@ impl UdSocket {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -373,7 +369,7 @@ impl Debug for UdSocket {
     }
 }
 
-#[cfg(any(doc, target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
 impl ReliableRecvMsg for UdSocket {
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
@@ -385,23 +381,20 @@ impl ReliableRecvMsg for UdSocket {
         Ok(TryRecvResult { size, fit })
     }
 }
-#[cfg(any(doc, target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl Sealed for UdSocket {}
 
 impl AsRawFd for UdSocket {
-    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.fd.as_raw_fd()
     }
 }
 impl IntoRawFd for UdSocket {
-    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.fd.into_raw_fd()
     }
 }
 impl FromRawFd for UdSocket {
-    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         let fd = unsafe { FdOps::from_raw_fd(fd) };
         Self {

@@ -16,7 +16,7 @@ pub enum AncillaryData<'a> {
     /// Credentials to be sent. The specified values are checked by the system when sent for all users except for the superuser – for senders, this means that the correct values need to be filled out, otherwise, an error is returned; for receivers, this means that the credentials are to be trusted for authentification purposes. For convenience, the [`credentials`] function provides a value which is known to be valid when sent.
     ///
     /// [`credentials`]: #method.credentials " "
-    #[cfg(any(doc, uds_ucred))]
+    #[cfg(uds_ucred)]
     #[cfg_attr( // uds_ucred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -58,14 +58,13 @@ impl<'a> AncillaryData<'a> {
     }
 
     /// Calculates the size of an `AncillaryData::FileDescriptors` element with the specified amount of file descriptors when packed into the Unix ancillary data format. Useful for allocating a buffer when you expect to receive a specific amount of file descriptors.
+    #[inline]
     pub const fn encoded_size_of_file_descriptors(num_descriptors: usize) -> usize {
-        #[cfg(not(unix))]
-        struct cmsghdr; // ???????????????
         size_of::<cmsghdr>() + num_descriptors * size_of::<pid_t>()
     }
 
     /// Inexpensievly clones `self` by borrowing the `FileDescriptors` variant or copying the `Credentials` variant.
-    #[must_use]
+    #[inline]
     pub fn clone_ref(&'a self) -> Self {
         match *self {
             Self::FileDescriptors(ref fds) => Self::FileDescriptors(Cow::Borrowed(fds)),
@@ -75,6 +74,7 @@ impl<'a> AncillaryData<'a> {
     }
 
     /// Returns the size of an ancillary data element when packed into the Unix ancillary data format.
+    #[inline]
     pub fn encoded_size(&self) -> usize {
         match self {
             Self::FileDescriptors(fds) => Self::encoded_size_of_file_descriptors(fds.len()),
@@ -139,7 +139,7 @@ impl AncillaryData<'static> {
     /// Fetches the credentials of the process from the system and returns a value which can be safely sent to another process without the system complaining about an unauthorized attempt to impersonate another process/user/group.
     ///
     /// If you want to send credentials to another process, this is usually the function you need to obtain the desired ancillary payload.
-    #[cfg(any(doc, uds_ucred))]
+    #[cfg(uds_ucred)]
     #[cfg_attr( // uds_ucred template
     feature = "doc_cfg",
         doc(cfg(any(

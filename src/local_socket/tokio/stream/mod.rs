@@ -15,12 +15,9 @@ use {
     },
 };
 
-#[cfg(feature = "tokio")]
 impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl
 }
-#[cfg(not(feature = "tokio"))]
-struct LocalSocketStreamImpl;
 
 /// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
 ///
@@ -28,8 +25,6 @@ struct LocalSocketStreamImpl;
 ///
 /// ## Basic client
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(feature = "tokio")] {
 /// use futures::{
 ///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 ///     try_join,
@@ -74,7 +69,7 @@ struct LocalSocketStreamImpl;
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
-/// # } Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct LocalSocketStream {
     pub(super) inner: LocalSocketStreamImpl,

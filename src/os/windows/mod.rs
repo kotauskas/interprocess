@@ -5,7 +5,6 @@ pub mod named_pipe;
 pub mod unnamed_pipe;
 // TODO mailslots
 //pub mod mailslot;
-#[cfg(windows)]
 pub(crate) mod local_socket;
 
 pub(crate) mod imports;
@@ -47,13 +46,9 @@ pub trait ShareHandle: AsRawHandle {
         ok_or_ret_errno!(success => new_handle)
     }
 }
-#[cfg(windows)]
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
-#[cfg(windows)]
 impl ShareHandle for unnamed_pipe::UnnamedPipeReader {}
-#[cfg(windows)]
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
-#[cfg(windows)]
 impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 
 #[inline(always)]
@@ -123,14 +118,12 @@ impl Drop for FileHandle {
         debug_assert!(_success, "failed to close file handle: {}", io::Error::last_os_error());
     }
 }
-#[cfg(windows)]
 impl AsRawHandle for FileHandle {
     #[inline(always)]
     fn as_raw_handle(&self) -> HANDLE {
         self.0
     }
 }
-#[cfg(windows)]
 impl IntoRawHandle for FileHandle {
     #[inline(always)]
     fn into_raw_handle(self) -> HANDLE {
@@ -138,7 +131,6 @@ impl IntoRawHandle for FileHandle {
         self_.as_raw_handle()
     }
 }
-#[cfg(windows)]
 impl FromRawHandle for FileHandle {
     #[inline(always)]
     unsafe fn from_raw_handle(op: HANDLE) -> Self {

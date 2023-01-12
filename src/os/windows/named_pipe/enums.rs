@@ -25,7 +25,6 @@ impl PipeDirection {
     ///
     /// # Usage
     /// ```
-    /// # #[cfg(windows)] {
     /// # use interprocess::os::windows::named_pipe::{PipeDirection, PipeStreamRole};
     /// assert_eq!(
     ///     PipeDirection::ClientToServer.client_role(),
@@ -39,7 +38,6 @@ impl PipeDirection {
     ///     PipeDirection::Duplex.client_role(),
     ///     PipeStreamRole::ReaderAndWriter,
     /// );
-    /// # }
     /// ```
     pub const fn client_role(self) -> PipeStreamRole {
         match self {
@@ -52,7 +50,6 @@ impl PipeDirection {
     ///
     /// # Usage
     /// ```
-    /// # #[cfg(windows)] {
     /// # use interprocess::os::windows::named_pipe::{PipeDirection, PipeStreamRole};
     /// assert_eq!(
     ///     PipeDirection::ClientToServer.server_role(),
@@ -66,7 +63,6 @@ impl PipeDirection {
     ///     PipeDirection::Duplex.server_role(),
     ///     PipeStreamRole::ReaderAndWriter,
     /// );
-    /// # }
     /// ```
     pub const fn server_role(self) -> PipeStreamRole {
         match self {
@@ -116,7 +112,6 @@ impl PipeStreamRole {
     ///
     /// # Usage
     /// ```
-    /// # #[cfg(windows)] {
     /// # use interprocess::os::windows::named_pipe::{PipeDirection, PipeStreamRole};
     /// assert_eq!(
     ///     PipeStreamRole::Reader.direction_as_server(),
@@ -130,7 +125,6 @@ impl PipeStreamRole {
     ///     PipeStreamRole::ReaderAndWriter.direction_as_server(),
     ///     PipeDirection::Duplex,
     /// );
-    /// # }
     /// ```
     pub const fn direction_as_server(self) -> PipeDirection {
         match self {
@@ -143,7 +137,6 @@ impl PipeStreamRole {
     ///
     /// # Usage
     /// ```
-    /// # #[cfg(windows)] {
     /// # use interprocess::os::windows::named_pipe::{PipeDirection, PipeStreamRole};
     /// assert_eq!(
     ///     PipeStreamRole::Reader.direction_as_client(),
@@ -157,7 +150,6 @@ impl PipeStreamRole {
     ///     PipeStreamRole::ReaderAndWriter.direction_as_client(),
     ///     PipeDirection::Duplex,
     /// );
-    /// # }
     /// ```
     pub const fn direction_as_client(self) -> PipeDirection {
         match self {

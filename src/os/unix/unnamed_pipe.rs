@@ -82,19 +82,16 @@ impl Write for UnnamedPipeWriter {
 }
 impl Sealed for UnnamedPipeWriter {}
 impl AsRawFd for UnnamedPipeWriter {
-    #[cfg(unix)]
     fn as_raw_fd(&self) -> c_int {
         self.0.as_raw_fd()
     }
 }
 impl IntoRawFd for UnnamedPipeWriter {
-    #[cfg(unix)]
     fn into_raw_fd(self) -> c_int {
         self.0.into_raw_fd()
     }
 }
 impl FromRawFd for UnnamedPipeWriter {
-    #[cfg(unix)]
     unsafe fn from_raw_fd(fd: c_int) -> Self {
         Self(FdOps::new(fd))
     }

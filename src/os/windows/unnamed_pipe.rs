@@ -156,20 +156,17 @@ impl Read for UnnamedPipeReader {
         self.0.read(weaken_buf_init(buf))
     }
 }
-#[cfg(windows)]
 impl AsRawHandle for UnnamedPipeReader {
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
-#[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeReader {
     fn into_raw_handle(self) -> HANDLE {
         let self_ = ManuallyDrop::new(self);
         self_.as_raw_handle()
     }
 }
-#[cfg(windows)]
 impl FromRawHandle for UnnamedPipeReader {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         let fho = unsafe {
@@ -196,20 +193,17 @@ impl Write for UnnamedPipeWriter {
         self.0.flush()
     }
 }
-#[cfg(windows)]
 impl AsRawHandle for UnnamedPipeWriter {
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()
     }
 }
-#[cfg(windows)]
 impl IntoRawHandle for UnnamedPipeWriter {
     fn into_raw_handle(self) -> HANDLE {
         let self_ = ManuallyDrop::new(self);
         self_.as_raw_handle()
     }
 }
-#[cfg(windows)]
 impl FromRawHandle for UnnamedPipeWriter {
     unsafe fn from_raw_handle(handle: HANDLE) -> Self {
         Self(FileHandle(handle))

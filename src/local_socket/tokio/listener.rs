@@ -6,12 +6,9 @@ use {
     },
 };
 
-#[cfg(feature = "tokio")]
 impmod! {local_socket::tokio,
     LocalSocketListener as LocalSocketListenerImpl
 }
-#[cfg(not(feature = "tokio"))]
-struct LocalSocketListenerImpl;
 
 /// A Tokio-based local socket server, listening for connections.
 ///
@@ -19,8 +16,6 @@ struct LocalSocketListenerImpl;
 ///
 /// ## Basic server
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(feature = "tokio")] {
 /// use futures::{
 ///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 ///     try_join,
@@ -101,7 +96,7 @@ struct LocalSocketListenerImpl;
 ///         }
 ///     });
 /// }
-/// # } Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct LocalSocketListener {
     inner: LocalSocketListenerImpl,

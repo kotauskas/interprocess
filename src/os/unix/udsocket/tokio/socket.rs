@@ -19,8 +19,6 @@ use {
 ///
 /// ## Basic packet exchange
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(all(unix, feature = "tokio"))] {
 /// use interprocess::os::unix::udsocket::tokio::*;
 /// use std::{io, mem::MaybeUninit};
 /// use tokio::{io::ReadBuf, try_join};
@@ -59,7 +57,7 @@ use {
 /// let received_string = String::from_utf8_lossy(readbuf.filled());
 ///
 /// println!("Other side answered: {}", &received_string);
-/// # } Ok() }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 // TODO update..?
 #[derive(Debug)]
@@ -167,7 +165,7 @@ impl UdSocket {
         self.0.poll_send_to(cx, buf, path.as_osstr())
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(

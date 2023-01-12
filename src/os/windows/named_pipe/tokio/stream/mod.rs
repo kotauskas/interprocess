@@ -24,8 +24,6 @@ use std::{
 ///
 /// ## Basic client
 /// ```no_run
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # #[cfg(all(windows, feature = "tokio"))] {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 ///
@@ -63,7 +61,7 @@ use std::{
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
-/// # } Ok(()) }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,

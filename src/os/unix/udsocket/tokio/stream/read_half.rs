@@ -1,6 +1,4 @@
-#[cfg(uds_supported)]
-use super::c_wrappers;
-use super::{OwnedWriteHalf, ReuniteError, UdStream};
+use super::{c_wrappers, OwnedWriteHalf, ReuniteError, UdStream};
 use crate::os::unix::imports::*;
 use std::{
     io,
@@ -15,7 +13,7 @@ pub struct BorrowedReadHalf<'a>(pub(super) TokioUdStreamReadHalf<'a>);
 
 impl<'a> BorrowedReadHalf<'a> {
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -56,13 +54,11 @@ impl<'a> BorrowedReadHalf<'a> {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamReadHalf<'a>);
 }
 
-#[cfg(feature = "tokio")]
 impl TokioAsyncRead for BorrowedReadHalf<'_> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for BorrowedReadHalf<'_> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
@@ -87,7 +83,7 @@ impl OwnedReadHalf {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(any(doc, uds_peercred))]
+    #[cfg(uds_peercred)]
     #[cfg_attr( // uds_peercred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -129,13 +125,11 @@ impl OwnedReadHalf {
     tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamOwnedReadHalf);
 }
 
-#[cfg(feature = "tokio")]
 impl TokioAsyncRead for OwnedReadHalf {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-#[cfg(feature = "tokio")]
 impl FuturesAsyncRead for OwnedReadHalf {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let mut buf = ReadBuf::new(buf);
