@@ -1,6 +1,5 @@
 use crate::{
     os::windows::{
-        imports::*,
         named_pipe::{
             enums::{PipeMode, PipeStreamRole},
             pipe_mode,
@@ -16,7 +15,7 @@ use std::{
     marker::PhantomData,
     mem::replace,
 };
-use tokio::sync::Mutex;
+use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mutex};
 
 /// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing asynchronous pipe streams.
 ///

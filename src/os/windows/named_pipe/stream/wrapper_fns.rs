@@ -1,5 +1,14 @@
-use crate::os::windows::{imports::*, FileHandle};
+use crate::os::windows::{winprelude::*, FileHandle};
 use std::{io, os::windows::prelude::*, ptr};
+use winapi::{
+    shared::winerror::ERROR_PIPE_BUSY,
+    um::{
+        fileapi::{CreateFileW, OPEN_EXISTING},
+        handleapi::INVALID_HANDLE_VALUE,
+        namedpipeapi::{GetNamedPipeInfo, PeekNamedPipe, WaitNamedPipeW},
+        winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE},
+    },
+};
 
 /// Helper for several functions that take a handle and a DWORD out-pointer.
 pub(crate) unsafe fn hget(
@@ -53,12 +62,7 @@ pub(crate) fn peek_msg_len(handle: HANDLE) -> io::Result<usize> {
     ok_or_ret_errno!(ok => len as usize)
 }
 
-pub(crate) fn _connect(
-    path: &[u16],
-    read: bool,
-    write: bool,
-    timeout: WaitTimeout,
-) -> io::Result<FileHandle> {
+pub(crate) fn _connect(path: &[u16], read: bool, write: bool, timeout: WaitTimeout) -> io::Result<FileHandle> {
     loop {
         match connect_without_waiting(path, read, write) {
             Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {

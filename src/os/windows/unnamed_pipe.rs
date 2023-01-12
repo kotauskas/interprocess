@@ -6,7 +6,7 @@
 
 // TODO add examples
 
-use super::{imports::*, weaken_buf_init, FileHandle};
+use super::{weaken_buf_init, winprelude::*, FileHandle};
 use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -15,6 +15,7 @@ use std::{
     num::NonZeroUsize,
     ptr,
 };
+use winapi::um::{minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreatePipe};
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///

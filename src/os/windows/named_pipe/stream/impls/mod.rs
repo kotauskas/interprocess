@@ -6,9 +6,10 @@ pub(crate) use split_owned::UNWRAP_FAIL_MSG;
 use super::{super::set_nonblocking_for_stream, *};
 use crate::{
     os::windows::{
-        imports::*,
         named_pipe::{convert_and_encode_path, PipeMode},
-        weaken_buf_init, FileHandle,
+        weaken_buf_init,
+        winprelude::*,
+        FileHandle,
     },
     reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
 };
@@ -20,6 +21,16 @@ use std::{
     mem::{ManuallyDrop, MaybeUninit},
     os::windows::prelude::*,
     ptr, slice,
+};
+use winapi::{
+    shared::winerror::ERROR_MORE_DATA,
+    um::{
+        namedpipeapi::DisconnectNamedPipe,
+        winbase::{
+            GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
+            GetNamedPipeServerSessionId,
+        },
+    },
 };
 
 /// Helper, used because `spare_capacity_mut()` on `Vec` is 1.60+. Borrows whole `Vec`, not just spare capacity.

@@ -7,14 +7,27 @@ pub mod unnamed_pipe;
 //pub mod mailslot;
 pub(crate) mod local_socket;
 
-pub(crate) mod imports;
-use imports::*;
-
 use std::{
     io,
     mem::{transmute, ManuallyDrop, MaybeUninit},
     ptr,
 };
+use winapi::um::{
+    fileapi::{FlushFileBuffers, ReadFile, WriteFile},
+    handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
+    processthreadsapi::GetCurrentProcess,
+};
+mod winprelude {
+    pub use std::os::windows::prelude::*;
+    pub use winapi::{
+        shared::{
+            minwindef::{BOOL, DWORD, LPVOID},
+            ntdef::HANDLE,
+        },
+        um::handleapi::INVALID_HANDLE_VALUE,
+    };
+}
+use winprelude::*;
 
 /// Objects which own handles which can be shared with another processes.
 ///

@@ -25,11 +25,14 @@ pub use {enums::*, listener::*, stream::*};
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
-use super::imports::*;
+use super::winprelude::*;
 use std::{
     ffi::{OsStr, OsString},
-    io, iter, ptr,
+    io, iter,
+    os::windows::ffi::OsStrExt,
+    ptr,
 };
+use winapi::um::namedpipeapi::SetNamedPipeHandleState;
 
 fn pathcvt<'a>(pipe_name: &'a OsStr, hostname: Option<&'a OsStr>) -> (impl Iterator<Item = &'a OsStr>, usize) {
     use iter::once as i;

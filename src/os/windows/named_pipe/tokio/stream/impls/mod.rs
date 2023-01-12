@@ -4,7 +4,6 @@ mod split_owned;
 
 use crate::{
     os::windows::{
-        imports::*,
         named_pipe::{
             convert_path, encode_to_utf16,
             stream::{
@@ -14,10 +13,13 @@ use crate::{
             tokio::stream::*,
             PipeMode, PmtNotNone,
         },
+        winprelude::*,
         FileHandle,
     },
     reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
 };
+use futures_io::{AsyncRead, AsyncWrite};
+use futures_core::ready;
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
@@ -26,6 +28,18 @@ use std::{
     ops::Deref,
     pin::Pin,
     task::{Context, Poll},
+};
+use tokio::{
+    io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
+    net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
+    sync::MutexGuard as TokioMutexGuard,
+};
+use winapi::{
+    shared::winerror::ERROR_MORE_DATA,
+    um::winbase::{
+        GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
+        GetNamedPipeServerSessionId,
+    },
 };
 
 macro_rules! same_clsrv {

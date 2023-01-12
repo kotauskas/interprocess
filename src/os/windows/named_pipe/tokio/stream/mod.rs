@@ -4,7 +4,6 @@ pub(crate) use wrapper_fns::*;
 
 use super::{
     super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
-    imports::*,
 };
 use std::{
     error::Error,
@@ -12,6 +11,10 @@ use std::{
     io,
     marker::PhantomData,
     sync::Arc,
+};
+use tokio::{
+    net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
+    sync::Mutex as TokioMutex,
 };
 
 /// A Tokio-based named pipe stream, created by a server-side listener or by connecting to a server.
@@ -68,7 +71,7 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     flush: TokioMutex<Option<FlushJH>>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
-type FlushJH = TokioJoinHandle<io::Result<()>>;
+type FlushJH = tokio::task::JoinHandle<io::Result<()>>;
 
 /// Type alias for a Tokio-based pipe stream with the same read mode and write mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;

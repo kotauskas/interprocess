@@ -1,5 +1,5 @@
 use super::{pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
-use crate::os::windows::{imports::*, FileHandle};
+use crate::os::windows::{winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
     ffi::OsStr,
@@ -15,6 +15,16 @@ use std::{
     },
 };
 use to_method::To;
+use winapi::{
+    shared::winerror::ERROR_PIPE_CONNECTED,
+    um::{
+        namedpipeapi::{ConnectNamedPipe, CreateNamedPipeW},
+        winbase::{
+            FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH, PIPE_NOWAIT,
+            PIPE_REJECT_REMOTE_CLIENTS,
+        },
+    },
+};
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///

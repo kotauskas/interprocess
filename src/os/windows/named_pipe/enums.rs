@@ -1,7 +1,10 @@
-use crate::os::windows::imports::*;
-use std::{convert::TryFrom, mem};
-
 use super::PipeModeTag;
+use crate::os::windows::winprelude::*;
+use std::{convert::TryFrom, mem};
+use winapi::um::winbase::{
+    PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE,
+    PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
+};
 
 /// The direction of a named pipe connection, designating who can read data and who can write it. This describes the direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server – [`ClientToServer`] always means client → server, for example.
 ///
