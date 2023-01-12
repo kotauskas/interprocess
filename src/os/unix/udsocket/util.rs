@@ -1,5 +1,6 @@
-use super::imports::*;
+use crate::os::unix::unixprelude::*;
 use cfg_if::cfg_if;
+use libc::{iovec, msghdr};
 use std::{
     ffi::{CStr, CString},
     hint::unreachable_unchecked,
@@ -26,7 +27,7 @@ cfg_if! {
 }
 cfg_if! {
     if #[cfg(uds_msghdr_controllen_socklen_t)] {
-        pub type MsghdrControllen = socklen_t;
+        pub type MsghdrControllen = libc::socklen_t;
         static MSGHDR_CONTROLLEN_NAME: &str = tname::SOCKLEN_T;
 } else if #[cfg(uds_msghdr_controllen_size_t)] {
         pub type MsghdrControllen = size_t;

@@ -28,10 +28,7 @@ use path_drop_guard::*;
 
 mod c_wrappers;
 
-use super::imports;
-use cfg_if::cfg_if;
-
-cfg_if! {
+cfg_if::cfg_if! {
     if #[cfg(uds_sockaddr_un_len_108)] {
         const _MAX_UDSOCKET_PATH_LEN: usize = 108;
     } else if #[cfg(uds_sockaddr_un_len_104)] {

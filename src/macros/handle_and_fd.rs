@@ -7,7 +7,7 @@ macro_rules! impl_as_raw_handle {
             }
         }
         #[cfg(unix)]
-        impl $crate::os::unix::imports::AsRawFd for $ty {
+        impl ::std::os::unix::io::AsRawFd for $ty {
             fn as_raw_fd(&self) -> ::libc::c_int {
                 ::std::os::unix::io::AsRawFd::as_raw_fd(&self.inner)
             }

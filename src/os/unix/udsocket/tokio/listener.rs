@@ -1,10 +1,8 @@
-use crate::os::unix::{
-    imports::*,
-    udsocket::{
-        tokio::UdStream, ToUdSocketPath, UdSocketPath, UdStreamListener as SyncUdStreamListener,
-    },
+use crate::os::unix::udsocket::{
+    tokio::UdStream, ToUdSocketPath, UdSocketPath, UdStreamListener as SyncUdStreamListener,
 };
-use std::{convert::TryFrom, io};
+use std::{convert::TryFrom, io, os::unix::net::UnixListener as StdUdStreamListener};
+use tokio::net::UnixListener as TokioUdStreamListener;
 
 /// A Tokio-based Unix domain byte stream socket server, listening for connections.
 ///

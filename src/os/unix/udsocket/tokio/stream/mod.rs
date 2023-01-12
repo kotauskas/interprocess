@@ -1,17 +1,19 @@
-use {
-    crate::os::unix::{
-        imports::*,
-        udsocket::{c_wrappers, ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream},
-    },
-    std::{
-        convert::TryFrom,
-        error::Error,
-        fmt::{self, Formatter},
-        io,
-        net::Shutdown,
-        pin::Pin,
-        task::{Context, Poll},
-    },
+use crate::os::unix::udsocket::{c_wrappers, ToUdSocketPath, UdSocketPath, UdStream as SyncUdStream};
+use crate::os::unix::unixprelude::*;
+use futures_io::{AsyncRead, AsyncWrite};
+use std::{
+    convert::TryFrom,
+    error::Error,
+    fmt::{self, Formatter},
+    io,
+    net::Shutdown,
+    os::unix::net::UnixStream as StdUdStream,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::{
+    io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
+    net::{unix::ReuniteError as TokioReuniteError, UnixStream as TokioUdStream},
 };
 
 mod connect_future;
@@ -87,7 +89,7 @@ impl UdStream {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
     }
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStream> {
@@ -105,13 +107,13 @@ tokio_wrapper_trait_impls!(
     tokio TokioUdStream);
 
 impl TokioAsyncRead for UdStream {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-impl FuturesAsyncRead for UdStream {
+impl AsyncRead for UdStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        let mut buf = ReadBuf::new(buf);
+        let mut buf = TokioReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -131,7 +133,7 @@ impl TokioAsyncWrite for UdStream {
         self.pinproject().poll_shutdown(cx)
     }
 }
-impl FuturesAsyncWrite for UdStream {
+impl AsyncWrite for UdStream {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
     }

@@ -1,4 +1,5 @@
-use super::{imports::OsStrExt, UdSocketPath};
+use super::UdSocketPath;
+use crate::os::unix::unixprelude::*;
 use std::{ffi::OsStr, fs::remove_file, ops::Drop};
 
 #[derive(Debug)]

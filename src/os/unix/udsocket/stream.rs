@@ -1,9 +1,10 @@
 use super::{
     c_wrappers,
-    imports::*,
     util::{check_ancillary_unsound, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
 };
+use crate::os::unix::{unixprelude::*, FdOps};
+use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
@@ -208,7 +209,7 @@ impl UdStream {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(&self.fd)
     }
 }

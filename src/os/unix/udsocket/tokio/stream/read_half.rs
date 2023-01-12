@@ -1,10 +1,18 @@
 use super::{c_wrappers, OwnedWriteHalf, ReuniteError, UdStream};
-use crate::os::unix::imports::*;
+use crate::os::unix::unixprelude::*;
+use futures_io::AsyncRead;
 use std::{
     io,
     net::Shutdown,
     pin::Pin,
     task::{Context, Poll},
+};
+use tokio::{
+    io::{AsyncRead as TokioAsyncRead, ReadBuf as TokioReadBuf},
+    net::{
+        unix::{OwnedReadHalf as TokioUdStreamOwnedReadHalf, ReadHalf as TokioUdStreamReadHalf},
+        UnixStream as TokioUdStream,
+    },
 };
 
 /// Borrowed read half of a [`UdStream`](super::UdStream), created by [`.split()`](super::UdStream::split).
@@ -31,7 +39,7 @@ impl<'a> BorrowedReadHalf<'a> {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
     /// Shuts down the read half.
@@ -55,13 +63,13 @@ impl<'a> BorrowedReadHalf<'a> {
 }
 
 impl TokioAsyncRead for BorrowedReadHalf<'_> {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-impl FuturesAsyncRead for BorrowedReadHalf<'_> {
+impl AsyncRead for BorrowedReadHalf<'_> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        let mut buf = ReadBuf::new(buf);
+        let mut buf = TokioReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
@@ -101,7 +109,7 @@ impl OwnedReadHalf {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
 
@@ -126,13 +134,13 @@ impl OwnedReadHalf {
 }
 
 impl TokioAsyncRead for OwnedReadHalf {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
 }
-impl FuturesAsyncRead for OwnedReadHalf {
+impl AsyncRead for OwnedReadHalf {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        let mut buf = ReadBuf::new(buf);
+        let mut buf = TokioReadBuf::new(buf);
         match self.pinproject().poll_read(cx, &mut buf) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),

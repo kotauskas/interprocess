@@ -1,7 +1,6 @@
-use {
-    super::imports::*,
-    std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr},
-};
+use crate::os::unix::{unixprelude::*, FdOps};
+use libc::{sockaddr, sockaddr_un, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
+use std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr};
 
 pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
     #[allow(unused_mut, clippy::let_and_return)]
@@ -74,6 +73,7 @@ pub(super) fn listen(fd: &FdOps, backlog: c_int) -> io::Result<()> {
 pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
     #[cfg(uds_scm_credentials)]
     {
+        use libc::{SOL_SOCKET, SO_PASSCRED};
         use std::mem::size_of_val;
 
         let passcred = passcred as c_int;
@@ -95,13 +95,14 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
     }
 }
 #[cfg(uds_peercred)]
-pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<ucred> {
+pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<libc::ucred> {
+    use libc::{socklen_t, ucred, SOL_SOCKET, SO_PEERCRED};
     use std::mem::zeroed;
 
-    let mut cred: ucred = unsafe {
+    let mut cred = unsafe {
         // SAFETY: it's safe for the ucred structure to be zero-initialized, since
         // it only contains integers
-        zeroed()
+        zeroed::<ucred>()
     };
     let mut cred_len = size_of::<ucred>() as socklen_t;
     let success = unsafe {
@@ -159,6 +160,7 @@ pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
 #[cfg(not(target_os = "linux"))]
 mod non_linux {
     use super::*;
+    use libc::{FD_CLOEXEC, F_GETFD, F_SETFD};
     pub(super) fn get_fdflags(fd: &FdOps) -> io::Result<i32> {
         let (val, success) = unsafe {
             let ret = libc::fcntl(fd.0, F_GETFD, 0);

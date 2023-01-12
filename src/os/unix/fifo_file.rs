@@ -12,9 +12,8 @@
 //! [`File`]: https://doc.rust-lang.org/stable/std/fs/struct.File.html " "
 //! [`remove_file`]: https://doc.rust-lang.org/stable/std/fs/fn.remove_file.html " "
 
+use super::unixprelude::*;
 use std::{ffi::CString, io, path::Path};
-
-use super::imports::*;
 
 /// Creates a FIFO file at the specified path with the specified permissions.
 ///

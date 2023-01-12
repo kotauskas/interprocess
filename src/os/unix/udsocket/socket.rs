@@ -1,14 +1,15 @@
 use super::{
     c_wrappers,
-    imports::*,
     util::{check_ancillary_unsound, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w},
     AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
+use crate::os::unix::{unixprelude::*, FdOps};
 #[cfg(target_os = "linux")]
 use crate::{
     reliable_recv_msg::{ReliableRecvMsg, TryRecvResult},
     Sealed,
 };
+use libc::{msghdr, sockaddr_un, SOCK_DGRAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut},
@@ -355,7 +356,7 @@ impl UdSocket {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(&self.fd)
     }
 }

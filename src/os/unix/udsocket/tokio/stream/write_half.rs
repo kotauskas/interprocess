@@ -1,10 +1,18 @@
 use super::{c_wrappers, OwnedReadHalf, ReuniteError, UdStream};
-use crate::os::unix::imports::*;
+use crate::os::unix::unixprelude::*;
+use futures_io::AsyncWrite;
 use std::{
     io,
     net::Shutdown,
     pin::Pin,
     task::{Context, Poll},
+};
+use tokio::{
+    io::AsyncWrite as TokioAsyncWrite,
+    net::{
+        unix::{OwnedWriteHalf as TokioUdStreamOwnedWriteHalf, WriteHalf as TokioUdStreamWriteHalf},
+        UnixStream as TokioUdStream,
+    },
 };
 
 /// Borrowed write half of a [`UdStream`](super::UdStream), created by [`.split()`](super::UdStream::split).
@@ -31,7 +39,7 @@ impl<'a> BorrowedWriteHalf<'a> {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
     /// Shuts down the write half.
@@ -66,7 +74,7 @@ impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
         self.pinproject().poll_shutdown(cx)
     }
 }
-impl FuturesAsyncWrite for BorrowedWriteHalf<'_> {
+impl AsyncWrite for BorrowedWriteHalf<'_> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.pinproject().poll_write(cx, buf)
     }
@@ -111,7 +119,7 @@ impl OwnedWriteHalf {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
     }
 
@@ -149,7 +157,7 @@ impl TokioAsyncWrite for OwnedWriteHalf {
         Poll::Ready(Ok(()))
     }
 }
-impl FuturesAsyncWrite for OwnedWriteHalf {
+impl AsyncWrite for OwnedWriteHalf {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)
     }

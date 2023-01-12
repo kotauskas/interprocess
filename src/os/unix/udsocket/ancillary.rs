@@ -1,5 +1,8 @@
-use super::imports::*;
+use crate::os::unix::unixprelude::*;
 use cfg_if::cfg_if;
+use libc::{cmsghdr, SCM_RIGHTS, SOL_SOCKET};
+#[cfg(uds_ucred)]
+use libc::{ucred, SCM_CREDENTIALS};
 use std::{
     borrow::Cow,
     iter::{FromIterator, FusedIterator},
@@ -49,11 +52,9 @@ impl<'a> AncillaryData<'a> {
         if #[cfg(uds_ucred)] {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>() + size_of::<ucred>();
         } /*else if #[cfg(uds_xucred)] {
-            const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>() + size_of::<xucred>();
-        } */else if #[cfg(unix)] {
+            const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>() + size_of::<libc::xucred>();
+        } */else {
             const _ENCODED_SIZE_OF_CREDENTIALS: usize = size_of::<cmsghdr>();
-        } else {
-            const _ENCODED_SIZE_OF_CREDENTIALS: usize = 0;
         }
     }
 

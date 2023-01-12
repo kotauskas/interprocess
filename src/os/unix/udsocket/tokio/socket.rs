@@ -1,17 +1,19 @@
 #[cfg(uds_peercred)]
 use super::c_wrappers;
-use {
-    crate::os::unix::{imports::*, udsocket},
-    std::{
-        convert::TryFrom,
-        future::Future,
-        io,
-        net::Shutdown,
-        pin::Pin,
-        task::{Context, Poll},
-    },
+use crate::os::unix::{
     udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath},
+    unixprelude::*,
 };
+use std::{
+    convert::TryFrom,
+    future::Future,
+    io,
+    net::Shutdown,
+    os::unix::net::UnixDatagram as StdUdSocket,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 
 /// A Unix domain datagram socket, obtained either from [`UdSocketListener`](super::UdSocketListener) or by connecting to an existing server.
 ///
@@ -95,11 +97,11 @@ impl UdSocket {
     }
     /// Receives a single datagram from the socket, advancing the `ReadBuf` cursor by the datagram length.
     ///
-    /// Uses Tokio's [`ReadBuf`] interface. See `.recv_stdbuf()` for a `&mut [u8]` version.
-    pub async fn recv(&self, buf: &mut ReadBuf<'_>) -> io::Result<()> {
-        // Tokio's .recv() uses &mut [u8] instead of &mut ReadBuf<'_> for some
+    /// Uses Tokio's [`ReadBuf`](TokioReadBuf) interface. See `.recv_stdbuf()` for a `&mut [u8]` version.
+    pub async fn recv(&self, buf: &mut TokioReadBuf<'_>) -> io::Result<()> {
+        // Tokio's .recv() uses &mut [u8] instead of &mut TokioReadBuf<'_> for some
         // reason, this works around that
-        struct WrapperFuture<'a, 'b, 'c>(&'a UdSocket, &'b mut ReadBuf<'c>);
+        struct WrapperFuture<'a, 'b, 'c>(&'a UdSocket, &'b mut TokioReadBuf<'c>);
         impl Future for WrapperFuture<'_, '_, '_> {
             type Output = io::Result<()>;
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -108,9 +110,9 @@ impl UdSocket {
         }
         WrapperFuture(self, buf).await
     }
-    /// Receives a single datagram from the socket, advancing the `ReadBuf` cursor by the datagram length.
+    /// Receives a single datagram from the socket, returning the amount of bytes received.
     ///
-    /// Uses an `std`-like `&mut [u8]` interface. See `.recv()` for a version which uses Tokio's [`ReadBuf`] instead.
+    /// Uses an `std`-like `&mut [u8]` interface. See `.recv()` for a version which uses Tokio's [`ReadBuf`](TokioReadBuf) instead.
     pub async fn recv_stdbuf(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.recv(buf).await
     }
@@ -139,12 +141,12 @@ impl UdSocket {
         self.0.writable().await
     }
     /// Raw polling interface for receiving datagrams. You probably want `.recv()` instead.
-    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.0.poll_recv(cx, buf)
     }
     /// Raw polling interface for receiving datagrams with an `std`-like receive buffer. You probably want `.recv_stdbuf()` instead.
     pub fn poll_recv_stdbuf(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<()>> {
-        let mut readbuf = ReadBuf::new(buf);
+        let mut readbuf = TokioReadBuf::new(buf);
         self.0.poll_recv(cx, &mut readbuf)
     }
     /// Raw polling interface for sending datagrams. You probably want `.send()` instead.
@@ -183,7 +185,7 @@ impl UdSocket {
             target_os = "haiku"
         )))
     )]
-    pub fn get_peer_credentials(&self) -> io::Result<ucred> {
+    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
     }
     tokio_wrapper_conversion_methods!(

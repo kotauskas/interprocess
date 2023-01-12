@@ -15,37 +15,37 @@ macro_rules! tokio_wrapper_conversion_methods {
         ///
         /// # Safety
         /// The given file descriptor must be valid (i.e. refer to an existing kernel object) and must not be owned by any other file descriptor container. If this is not upheld, an arbitrary file descriptor will be closed when the returned object is dropped.
-        pub unsafe fn from_raw_fd(fd: c_int) -> io::Result<Self> {
-            let std = unsafe { FromRawFd::from_raw_fd(fd) };
+        pub unsafe fn from_raw_fd(fd: libc::c_int) -> io::Result<Self> {
+            let std = unsafe { std::os::unix::io::FromRawFd::from_raw_fd(fd) };
             let tokio = <$tok>::from_std(std)?;
             Ok(Self(tokio))
         }
         /// Releases ownership of the raw file descriptor, detaches the object from the Tokio runtime (therefore has to be called within the runtime) and returns the file descriptor as an integer.
-        pub fn into_raw_fd(self) -> io::Result<c_int> {
+        pub fn into_raw_fd(self) -> io::Result<libc::c_int> {
             let std = <$tok>::into_std(self.0)?;
-            let fd = IntoRawFd::into_raw_fd(std);
+            let fd = std::os::unix::io::IntoRawFd::into_raw_fd(std);
             Ok(fd)
         }
     };
     (sync $sync:ty) => {
         /// Detaches the async object from the Tokio runtime (therefore has to be called within the runtime) and converts it to a blocking one.
         pub fn into_sync(self) -> io::Result<$sync> {
-            Ok(unsafe { <$sync as FromRawFd>::from_raw_fd(self.into_raw_fd()?) })
+            Ok(unsafe { <$sync as std::os::unix::io::FromRawFd>::from_raw_fd(self.into_raw_fd()?) })
         }
         /// Creates a Tokio-based async object from a blocking one. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error.
         pub fn from_sync(sync: $sync) -> io::Result<Self> {
-            let fd = IntoRawFd::into_raw_fd(sync);
+            let fd = std::os::unix::io::IntoRawFd::into_raw_fd(sync);
             unsafe { Self::from_raw_fd(fd) }
         }
     };
     (std $std:ty) => {
         /// Detaches the async object from the Tokio runtime and converts it to a blocking one from the standard library. Returns an error if called outside a Tokio runtime context.
         pub fn into_std(self) -> io::Result<$std> {
-            Ok(unsafe { <$std as FromRawFd>::from_raw_fd(self.into_raw_fd()?) })
+            Ok(unsafe { <$std as std::os::unix::io::FromRawFd>::from_raw_fd(self.into_raw_fd()?) })
         }
         /// Creates a Tokio-based async object from a blocking one from the standard library. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error.
         pub fn from_std(std: $std) -> io::Result<Self> {
-            let fd = IntoRawFd::into_raw_fd(std);
+            let fd = std::os::unix::io::IntoRawFd::into_raw_fd(std);
             unsafe { Self::from_raw_fd(fd) }
         }
     };
@@ -76,8 +76,8 @@ macro_rules! tokio_wrapper_trait_impls {
     (for $slf:ty, tokio $tok:ty) => {
         tokio_wrapper_trait_impls!(for $slf, tokio_norawfd $tok);
 
-        impl AsRawFd for $slf {
-            fn as_raw_fd(&self) -> c_int {
+        impl std::os::unix::io::AsRawFd for $slf {
+            fn as_raw_fd(&self) -> libc::c_int {
                 self.0.as_raw_fd()
             }
         }

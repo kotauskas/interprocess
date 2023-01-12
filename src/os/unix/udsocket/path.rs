@@ -1,8 +1,9 @@
 use super::{
-    imports::*,
     util::{empty_cstr, empty_cstring, eunreachable},
     MAX_UDSOCKET_PATH_LEN,
 };
+use crate::os::unix::unixprelude::*;
+use libc::{sockaddr_un, AF_UNIX};
 use std::{
     borrow::{Cow, ToOwned},
     convert::TryFrom,

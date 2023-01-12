@@ -1,4 +1,6 @@
-use super::{c_wrappers, imports::*, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
+use super::{c_wrappers, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
+use crate::os::unix::{unixprelude::*, FdOps};
+use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
