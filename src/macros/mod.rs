@@ -1,8 +1,6 @@
 #[macro_use]
 mod handle_and_fd;
 #[macro_use]
-mod import_tables;
-#[macro_use]
 mod ok_or_ret_errno;
 
 macro_rules! impmod {
