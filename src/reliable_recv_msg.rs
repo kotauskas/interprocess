@@ -1,33 +1,36 @@
 //! Traits for receiving from IPC channels with message boundaries reliably, without truncation.
 //!
 //! ## The problem
-/// Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by any OS – instead, all messages received from message IPC channels are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
-///
-/// There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully receive a message. With byte streams, that always works – there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually receiving it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
-///
-/// This brings the discussion specifically to the signature of the `recv` method:
-/// ```no_run
-/// # use std::io;
-/// # trait Tr {
-/// fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
-/// # }
-/// ```
-/// Notice the nested result that's going on here. Setting aside from the `io::Result` part, the "true return value" is [`RecvResult`]. The `Fit(...)` variant here means that the message has been successfully received into the buffer and contains the actual size of the message which has been received. The `Alloc(...)` variant means that the buffer was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message. The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv` function, see if it fits inside the buffer, and if it does not, replace the stored buffer with the new one.
-///
-/// The `try_recv` method is used mainly by implementations of `recv`, but can also be called directly. It has the following signature:
-/// ```no_run
-/// # use std::io;
-/// # trait Tr {
-/// fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
-/// # }
-/// ```
-/// The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it didn't fit, the buffer is unaffected (unlike with `RecvResult`).
-///
-/// ## Platform support
-/// The traits are implemented for:
-/// - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
-/// - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
-///     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
+//! Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by any OS – instead, all messages received from message IPC channels are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
+//!
+//! There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully receive a message. With byte streams, that always works – there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually receiving it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
+//!
+//! This brings the discussion specifically to the signature of the `recv` method:
+//! ```no_run
+//! # use std::io;
+//! # type RecvResult = ();
+//! # trait Tr {
+//! fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
+//! # }
+//! ```
+//! Notice the nested result that's going on here. Setting aside from the `io::Result` part, the "true return value" is [`RecvResult`]. The `Fit(...)` variant here means that the message has been successfully received into the buffer and contains the actual size of the message which has been received. The `Alloc(...)` variant means that the buffer was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message. The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv` function, see if it fits inside the buffer, and if it does not, replace the stored buffer with the new one.
+//!
+//! The `try_recv` method is used mainly by implementations of `recv`, but can also be called directly. It has the following signature:
+//! ```no_run
+//! # use std::io;
+//! # type TryRecvResult = ();
+//! # trait Tr {
+//! fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
+//! # }
+//! ```
+//! The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it didn't fit, the buffer is unaffected (unlike with `RecvResult`).
+//!
+//! ## Platform support
+//! The traits are implemented for:
+//! - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
+//! - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
+//!     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
+
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -176,8 +179,8 @@ impl RecvResult {
     /// This is intended to be used right after `.recv()` to access the message, kinda like this:
     /// ```no_run
     /// # use interprocess::reliable_recv_msg::*;
-    /// # fn _swag(conn: &mut dyn ReliableRecvMsg) -> Result<(), std::error::Error> {
-    /// let buf = [0_u8; 32];
+    /// # fn _swag(conn: &mut dyn ReliableRecvMsg) -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut buf = [0_u8; 32];
     /// let rslt = conn.recv(&mut buf)?;
     /// let msg = rslt.borrow_to_size(&buf);
     /// // do stuff with the message
