@@ -8,8 +8,10 @@ use {
     },
 };
 
-static SERVER_MSG: &str = "Hello from server!\n";
-static CLIENT_MSG: &str = "Hello from client!\n";
+static SERVER_LINE: &[u8] = b"Hello from server!\n";
+static SERVER_BYTES: &[u8] = b"Bytes from server!\0";
+static CLIENT_LINE: &[u8] = b"Hello from client!\n";
+static CLIENT_BYTES: &[u8] = b"Bytes from client!\0";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
     let (name, listener) = NameGen::new_auto(prefer_namespaced)
@@ -26,7 +28,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
 
     let _ = name_sender.send(name);
 
-    let mut buffer = String::with_capacity(128);
+    let mut buffer = Vec::with_capacity(128);
 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
@@ -37,31 +39,49 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
             }
         };
 
-        conn.read_line(&mut buffer).context("Socket receive failed")?;
+        conn.read_until(b'\n', &mut buffer)
+            .context("First socket receive failed")?;
+        assert_eq!(buffer, CLIENT_LINE);
+        buffer.clear();
 
         conn.get_mut()
-            .write_all(SERVER_MSG.as_bytes())
-            .context("Socket send failed")?;
+            .write_all(SERVER_LINE)
+            .context("First socket send failed")?;
 
-        assert_eq!(buffer, CLIENT_MSG);
+        conn.read_until(b'\0', &mut buffer)
+            .context("Second socket receive failed")?;
+        assert_eq!(buffer, CLIENT_BYTES);
         buffer.clear();
+
+        conn.get_mut()
+            .write_all(SERVER_BYTES)
+            .context("Second socket send failed")?;
     }
     Ok(())
 }
 pub fn client(name: Arc<String>) -> TestResult {
-    let mut buffer = String::with_capacity(128);
+    let mut buffer = Vec::with_capacity(128);
 
     let mut conn = LocalSocketStream::connect(name.as_str())
         .context("Connect failed")
         .map(BufReader::new)?;
 
     conn.get_mut()
-        .write_all(CLIENT_MSG.as_bytes())
-        .context("Socket send failed")?;
+        .write_all(CLIENT_LINE)
+        .context("First socket send failed")?;
 
-    conn.read_line(&mut buffer).context("Socket receive failed")?;
+    conn.read_until(b'\n', &mut buffer)
+        .context("First socket receive failed")?;
+    assert_eq!(buffer, SERVER_LINE);
+    buffer.clear();
 
-    assert_eq!(buffer, SERVER_MSG);
+    conn.get_mut()
+        .write_all(CLIENT_BYTES)
+        .context("Second socket send failed")?;
+
+    conn.read_until(b'\0', &mut buffer)
+        .context("Second socket receive failed")?;
+    assert_eq!(buffer, SERVER_BYTES);
 
     Ok(())
 }

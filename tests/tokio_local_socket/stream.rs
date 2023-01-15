@@ -7,25 +7,45 @@ use {
     tokio::{sync::oneshot::Sender, task, try_join},
 };
 
-static SERVER_MSG: &str = "Hello from server!\n";
-static CLIENT_MSG: &str = "Hello from client!\n";
+static SERVER_LINE: &[u8] = b"Hello from server!\n";
+static SERVER_BYTES: &[u8] = b"Bytes from server!\0";
+static CLIENT_LINE: &[u8] = b"Hello from client!\n";
+static CLIENT_BYTES: &[u8] = b"Bytes from client!\0";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
     async fn handle_conn(conn: LocalSocketStream) -> TestResult {
         let (reader, mut writer) = conn.into_split();
-        let mut buffer = String::with_capacity(128);
+        let mut buffer = Vec::with_capacity(128);
         let mut reader = BufReader::new(reader);
 
-        let read = async { reader.read_line(&mut buffer).await.context("Socket receive failed") };
+        let read = async {
+            reader
+                .read_until(b'\n', &mut buffer)
+                .await
+                .context("First socket receive failed")?;
+            assert_eq!(buffer, CLIENT_LINE);
+            buffer.clear();
+
+            reader
+                .read_until(b'\0', &mut buffer)
+                .await
+                .context("Second socket receive failed")?;
+            assert_eq!(buffer, CLIENT_BYTES);
+            TestResult::Ok(())
+        };
         let write = async {
             writer
-                .write_all(SERVER_MSG.as_bytes())
+                .write_all(SERVER_LINE)
                 .await
-                .context("Socket send failed")
+                .context("First socket send failed")?;
+
+            writer
+                .write_all(SERVER_BYTES)
+                .await
+                .context("First socket send failed")?;
+            TestResult::Ok(())
         };
         try_join!(read, write)?;
-
-        assert_eq!(buffer, CLIENT_MSG);
         Ok(())
     }
 
@@ -62,7 +82,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32, prefer_namesp
     Ok(())
 }
 pub async fn client(name: Arc<String>) -> TestResult {
-    let mut buffer = String::with_capacity(128);
+    let mut buffer = Vec::with_capacity(128);
 
     let (reader, mut writer) = LocalSocketStream::connect(name.as_str())
         .await
@@ -70,16 +90,33 @@ pub async fn client(name: Arc<String>) -> TestResult {
         .into_split();
     let mut reader = BufReader::new(reader);
 
-    let read = async { reader.read_line(&mut buffer).await.context("Socket receive failed") };
+    let read = async {
+        reader
+            .read_until(b'\n', &mut buffer)
+            .await
+            .context("First socket receive failed")?;
+        assert_eq!(buffer, SERVER_LINE);
+        buffer.clear();
+
+        reader
+            .read_until(b'\0', &mut buffer)
+            .await
+            .context("Second socket receive failed")?;
+        assert_eq!(buffer, SERVER_BYTES);
+        TestResult::Ok(())
+    };
     let write = async {
         writer
-            .write_all(CLIENT_MSG.as_bytes())
+            .write_all(CLIENT_LINE)
             .await
-            .context("Socket send failed")
+            .context("First socket send failed")?;
+
+        writer
+            .write_all(CLIENT_BYTES)
+            .await
+            .context("Second socket send failed")?;
+        TestResult::Ok(())
     };
     try_join!(read, write)?;
-
-    assert_eq!(buffer, SERVER_MSG);
-
     Ok(())
 }
