@@ -16,6 +16,8 @@ impmod! {local_socket::tokio,
 ///
 /// ## Basic server
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use futures::{
 ///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 ///     try_join,
@@ -96,7 +98,7 @@ impmod! {local_socket::tokio,
 ///         }
 ///     });
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 pub struct LocalSocketListener {
     inner: LocalSocketListenerImpl,

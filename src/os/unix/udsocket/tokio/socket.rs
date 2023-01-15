@@ -21,6 +21,8 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 ///
 /// ## Basic packet exchange
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::os::unix::udsocket::tokio::*;
 /// use std::{io, mem::MaybeUninit};
 /// use tokio::{io::ReadBuf, try_join};
@@ -40,7 +42,7 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 ///
 /// // Describe the send operation, but don't run it yet.
 /// // We'll launch it concurrently with the read operation.
-/// let send = socket.send("Hello from side A!");
+/// let send = socket.send(b"Hello from side A!");
 ///
 /// // Describe the receive operation, and also don't run it yet.
 /// let recv = socket.recv(&mut readbuf);
@@ -59,7 +61,7 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 /// let received_string = String::from_utf8_lossy(readbuf.filled());
 ///
 /// println!("Other side answered: {}", &received_string);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 // TODO update..?
 #[derive(Debug)]

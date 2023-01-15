@@ -14,6 +14,8 @@ use tokio::net::UnixListener as TokioUdStreamListener;
 ///
 /// ## Basic server
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::os::unix::udsocket::tokio::{UdStream, UdStreamListener};
 /// use std::io;
 /// use tokio::{
@@ -88,7 +90,7 @@ use tokio::net::UnixListener as TokioUdStreamListener;
 ///         }
 ///     });
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 #[derive(Debug)]
 pub struct UdStreamListener(TokioUdStreamListener);

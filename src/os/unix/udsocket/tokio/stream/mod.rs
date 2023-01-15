@@ -28,6 +28,8 @@ pub use {read_half::*, write_half::*};
 ///
 /// ## Basic client
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::os::unix::udsocket::tokio::*;
 /// use tokio::{
 ///     io::{AsyncReadExt, AsyncWriteExt},
@@ -66,7 +68,7 @@ pub use {read_half::*, write_half::*};
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 #[derive(Debug)]
 pub struct UdStream(TokioUdStream);

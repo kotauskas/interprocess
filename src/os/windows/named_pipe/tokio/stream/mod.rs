@@ -2,9 +2,7 @@ mod impls;
 mod wrapper_fns;
 pub(crate) use wrapper_fns::*;
 
-use super::{
-    super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
-};
+use super::super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -27,6 +25,8 @@ use tokio::{
 ///
 /// ## Basic client
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 ///
@@ -64,7 +64,7 @@ use tokio::{
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: RawPipeStream,

@@ -1,11 +1,9 @@
 use crate::{
-    os::windows::{
-        named_pipe::{
-            enums::{PipeMode, PipeStreamRole},
-            pipe_mode,
-            tokio::{PipeStream, RawPipeStream},
-            PipeListenerOptions, PipeModeTag,
-        },
+    os::windows::named_pipe::{
+        enums::{PipeMode, PipeStreamRole},
+        pipe_mode,
+        tokio::{PipeStream, RawPipeStream},
+        PipeListenerOptions, PipeModeTag,
     },
     Sealed,
 };
@@ -25,6 +23,8 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 ///
 /// ## Basic server
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use futures::{prelude::*, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
 /// use std::{ffi::OsStr, io};
@@ -95,7 +95,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 ///         }
 ///     });
 /// }
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances

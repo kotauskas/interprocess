@@ -25,6 +25,8 @@ impmod! {local_socket::tokio,
 ///
 /// ## Basic client
 /// ```no_run
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use futures::{
 ///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 ///     try_join,
@@ -69,7 +71,7 @@ impmod! {local_socket::tokio,
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// # Ok(()) }
 /// ```
 pub struct LocalSocketStream {
     pub(super) inner: LocalSocketStreamImpl,
