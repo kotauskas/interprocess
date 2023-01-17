@@ -64,10 +64,7 @@ impl RawPipeStream {
                     // ReadFile call is non-zero in size.
                     Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
                     Err(e) => return Err(e),
-                    Ok(nsz) => {
-                        size = nsz;
-                        break;
-                    }
+                    Ok(nsz) => size = nsz,
                 }
             } else {
                 break;
@@ -76,19 +73,19 @@ impl RawPipeStream {
         Ok(TryRecvResult { size, fit })
     }
     fn recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
-        match self.try_recv_msg(buf)?.to_result() {
-            Err(sz) => {
-                let mut buf = Vec::with_capacity(sz);
-                debug_assert!(buf.capacity() >= sz);
+        let TryRecvResult { mut size, fit } = self.try_recv_msg(buf)?;
+        if fit {
+            Ok(RecvResult::Fit(size))
+        } else {
+            let mut buf = Vec::with_capacity(size);
+            debug_assert!(buf.capacity() >= size);
 
-                let len = self.handle.read(vec_as_uninit(&mut buf))?;
-                unsafe {
-                    // SAFETY: Win32 guarantees that at least this much is initialized.
-                    buf.set_len(len)
-                };
-                Ok(RecvResult::Alloc(buf))
-            }
-            Ok(sz) => Ok(RecvResult::Fit(sz)),
+            size = self.handle.read(vec_as_uninit(&mut buf))?;
+            unsafe {
+                // SAFETY: Win32 guarantees that at least this much is initialized.
+                buf.set_len(size)
+            };
+            Ok(RecvResult::Alloc(buf))
         }
     }
 

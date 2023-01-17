@@ -18,8 +18,8 @@ use crate::{
     },
     reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
 };
-use futures_io::{AsyncRead, AsyncWrite};
 use futures_core::ready;
+use futures_io::{AsyncRead, AsyncWrite};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
@@ -149,13 +149,14 @@ impl RawPipeStream {
                     // the ReadFile call is non-zero in size.
                     Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
                     Err(e) => return Poll::Ready(Err(e)),
-                    Ok(nsz) => {
-                        size = nsz;
-                        break;
-                    }
+                    Ok(nsz) => size = nsz,
                 }
             } else {
                 break;
+            }
+            if size == 0 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
             }
         }
 
@@ -252,7 +253,7 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
+    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), waiting until a server instance is dispatched.
     pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some()).await?;
         Ok(Self::new(raw))
