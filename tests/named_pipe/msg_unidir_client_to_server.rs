@@ -52,7 +52,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
         let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
         assert_eq!(rslt.size(), MSG_2.len());
-        assert_eq!(rslt.borrow_to_size(&buf1), MSG_2);
+        assert_eq!(rslt.borrow_to_size(&buf2), MSG_2);
     }
 
     Ok(())
@@ -66,7 +66,7 @@ pub fn client(name: Arc<String>) -> TestResult {
     let sent = conn.send(MSG_2).context("Second pipe send failed")?;
     assert_eq!(sent, MSG_2.len());
 
-    conn.flush()?;
+    conn.flush().context("Flush failed")?;
 
     Ok(())
 }

@@ -25,21 +25,13 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
         let recv = async {
-            let size = (&reader)
-                .recv(&mut buf1)
-                .await
-                .context("First pipe receive failed")?
-                .size();
-            assert_eq!(size, CLIENT_MSG_1.len());
-            assert_eq!(&buf1[0..size], CLIENT_MSG_1);
+            let rslt = (&reader).recv(&mut buf1).await.context("First pipe receive failed")?;
+            assert_eq!(rslt.size(), CLIENT_MSG_1.len());
+            assert_eq!(rslt.borrow_to_size(&buf1), CLIENT_MSG_1);
 
-            let size = (&reader)
-                .recv(&mut buf2)
-                .await
-                .context("Second pipe receive failed")?
-                .size();
-            assert_eq!(size, CLIENT_MSG_2.len());
-            assert_eq!(&buf2[0..size], CLIENT_MSG_2);
+            let rslt = (&reader).recv(&mut buf2).await.context("Second pipe receive failed")?;
+            assert_eq!(rslt.size(), CLIENT_MSG_2.len());
+            assert_eq!(rslt.borrow_to_size(&buf2), CLIENT_MSG_2);
 
             TestResult::Ok(())
         };
@@ -49,6 +41,8 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
 
             let sent = writer.send(SERVER_MSG_2).await.context("Pipe send failed")?;
             assert_eq!(sent, SERVER_MSG_2.len());
+
+            writer.flush().await.context("Flush failed")?;
 
             TestResult::Ok(())
         };
@@ -106,21 +100,13 @@ pub async fn client(name: Arc<String>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; SERVER_MSG_1.len()], [0; SERVER_MSG_2.len()]);
 
     let recv = async {
-        let size = (&reader)
-            .recv(&mut buf1)
-            .await
-            .context("First pipe receive failed")?
-            .size();
-        assert_eq!(size, SERVER_MSG_1.len());
-        assert_eq!(&buf1[0..size], SERVER_MSG_1);
+        let rslt = (&reader).recv(&mut buf1).await.context("First pipe receive failed")?;
+        assert_eq!(rslt.size(), SERVER_MSG_1.len());
+        assert_eq!(rslt.borrow_to_size(&buf1), SERVER_MSG_1);
 
-        let size = (&reader)
-            .recv(&mut buf2)
-            .await
-            .context("Second pipe receive failed")?
-            .size();
-        assert_eq!(size, SERVER_MSG_2.len());
-        assert_eq!(&buf2[0..size], SERVER_MSG_2);
+        let rslt = (&reader).recv(&mut buf2).await.context("Second pipe receive failed")?;
+        assert_eq!(rslt.size(), SERVER_MSG_2.len());
+        assert_eq!(rslt.borrow_to_size(&buf2), SERVER_MSG_2);
 
         TestResult::Ok(())
     };
@@ -130,6 +116,8 @@ pub async fn client(name: Arc<String>) -> TestResult {
 
         let sent = writer.send(CLIENT_MSG_2).await.context("Second pipe send failed")?;
         assert_eq!(sent, CLIENT_MSG_2.len());
+
+        writer.flush().await.context("Flush failed")?;
 
         TestResult::Ok(())
     };

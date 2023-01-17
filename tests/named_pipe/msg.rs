@@ -55,13 +55,15 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
         let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
         assert_eq!(rslt.size(), CLIENT_MSG_2.len());
-        assert_eq!(rslt.borrow_to_size(&buf1), CLIENT_MSG_2);
+        assert_eq!(rslt.borrow_to_size(&buf2), CLIENT_MSG_2);
 
         let written = conn.send(SERVER_MSG_1).context("First pipe send failed")?;
         assert_eq!(written, SERVER_MSG_1.len());
 
         let written = conn.send(SERVER_MSG_2).context("Second pipe send failed")?;
         assert_eq!(written, SERVER_MSG_2.len());
+
+        conn.flush().context("Flush failed")?;
     }
 
     Ok(())
@@ -84,6 +86,9 @@ pub fn client(name: Arc<String>) -> TestResult {
     let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
     assert_eq!(rslt.size(), SERVER_MSG_2.len());
     assert_eq!(rslt.borrow_to_size(&buf2), SERVER_MSG_2);
+
+    // TODO necessary or not?
+    conn.flush().context("Flush failed")?;
 
     Ok(())
 }
