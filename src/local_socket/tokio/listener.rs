@@ -3,6 +3,7 @@ use {
     std::{
         fmt::{self, Debug, Formatter},
         io,
+        os::fd::FromRawFd,
     },
 };
 
@@ -122,4 +123,9 @@ impl Debug for LocalSocketListener {
         Debug::fmt(&self.inner, f)
     }
 }
-// TODO: incoming
+impl FromRawFd for LocalSocketListener {
+    /// Create a listener from a raw file descriptor
+    unsafe fn from_raw_fd(fd: i32) -> Self {
+        Self{inner: unsafe {LocalSocketListenerImpl::from_raw_fd(fd)}}
+    }
+}
