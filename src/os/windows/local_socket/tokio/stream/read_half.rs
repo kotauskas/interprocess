@@ -1,6 +1,5 @@
 use {
     crate::os::windows::named_pipe::{pipe_mode, tokio::RecvHalf},
-    futures_core::ready,
     futures_io::AsyncRead,
     std::{
         ffi::c_void,
@@ -35,8 +34,7 @@ impl OwnedReadHalf {
 impl AsyncRead for OwnedReadHalf {
     #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        let rslt = self.pinproj().poll_read(cx, buf);
-        Poll::Ready(ready!(rslt))
+        self.pinproj().poll_read(cx, buf)
     }
 }
 impl Debug for OwnedReadHalf {
