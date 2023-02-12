@@ -122,4 +122,5 @@ impl Debug for LocalSocketListener {
         Debug::fmt(&self.inner, f)
     }
 }
+impl_handle_manip_unix!(LocalSocketListener);
 // TODO: incoming
