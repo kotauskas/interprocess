@@ -23,8 +23,7 @@ pub struct LocalSocketStream {
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
-        let inner = UdStream::connect(path).await?;
-        Ok(Self { inner })
+        UdStream::connect(path).await.map(Self::from)
     }
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         let (r, w) = self.inner.into_split();
@@ -33,38 +32,37 @@ impl LocalSocketStream {
     pub fn peer_pid(&self) -> io::Result<u32> {
         #[cfg(uds_peercred)]
         {
-            self.inner
-                .get_peer_credentials()
-                .map(|ucred| ucred.pid as u32)
+            self.inner.get_peer_credentials().map(|ucred| ucred.pid as u32)
         }
         #[cfg(not(uds_peercred))]
         {
             Err(io::Error::new(io::ErrorKind::Other, "not supported"))
         }
     }
-    // TODO use those
-    pub unsafe fn _from_raw_fd(fd: i32) -> io::Result<Self> {
-        let inner = unsafe {
-            // SAFETY: as per safety contract
-            UdStream::from_raw_fd(fd)?
-        };
-        Ok(Self { inner })
+    #[inline]
+    pub unsafe fn from_raw_fd(fd: i32) -> io::Result<Self> {
+        unsafe { UdStream::from_raw_fd(fd) }.map(Self::from)
     }
-    pub fn _into_raw_fd(self) -> io::Result<i32> {
+    #[inline]
+    pub fn into_raw_fd(self) -> io::Result<i32> {
         self.inner.into_raw_fd()
     }
     fn pinproj(&mut self) -> Pin<&mut UdStream> {
         Pin::new(&mut self.inner)
     }
 }
+impl From<UdStream> for LocalSocketStream {
+    #[inline]
+    fn from(inner: UdStream) -> Self {
+        Self { inner }
+    }
+}
 impl AsyncRead for LocalSocketStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> std::task::Poll<io::Result<usize>> {
+    #[inline]
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> std::task::Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
     }
+    #[inline]
     fn poll_read_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -74,13 +72,11 @@ impl AsyncRead for LocalSocketStream {
     }
 }
 impl AsyncWrite for LocalSocketStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[inline]
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
+    #[inline]
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -89,9 +85,11 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_write_vectored(cx, bufs)
     }
 
+    #[inline]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_flush(cx)
     }
+    #[inline]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_close(cx)
     }
@@ -104,6 +102,7 @@ impl Debug for LocalSocketStream {
     }
 }
 impl AsRawFd for LocalSocketStream {
+    #[inline]
     fn as_raw_fd(&self) -> i32 {
         self.inner.as_raw_fd()
     }

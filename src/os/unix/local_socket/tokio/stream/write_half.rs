@@ -16,27 +16,24 @@ impl OwnedWriteHalf {
     pub fn peer_pid(&self) -> io::Result<u32> {
         #[cfg(uds_peercred)]
         {
-            self.inner
-                .get_peer_credentials()
-                .map(|ucred| ucred.pid as u32)
+            self.inner.get_peer_credentials().map(|ucred| ucred.pid as u32)
         }
         #[cfg(not(uds_peercred))]
         {
             Err(io::Error::new(io::ErrorKind::Other, "not supported"))
         }
     }
+    #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
         Pin::new(&mut self.inner)
     }
 }
 impl AsyncWrite for OwnedWriteHalf {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
+    #[inline]
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
+    #[inline]
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -44,9 +41,11 @@ impl AsyncWrite for OwnedWriteHalf {
     ) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write_vectored(cx, bufs)
     }
+    #[inline]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_flush(cx)
     }
+    #[inline]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_close(cx)
     }

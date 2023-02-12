@@ -27,18 +27,22 @@ impl OwnedWriteHalf {
     /// # Platform-specific behavior
     /// ## macOS and iOS
     /// Not supported by the OS, will always generate an error at runtime.
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.peer_pid()
     }
+    #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
         Pin::new(&mut self.inner)
     }
 }
 
 impl AsyncWrite for OwnedWriteHalf {
+    #[inline]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
+    #[inline]
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -47,15 +51,18 @@ impl AsyncWrite for OwnedWriteHalf {
         self.pinproj().poll_write_vectored(cx, bufs)
     }
     // Those don't do anything
+    #[inline]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_flush(cx)
     }
+    #[inline]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_close(cx)
     }
 }
 
 impl Debug for OwnedWriteHalf {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }

@@ -27,18 +27,22 @@ impl OwnedReadHalf {
     /// # Platform-specific behavior
     /// ## macOS and iOS
     /// Not supported by the OS, will always generate an error at runtime.
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.peer_pid()
     }
+    #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedReadHalfImpl> {
         Pin::new(&mut self.inner)
     }
 }
 
 impl AsyncRead for OwnedReadHalf {
+    #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
     }
+    #[inline]
     fn poll_read_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -49,6 +53,7 @@ impl AsyncRead for OwnedReadHalf {
 }
 
 impl Debug for OwnedReadHalf {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }

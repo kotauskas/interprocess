@@ -21,6 +21,20 @@ impl LocalSocketListener {
         let inner = self.inner.accept().await?;
         Ok(LocalSocketStream { inner })
     }
+    #[inline]
+    pub unsafe fn from_raw_fd(fd: libc::c_int) -> io::Result<Self> {
+        unsafe { UdStreamListener::from_raw_fd(fd) }.map(Self::from)
+    }
+    #[inline]
+    pub fn into_raw_fd(self) -> io::Result<libc::c_int> {
+        self.inner.into_raw_fd()
+    }
+}
+impl From<UdStreamListener> for LocalSocketListener {
+    #[inline]
+    fn from(inner: UdStreamListener) -> Self {
+        Self { inner }
+    }
 }
 impl Debug for LocalSocketListener {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

@@ -78,12 +78,12 @@ pub struct LocalSocketStream {
 }
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
+    #[inline]
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self {
-            inner: LocalSocketStreamImpl::connect(name).await?,
-        })
+        LocalSocketStreamImpl::connect(name).await.map(Self::from)
     }
     /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently.
+    #[inline]
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         let (r, w) = self.inner.into_split();
         (OwnedReadHalf { inner: r }, OwnedWriteHalf { inner: w })
@@ -93,18 +93,46 @@ impl LocalSocketStream {
     /// # Platform-specific behavior
     /// ## macOS and iOS
     /// Not supported by the OS, will always generate an error at runtime.
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         self.inner.peer_pid()
     }
+    /// Creates a Tokio-based async object from a given raw file descriptor. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error (which is why the `FromRawFd` trait can't be implemented instead).
+    ///
+    /// # Safety
+    /// The given file descriptor must be valid (i.e. refer to an existing kernel object) and must not be owned by any other file descriptor container. If this is not upheld, an arbitrary file descriptor will be closed when the returned object is dropped.
+    #[cfg(unix)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+    #[inline]
+    pub unsafe fn from_raw_fd(fd: libc::c_int) -> io::Result<Self> {
+        unsafe { LocalSocketStreamImpl::from_raw_fd(fd) }.map(Self::from)
+    }
+    /// Releases ownership of the raw file descriptor, detaches the object from the Tokio runtime (therefore has to be called within the runtime) and returns the file descriptor as an integer.
+    #[cfg(unix)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+    #[inline]
+    pub fn into_raw_fd(self) -> io::Result<libc::c_int> {
+        self.inner.into_raw_fd()
+    }
+    #[inline]
     fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
         Pin::new(&mut self.inner)
     }
 }
+#[doc(hidden)]
+impl From<LocalSocketStreamImpl> for LocalSocketStream {
+    #[inline]
+    fn from(inner: LocalSocketStreamImpl) -> Self {
+        Self { inner }
+    }
+}
 
 impl AsyncRead for LocalSocketStream {
+    #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
     }
+    #[inline]
     fn poll_read_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -114,9 +142,11 @@ impl AsyncRead for LocalSocketStream {
     }
 }
 impl AsyncWrite for LocalSocketStream {
+    #[inline]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
     }
+    #[inline]
     fn poll_write_vectored(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -125,15 +155,18 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_write_vectored(cx, bufs)
     }
     // Those don't do anything
+    #[inline]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_flush(cx)
     }
+    #[inline]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproj().poll_close(cx)
     }
 }
 
 impl Debug for LocalSocketStream {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.inner, f)
     }
