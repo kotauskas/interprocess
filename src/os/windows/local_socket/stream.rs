@@ -1,5 +1,4 @@
 use {
-    super::thunk_broken_pipe_to_eof,
     crate::{
         local_socket::ToLocalSocketName,
         os::windows::named_pipe::{pipe_mode, DuplexPipeStream},
@@ -21,12 +20,14 @@ impl LocalSocketStream {
         let inner = DuplexPipeStream::connect(name.inner())?;
         Ok(Self { inner })
     }
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         match self.inner.is_server() {
             true => self.inner.client_process_id(),
             false => self.inner.server_process_id(),
         }
     }
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.inner.set_nonblocking(nonblocking)
     }
@@ -35,20 +36,25 @@ impl LocalSocketStream {
 /// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
 /// reader, but Windows shoehorns both into the former.
 impl Read for LocalSocketStream {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        thunk_broken_pipe_to_eof(self.inner.read(buf))
+        self.inner.read(buf)
     }
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        thunk_broken_pipe_to_eof(self.inner.read_vectored(bufs))
+        self.inner.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         self.inner.write_vectored(bufs)
     }
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
     }
@@ -61,11 +67,13 @@ impl Debug for LocalSocketStream {
     }
 }
 impl AsRawHandle for LocalSocketStream {
+    #[inline]
     fn as_raw_handle(&self) -> *mut c_void {
         self.inner.as_raw_handle()
     }
 }
 impl IntoRawHandle for LocalSocketStream {
+    #[inline]
     fn into_raw_handle(self) -> *mut c_void {
         self.inner.into_raw_handle()
     }

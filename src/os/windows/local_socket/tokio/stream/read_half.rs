@@ -1,5 +1,4 @@
 use {
-    super::thunk_broken_pipe_to_eof,
     crate::os::windows::named_pipe::{pipe_mode, tokio::RecvHalf},
     futures_core::ready,
     futures_io::AsyncRead,
@@ -19,6 +18,7 @@ pub struct OwnedReadHalf {
     pub(super) inner: ReadHalfImpl,
 }
 impl OwnedReadHalf {
+    #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
         match self.inner.is_server() {
             true => self.inner.client_process_id(),
@@ -33,10 +33,10 @@ impl OwnedReadHalf {
 /// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
 /// reader, but Windows shoehorns both into the former.
 impl AsyncRead for OwnedReadHalf {
+    #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let rslt = self.pinproj().poll_read(cx, buf);
-        let thunked = thunk_broken_pipe_to_eof(ready!(rslt));
-        Poll::Ready(thunked)
+        Poll::Ready(ready!(rslt))
     }
 }
 impl Debug for OwnedReadHalf {
@@ -47,6 +47,7 @@ impl Debug for OwnedReadHalf {
     }
 }
 impl AsRawHandle for OwnedReadHalf {
+    #[inline]
     fn as_raw_handle(&self) -> *mut c_void {
         self.inner.as_raw_handle()
     }

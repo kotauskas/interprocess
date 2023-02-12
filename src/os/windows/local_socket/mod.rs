@@ -17,13 +17,6 @@ pub use listener::*;
 mod stream;
 pub use stream::*;
 
-fn thunk_broken_pipe_to_eof(r: std::io::Result<usize>) -> std::io::Result<usize> {
-    match r {
-        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Ok(0),
-        els => els,
-    }
-}
-
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
 
 pub fn name_type_support_query() -> NameTypeSupport {

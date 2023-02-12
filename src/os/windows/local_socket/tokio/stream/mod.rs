@@ -5,7 +5,6 @@ mod write_half;
 pub use write_half::*;
 // TODO reunite
 
-use super::super::thunk_broken_pipe_to_eof;
 use {
     crate::{
         local_socket::ToLocalSocketName,
@@ -54,7 +53,7 @@ impl LocalSocketStream {
 impl AsyncRead for LocalSocketStream {
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let rslt = self.pinproj().poll_read(cx, buf);
-        let thunked = thunk_broken_pipe_to_eof(ready!(rslt));
+        let thunked = ready!(rslt);
         Poll::Ready(thunked)
     }
 }
