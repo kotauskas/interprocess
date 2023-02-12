@@ -1,11 +1,9 @@
 //! Adapter module, implements local sockets under Windows.
 
-use {
-    crate::local_socket::{LocalSocketName, NameTypeSupport},
-    std::{
-        borrow::Cow,
-        ffi::{OsStr, OsString},
-    },
+use crate::local_socket::{LocalSocketName, NameTypeSupport};
+use std::{
+    borrow::Cow,
+    ffi::{OsStr, OsString},
 };
 
 #[cfg(feature = "tokio")]
@@ -31,15 +29,15 @@ pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'sta
 
 /*
 /// Helper function to check whether a series of UTF-16 bytes starts with `\\.\pipe\`.
-fn has_pipefs_prefix(
-    val: impl IntoIterator<Item = u16>,
-) -> bool {
-    let pipefs_prefix: [u16; 9] = [
-        // The string \\.\pipe\ in UTF-16
-        0x005c, 0x005c, 0x002e, 0x005c, 0x0070, 0x0069, 0x0070, 0x0065, 0x005c,
-    ];
-    pipefs_prefix.iter().copied().eq(val)
-
+fn has_pipefs_prefix(val: impl IntoIterator<Item = u16>) -> bool {
+    const BKSLSH: u16 = '\\' as _;
+    const PERIOD: u16 = '.' as _;
+    const P: u16 = 'p' as _;
+    const I: u16 = 'i' as _;
+    const E: u16 = 'e' as _;
+    static PIPEFS_PREFIX: [u16; 9] = [BKSLSH, BKSLSH, PERIOD, BKSLSH, P, I, P, E, BKSLSH];
+    PIPEFS_PREFIX.iter().copied().eq(val)
 }*/
 
 // TODO add Path/PathBuf special-case for \\.\pipe\*
+// Maybe use namespaced = false to signify that \\.\pipe\ does not need to be prepended.
