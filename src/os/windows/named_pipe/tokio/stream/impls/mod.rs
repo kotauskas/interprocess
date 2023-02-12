@@ -4,6 +4,7 @@ mod split_owned;
 
 use crate::{
     os::windows::{
+        is_eof_like,
         named_pipe::{
             convert_path, encode_to_utf16,
             stream::{
@@ -51,6 +52,16 @@ macro_rules! same_clsrv {
     };
 }
 
+fn downgrade_poll_read_eof<T: Default>(r: Poll<io::Result<T>>) -> Poll<io::Result<T>> {
+    Poll::Ready(downgrade_read_eof(ready!(r)))
+}
+fn downgrade_read_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
+    match r {
+        Err(e) if is_eof_like(&e) => Ok(T::default()),
+        els => els,
+    }
+}
+
 #[repr(transparent)]
 struct AssertHandleSyncSend(HANDLE);
 unsafe impl Sync for AssertHandleSyncSend {}
@@ -96,14 +107,14 @@ impl RawPipeStream {
     }
 
     fn poll_read_readbuf(&mut self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf))
+        downgrade_poll_read_eof(same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf)))
     }
 
     // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
     // has to be `&mut self`.
     fn poll_read_uninit(&mut self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
         let mut readbuf = TokioReadBuf::uninit(buf);
-        ready!(self.poll_read_readbuf(cx, &mut readbuf))?;
+        ready!(downgrade_poll_read_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
         Poll::Ready(Ok(readbuf.filled().len()))
     }
     #[inline]
@@ -113,8 +124,9 @@ impl RawPipeStream {
 
     fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
-            ready!(same_clsrv!(x in self => x.poll_read_ready(cx)))?;
-            match same_clsrv!(x in self => x.try_read(buf)) {
+            let prr = same_clsrv!(x in self => x.poll_read_ready(cx));
+            ready!(downgrade_poll_read_eof(prr))?;
+            match downgrade_read_eof(same_clsrv!(x in self => x.try_read(buf))) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 els => return Poll::Ready(els),
             }
@@ -139,7 +151,7 @@ impl RawPipeStream {
         let mut size = 0;
         let mut fit = false;
         while size == 0 {
-            size = peek_msg_len(self.as_raw_handle())?;
+            size = downgrade_read_eof(peek_msg_len(self.as_raw_handle()))?;
             fit = buf.len() >= size;
             if fit {
                 match ready!(self.poll_read_init(cx, buf)) {
@@ -216,7 +228,7 @@ impl Future for ReadUninit<'_, '_> {
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let slf = self.get_mut();
-        slf.0.poll_read_uninit(cx, slf.1)
+        downgrade_poll_read_eof(slf.0.poll_read_uninit(cx, slf.1))
     }
 }
 
@@ -371,7 +383,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
         let mut slf_flush = self.flush.lock().await;
         let rslt = loop {
             match slf_flush.as_mut() {
-                Some(fl) => break fl.await.unwrap(),
+                Some(fl) => match fl.await {
+                    Err(e) => {
+                        *slf_flush = None;
+                        panic!("flush task panicked: {e}")
+                    }
+                    Ok(ok) => break ok,
+                },
                 None => self.ensure_flush_start(&mut slf_flush),
             }
         };

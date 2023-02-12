@@ -63,13 +63,13 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 ///
 /// // Preemptively allocate a sizeable buffer for reading. Keep in mind that this will depend on
 /// // the specifics of the protocol you're using.
-/// let mut buffer = String::with_capacity(128);
+/// let mut buffer = Vec::<u8>::with_capacity(128);
 ///
 /// // Create our connection. This will block until the server accepts our connection, but will fail
 /// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
 /// // where connecting to a port that's not bound to any server will send a "connection refused"
 /// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let conn = DuplexPipeStream::<pipe_mode::Messages>::connect("Example")?;
+/// let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect("Example")?;
 ///
 /// // Here's our message so that we could check its length later.
 /// static MESSAGE: &[u8] = b"Hello from client!";
@@ -80,12 +80,20 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 /// // Use the reliable message receive API, which gets us a `RecvResult` from the
 /// // `reliable_recv_msg` module.
 /// let rslt = conn.recv(&mut buffer)?;
+///
 /// // This borrows our message either from the new buffer or from the old one,
 /// // cropped to its size. Note that this is one of `RecvResult`'s helpers.
-/// let msg = rslt.borrow_to_size(&buffer);
+/// let received_bytes = rslt.borrow_to_size(&buffer);
+///
+/// // Convert the data that's been read into a string. This checks for UTF-8
+/// // validity, and if invalid characters are found, a new buffer is
+/// // allocated to house a modified version of the received data, where
+/// // decoding errors are replaced with those diamond-shaped question mark
+/// // U+FFFD REPLACEMENT CHARACTER thingies: �.
+/// let received_string = String::from_utf8_lossy(received_bytes);
 ///
 /// // Print out the result!
-/// println!("Server answered: {msg}");
+/// println!("Server answered: {received_string}");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {

@@ -129,7 +129,13 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
         let mut slf_flush = self.flush.lock().await;
         let rslt = loop {
             match slf_flush.as_mut() {
-                Some(fl) => break fl.await.unwrap(),
+                Some(fl) => match fl.await {
+                    Err(e) => {
+                        *slf_flush = None;
+                        panic!("flush task panicked: {e}")
+                    }
+                    Ok(ok) => break ok,
+                },
                 None => self.ensure_flush_start(&mut slf_flush),
             }
         };

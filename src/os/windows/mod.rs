@@ -12,10 +12,13 @@ use std::{
     mem::{transmute, ManuallyDrop, MaybeUninit},
     ptr,
 };
-use winapi::um::{
-    fileapi::{FlushFileBuffers, ReadFile, WriteFile},
-    handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
-    processthreadsapi::GetCurrentProcess,
+use winapi::{
+    shared::winerror::ERROR_PIPE_NOT_CONNECTED,
+    um::{
+        fileapi::{FlushFileBuffers, ReadFile, WriteFile},
+        handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
+        processthreadsapi::GetCurrentProcess,
+    },
 };
 mod winprelude {
     pub use std::os::windows::prelude::*;
@@ -94,7 +97,10 @@ impl FileHandle {
             );
             (result != 0, num_bytes_read as usize)
         };
-        ok_or_ret_errno!(success => num_bytes_read)
+        match ok_or_ret_errno!(success => num_bytes_read) {
+            Err(e) if is_eof_like(&e) => Ok(0),
+            els => els,
+        }
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         debug_assert!(
@@ -121,7 +127,10 @@ impl FileHandle {
     #[inline]
     pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
         let success = unsafe { FlushFileBuffers(handle) != 0 };
-        ok_or_ret_errno!(success => ())
+        match ok_or_ret_errno!(success => ()) {
+            Err(e) if is_eof_like(&e) => Ok(()),
+            els => els,
+        }
     }
 }
 impl Drop for FileHandle {
@@ -152,3 +161,7 @@ impl FromRawHandle for FileHandle {
 }
 unsafe impl Send for FileHandle {}
 unsafe impl Sync for FileHandle {} // WriteFile and ReadFile are thread-safe, apparently
+
+fn is_eof_like(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::BrokenPipe || e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _)
+}
