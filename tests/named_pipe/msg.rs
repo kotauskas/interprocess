@@ -87,7 +87,6 @@ pub fn client(name: Arc<String>) -> TestResult {
     assert_eq!(rslt.size(), SERVER_MSG_2.len());
     assert_eq!(rslt.borrow_to_size(&buf2), SERVER_MSG_2);
 
-    // TODO necessary or not?
     conn.flush().context("Flush failed")?;
 
     Ok(())

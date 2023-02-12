@@ -24,7 +24,6 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         assert_eq!(sent, MSG_2.len());
 
         conn.flush().await.context("Flush failed")?;
-        conn.flush().await.context("Flush failed")?; // FIXME what the shit?
 
         Ok(())
     }
