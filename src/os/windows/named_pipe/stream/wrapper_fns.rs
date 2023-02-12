@@ -81,7 +81,6 @@ fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<
             path.as_ptr() as *mut _,
             {
                 let mut access_flags: DWORD = 0;
-                // TODO add FILE_READ_ATTRIBUTES perms
                 if read {
                     access_flags |= GENERIC_READ;
                 }
