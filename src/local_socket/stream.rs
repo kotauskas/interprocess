@@ -87,7 +87,6 @@ impl LocalSocketStream {
         self.inner.set_nonblocking(nonblocking)
     }
 }
-// TODO panic on read-to-end and read-to-string
 // TODO vectored I/O on Unix
 impl Read for LocalSocketStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
