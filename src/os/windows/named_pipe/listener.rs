@@ -159,21 +159,21 @@ pub struct PipeListenerOptions<'a> {
     pub wait_timeout: NonZeroU32,
 }
 macro_rules! genset {
-    // TODO get rid of this $namel thing when bumping MSRV in 2.0.0
-    ($name:ident $namel:literal : $ty:ty) => {
-        #[doc = "Sets the [`"]
-        #[doc = $namel]
-        #[doc = "`](#structfield."]
-        #[doc = $namel]
-        #[doc = ") parameter to the specified value."]
+    ($name:ident : $ty:ty) => {
+        #[doc = concat!(
+            "Sets the [`",
+            stringify!($name),
+            "`](#structfield.", stringify!($name),
+            ") parameter to the specified value."
+        )]
         #[must_use = "builder setters take the entire structure and return the result"]
         pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
             self.$name = $name.into();
             self
         }
     };
-    ($($name:ident $namel:literal : $ty:ty),+ $(,)?) => {
-        $(genset!($name $namel : $ty);)+
+    ($($name:ident : $ty:ty),+ $(,)?) => {
+        $(genset!($name: $ty);)+
     };
 }
 impl<'a> PipeListenerOptions<'a> {
@@ -192,8 +192,6 @@ impl<'a> PipeListenerOptions<'a> {
         }
     }
     /// Clones configuration options which are not owned by value and returns a copy of the original option table which is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
-    ///
-    /// This is used instead of the `ToOwned` trait for backwards compatibility – this will be fixed in the next breaking release.
     pub fn to_owned(&self) -> PipeListenerOptions<'static> {
         // We need this ugliness because the compiler does not understand that
         // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
@@ -213,15 +211,15 @@ impl<'a> PipeListenerOptions<'a> {
         }
     }
     genset!(
-        name "name": Cow<'a, OsStr>,
-        mode "mode": PipeMode,
-        nonblocking "nonblocking": bool,
-        instance_limit "instance_limit": Option<NonZeroU8>,
-        write_through "write_through": bool,
-        accept_remote "accept_remote": bool,
-        input_buffer_size_hint "input_buffer_size_hint": DWORD,
-        output_buffer_size_hint "output_buffer_size_hint": DWORD,
-        wait_timeout "wait_timeout": NonZeroU32,
+        name: Cow<'a, OsStr>,
+        mode: PipeMode,
+        nonblocking: bool,
+        instance_limit: Option<NonZeroU8>,
+        write_through: bool,
+        accept_remote: bool,
+        input_buffer_size_hint: DWORD,
+        output_buffer_size_hint: DWORD,
+        wait_timeout: NonZeroU32,
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
     pub(super) fn create_instance(
@@ -242,8 +240,8 @@ cannot create pipe server that has byte type but reads messages – have you for
         }
 
         let path = super::convert_and_encode_path(&self.name, None);
-        let open_mode = self.to_open_mode(first, role, overlapped);
-        let pipe_mode = self.to_pipe_mode(read_mode, nonblocking);
+        let open_mode = self.open_mode(first, role, overlapped);
+        let pipe_mode = self.pipe_mode(read_mode, nonblocking);
         let (handle, success) = unsafe {
             // TODO security attributes
             let handle = CreateNamedPipeW(
@@ -313,7 +311,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         Ok((owned_config, instance))
     }
 
-    fn to_open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> DWORD {
+    fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> DWORD {
         let mut open_mode = 0_u32;
         open_mode |= role.direction_as_server().to::<DWORD>();
         if first {
@@ -327,7 +325,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         }
         open_mode
     }
-    fn to_pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> DWORD {
+    fn pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> DWORD {
         let mut pipe_mode = 0_u32;
         pipe_mode |= self.mode.to_pipe_type();
         pipe_mode |= read_mode.map_or(0, PipeMode::to_readmode);
@@ -341,6 +339,7 @@ cannot create pipe server that has byte type but reads messages – have you for
     }
 }
 impl Default for PipeListenerOptions<'_> {
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
