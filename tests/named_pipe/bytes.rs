@@ -45,6 +45,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
         conn.get_mut()
             .write_all(SERVER_MSG.as_bytes())
             .context("Pipe send failed")?;
+        conn.get_mut().flush().context("Pipe flush failed")?;
     }
 
     Ok(())
@@ -56,9 +57,11 @@ pub fn client(name: Arc<String>) -> TestResult {
         .context("Connect failed")
         .map(BufReader::new)?;
 
-    conn.get_mut().write_all(CLIENT_MSG.as_bytes())?;
+    conn.get_mut()
+        .write_all(CLIENT_MSG.as_bytes())
+        .context("Pipe send failed")?;
 
-    conn.read_line(&mut buffer)?;
+    conn.read_line(&mut buffer).context("Pipe receive failed")?;
     assert_eq!(buffer, SERVER_MSG);
 
     Ok(())

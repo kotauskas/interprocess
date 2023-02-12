@@ -53,7 +53,7 @@ pub fn client(name: Arc<String>) -> TestResult {
     let mut conn = SendPipeStream::<pipe_mode::Bytes>::connect(name.as_str()).context("Connect failed")?;
 
     conn.write_all(MSG.as_bytes()).context("Pipe send failed")?;
-    conn.flush()?;
+    conn.flush().context("Pipe flush failed")?;
 
     Ok(())
 }
