@@ -1,3 +1,5 @@
+// TODO LocalSocketNameBuf
+
 use {
     super::NameTypeSupport,
     std::{
@@ -14,14 +16,9 @@ use {
 /// A separate trait is used to create names from basic strings: [`ToLocalSocketName`](super::ToLocalSocketName). Aside from being conveniently implemented on every single string type in the standard library, it also provides some special processing. Please read its documentation if you haven't already – the rest of this page assumes you did.
 ///
 /// # Validity
-/// As mentioned in the [module-level documentation], not all platforms support all types of local socket names. A name pointing to a filesystem location is only supported on Unix-like systems, and names pointing to an abstract namespace reserved specifically for local sockets are only available on Linux and Windows. Due to the diversity of those differences, `LocalSocketName` does not provide any forced validation by itself – the [`is_supported`] and [`is_always_supported`] checks are not enforced to succeed. Instead, they are intended as helpers for the process of user input validation, if any local socket names are ever read from environment variables, configuration files or other methods of user input.
+/// As mentioned in the [module-level documentation](super), not all platforms support all types of local socket names. A name pointing to a filesystem location is only supported on Unix-like systems, and names pointing to an abstract namespace reserved specifically for local sockets are only available on Linux and Windows. Due to the diversity of those differences, `LocalSocketName` does not provide any forced validation by itself – the [`is_supported`] and [`is_always_supported`] checks are not enforced to succeed. Instead, they are intended as helpers for the process of user input validation, if any local socket names are ever read from environment variables, configuration files or other methods of user input.
 ///
 /// If an invalid local socket name is used to create a local socket or connect to it, the creation/connection method will fail.
-///
-/// [`to_local_socket_name`]: trait.ToLocalSocketName.html " "
-/// [module-level documentation]: index.html " "
-/// [`is_supported`]: #method.is_supported " "
-/// [`is_always_supported`]: #method.is_always_supported " "
 pub struct LocalSocketName<'a> {
     inner: Cow<'a, OsStr>,
     namespaced: bool,
@@ -43,8 +40,7 @@ impl<'a> LocalSocketName<'a> {
     ///
     /// This is mainly a helper function for [`.is_supported()`](Self::is_supported) and [`.is_always_supported()`](Self::is_always_supported), but there's no good reason not to expose it as a public method, so why not?
     pub const fn is_supported_in_nts_type(&self, nts: NameTypeSupport) -> bool {
-        (self.is_namespaced() && nts.namespace_supported())
-            || (self.is_path() && nts.paths_supported())
+        (self.is_namespaced() && nts.namespace_supported()) || (self.is_path() && nts.paths_supported())
     }
     /// Returns `true` if the value is a namespaced name, `false` otherwise.
     pub const fn is_namespaced(&self) -> bool {
