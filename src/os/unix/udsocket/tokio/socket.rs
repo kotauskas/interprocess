@@ -1,9 +1,6 @@
+use crate::os::unix::udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath};
 #[cfg(uds_peercred)]
-use super::c_wrappers;
-use crate::os::unix::{
-    udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath},
-    unixprelude::*,
-};
+use crate::os::unix::{udsocket::c_wrappers, unixprelude::*};
 use std::{
     convert::TryFrom,
     future::Future,
