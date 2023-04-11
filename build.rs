@@ -22,11 +22,11 @@ fn is_unix() -> bool {
 /// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
 ///     - `uds_sockcred`
-/// - Socket peer credential accessors:
-///     - `uds_peercred`, support for `SO_PEERCRED`
+/// - Socket options for retrieving peer credentials:
+///     - `uds_peercred`
 ///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to Linux)
-///     - `uds_peereid`, as seen on all BSDs
-///     - `uds_xucred`
+///     - `uds_unpcbid`, as seen on NetBSD
+///     - `uds_xucred`, as seen on all BSDs except for NetBSD
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
 ///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
@@ -73,7 +73,9 @@ fn collect_uds_features(target: &TargetTriplet) {
             "uds_sockcred",
             "uds_peereid",
         ]);
-        if !target.os("netbsd") {
+        if target.os("netbsd") {
+            define("uds_unpcbid");
+        } else {
             define("uds_xucred");
         }
     } else if target.os_any(&["solaris", "illumos"]) {
