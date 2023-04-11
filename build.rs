@@ -19,20 +19,20 @@ fn is_unix() -> bool {
 /// - Ancillary data support:
 ///     - `uds_scm_rights` ("passfd")
 ///     - `uds_scm_credentials` ("passcred")
-/// - Credentials structure flavor:
+/// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
-///     - `uds_xucred`
-///     - `uds_sockcred` from NetBSD
+///     - `uds_sockcred`
 /// - Socket peer credential accessors:
 ///     - `uds_peercred`, support for `SO_PEERCRED`
-///     - `uds_getpeerucred` as seen on Solaris
-///     - `uds_peereid`, exclusive to NetBSD
+///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to Linux)
+///     - `uds_peereid`, as seen on all BSDs
+///     - `uds_xucred`
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
-///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, Android, uClibc MIPS64, and uClibc x86-64
+///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
 /// - `msghdr`'s `msg_controllen` type:
 ///     - `uds_msghdr_controllen_socklen_t`
-///     - `uds_msghdr_controllen_size_t`, on Linux with GNU, Android, uClibc MIPS64, and uClibc x86-64
+///     - `uds_msghdr_controllen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
     let (mut uds, mut scm_rights) = (false, true);
@@ -54,6 +54,12 @@ fn collect_uds_features(target: &TargetTriplet) {
             // Only actual Linux has that... I think? lmao
             define("uds_linux_namespace");
         }
+    } else if target.os("aix") {
+        uds = true;
+        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
+    } else if target.os("nto") {
+        uds = true;
+        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_peercred"]);
     } else if target.env("newlib") && target.arch("xtensa") {
         uds = true;
         scm_rights = false;
@@ -64,13 +70,10 @@ fn collect_uds_features(target: &TargetTriplet) {
         ldefine(&[
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
-            "uds_xucred",
+            "uds_sockcred",
+            "uds_peereid",
         ]);
-        if target.os("netbsd") {
-            // NetBSD differs from all other BSDs in that it uses its own
-            // credential structure, sockcred
-            ldefine(&["uds_sockcred", "uds_peereid"]);
-        } else if target.os_any(&["freebsd", "dragonfly", "macos", "ios"]) {
+        if !target.os("netbsd") {
             define("uds_xucred");
         }
     } else if target.os_any(&["solaris", "illumos"]) {
