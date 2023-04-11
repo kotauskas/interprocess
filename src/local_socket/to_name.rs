@@ -59,6 +59,7 @@ pub trait ToLocalSocketName<'a> {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>>;
 }
 
+/// Returns self.
 impl<'a> ToLocalSocketName<'a> for LocalSocketName<'a> {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         Ok(self)
