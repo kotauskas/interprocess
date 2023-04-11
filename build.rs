@@ -27,10 +27,6 @@ fn is_unix() -> bool {
 ///     - `uds_peercred`, support for `SO_PEERCRED`
 ///     - `uds_getpeerucred` as seen on Solaris
 ///     - `uds_peereid`, exclusive to NetBSD
-/// - Address length flavors:
-///     - `uds_sockaddr_un_len_108`
-///     - `uds_sockaddr_un_len_104`, on the BSD family
-///     - `uds_sockaddr_un_len_126`, only on Haiku
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
 ///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, Android, uClibc MIPS64, and uClibc x86-64
@@ -44,7 +40,6 @@ fn collect_uds_features(target: &TargetTriplet) {
     || target.os_any(&["android", "emscripten", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
         uds = true;
-        define("uds_sockaddr_un_len_108");
         if !target.os("emscripten") {
             ldefine(&["uds_ucred", "uds_scm_credentials", "uds_peercred"]);
         }
@@ -62,14 +57,11 @@ fn collect_uds_features(target: &TargetTriplet) {
     } else if target.env("newlib") && target.arch("xtensa") {
         uds = true;
         scm_rights = false;
-        ldefine(&[
-            "sockaddr_un_len_108", "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t",
-        ]);
+        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
     } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
         // The BSD OS family
         uds = true;
         ldefine(&[
-            "uds_sockaddr_un_len_104",
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
             "uds_xucred",
@@ -84,7 +76,6 @@ fn collect_uds_features(target: &TargetTriplet) {
     } else if target.os_any(&["solaris", "illumos"]) {
         uds = true;
         ldefine(&[
-            "uds_sockaddr_un_len_108",
             "uds_getpeerucred",
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
@@ -92,7 +83,6 @@ fn collect_uds_features(target: &TargetTriplet) {
     } else if target.os("haiku") {
         uds = true;
         ldefine(&[
-            "uds_sockaddr_un_len_126",
             "uds_ucred",
             "uds_peercred",
             "uds_msghdr_iovlen_c_int",

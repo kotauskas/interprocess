@@ -11,37 +11,26 @@
 //! [`UdStreamListener`]: struct.UdStreamListener.html " "
 //! [`UdSocket`]: struct.UdSocket.html " "
 
+pub mod cmsg;
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
-mod ancillary;
+mod ancillary_old;
 mod listener;
 mod path;
 mod socket;
 mod stream;
 mod util;
-pub use {ancillary::*, listener::*, path::*, socket::*, stream::*};
+pub use {ancillary_old::*, cmsg::*, listener::*, path::*, socket::*, stream::*};
 
 mod path_drop_guard;
 use path_drop_guard::*;
 
 mod c_wrappers;
 
-cfg_if::cfg_if! {
-    if #[cfg(uds_sockaddr_un_len_108)] {
-        const _MAX_UDSOCKET_PATH_LEN: usize = 108;
-    } else if #[cfg(uds_sockaddr_un_len_104)] {
-        const _MAX_UDSOCKET_PATH_LEN: usize = 104;
-    } else if #[cfg(uds_sockaddr_un_len_126)] {
-        const _MAX_UDSOCKET_PATH_LEN: usize = 126;
-    } else {
-        compile_error!("\
-Please fill out MAX_UDSOCKET_PATH_LEN in interprocess/src/os/unix/udsocket/mod.rs for your \
-platform if you wish to enable Unix domain socket support for it"
-        );
-    }
-}
+use libc::{sa_family_t, sockaddr_un};
+use std::mem::size_of;
 
 /// The maximum path length for Unix domain sockets. [`UdStreamListener::bind`] panics if the specified path exceeds this value.
 ///
@@ -73,4 +62,13 @@ platform if you wish to enable Unix domain socket support for it"
 // The reason why this constant wraps the underscored one instead of being defined directly is
 // because that'd require documenting both branches separately. This way, the user-faced
 // constant has only one definition and one documentation comment block.
-pub const MAX_UDSOCKET_PATH_LEN: usize = _MAX_UDSOCKET_PATH_LEN;
+pub const MAX_UDSOCKET_PATH_LEN: usize = {
+    const LENGTH: usize = size_of::<sockaddr_un>() - size_of::<sa_family_t>();
+    // Validates the calculated length and generates a cryptic compile error
+    // if we guessed wrong, which isn't supposed to happen on any sane platform.
+    let _ = sockaddr_un {
+        sun_family: 0,
+        sun_path: [0; LENGTH],
+    };
+    LENGTH
+};
