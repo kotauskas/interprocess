@@ -94,7 +94,7 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
         Ok(())
     }
 }
-#[cfg(uds_peercred)]
+#[cfg(uds_peerucred)]
 pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<libc::ucred> {
     use libc::{socklen_t, ucred, SOL_SOCKET, SO_PEERCRED};
     use std::mem::zeroed;

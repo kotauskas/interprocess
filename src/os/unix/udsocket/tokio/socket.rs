@@ -1,5 +1,5 @@
 use crate::os::unix::udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath};
-#[cfg(uds_peercred)]
+#[cfg(uds_peerucred)]
 use crate::os::unix::{udsocket::c_wrappers, unixprelude::*};
 use std::{
     convert::TryFrom,
@@ -166,8 +166,8 @@ impl UdSocket {
         self.0.poll_send_to(cx, buf, path.as_osstr())
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(uds_peercred)]
-    #[cfg_attr( // uds_peercred template
+    #[cfg(uds_peerucred)]
+    #[cfg_attr( // uds_peerucred template
         feature = "doc_cfg",
         doc(cfg(any(
             all(

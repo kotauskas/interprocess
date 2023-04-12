@@ -21,8 +21,8 @@ pub struct BorrowedWriteHalf<'a>(pub(super) TokioUdStreamWriteHalf<'a>);
 
 impl<'a> BorrowedWriteHalf<'a> {
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(uds_peercred)]
-    #[cfg_attr( // uds_peercred template
+    #[cfg(uds_peerucred)]
+    #[cfg_attr( // uds_peerucred template
         feature = "doc_cfg",
         doc(cfg(any(
             all(
@@ -101,8 +101,8 @@ impl OwnedWriteHalf {
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(uds_peercred)]
-    #[cfg_attr( // uds_peercred template
+    #[cfg(uds_peerucred)]
+    #[cfg_attr( // uds_peerucred template
         feature = "doc_cfg",
         doc(cfg(any(
             all(

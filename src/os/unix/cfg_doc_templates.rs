@@ -23,7 +23,7 @@
     doc(cfg(any(target_os = "linux", target_os = "android")))
 )]
 
-#[cfg_attr( // uds_peercred template
+#[cfg_attr( // uds_peerucred template
     feature = "doc_cfg",
     doc(cfg(any(
         all(

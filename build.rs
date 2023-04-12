@@ -23,7 +23,7 @@ fn is_unix() -> bool {
 ///     - `uds_ucred`
 ///     - `uds_sockcred`
 /// - Socket options for retrieving peer credentials:
-///     - `uds_peercred`
+///     - `uds_peerucred`
 ///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to Linux)
 ///     - `uds_unpcbid`, as seen on NetBSD
 ///     - `uds_xucred`, as seen on all BSDs except for NetBSD
@@ -41,7 +41,7 @@ fn collect_uds_features(target: &TargetTriplet) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
         uds = true;
         if !target.os("emscripten") {
-            ldefine(&["uds_ucred", "uds_scm_credentials", "uds_peercred"]);
+            ldefine(&["uds_ucred", "uds_scm_credentials", "uds_peerucred"]);
         }
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
@@ -59,7 +59,7 @@ fn collect_uds_features(target: &TargetTriplet) {
         ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
     } else if target.os("nto") {
         uds = true;
-        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_peercred"]);
+        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_peerucred"]);
     } else if target.env("newlib") && target.arch("xtensa") {
         uds = true;
         scm_rights = false;
@@ -89,7 +89,7 @@ fn collect_uds_features(target: &TargetTriplet) {
         uds = true;
         ldefine(&[
             "uds_ucred",
-            "uds_peercred",
+            "uds_peerucred",
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
         ]);
