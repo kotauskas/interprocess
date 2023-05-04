@@ -12,6 +12,3 @@ mod listener;
 mod socket;
 mod stream;
 pub use {listener::*, socket::*, stream::*};
-
-#[cfg(uds_peerucred)]
-use super::c_wrappers;
