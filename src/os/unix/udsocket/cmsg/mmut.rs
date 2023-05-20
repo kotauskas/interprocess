@@ -1,6 +1,11 @@
-use super::{ancillary::ToCmsg, *};
+use super::{
+    super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
+    ancillary::ToCmsg,
+    *,
+};
 use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
 use std::{
+    io,
     mem::{size_of, transmute, zeroed, MaybeUninit},
     num::NonZeroUsize,
     ptr, slice,
@@ -19,6 +24,7 @@ impl<'a> CmsgMut<'a> {
     /// # Panics
     /// The buffer's length must not overflow `isize`.
     pub fn new(buf: &'a mut [MaybeUninit<u8>]) -> Self {
+        // TODO check against real type of controllen and not isize
         Self::try_from(buf).expect("buffer size overflowed `isize`")
     }
 
@@ -66,16 +72,22 @@ impl<'a> CmsgMut<'a> {
         self.buf
     }
 
-    fn make_dummy_msghdr(&self) -> msghdr {
-        let mut msghdr = DUMMY_MSGHDR;
-        msghdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
-        msghdr.msg_controllen = self.buf.len();
-        msghdr
+    pub(crate) fn fill_msghdr(&self, hdr: &mut msghdr, full_length: bool) -> io::Result<()> {
+        hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
+        let len = if full_length { self.buf.len() } else { self.init_len };
+        hdr.msg_controllen = to_msghdr_controllen(len)?;
+        Ok(())
     }
+    fn make_msghdr(&self, full_length: bool) -> msghdr {
+        let mut hdr = DUMMY_MSGHDR;
+        self.fill_msghdr(&mut hdr, full_length).expect("too big");
+        hdr
+    }
+
     /// Finds the first `cmsghdr` with zeroes and returns a reference to it.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_dummy_msghdr()` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
     unsafe fn first_cmsghdr<'x>(
         buf: &'x mut [MaybeUninit<u8>],
         dummy_msghdr: &msghdr,
@@ -102,7 +114,7 @@ impl<'a> CmsgMut<'a> {
     /// Fills bytes until the first `cmsghdr` with zeroes and returns a reference to it.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_dummy_msghdr()` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
     unsafe fn prepare_first_cmsghdr<'x>(
         buf: &'x mut [MaybeUninit<u8>],
         dummy_msghdr: &msghdr,
@@ -164,7 +176,7 @@ impl<'a> CmsgMut<'a> {
     /// Finds the last `cmsghdr` in a buffer that was previously initialized by some other routine, most likely the kernel (via `recv_ancillary`).
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_dummy_msghdr()` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
     unsafe fn find_cmsghdr_offset_from_init(&mut self, dummy_msghdr: &msghdr) {
         let origin = self.buf.as_ptr_range().start;
 
@@ -188,7 +200,7 @@ impl<'a> CmsgMut<'a> {
     /// Returns a reference to the next `cmsghdr`, depending on the value of `self.cmghdr_offset`: if it's `None`, uses `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_dummy_msghdr()` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
     unsafe fn prepare_cmsghdr<'x>(&'x mut self, dummy_msghdr: &msghdr) -> Option<&'x mut MaybeUninit<cmsghdr>> {
         let origin = self.buf.as_ptr_range().start;
 
@@ -282,7 +294,7 @@ impl<'a> CmsgMut<'a> {
     /// Initializes the bytes that are either padding between the current control message and the next or dead space at the end of the buffer, returning how much `self`'s init cursor needs to be advanced by.
     ///
     /// # Safety
-    /// - The dummy `msghdr` must be the product of `make_dummy_msghdr()` called on the exact same bytecrop of `self` (same base address, same length).
+    /// - The dummy `msghdr` must be the product of `make_msghdr(true)` called on the exact same bytecrop of `self` (same base address, same length).
     /// - `cmsghdr` must be non-null, must point somewhere within `self`'s buffer and must be, well, the `cmsghdr` the payload of which has just been filled in.
     /// - `one_past_end_of_payload` must be a pointer to the byte directly past the end of the data payload, the base address of which is the output of `CMSG_DATA` and the length of which is the output of `CMSG_LEN`.
     unsafe fn initialize_post_payload(
@@ -355,7 +367,7 @@ impl<'a> CmsgMut<'a> {
             .try_into()
             .expect("could not convert message length to `unsigned int`");
 
-        let dummy_msghdr = self.make_dummy_msghdr();
+        let dummy_msghdr = self.make_msghdr(true);
         let cmsghdr = match unsafe { self.prepare_cmsghdr(&dummy_msghdr) } {
             Some(h) => h,
             None => return 0,

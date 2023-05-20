@@ -16,13 +16,12 @@ pub mod cmsg;
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
-mod ancillary_old;
 mod listener;
 mod path;
 mod socket;
 mod stream;
 mod util;
-pub use {ancillary_old::*, cmsg::*, listener::*, path::*, socket::*, stream::*};
+pub use {listener::*, path::*, socket::*, stream::*};
 
 mod path_drop_guard;
 use path_drop_guard::*;

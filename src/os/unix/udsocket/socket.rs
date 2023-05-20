@@ -1,7 +1,8 @@
 use super::{
     c_wrappers,
-    util::{check_ancillary_unsound, fill_out_msghdr_r, mk_msghdr_r, mk_msghdr_w},
-    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, PathDropGuard, ToUdSocketPath, UdSocketPath,
+    cmsg::{CmsgMut, CmsgRef},
+    util::{make_msghdr_r, make_msghdr_w},
+    PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
 use crate::os::unix::{unixprelude::*, FdOps};
 #[cfg(target_os = "linux")]
@@ -9,12 +10,12 @@ use crate::{
     reliable_recv_msg::{ReliableRecvMsg, TryRecvResult},
     Sealed,
 };
-use libc::{msghdr, sockaddr_un, SOCK_DGRAM};
+use libc::{sockaddr_un, SOCK_DGRAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut},
-    iter,
     mem::{size_of_val, zeroed},
+    os::raw::c_void,
 };
 use to_method::To;
 
@@ -129,12 +130,7 @@ impl UdSocket {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn recv_ancillary<'a: 'b, 'b>(
-        &self,
-        buf: &mut [u8],
-        abuf: &'b mut AncillaryDataBuf<'a>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
+    pub fn recv_ancillary(&self, buf: &mut [u8], abuf: &mut CmsgMut<'_>) -> io::Result<(usize, usize)> {
         self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
 
@@ -146,14 +142,13 @@ impl UdSocket {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    #[allow(clippy::useless_conversion)]
-    pub fn recv_ancillary_vectored<'a: 'b, 'b>(
+    pub fn recv_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &'b mut AncillaryDataBuf<'a>,
+        abuf: &mut CmsgMut<'_>,
     ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        let mut hdr = mk_msghdr_r(bufs, abuf.as_mut())?;
+        let mut hdr = make_msghdr_r(bufs, abuf)?;
+
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -184,7 +179,7 @@ impl UdSocket {
         bufs: &mut [IoSliceMut<'_>],
         addr_buf: &'b mut UdSocketPath<'a>,
     ) -> io::Result<usize> {
-        self.recv_from_ancillary_vectored(bufs, &mut AncillaryDataBuf::Owned(Vec::new()), addr_buf)
+        self.recv_from_ancillary_vectored(bufs, &mut CmsgMut::new(&mut []), addr_buf)
             .map(|x| x.0)
     }
 
@@ -194,17 +189,13 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `recvmsg`
-    pub fn recv_from_ancillary<'a: 'b, 'b, 'c: 'd, 'd>(
+    #[inline]
+    pub fn recv_from_ancillary(
         &self,
         buf: &mut [u8],
-        abuf: &'b mut AncillaryDataBuf<'a>,
-        addr_buf: &'d mut UdSocketPath<'c>,
+        abuf: &mut CmsgMut<'_>,
+        addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
-        if !abuf.as_ref().is_empty() {
-            // Branching required because recv_from_vectored always uses
-            // recvmsg (no non-ancillary counterpart)
-            check_ancillary_unsound()?;
-        }
         self.recv_from_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf, addr_buf)
     }
 
@@ -216,21 +207,19 @@ impl UdSocket {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn recv_from_ancillary_vectored<'a: 'b, 'b, 'c: 'd, 'd>(
+    pub fn recv_from_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &'b mut AncillaryDataBuf<'a>,
-        addr_buf: &'d mut UdSocketPath<'c>,
+        abuf: &mut CmsgMut<'_>,
+        addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        // SAFETY: msghdr consists of integers and pointers, all of which are nullable
-        let mut hdr = unsafe { zeroed::<msghdr>() };
-        // Same goes for sockaddr_un
+        let mut hdr = make_msghdr_r(bufs, abuf)?;
+
+        // SAFETY: sockaddr_un is POD
         let mut addr_buf_staging = unsafe { zeroed::<sockaddr_un>() };
-        // It's a void* so the doublecast is mandatory
-        hdr.msg_name = &mut addr_buf_staging as *mut _ as *mut _;
+        hdr.msg_name = (&mut addr_buf_staging as *mut sockaddr_un).cast::<c_void>();
         hdr.msg_namelen = size_of_val(&addr_buf_staging).try_to::<u32>().unwrap();
-        fill_out_msghdr_r(&mut hdr, bufs, abuf.as_mut())?;
+
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -270,20 +259,21 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `write`
+    #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.fd.write(buf)
     }
+    // TODO sendto
     /// Sends a datagram into the socket, making use of [gather output] for the main data.
     ///
     ///
     /// # System calls
-    /// - `sendmsg`
-    ///     - Future versions of `interprocess` may use `writev` instead; for now, this method is a wrapper around [`send_ancillary_vectored`].
+    /// - `writev`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    /// [`send_ancillary_vectored`]: #method.send_ancillary_vectored " "
+    #[inline]
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_ancillary_vectored(bufs, iter::empty()).map(|x| x.0)
+        self.fd.write_vectored(bufs)
     }
     /// Sends a datagram and ancillary data into the socket.
     ///
@@ -291,13 +281,9 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `sendmsg`
-    pub fn send_ancillary<'a>(
-        &self,
-        buf: &[u8],
-        ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        self.send_ancillary_vectored(&[IoSlice::new(buf)], ancillary_data)
+    #[inline]
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+        self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
     /// Sends a datagram and ancillary data into the socket, making use of [gather output] for the main data.
     ///
@@ -307,14 +293,9 @@ impl UdSocket {
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn send_ancillary_vectored<'a>(
-        &self,
-        bufs: &[IoSlice<'_>],
-        ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        let abuf = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
-        let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+        let hdr = make_msghdr_w(bufs, abuf)?;
+
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)

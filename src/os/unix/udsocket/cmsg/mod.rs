@@ -18,7 +18,6 @@ use std::{
     error::Error,
     fmt::{self, Debug, Display, Formatter},
     ops::Deref,
-    ptr,
 };
 
 /// A **c**ontrol **m**e**s**sa**g**e, consisting of a level, type and its payload.
@@ -82,16 +81,6 @@ impl<'a> Cmsg<'a> {
         }
     }
 }
-
-const DUMMY_MSGHDR: msghdr = msghdr {
-    msg_name: ptr::null_mut(),
-    msg_namelen: 0,
-    msg_iov: ptr::null_mut(),
-    msg_iovlen: 0,
-    msg_control: ptr::null_mut(),
-    msg_controllen: 0,
-    msg_flags: 0,
-};
 
 /// The error type for the construction of [`CmsgMut`] from a slice, indicating that the slice size overflowed `isize`.
 pub struct BufferTooBig<T: Deref<Target = [E]>, E>(T);

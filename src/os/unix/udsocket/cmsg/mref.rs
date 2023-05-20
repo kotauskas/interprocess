@@ -1,9 +1,10 @@
 use super::{
+    super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
     ancillary::{Ancillary, FromCmsg, MalformedPayload, ParseError},
     *,
 };
 use libc::{c_void, cmsghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_NXTHDR};
-use std::{cmp::min, slice};
+use std::{cmp::min, io, slice};
 
 /// An immutable reference to a control message buffer that allows for decoding of ancillary data messages.
 ///
@@ -12,6 +13,11 @@ use std::{cmp::min, slice};
 #[derive(Copy, Clone, Debug)]
 pub struct CmsgRef<'a>(&'a [u8]);
 impl<'a> CmsgRef<'a> {
+    /// Creates an empty `CmsgRef`.
+    #[inline]
+    pub const fn empty() -> Self {
+        Self(&[])
+    }
     /// Creates a `CmsgRef` from the given byte buffer.
     ///
     /// # Errors
@@ -42,6 +48,12 @@ impl<'a> CmsgRef<'a> {
     #[inline]
     pub fn decode(self) -> impl Iterator<Item = Result<Ancillary<'a>, ParseError<'a, MalformedPayload>>> {
         self.cmsgs().map(Ancillary::try_parse)
+    }
+
+    pub(crate) fn fill_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
+        hdr.msg_control = self.0.as_ptr().cast::<c_void>().cast_mut();
+        hdr.msg_controllen = to_msghdr_controllen(self.0.len())?;
+        Ok(())
     }
 }
 

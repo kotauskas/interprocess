@@ -1,14 +1,14 @@
 use super::{
     c_wrappers,
-    util::{check_ancillary_unsound, mk_msghdr_r, mk_msghdr_w},
-    AncillaryData, AncillaryDataBuf, EncodedAncillaryData, ToUdSocketPath, UdSocketPath,
+    cmsg::{CmsgMut, CmsgRef},
+    util::{make_msghdr_r, make_msghdr_w},
+    ToUdSocketPath, UdSocketPath,
 };
 use crate::os::unix::{unixprelude::*, FdOps};
 use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
-    iter,
     net::Shutdown,
 };
 use to_method::To;
@@ -82,12 +82,8 @@ impl UdStream {
     ///
     /// # System calls
     /// - `recvmsg`
-    pub fn recv_ancillary<'a: 'b, 'b>(
-        &self,
-        buf: &mut [u8],
-        abuf: &'b mut AncillaryDataBuf<'a>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
+    #[inline]
+    pub fn recv_ancillary(&self, buf: &mut [u8], abuf: &mut CmsgMut<'_>) -> io::Result<(usize, usize)> {
         self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
     /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data.
@@ -98,14 +94,13 @@ impl UdStream {
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    #[allow(clippy::useless_conversion)]
-    pub fn recv_ancillary_vectored<'a: 'b, 'b>(
+    pub fn recv_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &'b mut AncillaryDataBuf<'a>,
+        abuf: &mut CmsgMut<'_>,
     ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        let mut hdr = mk_msghdr_r(bufs, abuf.as_mut())?;
+        let mut hdr = make_msghdr_r(bufs, abuf)?;
+
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
             (result != -1, result as usize)
@@ -123,7 +118,7 @@ impl UdStream {
     /// Sends bytes into the socket stream, making use of [gather output] for the main data.
     ///
     /// # System calls
-    /// - `senv`
+    /// - `writev`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -135,13 +130,9 @@ impl UdStream {
     ///
     /// # System calls
     /// - `sendmsg`
-    pub fn send_ancillary<'a>(
-        &self,
-        buf: &[u8],
-        ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        self.send_ancillary_vectored(&[IoSlice::new(buf)], ancillary_data)
+    #[inline]
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+        self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
 
     /// Sends bytes and ancillary data into the socket stream, making use of [gather output] for the main data.
@@ -152,15 +143,9 @@ impl UdStream {
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    #[allow(clippy::useless_conversion)]
-    pub fn send_ancillary_vectored<'a>(
-        &self,
-        bufs: &[IoSlice<'_>],
-        ancillary_data: impl IntoIterator<Item = AncillaryData<'a>>,
-    ) -> io::Result<(usize, usize)> {
-        check_ancillary_unsound()?;
-        let abuf = ancillary_data.into_iter().collect::<EncodedAncillaryData<'_>>();
-        let hdr = mk_msghdr_w(bufs, abuf.as_ref())?;
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+        let hdr = make_msghdr_w(bufs, abuf)?;
+
         let (success, bytes_written) = unsafe {
             let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
             (result != -1, result as usize)
@@ -171,6 +156,7 @@ impl UdStream {
     /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].
     ///
     /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
+    #[inline]
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         c_wrappers::shutdown(&self.fd, how)
     }
@@ -182,10 +168,12 @@ impl UdStream {
     /// [`accept`]: #method.accept " "
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         c_wrappers::set_nonblocking(&self.fd, nonblocking)
     }
     /// Checks whether the stream is currently in nonblocking mode or not.
+    #[inline]
     pub fn is_nonblocking(&self) -> io::Result<bool> {
         c_wrappers::get_nonblocking(&self.fd)
     }
@@ -215,20 +203,23 @@ impl UdStream {
 }
 
 impl Read for UdStream {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.fd.read(buf)
     }
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        let mut abuf = AncillaryDataBuf::Owned(Vec::new());
-        self.recv_ancillary_vectored(bufs, &mut abuf).map(|x| x.0)
+        self.fd.read_vectored(bufs)
     }
 }
 impl Write for UdStream {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.fd.write(buf)
     }
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_ancillary_vectored(bufs, iter::empty()).map(|x| x.0)
+        self.fd.write_vectored(bufs)
     }
     fn flush(&mut self) -> io::Result<()> {
         // You cannot flush a socket

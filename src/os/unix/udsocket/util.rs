@@ -1,13 +1,26 @@
-use crate::os::unix::unixprelude::*;
+use crate::os::unix::{
+    udsocket::cmsg::{CmsgMut, CmsgRef},
+    unixprelude::*,
+};
 use cfg_if::cfg_if;
 use libc::{iovec, msghdr};
 use std::{
     ffi::{CStr, CString},
     hint::unreachable_unchecked,
     io::{self, IoSlice, IoSliceMut},
-    mem::zeroed,
+    ptr,
 };
 use to_method::To;
+
+pub const DUMMY_MSGHDR: msghdr = msghdr {
+    msg_name: ptr::null_mut(),
+    msg_namelen: 0,
+    msg_iov: ptr::null_mut(),
+    msg_iovlen: 0,
+    msg_control: ptr::null_mut(),
+    msg_controllen: 0,
+    msg_flags: 0,
+};
 
 #[allow(dead_code)]
 mod tname {
@@ -65,64 +78,29 @@ pub fn empty_cstr() -> &'static CStr {
     }
 }
 
-pub fn fill_out_msghdr_r(hdr: &mut msghdr, iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<()> {
+pub fn make_msghdr_r(bufs: &mut [IoSliceMut<'_>], abuf: &mut CmsgMut<'_>) -> io::Result<msghdr> {
+    let mut hdr = DUMMY_MSGHDR;
     _fill_out_msghdr(
-        hdr,
-        iov.as_ptr() as *mut _,
-        to_msghdr_iovlen(iov.len())?,
-        anc.as_mut_ptr(),
-        to_msghdr_controllen(anc.len())?,
-    )
+        &mut hdr,
+        bufs.as_mut_ptr().cast::<iovec>(),
+        to_msghdr_iovlen(bufs.len())?,
+    );
+    abuf.fill_msghdr(&mut hdr, true)?;
+    Ok(hdr)
 }
-pub fn fill_out_msghdr_w(hdr: &mut msghdr, iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<()> {
+pub fn make_msghdr_w(bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<msghdr> {
+    let mut hdr = DUMMY_MSGHDR;
     _fill_out_msghdr(
-        hdr,
-        iov.as_ptr() as *mut _,
-        to_msghdr_iovlen(iov.len())?,
-        anc.as_ptr() as *mut _,
-        to_msghdr_controllen(anc.len())?,
-    )
+        &mut hdr,
+        bufs.as_ptr().cast_mut().cast::<iovec>(),
+        to_msghdr_iovlen(bufs.len())?,
+    );
+    abuf.fill_msghdr(&mut hdr)?;
+    Ok(hdr)
 }
-fn _fill_out_msghdr(
-    hdr: &mut msghdr,
-    iov: *mut iovec,
-    iovlen: MsghdrIovlen,
-    control: *mut u8,
-    controllen: MsghdrControllen,
-) -> io::Result<()> {
+fn _fill_out_msghdr(hdr: &mut msghdr, iov: *mut iovec, iovlen: MsghdrIovlen) {
     hdr.msg_iov = iov;
     hdr.msg_iovlen = iovlen;
-    hdr.msg_control = control as *mut _;
-    hdr.msg_controllen = controllen;
-    Ok(())
-}
-pub fn mk_msghdr_r(iov: &mut [IoSliceMut<'_>], anc: &mut [u8]) -> io::Result<msghdr> {
-    let mut hdr = unsafe {
-        // SAFETY: msghdr is plain old data, i.e. an all-zero pattern is allowed
-        zeroed()
-    };
-    fill_out_msghdr_r(&mut hdr, iov, anc)?;
-    Ok(hdr)
-}
-pub fn mk_msghdr_w(iov: &[IoSlice<'_>], anc: &[u8]) -> io::Result<msghdr> {
-    let mut hdr = unsafe {
-        // SAFETY: msghdr is plain old data, i.e. an all-zero pattern is allowed
-        zeroed()
-    };
-    fill_out_msghdr_w(&mut hdr, iov, anc)?;
-    Ok(hdr)
-}
-pub fn check_ancillary_unsound() -> io::Result<()> {
-    if cfg!(uds_ancillary_unsound) {
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "\
-ancillary data has been disabled for non-x86 ISAs in a hotfix because it \
-doesn't account for alignment",
-        ))
-    } else {
-        Ok(())
-    }
 }
 
 pub fn eunreachable<T, U>(_e: T) -> U {
