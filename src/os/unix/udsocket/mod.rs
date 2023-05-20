@@ -62,7 +62,7 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = {
     const LENGTH: usize = {
         let mut length = size_of::<sockaddr_un>() - size_of::<sa_family_t>();
         if cfg!(uds_sun_len) {
-            length += 1;
+            length -= 1;
         }
         length
     };
