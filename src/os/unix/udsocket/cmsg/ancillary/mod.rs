@@ -5,6 +5,24 @@
 // TODO SCM_CREDS2 from FreeBSD
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
 
+#[cfg_attr( // uds_ucred template
+    feature = "doc_cfg",
+    doc(cfg(any(
+        all(
+            target_os = "linux",
+            any(
+                target_env = "gnu",
+                target_env = "musl",
+                target_env = "musleabi",
+                target_env = "musleabihf"
+            )
+        ),
+        target_os = "emscripten",
+        target_os = "redox"
+    )))
+)]
+#[cfg(any(doc, uds_ucred))]
+// FIXME only enabled on ucred, sockcred is disabled
 pub mod credentials;
 pub mod file_descriptors;
 

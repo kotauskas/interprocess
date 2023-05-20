@@ -1,8 +1,6 @@
-use super::{
-    credentials::{Credentials, SizeMismatch},
-    file_descriptors::FileDescriptors,
-    Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, LEVEL,
-};
+#[cfg(uds_ucred)]
+use super::credentials::{Credentials, SizeMismatch};
+use super::{file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, LEVEL};
 use std::{
     convert::Infallible,
     error::Error,
@@ -15,6 +13,23 @@ use std::{
 #[allow(missing_docs)] // Self-explanatory
 pub enum Ancillary<'a> {
     FileDescriptors(FileDescriptors<'a>),
+    #[cfg_attr( // uds_ucred template
+        feature = "doc_cfg",
+        doc(cfg(any(
+            all(
+                target_os = "linux",
+                any(
+                    target_env = "gnu",
+                    target_env = "musl",
+                    target_env = "musleabi",
+                    target_env = "musleabihf"
+                )
+            ),
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
+    )]
+    #[cfg(any(doc, uds_ucred))]
     Credentials(Credentials<'a>),
 }
 impl<'a> Ancillary<'a> {
@@ -23,6 +38,7 @@ impl<'a> Ancillary<'a> {
             .map(Self::FileDescriptors)
             .map_err(|e| e.map_payload_err(MalformedPayload::from))
     }
+    #[cfg(uds_ucred)]
     fn parse_credentials(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
         Credentials::try_parse(cmsg)
             .map(Self::Credentials)
@@ -46,6 +62,7 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
         // let's get down to jump tables
         match cmsg.cmsg_type() {
             FileDescriptors::TYPE => Self::parse_fd(cmsg),
+            #[cfg(uds_ucred)]
             Credentials::TYPE => Self::parse_credentials(cmsg),
             _ => Err(ParseError {
                 cmsg,
@@ -62,11 +79,29 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
 #[derive(Debug)]
 #[allow(missing_docs)] // Self-explanatory
 pub enum MalformedPayload {
+    #[cfg_attr( // uds_ucred template
+        feature = "doc_cfg",
+        doc(cfg(any(
+            all(
+                target_os = "linux",
+                any(
+                    target_env = "gnu",
+                    target_env = "musl",
+                    target_env = "musleabi",
+                    target_env = "musleabihf"
+                )
+            ),
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
+    )]
+    #[cfg(any(doc, uds_ucred))]
     Credentials(SizeMismatch),
 }
 impl Display for MalformedPayload {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(uds_ucred)]
             Self::Credentials(e) => Display::fmt(e, f),
         }
     }

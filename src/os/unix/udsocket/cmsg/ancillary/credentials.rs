@@ -1,11 +1,13 @@
 //! [`Credentials`] and associated helper types.
 
+// FIXME uds_sockcred is disabled in build.rs for reasons outlined there.
+
 use super::*;
 use libc::{c_int, gid_t, pid_t, uid_t};
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
-    iter::FusedIterator,
+    // iter::FusedIterator,
     mem::size_of,
     slice,
 };
@@ -121,6 +123,7 @@ impl<'a> Credentials<'a> {
             cred: self,
         }
     }
+    /*
     fn n_sgroups(&self) -> c_int {
         #[cfg(uds_ucred)]
         {
@@ -131,6 +134,7 @@ impl<'a> Credentials<'a> {
             self.0.sc_ngroups
         }
     }
+    */
 }
 impl PartialEq for Credentials<'_> {
     fn eq(&self, other: &Self) -> bool {
@@ -229,6 +233,7 @@ impl Display for SizeMismatch {
 }
 impl Error for SizeMismatch {}
 
+/*
 /// An iterator over supplementary groups of [`Credentials`].
 ///
 /// Unobtainable and no-op on `ucred` platforms.
@@ -252,6 +257,7 @@ impl Iterator for Groups<'_> {
     }
 }
 impl FusedIterator for Groups<'_> {}
+*/
 
 #[cfg(uds_ucred)]
 #[repr(C, packed)]
@@ -267,6 +273,7 @@ static _CHK_UCRED: () = {
     let _ = libc::ucred { pid: 0, uid: 0, gid: 0 };
 };
 
+/*
 #[cfg(uds_sockcred)]
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -290,3 +297,4 @@ static _CHK_SOCKCRED: () = {
         sc_groups: [0],
     };
 };
+*/

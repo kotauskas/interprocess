@@ -16,6 +16,7 @@ fn is_unix() -> bool {
 
 /// This can define the following:
 /// - `uds_supported`
+/// - `uds_sun_len` on platforms that have the stupid as fuck `sun_len` field (to correct max length calculation)
 /// - Ancillary data support:
 ///     - `uds_scm_rights` ("passfd")
 ///     - `uds_scm_credentials` ("passcred")
@@ -70,9 +71,19 @@ fn collect_uds_features(target: &TargetTriplet) {
         ldefine(&[
             "uds_msghdr_iovlen_c_int",
             "uds_msghdr_controllen_socklen_t",
-            "uds_sockcred",
             "uds_peereid",
+            "uds_sun_len",
         ]);
+        // FIXME sockcred platforms are really fucked, like actually messed up in the head. They make my brain hurt
+        // in one of the worst ways imaginable. They disgust me beyond human belief. Just read the fucking FreeBSD
+        // manpage and you'll start wishing for a legally forced removal of Unix from human life. I've never been losing
+        // my shit over software this hard in my life. Anyway, if you want to fix this functionality, please make a PR.
+        // I'm not touching this again.
+
+        // Commented out to pretend it's not real.
+        // if !target.os_any(&["macos", "ios"]) {
+        //     define("uds_sockcred");
+        // }
         if target.os("netbsd") {
             define("uds_unpcbid");
         } else {
