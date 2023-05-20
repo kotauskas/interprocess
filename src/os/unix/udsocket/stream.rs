@@ -44,6 +44,7 @@ impl UdStream {
     pub fn connect<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_connect(path.to_socket_path()?, false)
     }
+    #[cfg(feature = "tokio")]
     pub(crate) fn connect_nonblocking<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_connect(path.to_socket_path()?, true)
     }
