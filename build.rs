@@ -34,9 +34,12 @@ fn is_unix() -> bool {
 /// - `msghdr`'s `msg_controllen` type:
 ///     - `uds_msghdr_controllen_socklen_t`
 ///     - `uds_msghdr_controllen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
+/// - `cmsghdr`'s `cmsg_len` type:
+///     - `uds_cmsghdr_len_socklen_t`
+///     - `uds_cmsghdr_len_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
-    let (mut uds, mut scm_rights) = (false, true);
+    let (mut uds, mut scm_rights, mut size_t_madness) = (false, true, false);
     if (target.os("linux") && target.env_any(&["gnu", "musl", "musleabi", "musleabihf"]))
     || target.os_any(&["android", "emscripten", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
@@ -47,30 +50,23 @@ fn collect_uds_features(target: &TargetTriplet) {
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
         || target.os("android") {
-            ldefine(&["uds_msghdr_iovlen_size_t", "uds_msghdr_controllen_size_t"]);
-        } else {
-            ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
+            size_t_madness = true;
         }
         if target.os_any(&["linux", "android"]) {
             // Only actual Linux has that... I think? lmao
             define("uds_linux_namespace");
         }
-    } else if target.os("aix") {
+    } else if target.os_any(&["aix", "nto"]) || (target.env("newlib") && target.arch("xtensa")) {
         uds = true;
-        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
-    } else if target.os("nto") {
-        uds = true;
-        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_peerucred"]);
-    } else if target.env("newlib") && target.arch("xtensa") {
-        uds = true;
-        scm_rights = false;
-        ldefine(&["uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t"]);
+        if target.os("nto") {
+            define("uds_peerucred");
+        } else if target.env("newlib") && target.arch("xtensa") {
+            scm_rights = false;
+        }
     } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
         // The BSD OS family
         uds = true;
         ldefine(&[
-            "uds_msghdr_iovlen_c_int",
-            "uds_msghdr_controllen_socklen_t",
             "uds_peereid",
             "uds_sun_len",
         ]);
@@ -91,24 +87,26 @@ fn collect_uds_features(target: &TargetTriplet) {
         }
     } else if target.os_any(&["solaris", "illumos"]) {
         uds = true;
-        ldefine(&[
-            "uds_getpeerucred",
-            "uds_msghdr_iovlen_c_int",
-            "uds_msghdr_controllen_socklen_t",
-        ]);
+        define("uds_getpeerucred");
     } else if target.os("haiku") {
         uds = true;
-        ldefine(&[
-            "uds_ucred",
-            "uds_peerucred",
-            "uds_msghdr_iovlen_c_int",
-            "uds_msghdr_controllen_socklen_t",
-        ]);
+        ldefine(&["uds_ucred", "uds_peerucred"]);
     }
+
     if uds {
-        if scm_rights { define("uds_scm_rights") };
-        if !target.arch_any(&["x86", "x86_64"]) { define("uds_ancillary_unsound") };
         define("uds_supported");
+
+        if scm_rights { define("uds_scm_rights") };
+
+        if size_t_madness {
+            ldefine(&[
+                "uds_msghdr_iovlen_size_t", "uds_msghdr_controllen_size_t", "uds_cmsghdr_len_size_t"
+            ]);
+        } else {
+            ldefine(&[
+                "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
+            ])
+        }
     }
 }
 

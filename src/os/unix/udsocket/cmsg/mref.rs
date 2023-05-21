@@ -66,8 +66,7 @@ pub struct Cmsgs<'a> {
 impl<'a> Cmsgs<'a> {
     fn new(buf: CmsgRef<'a>) -> Self {
         let mut dummy = DUMMY_MSGHDR;
-        dummy.msg_control = buf.0.as_ptr().cast::<c_void>().cast_mut();
-        dummy.msg_controllen = buf.0.len();
+        buf.fill_msghdr(&mut dummy).unwrap();
 
         Self {
             buf,
@@ -107,10 +106,10 @@ impl<'a> Iterator for Cmsgs<'a> {
             // Buffer overflow check because some OSes (such as everyone's favorite putrid hellspawn macOS) don't
             // even fucking clip the fucking cmsg_len thing to the buffer end as specified by msg_controllen.
             // Source: https://gist.github.com/kentonv/bc7592af98c68ba2738f4436920868dc
-            let len = min(cmsghdr.cmsg_len, max_len as usize);
+            let len = min(cmsghdr.cmsg_len as isize, max_len);
 
             // SAFETY: we trust CMSG_DATA; the init guarantee comes from CmsgRef containing a slice of initialized data
-            slice::from_raw_parts(dptr, len)
+            slice::from_raw_parts(dptr, len as usize)
         };
         let cmsg = unsafe {
             // SAFETY: as per CmsgRef's safety guarantees

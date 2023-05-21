@@ -22,29 +22,46 @@ pub const DUMMY_MSGHDR: msghdr = msghdr {
     msg_flags: 0,
 };
 
-#[allow(dead_code)]
-mod tname {
-    pub static SOCKLEN_T: &str = "`socklen_t`";
-    pub static SIZE_T: &str = "`size_t`";
-    pub static C_INT: &str = "`c_int`";
-}
+// TODO add type of cmsg_len
 
 cfg_if! {
     if #[cfg(uds_msghdr_iovlen_c_int)] {
         pub type MsghdrIovlen = c_int;
-        static MSGHDR_IOVLEN_NAME: &str = tname::C_INT;
+        macro_rules! msghdr_iovlen_name {
+            () => {"c_int"}
+        }
     } else if #[cfg(uds_msghdr_iovlen_size_t)] {
         pub type MsghdrIovlen = size_t;
-        static MSGHDR_IOVLEN_NAME: &str = tname::SIZE_T;
+        macro_rules! msghdr_iovlen_name {
+            () => {"size_t"}
+        }
     }
 }
 cfg_if! {
     if #[cfg(uds_msghdr_controllen_socklen_t)] {
         pub type MsghdrControllen = libc::socklen_t;
-        static MSGHDR_CONTROLLEN_NAME: &str = tname::SOCKLEN_T;
+        macro_rules! msghdr_controllen_name {
+            () => {"socklen_t"}
+        }
 } else if #[cfg(uds_msghdr_controllen_size_t)] {
         pub type MsghdrControllen = size_t;
-        static MSGHDR_CONTROLLEN_NAME: &str = tname::SIZE_T;
+        macro_rules! msghdr_controllen_name {
+            () => {"size_t"}
+        }
+    }
+}
+cfg_if! {
+    if #[cfg(uds_cmsghdr_len_socklen_t)] {
+        pub type CmsghdrLen = libc::socklen_t;
+        macro_rules! cmsghdr_len_name {
+            () => {"socklen_t"}
+        }
+    }
+    else if #[cfg(uds_cmsghdr_len_size_t)] {
+        pub type CmsghdrLen = libc::size_t;
+        macro_rules! cmsghdr_len_name {
+            () => {"size_t"}
+        }
     }
 }
 
@@ -52,7 +69,7 @@ pub fn to_msghdr_iovlen(iovlen: usize) -> io::Result<MsghdrIovlen> {
     iovlen.try_to::<MsghdrIovlen>().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("number of scatter-gather buffers overflowed {MSGHDR_IOVLEN_NAME}"),
+            concat!("number of scatter-gather buffers overflowed ", msghdr_iovlen_name!()),
         )
     })
 }
@@ -60,7 +77,15 @@ pub fn to_msghdr_controllen(controllen: usize) -> io::Result<MsghdrControllen> {
     controllen.try_to::<MsghdrControllen>().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("ancillary data buffer length overflowed {MSGHDR_CONTROLLEN_NAME}"),
+            concat!("control message buffer length overflowed ", msghdr_controllen_name!()),
+        )
+    })
+}
+pub fn to_cmsghdr_len<T: TryInto<CmsghdrLen>>(cmsg_len: T) -> io::Result<CmsghdrLen> {
+    cmsg_len.try_to::<CmsghdrLen>().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            concat!("control message length overflowed ", cmsghdr_len_name!()),
         )
     })
 }

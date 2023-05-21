@@ -1,3 +1,5 @@
+use crate::os::unix::udsocket::util::to_cmsghdr_len;
+
 use super::{
     super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
     ancillary::ToCmsg,
@@ -14,6 +16,9 @@ use std::{
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
 #[derive(Debug)]
 pub struct CmsgMut<'a> {
+    // TODO idea for how to fix the sockcred/cmsgcred debacle (aliasing of SCM_CREDS for two types of struct): add an
+    // "interpretation context" field that stores necessary state (such as the value of `LOCAL_CREDS`) to disambiguate
+    // without straying too far from what the manpage says is permissible
     buf: &'a mut [MaybeUninit<u8>],
     init_len: usize,
     cmsghdr_offset: Option<NonZeroUsize>,
@@ -227,23 +232,25 @@ impl<'a> CmsgMut<'a> {
         Some(cmsghdr)
     }
     fn fill_cmsghdr(
-        hdr: &mut MaybeUninit<cmsghdr>,
+        rhdr: &mut MaybeUninit<cmsghdr>,
         msg_len: c_uint,
         cmsg_level: c_int,
         cmsg_type: c_int,
     ) -> &mut cmsghdr {
         // Zero out all of the padding first, if any is present; will be elided by the compiler if unnecessary.
-        hdr.write(unsafe { zeroed() });
-        hdr.write(cmsghdr {
-            cmsg_len: unsafe { CMSG_LEN(msg_len) }
-                .try_into()
-                .expect("could not convert the output of CMSG_LEN to the type of cmsg_len"),
+        rhdr.write(unsafe { zeroed() });
+
+        let cmsg_len = to_cmsghdr_len(unsafe { CMSG_LEN(msg_len) }).unwrap();
+        let chdr = cmsghdr {
+            cmsg_len,
             cmsg_level,
             cmsg_type,
-        });
+        };
+
+        rhdr.write(chdr);
         unsafe {
-            // SAFETY: we filled out all the padding, if any, with zeroes, and the rest with the provided values
-            hdr.assume_init_mut()
+            // SAFETY: we've filled out all the padding, if any, with zeroes, and the rest with the provided values
+            rhdr.assume_init_mut()
         }
     }
     /// Fills bytes between the `cmsghdr` and the beginning of the payload range with zeroes and returns a reference to it.

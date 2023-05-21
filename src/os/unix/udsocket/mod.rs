@@ -69,6 +69,8 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = {
     // Validates the calculated length and generates a cryptic compile error
     // if we guessed wrong, which isn't supposed to happen on any sane platform.
     let _ = sockaddr_un {
+        #[cfg(uds_sun_len)]
+        sun_len: 0,
         sun_family: 0,
         sun_path: [0; LENGTH],
     };
