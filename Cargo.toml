@@ -30,13 +30,15 @@ tokio = ["dep:tokio", "futures-core", "futures-io"]
 doc_cfg = []
 
 [dependencies]
-tokio = { version = "1.23.0", features = [
+tokio = { version = "1.28.0", features = [
+    "sync",
+    "rt",
     "net",
     "time",
     "io-util",
 ], optional = true }
-futures-core = { version = "0.3.25", optional = true }
-futures-io = { version = "0.3.25", optional = true }
+futures-core = { version = "0.3.28", optional = true }
+futures-io = { version = "0.3.28", optional = true }
 to_method = "1.1"
 cfg-if = "1.0.0"
 
@@ -50,7 +52,7 @@ tokio = { version = "1.23.0", features = [
     "sync",
     "macros",
 ] }
-futures = "0.3"
+futures = "0.3.28"
 anyhow = "1.0.32"
 
 [target.'cfg(windows)'.dependencies]
