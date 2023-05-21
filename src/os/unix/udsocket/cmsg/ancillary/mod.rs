@@ -21,7 +21,7 @@
         target_os = "redox"
     )))
 )]
-#[cfg(all(any(doc, uds_ucred), not(doctest)))]
+#[cfg(any(all(doc, not(doctest)), uds_ucred))]
 // FIXME only enabled on ucred, sockcred is disabled
 pub mod credentials;
 pub mod file_descriptors;

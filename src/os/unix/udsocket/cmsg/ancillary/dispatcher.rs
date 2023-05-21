@@ -1,4 +1,4 @@
-#[cfg(uds_ucred)]
+#[cfg(any(all(doc, not(doctest)), uds_ucred))]
 use super::credentials::{Credentials, SizeMismatch};
 use super::{file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, LEVEL};
 use std::{
@@ -29,7 +29,7 @@ pub enum Ancillary<'a> {
             target_os = "redox"
         )))
     )]
-    #[cfg(any(doc, uds_ucred))]
+    #[cfg(any(all(doc, not(doctest)), uds_ucred))]
     Credentials(Credentials<'a>),
 }
 impl<'a> Ancillary<'a> {
@@ -95,7 +95,7 @@ pub enum MalformedPayload {
             target_os = "redox"
         )))
     )]
-    #[cfg(any(doc, uds_ucred))]
+    #[cfg(any(all(doc, not(doctest)), uds_ucred))]
     Credentials(SizeMismatch),
 }
 impl Display for MalformedPayload {

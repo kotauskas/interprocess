@@ -298,3 +298,6 @@ static _CHK_SOCKCRED: () = {
     };
 };
 */
+
+#[cfg(not(any(uds_ucred, uds_sockcred)))]
+type CredType = ();
