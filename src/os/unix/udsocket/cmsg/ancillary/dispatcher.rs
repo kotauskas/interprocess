@@ -99,10 +99,10 @@ pub enum MalformedPayload {
     Credentials(SizeMismatch),
 }
 impl Display for MalformedPayload {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
             #[cfg(uds_ucred)]
-            Self::Credentials(e) => Display::fmt(e, f),
+            Self::Credentials(e) => Display::fmt(&e, _f),
         }
     }
 }
