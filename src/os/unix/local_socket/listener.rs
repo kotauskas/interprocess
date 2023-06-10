@@ -4,7 +4,7 @@ use {
     std::{
         fmt::{self, Debug, Formatter},
         io,
-        os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
+        os::unix::io::AsRawFd,
     },
 };
 
@@ -32,20 +32,4 @@ impl Debug for LocalSocketListener {
             .finish()
     }
 }
-impl AsRawFd for LocalSocketListener {
-    fn as_raw_fd(&self) -> i32 {
-        self.inner.as_raw_fd()
-    }
-}
-impl IntoRawFd for LocalSocketListener {
-    fn into_raw_fd(self) -> i32 {
-        self.inner.into_raw_fd()
-    }
-}
-impl FromRawFd for LocalSocketListener {
-    unsafe fn from_raw_fd(fd: i32) -> Self {
-        Self {
-            inner: unsafe { UdStreamListener::from_raw_fd(fd) },
-        }
-    }
-}
+forward_handle!(unix: LocalSocketListener, inner);

@@ -39,14 +39,6 @@ impl LocalSocketStream {
             Err(io::Error::new(io::ErrorKind::Other, "not supported"))
         }
     }
-    #[inline]
-    pub unsafe fn from_raw_fd(fd: i32) -> io::Result<Self> {
-        unsafe { UdStream::from_raw_fd(fd) }.map(Self::from)
-    }
-    #[inline]
-    pub fn into_raw_fd(self) -> io::Result<i32> {
-        self.inner.into_raw_fd()
-    }
     fn pinproj(&mut self) -> Pin<&mut UdStream> {
         Pin::new(&mut self.inner)
     }
@@ -101,9 +93,6 @@ impl Debug for LocalSocketStream {
             .finish()
     }
 }
-impl AsRawFd for LocalSocketStream {
-    #[inline]
-    fn as_raw_fd(&self) -> i32 {
-        self.inner.as_raw_fd()
-    }
-}
+
+forward_as_handle!(unix: LocalSocketStream, inner);
+forward_try_handle!(unix: LocalSocketStream, inner, UdStream);

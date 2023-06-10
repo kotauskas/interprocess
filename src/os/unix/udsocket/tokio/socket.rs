@@ -2,7 +2,6 @@ use crate::os::unix::udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSock
 #[cfg(uds_peerucred)]
 use crate::os::unix::{udsocket::c_wrappers, unixprelude::*};
 use std::{
-    convert::TryFrom,
     future::Future,
     io,
     net::Shutdown,
@@ -185,7 +184,7 @@ impl UdSocket {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.0.as_fd())
     }
     tokio_wrapper_conversion_methods!(
         sync SyncUdSocket,
@@ -198,3 +197,4 @@ tokio_wrapper_trait_impls!(
     sync SyncUdSocket,
     std StdUdSocket,
     tokio TokioUdSocket);
+derive_asraw!(unix: UdSocket);

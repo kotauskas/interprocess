@@ -40,26 +40,26 @@ impl<'a> BorrowedReadHalf<'a> {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.as_stream_fd())
     }
     /// Shuts down the read half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Read)
+        c_wrappers::shutdown(self.as_stream_fd(), Shutdown::Read)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the read half specifically, but rather for the whole stream, so this isn't exposed as a struct method.
-    fn as_stream_raw_fd(&self) -> c_int {
+    fn as_stream_fd(&self) -> BorrowedFd<'_> {
         let stream: &TokioUdStream = self.0.as_ref();
-        stream.as_raw_fd()
+        stream.as_fd()
     }
 
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamReadHalf<'a>> {
         Pin::new(&mut self.get_mut().0)
     }
 
-    tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamReadHalf<'a>);
+    tokio_wrapper_conversion_methods!(tokio TokioUdStreamReadHalf<'a>);
 }
 
 impl TokioAsyncRead for BorrowedReadHalf<'_> {
@@ -77,9 +77,16 @@ impl AsyncRead for BorrowedReadHalf<'_> {
         }
     }
 }
+impl AsFd for BorrowedReadHalf<'_> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_ref().as_fd()
+    }
+}
 
 tokio_wrapper_trait_impls!(
-    for BorrowedReadHalf<'a>, tokio_norawfd_lt 'a TokioUdStreamReadHalf<'a>);
+    for BorrowedReadHalf<'a>, tokio_nofd_lt 'a TokioUdStreamReadHalf<'a>);
+derive_asraw!(unix: BorrowedReadHalf<'_>);
 
 /// Owned read half of a [`UdStream`](super::UdStream), created by [`.into_split()`](super::UdStream::into_split).
 #[derive(Debug)]
@@ -110,27 +117,27 @@ impl OwnedReadHalf {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.as_stream_fd())
     }
 
     /// Shuts down the read half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Read)
+        c_wrappers::shutdown(self.as_stream_fd(), Shutdown::Read)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the read half specifically, but rather for the whole stream, so this isn't exposed as a struct method.
-    fn as_stream_raw_fd(&self) -> c_int {
+    fn as_stream_fd(&self) -> BorrowedFd<'_> {
         let stream: &TokioUdStream = self.0.as_ref();
-        stream.as_raw_fd()
+        stream.as_fd()
     }
 
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamOwnedReadHalf> {
         Pin::new(&mut self.get_mut().0)
     }
 
-    tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamOwnedReadHalf);
+    tokio_wrapper_conversion_methods!(tokio TokioUdStreamOwnedReadHalf);
 }
 
 impl TokioAsyncRead for OwnedReadHalf {
@@ -148,6 +155,13 @@ impl AsyncRead for OwnedReadHalf {
         }
     }
 }
+impl AsFd for OwnedReadHalf {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_ref().as_fd()
+    }
+}
 
 tokio_wrapper_trait_impls!(
-    for OwnedReadHalf, tokio_norawfd TokioUdStreamOwnedReadHalf);
+    for OwnedReadHalf, tokio_nofd TokioUdStreamOwnedReadHalf);
+derive_asraw!(unix: OwnedReadHalf);

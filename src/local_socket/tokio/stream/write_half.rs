@@ -68,5 +68,5 @@ impl Debug for OwnedWriteHalf {
     }
 }
 
-// TODO can't do this on Unix
-//impl_as_raw_handle!(OwnedWriteHalf);
+forward_as_handle!(OwnedWriteHalf, inner);
+derive_asraw!(OwnedWriteHalf);

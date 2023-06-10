@@ -116,23 +116,6 @@ impl LocalSocketListener {
             inner: self.inner.accept().await?,
         })
     }
-    /// Creates a Tokio-based async object from a given raw file descriptor. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error (which is why the `FromRawFd` trait can't be implemented instead).
-    ///
-    /// # Safety
-    /// The given file descriptor must be valid (i.e. refer to an existing kernel object) and must not be owned by any other file descriptor container. If this is not upheld, an arbitrary file descriptor will be closed when the returned object is dropped.
-    #[cfg(unix)]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-    #[inline]
-    pub unsafe fn from_raw_fd(fd: libc::c_int) -> io::Result<Self> {
-        unsafe { LocalSocketListenerImpl::from_raw_fd(fd) }.map(Self::from)
-    }
-    /// Releases ownership of the raw file descriptor, detaches the object from the Tokio runtime (therefore has to be called within the runtime) and returns the file descriptor as an integer.
-    #[cfg(unix)]
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-    #[inline]
-    pub fn into_raw_fd(self) -> io::Result<libc::c_int> {
-        self.inner.into_raw_fd()
-    }
 }
 #[doc(hidden)]
 impl From<LocalSocketListenerImpl> for LocalSocketListener {
@@ -147,5 +130,7 @@ impl Debug for LocalSocketListener {
         Debug::fmt(&self.inner, f)
     }
 }
-impl_as_raw_handle_unix!(LocalSocketListener);
+forward_as_handle!(unix: LocalSocketListener, inner);
+derive_asraw!(unix: LocalSocketListener);
+forward_try_handle!(unix: LocalSocketListener, inner, LocalSocketListenerImpl);
 // TODO: incoming

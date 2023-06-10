@@ -7,8 +7,10 @@ use libc::c_int;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
-    mem::ManuallyDrop,
-    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
+    os::{
+        fd::{AsFd, BorrowedFd, OwnedFd},
+        unix::io::{AsRawFd, FromRawFd},
+    },
 };
 
 pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
@@ -35,32 +37,35 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
 }
 
 pub(crate) struct UnnamedPipeReader(FdOps);
-// Please, for the love of Unix gods, don't ever try to implement this for &UnnamedPipeReader,
-// reading a pipe concurrently is UB and UnnamedPipeReader is Send and Sync. If you do, the
-// universe will collapse immediately.
-impl Read for UnnamedPipeReader {
+impl Read for &UnnamedPipeReader {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+        (&self.0).read(buf)
+    }
+}
+impl Read for UnnamedPipeReader {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (self as &Self).read(buf)
     }
 }
 impl Sealed for UnnamedPipeReader {}
-impl AsRawFd for UnnamedPipeReader {
-    fn as_raw_fd(&self) -> c_int {
-        self.0.as_raw_fd()
+impl AsFd for UnnamedPipeReader {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0 .0.as_fd()
     }
 }
-impl IntoRawFd for UnnamedPipeReader {
-    fn into_raw_fd(self) -> c_int {
-        let self_ = ManuallyDrop::new(self);
-        self_.as_raw_fd()
+impl From<UnnamedPipeReader> for OwnedFd {
+    #[inline]
+    fn from(x: UnnamedPipeReader) -> Self {
+        x.0 .0
     }
 }
-impl FromRawFd for UnnamedPipeReader {
-    unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self(unsafe {
-            // SAFETY: guaranteed by safety contract
-            FdOps::from_raw_fd(fd)
-        })
+impl From<OwnedFd> for UnnamedPipeReader {
+    #[inline]
+    fn from(fd: OwnedFd) -> Self {
+        Self(FdOps(fd))
     }
 }
 impl Debug for UnnamedPipeReader {
@@ -70,30 +75,47 @@ impl Debug for UnnamedPipeReader {
             .finish()
     }
 }
+// TODO move from here to public API
+derive_raw!(unix: UnnamedPipeReader);
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
-impl Write for UnnamedPipeWriter {
+impl Write for &UnnamedPipeWriter {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
+        (&self.0).write(buf)
     }
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
+        (&self.0).flush()
+    }
+}
+impl Write for UnnamedPipeWriter {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (self as &Self).write(buf)
+    }
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        (self as &Self).flush()
     }
 }
 impl Sealed for UnnamedPipeWriter {}
-impl AsRawFd for UnnamedPipeWriter {
-    fn as_raw_fd(&self) -> c_int {
-        self.0.as_raw_fd()
+impl AsFd for UnnamedPipeWriter {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0 .0.as_fd()
     }
 }
-impl IntoRawFd for UnnamedPipeWriter {
-    fn into_raw_fd(self) -> c_int {
-        self.0.into_raw_fd()
+impl From<UnnamedPipeWriter> for OwnedFd {
+    #[inline]
+    fn from(x: UnnamedPipeWriter) -> Self {
+        x.0 .0
     }
 }
-impl FromRawFd for UnnamedPipeWriter {
-    unsafe fn from_raw_fd(fd: c_int) -> Self {
-        Self(FdOps::new(fd))
+impl From<OwnedFd> for UnnamedPipeWriter {
+    #[inline]
+    fn from(fd: OwnedFd) -> Self {
+        Self(FdOps(fd))
     }
 }
 impl Debug for UnnamedPipeWriter {
@@ -103,3 +125,4 @@ impl Debug for UnnamedPipeWriter {
             .finish()
     }
 }
+derive_raw!(unix: UnnamedPipeWriter);

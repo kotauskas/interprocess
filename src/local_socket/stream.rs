@@ -87,7 +87,6 @@ impl LocalSocketStream {
         self.inner.set_nonblocking(nonblocking)
     }
 }
-// TODO vectored I/O on Unix
 impl Read for LocalSocketStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
@@ -112,4 +111,5 @@ impl Debug for LocalSocketStream {
         Debug::fmt(&self.inner, f)
     }
 }
-impl_handle_manip!(LocalSocketStream);
+forward_handle!(LocalSocketStream, inner);
+derive_raw!(LocalSocketStream);

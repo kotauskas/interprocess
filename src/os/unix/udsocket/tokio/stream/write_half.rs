@@ -40,26 +40,26 @@ impl<'a> BorrowedWriteHalf<'a> {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.as_stream_fd())
     }
     /// Shuts down the write half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Write)
+        c_wrappers::shutdown(self.as_stream_fd(), Shutdown::Write)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the write half specifically, but rather for the whole stream, so this isn't exposed as a struct method.
-    fn as_stream_raw_fd(&self) -> c_int {
+    fn as_stream_fd(&self) -> BorrowedFd<'_> {
         let stream: &TokioUdStream = self.0.as_ref();
-        stream.as_raw_fd()
+        stream.as_fd()
     }
 
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamWriteHalf<'a>> {
         Pin::new(&mut self.get_mut().0)
     }
 
-    tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamWriteHalf<'a>);
+    tokio_wrapper_conversion_methods!(tokio TokioUdStreamWriteHalf<'a>);
 }
 
 impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
@@ -87,9 +87,16 @@ impl AsyncWrite for BorrowedWriteHalf<'_> {
         Poll::Ready(Ok(()))
     }
 }
+impl AsFd for BorrowedWriteHalf<'_> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_ref().as_fd()
+    }
+}
 
 tokio_wrapper_trait_impls!(
-    for BorrowedWriteHalf<'a>, tokio_norawfd_lt 'a TokioUdStreamWriteHalf<'a>);
+    for BorrowedWriteHalf<'a>, tokio_nofd_lt 'a TokioUdStreamWriteHalf<'a>);
+derive_asraw!(unix: BorrowedWriteHalf<'_>);
 
 /// Owned write half of a [`UdStream`](super::UdStream), created by [`.into_split()`](super::UdStream::into_split).
 #[derive(Debug)]
@@ -120,27 +127,27 @@ impl OwnedWriteHalf {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_stream_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.as_stream_fd())
     }
 
     /// Shuts down the write half.
     ///
     /// Attempting to call this method multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_stream_raw_fd().as_ref(), Shutdown::Write)
+        c_wrappers::shutdown(self.as_stream_fd(), Shutdown::Write)
     }
 
     /// Returns the underlying file descriptor. Note that this isn't a file descriptor for the write half specifically, but rather for the whole stream, so this isn't exposed as a struct method.
-    fn as_stream_raw_fd(&self) -> c_int {
+    fn as_stream_fd(&self) -> BorrowedFd<'_> {
         let stream: &TokioUdStream = self.0.as_ref();
-        stream.as_raw_fd()
+        stream.as_fd()
     }
 
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamOwnedWriteHalf> {
         Pin::new(&mut self.get_mut().0)
     }
 
-    tokio_wrapper_conversion_methods!(tokio_norawfd TokioUdStreamOwnedWriteHalf);
+    tokio_wrapper_conversion_methods!(tokio TokioUdStreamOwnedWriteHalf);
 }
 
 impl TokioAsyncWrite for OwnedWriteHalf {
@@ -170,6 +177,13 @@ impl AsyncWrite for OwnedWriteHalf {
         Poll::Ready(Ok(()))
     }
 }
+impl AsFd for OwnedWriteHalf {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_ref().as_fd()
+    }
+}
 
 tokio_wrapper_trait_impls!(
-    for OwnedWriteHalf, tokio_norawfd TokioUdStreamOwnedWriteHalf);
+    for OwnedWriteHalf, tokio_nofd TokioUdStreamOwnedWriteHalf);
+derive_asraw!(unix: OwnedWriteHalf);

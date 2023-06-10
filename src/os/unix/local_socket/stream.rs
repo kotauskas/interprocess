@@ -4,7 +4,7 @@ use {
     std::{
         fmt::{self, Debug, Formatter},
         io::{self, prelude::*, IoSlice, IoSliceMut},
-        os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
+        os::unix::io::AsRawFd,
     },
 };
 
@@ -57,20 +57,4 @@ impl Debug for LocalSocketStream {
             .finish()
     }
 }
-impl AsRawFd for LocalSocketStream {
-    fn as_raw_fd(&self) -> i32 {
-        self.inner.as_raw_fd()
-    }
-}
-impl IntoRawFd for LocalSocketStream {
-    fn into_raw_fd(self) -> i32 {
-        self.inner.into_raw_fd()
-    }
-}
-impl FromRawFd for LocalSocketStream {
-    unsafe fn from_raw_fd(fd: i32) -> Self {
-        Self {
-            inner: unsafe { UdStream::from_raw_fd(fd) },
-        }
-    }
-}
+forward_handle!(unix: LocalSocketStream, inner);

@@ -47,4 +47,4 @@ impl Debug for OwnedReadHalf {
         f.debug_tuple("local_socket::OwnedReadHalf").field(&self.inner).finish()
     }
 }
-// TODO as_raw_fd
+forward_as_handle!(OwnedReadHalf, inner);

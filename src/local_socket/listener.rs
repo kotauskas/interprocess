@@ -148,7 +148,8 @@ impl Debug for LocalSocketListener {
         Debug::fmt(&self.inner, f)
     }
 }
-impl_handle_manip_unix!(LocalSocketListener);
+forward_handle!(unix: LocalSocketListener, inner);
+derive_raw!(unix: LocalSocketListener);
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
 ///

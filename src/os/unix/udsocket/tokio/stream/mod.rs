@@ -2,7 +2,6 @@ use crate::os::unix::udsocket::{c_wrappers, ToUdSocketPath, UdSocketPath, UdStre
 use crate::os::unix::unixprelude::*;
 use futures_io::{AsyncRead, AsyncWrite};
 use std::{
-    convert::TryFrom,
     error::Error,
     fmt::{self, Formatter},
     io,
@@ -112,7 +111,7 @@ impl UdStream {
     ///
     /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_raw_fd().as_ref(), how)
+        c_wrappers::shutdown(self.0.as_fd(), how)
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
     #[cfg(uds_peerucred)]
@@ -134,7 +133,7 @@ impl UdStream {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_raw_fd().as_ref())
+        c_wrappers::get_peer_ucred(self.0.as_fd())
     }
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStream> {
         Pin::new(&mut self.get_mut().0)
@@ -149,6 +148,7 @@ tokio_wrapper_trait_impls!(
     sync SyncUdStream,
     std StdUdStream,
     tokio TokioUdStream);
+derive_asraw!(unix: UdStream);
 
 impl TokioAsyncRead for UdStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {

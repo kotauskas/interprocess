@@ -59,5 +59,5 @@ impl Debug for OwnedReadHalf {
     }
 }
 
-// TODO can't do this on Unix
-//impl_as_raw_handle!(OwnedReadHalf);
+forward_as_handle!(OwnedReadHalf, inner);
+derive_asraw!(OwnedReadHalf);

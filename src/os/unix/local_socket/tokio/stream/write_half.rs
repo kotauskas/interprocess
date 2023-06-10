@@ -57,4 +57,4 @@ impl Debug for OwnedWriteHalf {
             .finish()
     }
 }
-// TODO as_raw_fd
+forward_as_handle!(OwnedWriteHalf, inner);

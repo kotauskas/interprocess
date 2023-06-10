@@ -43,10 +43,10 @@ fn create_uds_raw(ty: c_int) -> io::Result<FdOps> {
 ///
 /// # Safety
 /// `addr` must be properly null-terminated.
-pub(super) unsafe fn bind(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
+pub(super) unsafe fn bind(fd: BorrowedFd<'_>, addr: &sockaddr_un) -> io::Result<()> {
     let success = unsafe {
         libc::bind(
-            fd.0,
+            fd.as_raw_fd(),
             // Double cast because you cannot cast a reference to a pointer of arbitrary type
             // but you can cast any narrow pointer to any other narrow pointer
             addr as *const _ as *const sockaddr,
@@ -60,17 +60,23 @@ pub(super) unsafe fn bind(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
 ///
 /// # Safety
 /// `addr` must be properly null-terminated.
-pub(super) unsafe fn connect(fd: &FdOps, addr: &sockaddr_un) -> io::Result<()> {
-    let success = unsafe { libc::connect(fd.0, addr as *const _ as *const _, size_of::<sockaddr_un>() as u32) != -1 };
+pub(super) unsafe fn connect(fd: BorrowedFd<'_>, addr: &sockaddr_un) -> io::Result<()> {
+    let success = unsafe {
+        libc::connect(
+            fd.as_raw_fd(),
+            (addr as *const sockaddr_un).cast(),
+            size_of::<sockaddr_un>() as _,
+        ) != -1
+    };
     ok_or_ret_errno!(success => ())
 }
 
-pub(super) fn listen(fd: &FdOps, backlog: c_int) -> io::Result<()> {
-    let success = unsafe { libc::listen(fd.0, backlog) != -1 };
+pub(super) fn listen(fd: BorrowedFd<'_>, backlog: c_int) -> io::Result<()> {
+    let success = unsafe { libc::listen(fd.as_raw_fd(), backlog) != -1 };
     ok_or_ret_errno!(success => ())
 }
 
-pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
+pub(super) fn set_passcred(fd: BorrowedFd<'_>, passcred: bool) -> io::Result<()> {
     #[cfg(uds_scm_credentials)]
     {
         use libc::{SOL_SOCKET, SO_PASSCRED};
@@ -79,7 +85,7 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
         let passcred = passcred as c_int;
         let success = unsafe {
             libc::setsockopt(
-                fd.0,
+                fd.as_raw_fd(),
                 SOL_SOCKET,
                 SO_PASSCRED,
                 &passcred as *const _ as *const _,
@@ -95,7 +101,7 @@ pub(super) fn set_passcred(fd: &FdOps, passcred: bool) -> io::Result<()> {
     }
 }
 #[cfg(uds_peerucred)]
-pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<libc::ucred> {
+pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
     use libc::{socklen_t, ucred, SOL_SOCKET, SO_PEERCRED};
     use std::mem::zeroed;
 
@@ -107,7 +113,7 @@ pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<libc::ucred> {
     let mut cred_len = size_of::<ucred>() as socklen_t;
     let success = unsafe {
         libc::getsockopt(
-            fd.0,
+            fd.as_raw_fd(),
             SOL_SOCKET,
             SO_PEERCRED,
             &mut cred as *mut _ as *mut _,
@@ -116,23 +122,23 @@ pub(super) fn get_peer_ucred(fd: &FdOps) -> io::Result<libc::ucred> {
     } != -1;
     ok_or_ret_errno!(success => cred)
 }
-fn get_status_flags(fd: &FdOps) -> io::Result<c_int> {
+fn get_status_flags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
     let (flags, success) = unsafe {
         // SAFETY: nothing too unsafe about this function. One thing to note is that we're passing
         // it a null pointer, which is, for some reason, required yet ignored for F_GETFL.
-        let result = libc::fcntl(fd.0, F_GETFL, ptr::null::<c_void>());
+        let result = libc::fcntl(fd.as_raw_fd(), F_GETFL, ptr::null::<c_void>());
         (result, result != -1)
     };
     ok_or_ret_errno!(success => flags)
 }
-fn set_status_flags(fd: &FdOps, new_flags: c_int) -> io::Result<()> {
+fn set_status_flags(fd: BorrowedFd<'_>, new_flags: c_int) -> io::Result<()> {
     let success = unsafe {
         // SAFETY: new_flags is a c_int, as documented in the manpage.
-        libc::fcntl(fd.0, F_SETFL, new_flags)
+        libc::fcntl(fd.as_raw_fd(), F_SETFL, new_flags)
     } != -1;
     ok_or_ret_errno!(success => ())
 }
-pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
+pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
     let old_flags = get_status_flags(fd)?;
     let new_flags = if nonblocking {
         old_flags | O_NONBLOCK
@@ -143,17 +149,17 @@ pub(super) fn set_nonblocking(fd: &FdOps, nonblocking: bool) -> io::Result<()> {
     };
     set_status_flags(fd, new_flags)
 }
-pub(super) fn get_nonblocking(fd: &FdOps) -> io::Result<bool> {
+pub(super) fn get_nonblocking(fd: BorrowedFd<'_>) -> io::Result<bool> {
     let flags = get_status_flags(fd)?;
     Ok(flags & O_NONBLOCK != 0)
 }
-pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
+pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
     let how = match how {
         Shutdown::Read => SHUT_RD,
         Shutdown::Write => SHUT_WR,
         Shutdown::Both => SHUT_RDWR,
     };
-    let success = unsafe { libc::shutdown(fd.0, how) != -1 };
+    let success = unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 };
     ok_or_ret_errno!(success => ())
 }
 
@@ -161,18 +167,18 @@ pub(super) fn shutdown(fd: &FdOps, how: Shutdown) -> io::Result<()> {
 mod non_linux {
     use super::*;
     use libc::{FD_CLOEXEC, F_GETFD, F_SETFD};
-    pub(super) fn get_fdflags(fd: &FdOps) -> io::Result<i32> {
+    pub(super) fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<i32> {
         let (val, success) = unsafe {
-            let ret = libc::fcntl(fd.0, F_GETFD, 0);
+            let ret = libc::fcntl(fd.as_raw_fd(), F_GETFD, 0);
             (ret, ret != -1)
         };
         ok_or_ret_errno!(success => val)
     }
-    pub(super) fn set_fdflags(fd: &FdOps, flags: i32) -> io::Result<()> {
-        let success = unsafe { libc::fcntl(fd.0, F_SETFD, flags) != -1 };
+    pub(super) fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
+        let success = unsafe { libc::fcntl(fd.as_raw_fd(), F_SETFD, flags) != -1 };
         ok_or_ret_errno!(success => ())
     }
-    pub(super) fn set_cloexec(fd: &FdOps, cloexec: bool) -> io::Result<()> {
+    pub(super) fn set_cloexec(fd: BorrowedFd<'_>, cloexec: bool) -> io::Result<()> {
         let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
         if cloexec {
             flags |= FD_CLOEXEC;

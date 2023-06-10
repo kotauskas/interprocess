@@ -83,14 +83,14 @@ impl UdStreamListener {
         let fd = c_wrappers::create_uds(SOCK_STREAM, nonblocking)?;
         unsafe {
             // SAFETY: addr is well-constructed
-            c_wrappers::bind(&fd, &addr)?;
+            c_wrappers::bind(fd.0.as_fd(), &addr)?;
         }
         // FIXME the standard library uses 128 here without an option to change this
         // number, why? If std has solid reasons to do this, remove this notice and
         // document the method's behavior on this matter explicitly; otherwise, add
         // an option to change this value.
-        c_wrappers::listen(&fd, 128)?;
-        c_wrappers::set_passcred(&fd, true)?;
+        c_wrappers::listen(fd.0.as_fd(), 128)?;
+        c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
         let dg = if keep_drop_guard {
             PathDropGuard {
@@ -175,11 +175,11 @@ impl UdStreamListener {
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking(&self.fd, nonblocking)
+        c_wrappers::set_nonblocking(self.fd.0.as_fd(), nonblocking)
     }
     /// Checks whether the socket is currently in nonblocking mode or not.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        c_wrappers::get_nonblocking(&self.fd)
+        c_wrappers::get_nonblocking(self.fd.0.as_fd())
     }
 }
 impl Debug for UdStreamListener {
@@ -190,25 +190,28 @@ impl Debug for UdStreamListener {
             .finish()
     }
 }
-impl AsRawFd for UdStreamListener {
-    fn as_raw_fd(&self) -> c_int {
-        self.fd.as_raw_fd()
+impl AsFd for UdStreamListener {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.0.as_fd()
     }
 }
-impl IntoRawFd for UdStreamListener {
-    fn into_raw_fd(self) -> c_int {
-        self.fd.into_raw_fd()
+impl From<UdStreamListener> for OwnedFd {
+    #[inline]
+    fn from(x: UdStreamListener) -> Self {
+        x.fd.0
     }
 }
-impl FromRawFd for UdStreamListener {
-    unsafe fn from_raw_fd(fd: c_int) -> Self {
-        let fd = unsafe { FdOps::from_raw_fd(fd) };
-        Self {
-            fd,
+impl From<OwnedFd> for UdStreamListener {
+    #[inline]
+    fn from(fd: OwnedFd) -> Self {
+        UdStreamListener {
             _drop_guard: PathDropGuard::dummy(),
+            fd: FdOps(fd),
         }
     }
 }
+derive_raw!(unix: UdStreamListener);
 
 /// An infinite iterator over incoming client connections of a [`UdStreamListener`].
 ///

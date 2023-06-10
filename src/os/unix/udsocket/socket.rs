@@ -13,7 +13,7 @@ use crate::{
 use libc::{sockaddr_un, SOCK_DGRAM};
 use std::{
     fmt::{self, Debug, Formatter},
-    io::{self, IoSlice, IoSliceMut},
+    io::{self, prelude::*, IoSlice, IoSliceMut},
     mem::{size_of_val, zeroed},
     os::raw::c_void,
 };
@@ -59,9 +59,9 @@ impl UdSocket {
         let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
         unsafe {
             // SAFETY: addr is well-constructed
-            c_wrappers::bind(&fd, &addr)?;
+            c_wrappers::bind(fd.0.as_fd(), &addr)?;
         }
-        c_wrappers::set_passcred(&fd, true)?;
+        c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
             PathDropGuard {
@@ -98,7 +98,7 @@ impl UdSocket {
 
         unsafe {
             // SAFETY: addr is well-constructed
-            c_wrappers::connect(&self.fd, &addr)?;
+            c_wrappers::connect(self.fd.0.as_fd(), &addr)?;
         }
 
         Ok(())
@@ -108,8 +108,9 @@ impl UdSocket {
     ///
     /// # System calls
     /// - `read`
+    #[inline]
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.fd.read(buf)
+        (&self.fd).read(buf)
     }
 
     /// Receives a single datagram from the socket, making use of [scatter input] and returning the size of the received datagram.
@@ -118,8 +119,9 @@ impl UdSocket {
     /// - `readv`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.fd.read_vectored(bufs)
+        (&self.fd).read_vectored(bufs)
     }
 
     /// Receives a single datagram and ancillary data from the socket. The return value is in the following order:
@@ -261,7 +263,7 @@ impl UdSocket {
     /// - `write`
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.fd.write(buf)
+        (&self.fd).write(buf)
     }
     // TODO sendto
     /// Sends a datagram into the socket, making use of [gather output] for the main data.
@@ -273,7 +275,7 @@ impl UdSocket {
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[inline]
     pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.fd.write_vectored(bufs)
+        (&self.fd).write_vectored(bufs)
     }
     /// Sends a datagram and ancillary data into the socket.
     ///
@@ -311,11 +313,11 @@ impl UdSocket {
     /// [`incoming`]: #method.incoming " "
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking(&self.fd, nonblocking)
+        c_wrappers::set_nonblocking(self.fd.0.as_fd(), nonblocking)
     }
     /// Checks whether the socket is currently in nonblocking mode or not.
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        c_wrappers::get_nonblocking(&self.fd)
+        c_wrappers::get_nonblocking(self.fd.0.as_fd())
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -338,7 +340,7 @@ impl UdSocket {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(&self.fd)
+        c_wrappers::get_peer_ucred(self.fd.0.as_fd())
     }
 }
 
@@ -366,22 +368,24 @@ impl ReliableRecvMsg for UdSocket {
 #[cfg(target_os = "linux")]
 impl Sealed for UdSocket {}
 
-impl AsRawFd for UdSocket {
-    fn as_raw_fd(&self) -> c_int {
-        self.fd.as_raw_fd()
+impl AsFd for UdSocket {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.0.as_fd()
     }
 }
-impl IntoRawFd for UdSocket {
-    fn into_raw_fd(self) -> c_int {
-        self.fd.into_raw_fd()
+impl From<UdSocket> for OwnedFd {
+    #[inline]
+    fn from(x: UdSocket) -> Self {
+        x.fd.0
     }
 }
-impl FromRawFd for UdSocket {
-    unsafe fn from_raw_fd(fd: c_int) -> Self {
-        let fd = unsafe { FdOps::from_raw_fd(fd) };
-        Self {
-            fd,
+impl From<OwnedFd> for UdSocket {
+    fn from(fd: OwnedFd) -> Self {
+        UdSocket {
             _drop_guard: PathDropGuard::dummy(),
+            fd: FdOps(fd),
         }
     }
 }
+derive_raw!(unix: UdSocket);
