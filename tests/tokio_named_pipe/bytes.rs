@@ -34,7 +34,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         Ok(())
     }
 
-    let (name, listener) = NameGen::new(true)
+    let (name, listener) = NameGen::new(make_id!(), true)
         .find_map(|nm| {
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new()

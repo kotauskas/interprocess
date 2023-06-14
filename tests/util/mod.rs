@@ -7,6 +7,7 @@ use choke::*;
 mod xorshift;
 pub use xorshift::*;
 
+#[macro_use]
 mod namegen;
 pub use namegen::*;
 

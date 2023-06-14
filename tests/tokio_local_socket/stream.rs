@@ -49,7 +49,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32, prefer_namesp
         Ok(())
     }
 
-    let (name, listener) = NameGen::new_auto(prefer_namespaced)
+    let (name, listener) = NameGen::new_auto(make_id!(), prefer_namespaced)
         .find_map(|nm| {
             let l = match LocalSocketListener::bind(&*nm) {
                 Ok(l) => l,

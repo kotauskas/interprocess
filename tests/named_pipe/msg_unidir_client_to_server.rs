@@ -16,7 +16,7 @@ const MSG_1: &[u8] = b"First client message";
 const MSG_2: &[u8] = b"Second client message";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    let (name, listener) = NameGen::new(true)
+    let (name, listener) = NameGen::new(make_id!(), true)
         .find_map(|nm| {
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new()

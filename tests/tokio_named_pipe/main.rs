@@ -1,5 +1,6 @@
 #![cfg(all(windows, feature = "tokio"))]
 #[path = "../util/mod.rs"]
+#[macro_use]
 mod util;
 
 mod bytes;

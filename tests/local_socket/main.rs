@@ -1,4 +1,5 @@
 #[path = "../util/mod.rs"]
+#[macro_use]
 mod util;
 use util::*;
 

@@ -1,4 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 /// The 32-bit variant of the Xorshift PRNG algorithm.
 ///
@@ -7,11 +10,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Copy, Clone, Debug)]
 pub struct Xorshift32(pub u32);
 impl Xorshift32 {
-    pub fn from_system_time() -> Self {
-        let dur = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|e| e.duration());
-        Self(dur.subsec_nanos())
+    pub fn from_id(id: &'static str) -> Self {
+        let mut hasher = DefaultHasher::new();
+        id.hash(&mut hasher);
+        let hash64 = hasher.finish();
+        let hash32 = ((hash64 & 0xFFFF_FFFF_0000_0000) >> 32) ^ (hash64 & 0xFFFF_FFFF);
+        Self(hash32 as u32)
     }
     pub fn next(&mut self) -> u32 {
         self.0 ^= self.0 << 13;

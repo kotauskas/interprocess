@@ -20,6 +20,7 @@ mod listener;
 mod path;
 mod socket;
 mod stream;
+#[macro_use]
 mod util;
 pub use {listener::*, path::*, socket::*, stream::*};
 

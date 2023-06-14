@@ -16,7 +16,7 @@ pub fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
     Ok(())
 }
 fn client(prefer_namespaced: bool) -> TestResult {
-    let name = NameGen::new_auto(prefer_namespaced).next().unwrap();
+    let name = NameGen::new_auto(make_id!(), prefer_namespaced).next().unwrap();
 
     LocalSocketStream::connect(name.as_str()).context("Connect failed")?;
     Ok(())

@@ -13,7 +13,7 @@ static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    let (name, listener) = NameGen::new(true)
+    let (name, listener) = NameGen::new(make_id!(), true)
         .find_map(|nm| {
             let rnm: &OsStr = nm.as_ref();
             let l = match PipeListenerOptions::new().name(rnm).create_duplex::<pipe_mode::Bytes>() {
