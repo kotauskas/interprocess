@@ -19,6 +19,7 @@ use {
 /// As mentioned in the [module-level documentation](super), not all platforms support all types of local socket names. A name pointing to a filesystem location is only supported on Unix-like systems, and names pointing to an abstract namespace reserved specifically for local sockets are only available on Linux and Windows. Due to the diversity of those differences, `LocalSocketName` does not provide any forced validation by itself – the [`is_supported`] and [`is_always_supported`] checks are not enforced to succeed. Instead, they are intended as helpers for the process of user input validation, if any local socket names are ever read from environment variables, configuration files or other methods of user input.
 ///
 /// If an invalid local socket name is used to create a local socket or connect to it, the creation/connection method will fail.
+#[derive(Clone, Debug, PartialEq)]
 pub struct LocalSocketName<'a> {
     inner: Cow<'a, OsStr>,
     namespaced: bool,
