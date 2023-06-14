@@ -8,19 +8,19 @@ use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
 pub(crate) struct FileHandle(pub(crate) OwnedHandle);
 impl FileHandle {
     pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        if buf.len() <= DWORD::max_value() as usize {
-            return Err(io::Error::new(
+        let len = DWORD::try_from(buf.len()).map_err(|_| {
+            io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "buffer is bigger than maximum buffer size for ReadFile",
-            ));
-        }
+            )
+        })?;
 
         let (success, num_bytes_read) = unsafe {
             let mut num_bytes_read: DWORD = 0;
             let result = ReadFile(
                 self.0.as_raw_handle(),
                 buf.as_mut_ptr().cast(),
-                buf.len() as DWORD,
+                len,
                 &mut num_bytes_read as *mut _,
                 ptr::null_mut(),
             );
@@ -29,19 +29,19 @@ impl FileHandle {
         downgrade_eof(ok_or_ret_errno!(success => num_bytes_read))
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        if buf.len() <= DWORD::max_value() as usize {
-            return Err(io::Error::new(
+        let len = DWORD::try_from(buf.len()).map_err(|_| {
+            io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "buffer is bigger than maximum buffer size for WriteFile",
-            ));
-        }
+                "buffer is bigger than maximum buffer size for ReadFile",
+            )
+        })?;
 
         let (success, bytes_written) = unsafe {
             let mut bytes_written: DWORD = 0;
             let result = WriteFile(
                 self.0.as_raw_handle(),
                 buf.as_ptr().cast(),
-                buf.len() as DWORD,
+                len,
                 &mut bytes_written as *mut _,
                 ptr::null_mut(),
             );
