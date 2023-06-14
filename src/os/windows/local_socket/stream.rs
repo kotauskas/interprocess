@@ -59,7 +59,9 @@ forward_into_handle!(LocalSocketStream);
 impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = (OwnedHandle, io::Error);
 
-    fn try_from(value: OwnedHandle) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+        PipeStream::try_from(handle)
+            .map(Self)
+            .map_err(|e| (e.handle, e.io_error))
     }
 }

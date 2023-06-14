@@ -513,9 +513,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
                 }
             };
             if !msg_bnd {
+                let kind = FromHandleErrorKind::NoMessageBoundaries;
                 return Err(FromHandleError {
-                    kind: FromHandleErrorKind::NoMessageBoundaries,
-                    io_error: io::Error::from(io::ErrorKind::InvalidInput),
+                    kind,
+                    io_error: io::Error::new(io::ErrorKind::InvalidInput, kind.msg()),
                     handle,
                 });
             }
