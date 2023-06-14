@@ -5,54 +5,49 @@ mod write_half;
 pub use write_half::*;
 // TODO reunite
 
-use {
-    crate::{
-        local_socket::ToLocalSocketName,
-        os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream},
-    },
-    futures_io::{AsyncRead, AsyncWrite},
-    std::{
-        ffi::c_void,
-        fmt::{self, Debug, Formatter},
-        io,
-        os::windows::io::AsRawHandle,
-        pin::Pin,
-        task::{Context, Poll},
-    },
+use crate::{
+    local_socket::ToLocalSocketName,
+    os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream},
+};
+use futures_io::{AsyncRead, AsyncWrite};
+use std::{
+    io,
+    os::windows::prelude::*,
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 type StreamImpl = DuplexPipeStream<pipe_mode::Bytes>;
 
-pub struct LocalSocketStream {
-    pub(super) inner: StreamImpl,
-}
+#[derive(Debug)]
+pub struct LocalSocketStream(pub(super) StreamImpl);
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let inner = DuplexPipeStream::connect(name.inner()).await?;
-        Ok(Self { inner })
+        Ok(Self(inner))
     }
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.inner.is_server() {
-            true => self.inner.client_process_id(),
-            false => self.inner.server_process_id(),
+        match self.0.is_server() {
+            true => self.0.client_process_id(),
+            false => self.0.server_process_id(),
         }
     }
     #[inline]
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        let (r, w) = self.inner.split();
-        (OwnedReadHalf { inner: r }, OwnedWriteHalf { inner: w })
+        let (r, w) = self.0.split();
+        (OwnedReadHalf(r), OwnedWriteHalf(w))
     }
     pub fn reunite(rh: OwnedReadHalf, wh: OwnedWriteHalf) -> io::Result<Self> {
-        match rh.inner.reunite(wh.inner) {
-            Ok(inner) => Ok(Self { inner }),
+        match rh.0.reunite(wh.0) {
+            Ok(inner) => Ok(Self(inner)),
             Err(_) => todo!(),
         }
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut StreamImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 
@@ -78,16 +73,11 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_close(cx)
     }
 }
-impl Debug for LocalSocketStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalSocketStream")
-            .field("handle", &self.as_raw_handle())
-            .finish()
-    }
-}
-impl AsRawHandle for LocalSocketStream {
-    #[inline]
-    fn as_raw_handle(&self) -> *mut c_void {
-        self.inner.as_raw_handle()
+forward_as_handle!(LocalSocketStream);
+impl TryFrom<OwnedHandle> for LocalSocketStream {
+    type Error = (OwnedHandle, io::Error);
+
+    fn try_from(value: OwnedHandle) -> Result<Self, Self::Error> {
+        todo!()
     }
 }

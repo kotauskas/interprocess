@@ -8,9 +8,7 @@ use std::io;
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
 #[derive(Debug)]
-pub struct LocalSocketListener {
-    inner: PipeListener,
-}
+pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
@@ -18,13 +16,13 @@ impl LocalSocketListener {
             .name(name.into_inner())
             .mode(PipeMode::Bytes)
             .create()?;
-        Ok(Self { inner })
+        Ok(Self(inner))
     }
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
-        let inner = self.inner.accept()?;
-        Ok(LocalSocketStream { inner })
+        let inner = self.0.accept()?;
+        Ok(LocalSocketStream(inner))
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking)
+        self.0.set_nonblocking(nonblocking)
     }
 }

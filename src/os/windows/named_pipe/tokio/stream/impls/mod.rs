@@ -4,9 +4,9 @@ mod split_owned;
 
 use crate::{
     os::windows::{
-        is_eof_like,
+        downgrade_eof, downgrade_poll_eof,
         named_pipe::{
-            convert_path, encode_to_utf16,
+            path_conversion,
             stream::{
                 block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
                 UNWRAP_FAIL_MSG,
@@ -25,7 +25,7 @@ use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
     future::Future,
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
     ops::Deref,
     pin::Pin,
     task::{Context, Poll},
@@ -52,16 +52,6 @@ macro_rules! same_clsrv {
     };
 }
 
-fn downgrade_poll_read_eof<T: Default>(r: Poll<io::Result<T>>) -> Poll<io::Result<T>> {
-    Poll::Ready(downgrade_read_eof(ready!(r)))
-}
-fn downgrade_read_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
-    match r {
-        Err(e) if is_eof_like(&e) => Ok(T::default()),
-        els => els,
-    }
-}
-
 #[repr(transparent)]
 struct AssertHandleSyncSend(HANDLE);
 unsafe impl Sync for AssertHandleSyncSend {}
@@ -77,14 +67,14 @@ impl RawPipeStream {
         .expect("waiting for server panicked")
     }
     async fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
-        let path = convert_path(pipename, hostname);
+        let path = path_conversion::convert_path(pipename, hostname);
         let mut path16 = None::<Vec<u16>>;
         let client = loop {
             match _connect(&path, read, write) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                     let p16_take = match path16.take() {
                         Some(p) => p,
-                        None => encode_to_utf16(&path),
+                        None => path_conversion::encode_to_utf16(&path),
                     };
                     let p16_take = Self::wait_for_server(p16_take).await?;
                     path16 = Some(p16_take);
@@ -94,27 +84,16 @@ impl RawPipeStream {
         };
         Ok(Self::Client(client))
     }
-    unsafe fn try_from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let is_server = is_server_from_sys(handle).map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
-
-        unsafe {
-            match is_server {
-                true => TokioNPServer::from_raw_handle(handle).map(Self::Server),
-                false => TokioNPClient::from_raw_handle(handle).map(Self::Client),
-            }
-            .map_err(|e| (FromRawHandleErrorKind::TokioError, e))
-        }
-    }
 
     fn poll_read_readbuf(&mut self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        downgrade_poll_read_eof(same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf)))
+        downgrade_poll_eof(same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf)))
     }
 
     // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
     // has to be `&mut self`.
     fn poll_read_uninit(&mut self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
         let mut readbuf = TokioReadBuf::uninit(buf);
-        ready!(downgrade_poll_read_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
+        ready!(downgrade_poll_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
         Poll::Ready(Ok(readbuf.filled().len()))
     }
     #[inline]
@@ -125,8 +104,8 @@ impl RawPipeStream {
     fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
             let prr = same_clsrv!(x in self => x.poll_read_ready(cx));
-            ready!(downgrade_poll_read_eof(prr))?;
-            match downgrade_read_eof(same_clsrv!(x in self => x.try_read(buf))) {
+            ready!(downgrade_poll_eof(prr))?;
+            match downgrade_eof(same_clsrv!(x in self => x.try_read(buf))) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 els => return Poll::Ready(els),
             }
@@ -151,7 +130,7 @@ impl RawPipeStream {
         let mut size = 0;
         let mut fit = false;
         while size == 0 {
-            size = downgrade_read_eof(peek_msg_len(self.as_raw_handle()))?;
+            size = downgrade_eof(peek_msg_len(self.as_handle()))?;
             fit = buf.len() >= size;
             if fit {
                 match ready!(self.poll_read_init(cx, buf)) {
@@ -206,11 +185,48 @@ impl Drop for RawPipeStream {
         self.disconnect().expect("failed to disconnect server from client");
     }
 }
-impl AsRawHandle for RawPipeStream {
-    fn as_raw_handle(&self) -> HANDLE {
-        same_clsrv!(x in self => x.as_raw_handle())
+impl AsHandle for RawPipeStream {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        same_clsrv!(x in self => x.as_handle())
     }
 }
+impl TryFrom<OwnedHandle> for RawPipeStream {
+    type Error = FromHandleError;
+
+    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+        let is_server = match is_server_from_sys(handle.as_handle()) {
+            Ok(b) => b,
+            Err(e) => {
+                return Err(FromHandleError {
+                    kind: FromHandleErrorKind::IsServerCheckFailed,
+                    io_error: e,
+                    handle,
+                })
+            }
+        };
+
+        let rh = handle.as_raw_handle();
+        let handle = ManuallyDrop::new(handle);
+
+        let tkresult = unsafe {
+            match is_server {
+                true => TokioNPServer::from_raw_handle(rh).map(Self::Server),
+                false => TokioNPClient::from_raw_handle(rh).map(Self::Client),
+            }
+        };
+        match tkresult {
+            Ok(s) => Ok(s),
+            Err(e) => Err(FromHandleError {
+                kind: FromHandleErrorKind::TokioError,
+                io_error: e,
+                handle: ManuallyDrop::into_inner(handle),
+            }),
+        }
+    }
+}
+// Tokio does not implement TryInto<OwnedHandle>
+derive_asraw!(RawPipeStream);
 
 struct Write<'a>(&'a RawPipeStream, &'a [u8]);
 impl Future for Write<'_> {
@@ -228,7 +244,7 @@ impl Future for ReadUninit<'_, '_> {
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let slf = self.get_mut();
-        downgrade_poll_read_eof(slf.0.poll_read_uninit(cx, slf.1))
+        downgrade_poll_eof(slf.0.poll_read_uninit(cx, slf.1))
     }
 }
 
@@ -300,22 +316,22 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.as_raw_handle(), GetNamedPipeClientProcessId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeClientProcessId) }
     }
     /// Retrieves the session identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.as_raw_handle(), GetNamedPipeClientSessionId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeClientSessionId) }
     }
     /// Retrieves the process identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.as_raw_handle(), GetNamedPipeServerProcessId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeServerProcessId) }
     }
     /// Retrieves the session identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.as_raw_handle(), GetNamedPipeServerSessionId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
@@ -326,31 +342,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.is_server()
-    }
-    /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
-    ///
-    /// For more on why this can fail, see [`FromRawHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
-    ///
-    /// # Safety
-    /// See equivalent safety notes on [`FromRawHandle`].
-    pub unsafe fn from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let raw = unsafe {
-            // SAFETY: safety contract is propagated.
-            RawPipeStream::try_from_raw_handle(handle)?
-        };
-        // If the wrapper type tries to read incoming data as messages, that might break if
-        // the underlying pipe has no message boundaries. Let's check for that.
-        if Rm::MODE == Some(PipeMode::Messages) {
-            let msg_bnd = has_msg_boundaries_from_sys(raw.as_raw_handle())
-                .map_err(|e| (FromRawHandleErrorKind::MessageBoundariesCheckFailed, e))?;
-            if !msg_bnd {
-                return Err((
-                    FromRawHandleErrorKind::NoMessageBoundaries,
-                    io::Error::from(io::ErrorKind::InvalidInput),
-                ));
-            }
-        }
-        Ok(Self::new(raw))
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
@@ -496,9 +487,42 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
         dbst.finish()
     }
 }
-impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeStream<Rm, Sm> {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.raw.as_raw_handle()
+impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.raw.as_handle()
     }
 }
+/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
+///
+/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
+    type Error = FromHandleError;
+
+    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+        // If the wrapper type tries to read incoming data as messages, that might break if
+        // the underlying pipe has no message boundaries. Let's check for that.
+        if Rm::MODE == Some(PipeMode::Messages) {
+            let msg_bnd = match has_msg_boundaries_from_sys(handle.as_handle()) {
+                Ok(b) => b,
+                Err(e) => {
+                    return Err(FromHandleError {
+                        kind: FromHandleErrorKind::MessageBoundariesCheckFailed,
+                        io_error: e,
+                        handle,
+                    })
+                }
+            };
+            if !msg_bnd {
+                return Err(FromHandleError {
+                    kind: FromHandleErrorKind::NoMessageBoundaries,
+                    io_error: io::Error::from(io::ErrorKind::InvalidInput),
+                    handle,
+                });
+            }
+        }
+        let raw = RawPipeStream::try_from(handle)?;
+        Ok(Self::new(raw))
+    }
+}
+
+derive_asraw!(windows: {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>);

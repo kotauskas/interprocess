@@ -11,6 +11,7 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     io,
     marker::PhantomData,
+    os::windows::prelude::*,
     sync::Arc,
 };
 
@@ -127,8 +128,10 @@ pub(crate) struct RawPipeStream {
 }
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
+///
+/// Not to be confused with the Tokio version.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum FromRawHandleErrorKind {
+pub enum FromHandleErrorKind {
     /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a pipe client.
     IsServerCheckFailed,
     /// The type being converted into has message semantics, but it wasn't possible to determine whether message boundaries are preserved in the pipe.
@@ -136,8 +139,62 @@ pub enum FromRawHandleErrorKind {
     /// The type being converted into has message semantics, but message boundaries are not preserved in the pipe.
     NoMessageBoundaries,
 }
-/// Error type for `from_raw_handle()` constructors.
-pub type FromRawHandleError = (FromRawHandleErrorKind, io::Error);
+impl FromHandleErrorKind {
+    fn should_display_io_error(self) -> bool {
+        !matches!(self, Self::NoMessageBoundaries)
+    }
+    const fn msg(self) -> &'static str {
+        use FromHandleErrorKind::*;
+        match self {
+            IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
+            MessageBoundariesCheckFailed => "failed to make sure that the pipe preserves message boundaries",
+            NoMessageBoundaries => "the pipe does not preserve message boundaries",
+        }
+    }
+}
+impl Display for FromHandleErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.pad(self.msg())
+    }
+}
+
+/// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.
+///
+/// Not to be confused with the Tokio version.
+#[derive(Debug)]
+pub struct FromHandleError {
+    /// The stage at which the error occurred.
+    pub kind: FromHandleErrorKind,
+    /// The underlying OS error.
+    pub io_error: io::Error,
+    /// Ownership of the handle, so that it could be repurposed.
+    pub handle: OwnedHandle,
+}
+impl Display for FromHandleError {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        display_from_handle_error(
+            f,
+            self.kind.msg(),
+            self.kind.should_display_io_error(),
+            &self.io_error,
+            self.handle.as_raw_handle(),
+        )
+    }
+}
+pub(crate) fn display_from_handle_error(
+    f: &mut fmt::Formatter<'_>,
+    kind: &'static str,
+    should_display_io_error: bool,
+    io_error: &io::Error,
+    handle: RawHandle,
+) -> fmt::Result {
+    f.write_str(kind)?;
+    if should_display_io_error {
+        write!(f, ": {}", &io_error)?;
+    }
+    write!(f, " (handle: {handle:?})")
+}
 
 /// Error type for `.reunite()` on split receive and send halves.
 ///

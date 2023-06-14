@@ -11,7 +11,7 @@ use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as P
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
-    mem::{size_of, zeroed, ManuallyDrop},
+    mem::{size_of, zeroed},
     num::NonZeroUsize,
     ptr,
 };
@@ -125,12 +125,8 @@ impl UnnamedPipeCreationOptions {
         if success {
             let (writer, reader) = unsafe {
                 // SAFETY: we just created those handles which means that we own them
-                let writer = PubWriter {
-                    inner: UnnamedPipeWriter::from_raw_handle(writer),
-                };
-                let reader = PubReader {
-                    inner: UnnamedPipeReader::from_raw_handle(reader),
-                };
+                let writer = PubWriter(UnnamedPipeWriter::from_raw_handle(writer));
+                let reader = PubReader(UnnamedPipeReader::from_raw_handle(reader));
                 (writer, reader)
             };
             Ok((writer, reader))
@@ -157,26 +153,6 @@ impl Read for UnnamedPipeReader {
         self.0.read(weaken_buf_init(buf))
     }
 }
-impl AsRawHandle for UnnamedPipeReader {
-    fn as_raw_handle(&self) -> HANDLE {
-        self.0.as_raw_handle()
-    }
-}
-impl IntoRawHandle for UnnamedPipeReader {
-    fn into_raw_handle(self) -> HANDLE {
-        let self_ = ManuallyDrop::new(self);
-        self_.as_raw_handle()
-    }
-}
-impl FromRawHandle for UnnamedPipeReader {
-    unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        let fho = unsafe {
-            // SAFETY: validity guaranteed by safety contract
-            FileHandle::from_raw_handle(handle)
-        };
-        Self(fho)
-    }
-}
 impl Debug for UnnamedPipeReader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
@@ -184,6 +160,8 @@ impl Debug for UnnamedPipeReader {
             .finish()
     }
 }
+forward_handle!(UnnamedPipeReader);
+derive_raw!(UnnamedPipeReader);
 
 pub(crate) struct UnnamedPipeWriter(FileHandle);
 impl Write for UnnamedPipeWriter {
@@ -194,22 +172,6 @@ impl Write for UnnamedPipeWriter {
         self.0.flush()
     }
 }
-impl AsRawHandle for UnnamedPipeWriter {
-    fn as_raw_handle(&self) -> HANDLE {
-        self.0.as_raw_handle()
-    }
-}
-impl IntoRawHandle for UnnamedPipeWriter {
-    fn into_raw_handle(self) -> HANDLE {
-        let self_ = ManuallyDrop::new(self);
-        self_.as_raw_handle()
-    }
-}
-impl FromRawHandle for UnnamedPipeWriter {
-    unsafe fn from_raw_handle(handle: HANDLE) -> Self {
-        Self(FileHandle(handle))
-    }
-}
 impl Debug for UnnamedPipeWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
@@ -217,3 +179,5 @@ impl Debug for UnnamedPipeWriter {
             .finish()
     }
 }
+forward_handle!(UnnamedPipeWriter);
+derive_raw!(UnnamedPipeWriter);

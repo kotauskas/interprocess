@@ -100,9 +100,7 @@ impmod! {local_socket::tokio,
 /// }
 /// # Ok(()) }
 /// ```
-pub struct LocalSocketListener {
-    inner: LocalSocketListenerImpl,
-}
+pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     #[inline]
@@ -112,25 +110,23 @@ impl LocalSocketListener {
     /// Listens for incoming connections to the socket, asynchronously waiting until a client is connected.
     #[inline]
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
-        Ok(LocalSocketStream {
-            inner: self.inner.accept().await?,
-        })
+        Ok(LocalSocketStream(self.0.accept().await?))
     }
 }
 #[doc(hidden)]
 impl From<LocalSocketListenerImpl> for LocalSocketListener {
     #[inline]
     fn from(inner: LocalSocketListenerImpl) -> Self {
-        Self { inner }
+        Self(inner)
     }
 }
 impl Debug for LocalSocketListener {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
-forward_as_handle!(unix: LocalSocketListener, inner);
+forward_as_handle!(unix: LocalSocketListener);
 derive_asraw!(unix: LocalSocketListener);
-forward_try_handle!(unix: LocalSocketListener, inner, LocalSocketListenerImpl);
+forward_try_handle!(unix: LocalSocketListener, LocalSocketListenerImpl);
 // TODO: incoming

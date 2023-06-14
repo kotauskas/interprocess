@@ -24,22 +24,22 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeClientProcessId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeClientProcessId) }
     }
     /// Retrieves the session identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeClientSessionId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeClientSessionId) }
     }
     /// Retrieves the process identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeServerProcessId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeServerProcessId) }
     }
     /// Retrieves the session identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeServerSessionId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeServerSessionId) }
     }
     /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
@@ -103,12 +103,13 @@ impl<Rm: PipeModeTag> Debug for RecvHalf<Rm> {
         self.raw.fill_fields(&mut dbst, Rm::MODE, None).finish()
     }
 }
-impl<Rm: PipeModeTag> AsRawHandle for RecvHalf<Rm> {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.raw.as_raw_handle()
+impl<Rm: PipeModeTag> AsHandle for RecvHalf<Rm> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.raw.as_handle()
     }
 }
+derive_asraw!(windows: {Rm: PipeModeTag} RecvHalf<Rm>);
 
 impl<Sm: PipeModeTag> SendHalf<Sm> {
     fn ensure_flush_start(&self, slf_flush: &mut TokioMutexGuard<'_, Option<FlushJH>>) {
@@ -150,22 +151,22 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeClientProcessId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeClientProcessId) }
     }
     /// Retrieves the session identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeClientSessionId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeClientSessionId) }
     }
     /// Retrieves the process identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeServerProcessId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeServerProcessId) }
     }
     /// Retrieves the session identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.as_raw_handle(), GetNamedPipeServerSessionId) }
+        unsafe { hget(self.raw.as_handle(), GetNamedPipeServerSessionId) }
     }
     /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
@@ -234,9 +235,10 @@ impl<Sm: PipeModeTag> Debug for SendHalf<Sm> {
             .finish()
     }
 }
-impl<Sm: PipeModeTag> AsRawHandle for SendHalf<Sm> {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.raw.as_raw_handle()
+impl<Sm: PipeModeTag> AsHandle for SendHalf<Sm> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.raw.as_handle()
     }
 }
+derive_asraw!(windows: {Sm: PipeModeTag} SendHalf<Sm>);

@@ -2,7 +2,11 @@ mod impls;
 mod wrapper_fns;
 pub(crate) use wrapper_fns::*;
 
-use super::super::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG};
+use crate::os::windows::{
+    named_pipe::stream::{display_from_handle_error, pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
+    winprelude::*,
+};
+
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
@@ -100,8 +104,10 @@ pub(crate) enum RawPipeStream {
 }
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
+///
+/// Not to be confused with the [non-Tokio version](crate::os::windows::named_pipe::stream::FromHandleError).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum FromRawHandleErrorKind {
+pub enum FromHandleErrorKind {
     /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a pipe client.
     IsServerCheckFailed,
     /// The type being converted into has message semantics, but it wasn't possible to determine whether message boundaries are preserved in the pipe.
@@ -113,8 +119,50 @@ pub enum FromRawHandleErrorKind {
     /// Most of the time, this means that `from_raw_handle()` call was performed outside of the Tokio runtime, but OS errors associated with the registration of the handle in the runtime belong to this category as well.
     TokioError,
 }
-/// Error type for `from_raw_handle()` constructors.
-pub type FromRawHandleError = (FromRawHandleErrorKind, io::Error);
+impl FromHandleErrorKind {
+    fn should_display_io_error(self) -> bool {
+        !matches!(self, Self::NoMessageBoundaries)
+    }
+    const fn msg(self) -> &'static str {
+        use FromHandleErrorKind::*;
+        match self {
+            IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
+            MessageBoundariesCheckFailed => "failed to make sure that the pipe preserves message boundaries",
+            NoMessageBoundaries => "the pipe does not preserve message boundaries",
+            TokioError => "Tokio error",
+        }
+    }
+}
+impl Display for FromHandleErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.pad(self.msg())
+    }
+}
+
+/// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.
+///
+/// Not to be confused with the [non-Tokio version](crate::os::windows::named_pipe::stream::FromHandleError).
+#[derive(Debug)]
+pub struct FromHandleError {
+    /// The stage at which the error occurred.
+    pub kind: FromHandleErrorKind,
+    /// The underlying OS error.
+    pub io_error: io::Error,
+    /// Ownership of the handle, so that it could be repurposed.
+    pub handle: OwnedHandle,
+}
+impl Display for FromHandleError {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        display_from_handle_error(
+            f,
+            self.kind.msg(),
+            self.kind.should_display_io_error(),
+            &self.io_error,
+            self.handle.as_raw_handle(),
+        )
+    }
+}
 
 /// Error type for `.reunite()` on split receive and send halves.
 ///

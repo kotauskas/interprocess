@@ -18,9 +18,7 @@ impmod! {local_socket::tokio,
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 ///
 /// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
-pub struct OwnedWriteHalf {
-    pub(super) inner: OwnedWriteHalfImpl,
-}
+pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
 impl OwnedWriteHalf {
     /// Retrieves the identifier of the process on the opposite end of the local socket connection.
     ///
@@ -29,11 +27,11 @@ impl OwnedWriteHalf {
     /// Not supported by the OS, will always generate an error at runtime.
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        self.inner.peer_pid()
+        self.0.peer_pid()
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 
@@ -64,9 +62,9 @@ impl AsyncWrite for OwnedWriteHalf {
 impl Debug for OwnedWriteHalf {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
-forward_as_handle!(OwnedWriteHalf, inner);
+forward_as_handle!(OwnedWriteHalf);
 derive_asraw!(OwnedWriteHalf);

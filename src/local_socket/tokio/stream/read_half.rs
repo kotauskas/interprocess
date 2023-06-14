@@ -18,9 +18,7 @@ impmod! {local_socket::tokio,
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 ///
 /// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
-pub struct OwnedReadHalf {
-    pub(super) inner: OwnedReadHalfImpl,
-}
+pub struct OwnedReadHalf(pub(super) OwnedReadHalfImpl);
 impl OwnedReadHalf {
     /// Retrieves the identifier of the process on the opposite end of the local socket connection.
     ///
@@ -29,14 +27,13 @@ impl OwnedReadHalf {
     /// Not supported by the OS, will always generate an error at runtime.
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        self.inner.peer_pid()
+        self.0.peer_pid()
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedReadHalfImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
-
 impl AsyncRead for OwnedReadHalf {
     #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
@@ -51,13 +48,12 @@ impl AsyncRead for OwnedReadHalf {
         self.pinproj().poll_read_vectored(cx, bufs)
     }
 }
-
 impl Debug for OwnedReadHalf {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
-forward_as_handle!(OwnedReadHalf, inner);
+forward_as_handle!(OwnedReadHalf);
 derive_asraw!(OwnedReadHalf);

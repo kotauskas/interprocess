@@ -104,27 +104,23 @@ impmod! {local_socket,
 /// }
 /// # io::Result::<()>::Ok(())
 /// ```
-pub struct LocalSocketListener {
-    inner: LocalSocketListenerImpl,
-}
+pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self {
-            inner: LocalSocketListenerImpl::bind(name)?,
-        })
+        LocalSocketListenerImpl::bind(name).map(Self)
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///
     /// See [`incoming`] for a convenient way to create a main loop for a server.
     ///
     /// [`incoming`]: #method.incoming " "
+    #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
-        Ok(LocalSocketStream {
-            inner: self.inner.accept()?,
-        })
+        self.0.accept().map(LocalSocketStream)
     }
     /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
@@ -139,16 +135,17 @@ impl LocalSocketListener {
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     /// [`accept`]: #method.accept " "
     /// [`incoming`]: #method.incoming " "
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking)
+        self.0.set_nonblocking(nonblocking)
     }
 }
 impl Debug for LocalSocketListener {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
-forward_handle!(unix: LocalSocketListener, inner);
+forward_handle!(unix: LocalSocketListener);
 derive_raw!(unix: LocalSocketListener);
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].

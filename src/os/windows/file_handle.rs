@@ -1,0 +1,62 @@
+use super::{downgrade_eof, winprelude::*};
+use std::{io, mem::MaybeUninit, ptr};
+use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
+
+/// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
+#[repr(transparent)]
+#[derive(Debug)]
+pub(crate) struct FileHandle(pub(crate) OwnedHandle);
+impl FileHandle {
+    pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+        if buf.len() <= DWORD::max_value() as usize {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "buffer is bigger than maximum buffer size for ReadFile",
+            ));
+        }
+
+        let (success, num_bytes_read) = unsafe {
+            let mut num_bytes_read: DWORD = 0;
+            let result = ReadFile(
+                self.0.as_raw_handle(),
+                buf.as_mut_ptr().cast(),
+                buf.len() as DWORD,
+                &mut num_bytes_read as *mut _,
+                ptr::null_mut(),
+            );
+            (result != 0, num_bytes_read as usize)
+        };
+        downgrade_eof(ok_or_ret_errno!(success => num_bytes_read))
+    }
+    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        if buf.len() <= DWORD::max_value() as usize {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "buffer is bigger than maximum buffer size for WriteFile",
+            ));
+        }
+
+        let (success, bytes_written) = unsafe {
+            let mut bytes_written: DWORD = 0;
+            let result = WriteFile(
+                self.0.as_raw_handle(),
+                buf.as_ptr().cast(),
+                buf.len() as DWORD,
+                &mut bytes_written as *mut _,
+                ptr::null_mut(),
+            );
+            (result != 0, bytes_written as usize)
+        };
+        ok_or_ret_errno!(success => bytes_written)
+    }
+    #[inline(always)]
+    pub fn flush(&self) -> io::Result<()> {
+        Self::flush_hndl(self.0.as_raw_handle())
+    }
+    #[inline]
+    pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
+        let success = unsafe { FlushFileBuffers(handle) != 0 };
+        downgrade_eof(ok_or_ret_errno!(success => ()))
+    }
+}
+forward_handle!(FileHandle);

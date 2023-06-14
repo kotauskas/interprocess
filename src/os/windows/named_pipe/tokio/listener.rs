@@ -1,9 +1,12 @@
 use crate::{
-    os::windows::named_pipe::{
-        enums::{PipeMode, PipeStreamRole},
-        pipe_mode,
-        tokio::{PipeStream, RawPipeStream},
-        PipeListenerOptions, PipeModeTag,
+    os::windows::{
+        named_pipe::{
+            enums::{PipeMode, PipeStreamRole},
+            pipe_mode,
+            tokio::{PipeStream, RawPipeStream},
+            PipeListenerOptions, PipeModeTag,
+        },
+        winprelude::*,
     },
     Sealed,
 };
@@ -119,11 +122,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     }
 
     fn create_instance(&self) -> io::Result<TokioNPServer> {
-        let handle = self
-            .config
-            .create_instance(false, false, true, Self::STREAM_ROLE, Rm::MODE)?;
-        // SAFETY: we just created this handle
-        Ok(unsafe { TokioNPServer::from_raw_handle(handle)? })
+        self.config
+            .create_instance(false, false, true, Self::STREAM_ROLE, Rm::MODE)
+            .and_then(npserver_from_handle)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
@@ -179,14 +180,13 @@ fn _create_tokio(
     // Tokio should ideally already set that, but let's do it just in case.
     config.nonblocking = false;
 
-    let instance = {
-        let handle = config.create_instance(true, config.nonblocking, true, role, read_mode)?;
-        unsafe {
-            // SAFETY: we just created this handle, so we know it's unique (and we've checked
-            // that it's valid)
-            TokioNPServer::from_raw_handle(handle)?
-        }
-    };
+    let instance = config
+        .create_instance(true, config.nonblocking, true, role, read_mode)
+        .and_then(npserver_from_handle)?;
 
     Ok((config, instance))
+}
+
+fn npserver_from_handle(handle: OwnedHandle) -> io::Result<TokioNPServer> {
+    unsafe { TokioNPServer::from_raw_handle(handle.into_raw_handle()) }
 }

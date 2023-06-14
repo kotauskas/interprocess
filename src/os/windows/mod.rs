@@ -7,18 +7,13 @@ pub mod unnamed_pipe;
 //pub mod mailslot;
 pub(crate) mod local_socket;
 
+mod file_handle;
+pub(crate) use file_handle::*;
+
 use std::{
     io,
-    mem::{transmute, ManuallyDrop, MaybeUninit},
-    ptr,
-};
-use winapi::{
-    shared::winerror::ERROR_PIPE_NOT_CONNECTED,
-    um::{
-        fileapi::{FlushFileBuffers, ReadFile, WriteFile},
-        handleapi::{CloseHandle, DuplicateHandle, INVALID_HANDLE_VALUE},
-        processthreadsapi::GetCurrentProcess,
-    },
+    mem::{transmute, MaybeUninit},
+    task::Poll,
 };
 mod winprelude {
     pub use std::os::windows::prelude::*;
@@ -31,6 +26,14 @@ mod winprelude {
     };
 }
 use winprelude::*;
+
+use winapi::{
+    shared::winerror::ERROR_PIPE_NOT_CONNECTED,
+    um::{
+        handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE},
+        processthreadsapi::GetCurrentProcess,
+    },
+};
 
 /// Objects which own handles which can be shared with another processes.
 ///
@@ -45,13 +48,13 @@ pub trait ShareHandle: AsRawHandle {
     ///
     /// Backed by [`DuplicateHandle`]. Doesn't require unsafe code since `DuplicateHandle` never leads to undefined behavior if the `lpTargetHandle` parameter is a valid pointer, only creates an error.
     #[allow(clippy::not_unsafe_ptr_arg_deref)] // Handles are not pointers, they have handle checks
-    fn share(&self, reciever: HANDLE) -> io::Result<HANDLE> {
+    fn share(&self, reciever: BorrowedHandle<'_>) -> io::Result<HANDLE> {
         let (success, new_handle) = unsafe {
             let mut new_handle = INVALID_HANDLE_VALUE;
             let success = DuplicateHandle(
                 GetCurrentProcess(),
                 self.as_raw_handle(),
-                reciever,
+                reciever.as_raw_handle(),
                 &mut new_handle,
                 0,
                 1,
@@ -76,92 +79,17 @@ fn weaken_buf_init(buf: &mut [u8]) -> &mut [MaybeUninit<u8>] {
     }
 }
 
-/// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
-#[repr(transparent)]
-#[derive(Debug)]
-pub(crate) struct FileHandle(pub(crate) HANDLE);
-impl FileHandle {
-    pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        debug_assert!(
-            buf.len() <= DWORD::max_value() as usize,
-            "buffer is bigger than maximum buffer size for ReadFile",
-        );
-        let (success, num_bytes_read) = unsafe {
-            let mut num_bytes_read: DWORD = 0;
-            let result = ReadFile(
-                self.0,
-                buf.as_mut_ptr() as *mut _,
-                buf.len() as DWORD,
-                &mut num_bytes_read as *mut _,
-                ptr::null_mut(),
-            );
-            (result != 0, num_bytes_read as usize)
-        };
-        match ok_or_ret_errno!(success => num_bytes_read) {
-            Err(e) if is_eof_like(&e) => Ok(0),
-            els => els,
-        }
-    }
-    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        debug_assert!(
-            buf.len() <= DWORD::max_value() as usize,
-            "buffer is bigger than maximum buffer size for WriteFile",
-        );
-        let (success, bytes_written) = unsafe {
-            let mut number_of_bytes_written: DWORD = 0;
-            let result = WriteFile(
-                self.0,
-                buf.as_ptr() as *mut _,
-                buf.len() as DWORD,
-                &mut number_of_bytes_written as *mut _,
-                ptr::null_mut(),
-            );
-            (result != 0, number_of_bytes_written as usize)
-        };
-        ok_or_ret_errno!(success => bytes_written)
-    }
-    #[inline(always)]
-    pub fn flush(&self) -> io::Result<()> {
-        Self::flush_hndl(self.0)
-    }
-    #[inline]
-    pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
-        let success = unsafe { FlushFileBuffers(handle) != 0 };
-        match ok_or_ret_errno!(success => ()) {
-            Err(e) if is_eof_like(&e) => Ok(()),
-            els => els,
-        }
-    }
-}
-impl Drop for FileHandle {
-    #[inline]
-    fn drop(&mut self) {
-        let _success = unsafe { CloseHandle(self.0) != 0 };
-        debug_assert!(_success, "failed to close file handle: {}", io::Error::last_os_error());
-    }
-}
-impl AsRawHandle for FileHandle {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.0
-    }
-}
-impl IntoRawHandle for FileHandle {
-    #[inline(always)]
-    fn into_raw_handle(self) -> HANDLE {
-        let self_ = ManuallyDrop::new(self);
-        self_.as_raw_handle()
-    }
-}
-impl FromRawHandle for FileHandle {
-    #[inline(always)]
-    unsafe fn from_raw_handle(op: HANDLE) -> Self {
-        Self(op)
-    }
-}
-unsafe impl Send for FileHandle {}
-unsafe impl Sync for FileHandle {} // WriteFile and ReadFile are thread-safe, apparently
-
 fn is_eof_like(e: &io::Error) -> bool {
     e.kind() == io::ErrorKind::BrokenPipe || e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _)
+}
+
+#[allow(unused)]
+fn downgrade_poll_eof<T: Default>(r: Poll<io::Result<T>>) -> Poll<io::Result<T>> {
+    r.map(downgrade_eof)
+}
+fn downgrade_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
+    match r {
+        Err(e) if is_eof_like(&e) => Ok(T::default()),
+        els => els,
+    }
 }

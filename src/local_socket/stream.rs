@@ -58,15 +58,11 @@ impmod! {local_socket,
 /// print!("Server answered: {buffer}");
 /// # std::io::Result::<()>::Ok(())
 /// ```
-pub struct LocalSocketStream {
-    pub(super) inner: LocalSocketStreamImpl,
-}
+pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self {
-            inner: LocalSocketStreamImpl::connect(name)?,
-        })
+        Ok(Self(LocalSocketStreamImpl::connect(name)?))
     }
     /// Retrieves the identifier of the process on the opposite end of the local socket connection.
     ///
@@ -74,7 +70,7 @@ impl LocalSocketStream {
     /// ## macOS and iOS
     /// Not supported by the OS, will always generate an error at runtime.
     pub fn peer_pid(&self) -> io::Result<u32> {
-        self.inner.peer_pid()
+        self.0.peer_pid()
     }
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
@@ -84,32 +80,39 @@ impl LocalSocketStream {
     ///
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.inner.set_nonblocking(nonblocking)
+        self.0.set_nonblocking(nonblocking)
     }
 }
 impl Read for LocalSocketStream {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+        self.0.read(buf)
     }
+    #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.inner.read_vectored(bufs)
+        self.0.read_vectored(bufs)
     }
 }
 impl Write for LocalSocketStream {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)
+        self.0.write(buf)
     }
+    #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.inner.write_vectored(bufs)
+        self.0.write_vectored(bufs)
     }
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        self.0.flush()
     }
 }
 impl Debug for LocalSocketStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
-forward_handle!(LocalSocketStream, inner);
-derive_raw!(LocalSocketStream);
+forward_as_handle!(LocalSocketStream);
+forward_into_handle!(LocalSocketStream);
+forward_try_from_handle!(LocalSocketStream, LocalSocketStreamImpl);
+derive_asintoraw!(LocalSocketStream);

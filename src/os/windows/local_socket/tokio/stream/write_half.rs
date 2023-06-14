@@ -2,10 +2,8 @@ use {
     crate::os::windows::named_pipe::{pipe_mode, tokio::SendHalf},
     futures_io::AsyncWrite,
     std::{
-        ffi::c_void,
         fmt::{self, Debug, Formatter},
         io,
-        os::windows::io::AsRawHandle,
         pin::Pin,
         task::{Context, Poll},
     },
@@ -13,19 +11,17 @@ use {
 
 type WriteHalfImpl = SendHalf<pipe_mode::Bytes>;
 
-pub struct OwnedWriteHalf {
-    pub(super) inner: WriteHalfImpl,
-}
+pub struct OwnedWriteHalf(pub(super) WriteHalfImpl);
 impl OwnedWriteHalf {
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.inner.is_server() {
-            true => self.inner.client_process_id(),
-            false => self.inner.server_process_id(),
+        match self.0.is_server() {
+            true => self.0.client_process_id(),
+            false => self.0.server_process_id(),
         }
     }
     fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 impl AsyncWrite for OwnedWriteHalf {
@@ -45,14 +41,7 @@ impl AsyncWrite for OwnedWriteHalf {
 
 impl Debug for OwnedWriteHalf {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("local_socket::OwnedWriteHalf")
-            .field("handle", &self.as_raw_handle())
-            .finish()
+        f.debug_tuple("local_socket::OwnedWriteHalf").field(&self.0).finish()
     }
 }
-impl AsRawHandle for OwnedWriteHalf {
-    #[inline]
-    fn as_raw_handle(&self) -> *mut c_void {
-        self.inner.as_raw_handle()
-    }
-}
+forward_as_handle!(OwnedWriteHalf);

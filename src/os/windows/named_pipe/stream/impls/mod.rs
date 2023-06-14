@@ -3,13 +3,11 @@
 mod split_owned;
 pub(crate) use split_owned::UNWRAP_FAIL_MSG;
 
-use super::{super::set_nonblocking_for_stream, *};
+use super::*;
 use crate::{
     os::windows::{
-        named_pipe::{convert_and_encode_path, PipeMode},
-        weaken_buf_init,
-        winprelude::*,
-        FileHandle,
+        named_pipe::{path_conversion, set_nonblocking_for_stream, PipeMode},
+        weaken_buf_init, FileHandle,
     },
     reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
 };
@@ -18,9 +16,9 @@ use std::{
     fmt::{self, Debug, DebugStruct, Formatter},
     io::{self, prelude::*},
     marker::PhantomData,
-    mem::{ManuallyDrop, MaybeUninit},
+    mem::MaybeUninit,
     os::windows::prelude::*,
-    ptr, slice,
+    slice,
 };
 use winapi::{
     shared::winerror::ERROR_MORE_DATA,
@@ -42,7 +40,7 @@ pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
 
 impl RawPipeStream {
     fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
-        let path = convert_and_encode_path(pipename, hostname);
+        let path = path_conversion::convert_and_encode_path(pipename, hostname);
         let handle = _connect(&path, read, write, WaitTimeout::DEFAULT)?;
         Ok(Self {
             handle,
@@ -54,7 +52,7 @@ impl RawPipeStream {
         let mut size = 0;
         let mut fit = false;
         while size == 0 {
-            size = peek_msg_len(self.handle.0)?;
+            size = peek_msg_len(self.handle.as_handle())?;
             fit = buf.len() >= size;
             if fit {
                 match self.handle.read(&mut buf[0..size]) {
@@ -90,14 +88,7 @@ impl RawPipeStream {
     }
 
     fn set_nonblocking(&self, readmode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
-        unsafe { set_nonblocking_for_stream(self.handle.0, readmode, nonblocking) }
-    }
-    unsafe fn try_from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let is_server = is_server_from_sys(handle).map_err(|e| (FromRawHandleErrorKind::IsServerCheckFailed, e))?;
-        Ok(Self {
-            handle: FileHandle(handle),
-            is_server,
-        })
+        unsafe { set_nonblocking_for_stream(self.handle.as_handle(), readmode, nonblocking) }
     }
 
     fn disconnect(&self) -> io::Result<()> {
@@ -123,25 +114,44 @@ impl RawPipeStream {
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
         if self.is_server {
-            self.disconnect().expect("failed to disconnect server from client");
+            let r = self.disconnect();
+            if cfg!(debug_assert) {
+                r.expect("failed to disconnect server from client");
+            }
         }
     }
 }
-impl AsRawHandle for RawPipeStream {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.handle.0
+impl AsHandle for RawPipeStream {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.handle.as_handle()
     }
 }
-impl IntoRawHandle for RawPipeStream {
+derive_asraw!(RawPipeStream);
+impl From<RawPipeStream> for OwnedHandle {
     #[inline]
-    fn into_raw_handle(self) -> HANDLE {
-        let slf = ManuallyDrop::new(self);
-        let handle = unsafe {
-            // SAFETY: `slf` is never dropped
-            ptr::read(&slf.handle)
+    fn from(x: RawPipeStream) -> Self {
+        x.into()
+    }
+}
+impl TryFrom<OwnedHandle> for RawPipeStream {
+    type Error = FromHandleError;
+
+    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+        let is_server = match is_server_from_sys(handle.as_handle()) {
+            Ok(b) => b,
+            Err(io_error) => {
+                return Err(FromHandleError {
+                    kind: FromHandleErrorKind::IsServerCheckFailed,
+                    io_error,
+                    handle,
+                })
+            }
         };
-        handle.into_raw_handle()
+        Ok(Self {
+            handle: FileHandle(handle),
+            is_server,
+        })
     }
 }
 
@@ -205,22 +215,22 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.handle.0, GetNamedPipeClientProcessId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeClientProcessId) }
     }
     /// Retrieves the session identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.handle.0, GetNamedPipeClientSessionId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeClientSessionId) }
     }
     /// Retrieves the process identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_process_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.handle.0, GetNamedPipeServerProcessId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeServerProcessId) }
     }
     /// Retrieves the session identifier of the server side of the named pipe connection.
     #[inline]
     pub fn server_session_id(&self) -> io::Result<u32> {
-        unsafe { hget(self.raw.handle.0, GetNamedPipeServerSessionId) }
+        unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
@@ -243,31 +253,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.raw.set_nonblocking(Rm::MODE, nonblocking)
-    }
-    /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
-    ///
-    /// For more on why this can fail, see [`FromRawHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
-    ///
-    /// # Safety
-    /// See equivalent safety notes on [`FromRawHandle`].
-    pub unsafe fn from_raw_handle(handle: HANDLE) -> Result<Self, FromRawHandleError> {
-        let raw = unsafe {
-            // SAFETY: safety contract is propagated.
-            RawPipeStream::try_from_raw_handle(handle)?
-        };
-        // If the wrapper type tries to read incoming data as messages, that might break if
-        // the underlying pipe has no message boundaries. Let's check for that.
-        if Rm::MODE == Some(PipeMode::Messages) {
-            let msg_bnd = has_msg_boundaries_from_sys(raw.handle.0)
-                .map_err(|e| (FromRawHandleErrorKind::MessageBoundariesCheckFailed, e))?;
-            if !msg_bnd {
-                return Err((
-                    FromRawHandleErrorKind::NoMessageBoundaries,
-                    io::Error::from(io::ErrorKind::InvalidInput),
-                ));
-            }
-        }
-        Ok(Self::new(raw))
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
@@ -341,15 +326,50 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
         self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE).finish()
     }
 }
-impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeStream<Rm, Sm> {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> HANDLE {
-        self.raw.handle.0
-    }
-}
-impl<Rm: PipeModeTag, Sm: PipeModeTag> IntoRawHandle for PipeStream<Rm, Sm> {
+
+impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
     #[inline]
-    fn into_raw_handle(self) -> RawHandle {
-        self.raw.into_raw_handle()
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.raw.as_handle()
     }
 }
+impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeStream<Rm, Sm>> for OwnedHandle {
+    #[inline]
+    fn from(x: PipeStream<Rm, Sm>) -> Self {
+        x.raw.into()
+    }
+}
+/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
+///
+/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
+    type Error = FromHandleError;
+
+    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+        let raw = RawPipeStream::try_from(handle)?;
+        // If the wrapper type tries to read incoming data as messages, that might break if
+        // the underlying pipe has no message boundaries. Let's check for that.
+        if Rm::MODE == Some(PipeMode::Messages) {
+            let msg_bnd = match has_msg_boundaries_from_sys(raw.as_handle()) {
+                Ok(b) => b,
+                Err(io_error) => {
+                    return Err(FromHandleError {
+                        kind: FromHandleErrorKind::MessageBoundariesCheckFailed,
+                        io_error,
+                        handle: raw.into(),
+                    })
+                }
+            };
+            if !msg_bnd {
+                return Err(FromHandleError {
+                    kind: FromHandleErrorKind::NoMessageBoundaries,
+                    io_error: io::Error::from(io::ErrorKind::InvalidInput),
+                    handle: raw.into(),
+                });
+            }
+        }
+        Ok(Self::new(raw))
+    }
+}
+
+derive_asintoraw!(windows: {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>);

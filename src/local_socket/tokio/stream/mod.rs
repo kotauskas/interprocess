@@ -73,9 +73,7 @@ impmod! {local_socket::tokio,
 /// println!("Server answered: {}", buffer.trim());
 /// # Ok(()) }
 /// ```
-pub struct LocalSocketStream {
-    pub(super) inner: LocalSocketStreamImpl,
-}
+pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
     #[inline]
@@ -85,8 +83,8 @@ impl LocalSocketStream {
     /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently.
     #[inline]
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        let (r, w) = self.inner.into_split();
-        (OwnedReadHalf { inner: r }, OwnedWriteHalf { inner: w })
+        let (r, w) = self.0.into_split();
+        (OwnedReadHalf(r), OwnedWriteHalf(w))
     }
     /// Retrieves the identifier of the process on the opposite end of the local socket connection.
     ///
@@ -95,18 +93,18 @@ impl LocalSocketStream {
     /// Not supported by the OS, will always generate an error at runtime.
     #[inline]
     pub fn peer_pid(&self) -> io::Result<u32> {
-        self.inner.peer_pid()
+        self.0.peer_pid()
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 #[doc(hidden)]
 impl From<LocalSocketStreamImpl> for LocalSocketStream {
     #[inline]
     fn from(inner: LocalSocketStreamImpl) -> Self {
-        Self { inner }
+        Self(inner)
     }
 }
 
@@ -147,14 +145,12 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_close(cx)
     }
 }
-
 impl Debug for LocalSocketStream {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.inner, f)
+        Debug::fmt(&self.0, f)
     }
 }
-
-forward_as_handle!(LocalSocketStream, inner);
+forward_as_handle!(LocalSocketStream);
 derive_asraw!(LocalSocketStream);
-forward_try_handle!(LocalSocketStream, inner, LocalSocketStreamImpl);
+forward_try_from_handle!(LocalSocketStream, LocalSocketStreamImpl);

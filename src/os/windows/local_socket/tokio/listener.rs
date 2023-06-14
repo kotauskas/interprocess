@@ -12,9 +12,7 @@ use std::io;
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
 #[derive(Debug)]
-pub struct LocalSocketListener {
-    inner: PipeListener,
-}
+pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
@@ -22,10 +20,10 @@ impl LocalSocketListener {
             .name(name.into_inner())
             .mode(PipeMode::Bytes)
             .create_tokio()?;
-        Ok(Self { inner })
+        Ok(Self(inner))
     }
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
-        let inner = self.inner.accept().await?;
-        Ok(LocalSocketStream { inner })
+        let inner = self.0.accept().await?;
+        Ok(LocalSocketStream(inner))
     }
 }

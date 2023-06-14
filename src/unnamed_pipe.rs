@@ -35,21 +35,19 @@ pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
 /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html " "
 /// [`IntoRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html " "
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html " "
-pub struct UnnamedPipeReader {
-    // pub(crate) to allow the platform specific builders to create the public-facing pipe types
-    pub(crate) inner: UnnamedPipeReaderImpl,
-}
+// field is pub(crate) to allow the platform specific builders to create the public-facing pipe types
+pub struct UnnamedPipeReader(pub(crate) UnnamedPipeReaderImpl);
 impl Read for UnnamedPipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.inner.read(buf)
+        self.0.read(buf)
     }
 }
 impl fmt::Debug for UnnamedPipeReader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.inner, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
-forward_handle!(UnnamedPipeReader, inner);
+forward_handle!(UnnamedPipeReader);
 derive_raw!(UnnamedPipeReader);
 
 /// A handle to the writing end of an unnamed pipe, created by the [`pipe`] function together with the [reading end].
@@ -66,21 +64,19 @@ derive_raw!(UnnamedPipeReader);
 /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html " "
 /// [`IntoRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html " "
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html " "
-pub struct UnnamedPipeWriter {
-    pub(crate) inner: UnnamedPipeWriterImpl,
-}
+pub struct UnnamedPipeWriter(pub(crate) UnnamedPipeWriterImpl);
 impl Write for UnnamedPipeWriter {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        self.inner.write(data)
+        self.0.write(data)
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
+        self.0.flush()
     }
 }
 impl fmt::Debug for UnnamedPipeWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.inner, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
-forward_handle!(UnnamedPipeWriter, inner);
+forward_handle!(UnnamedPipeWriter);
 derive_raw!(UnnamedPipeWriter);
