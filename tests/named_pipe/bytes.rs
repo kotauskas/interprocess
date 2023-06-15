@@ -1,16 +1,11 @@
-use {
-    super::util::{NameGen, TestResult},
-    anyhow::Context,
-    interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions},
-    std::{
-        ffi::OsStr,
-        io::{self, prelude::*, BufReader},
-        sync::{mpsc::Sender, Arc},
-    },
+use super::util::*;
+use anyhow::Context;
+use interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions};
+use std::{
+    ffi::OsStr,
+    io::{self, prelude::*, BufReader},
+    sync::{mpsc::Sender, Arc},
 };
-
-static SERVER_MSG: &str = "Hello from server!\n";
-static CLIENT_MSG: &str = "Hello from client!\n";
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     let (name, listener) = NameGen::new(make_id!(), true)
@@ -28,6 +23,8 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
     let _ = name_sender.send(name);
 
+    let mut buffer = String::with_capacity(128);
+
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
@@ -37,14 +34,13 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             }
         };
 
-        let mut buffer = String::with_capacity(128);
-
+        let expected = message(false, Some('\n'));
         conn.read_line(&mut buffer).context("Pipe receive failed")?;
-        assert_eq!(buffer, CLIENT_MSG);
+        assert_eq!(buffer, expected);
+        buffer.clear();
 
-        conn.get_mut()
-            .write_all(SERVER_MSG.as_bytes())
-            .context("Pipe send failed")?;
+        let msg = message(true, Some('\n'));
+        conn.get_mut().write_all(msg.as_bytes()).context("Pipe send failed")?;
         conn.get_mut().flush().context("Pipe flush failed")?;
     }
 
@@ -57,12 +53,14 @@ pub fn client(name: Arc<String>) -> TestResult {
         .context("Connect failed")
         .map(BufReader::new)?;
 
-    conn.get_mut()
-        .write_all(CLIENT_MSG.as_bytes())
-        .context("Pipe send failed")?;
+    let msg = message(false, Some('\n'));
+    conn.get_mut().write_all(msg.as_bytes()).context("Pipe send failed")?;
 
+    let expected = message(true, Some('\n'));
     conn.read_line(&mut buffer).context("Pipe receive failed")?;
-    assert_eq!(buffer, SERVER_MSG);
+    assert_eq!(buffer, expected);
+
+    conn.get_mut().flush().context("Pipe flush failed")?;
 
     Ok(())
 }

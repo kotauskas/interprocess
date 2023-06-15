@@ -96,3 +96,12 @@ where
 
     drive_pair(server_wrapper, "Server", client_wrapper, "Client");
 }
+
+pub fn message(server: bool, terminator: Option<char>) -> String {
+    let sc = if server { "server" } else { "client" };
+    let mut msg = format!("Message from {sc}!");
+    if let Some(t) = terminator {
+        msg.push(t);
+    }
+    msg
+}
