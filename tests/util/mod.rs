@@ -14,8 +14,8 @@ pub use namegen::*;
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
-const NUM_CLIENTS: u32 = 20;
-const NUM_CONCURRENT_CLIENTS: u32 = 4;
+const NUM_CLIENTS: u32 = 80;
+const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
 use {
     std::{
