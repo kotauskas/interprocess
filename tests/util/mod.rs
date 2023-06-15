@@ -71,14 +71,20 @@ where
     let client_wrapper = move |msg| {
         let msg = Arc::new(msg);
         let mut client_threads = Vec::with_capacity(NUM_CLIENTS.try_to().unwrap());
-        for _ in 0..NUM_CLIENTS {
-            let choke_guard = choke.take();
+        for n in 1..=NUM_CLIENTS {
+            let tname = format!("client {n}");
             let clientc = Arc::clone(&client);
             let msgc = Arc::clone(&msg);
-            let jhndl = thread::spawn(move || {
-                let _cg = choke_guard; // Send to other thread to drop when client finishes
-                clientc(msgc)
-            });
+
+            let choke_guard = choke.take();
+
+            let jhndl = thread::Builder::new()
+                .name(tname.clone())
+                .spawn(move || {
+                    let _cg = choke_guard; // Send to other thread to drop when client finishes
+                    clientc(msgc)
+                })
+                .unwrap_or_else(|e| panic!("{tname} thread launch failed: {e}"));
             client_threads.push(jhndl);
         }
         for client in client_threads {
