@@ -60,8 +60,6 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
         conn.get_mut()
             .write_all(msg.as_bytes())
             .context("Second socket send failed")?;
-
-        conn.get_mut().flush().context("Socket flush failed")?;
     }
     Ok(())
 }
@@ -98,8 +96,6 @@ pub fn client(name: Arc<String>) -> TestResult {
         str::from_utf8(&buffer).context("Second socket receive wasn't valid UTF-8")?,
         expected
     );
-
-    conn.get_mut().flush().context("Socket flush failed")?;
 
     Ok(())
 }
