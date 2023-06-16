@@ -103,6 +103,10 @@ impl RawPipeStream {
         }
     }
 
+    fn assume_flushed(&self) {
+        self.needs_flush.store(false, Ordering::Release);
+    }
+
     fn try_recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         let mut size = 0;
         let mut fit = false;
@@ -315,6 +319,15 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
         self.raw.flush()
+    }
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    #[inline]
+    pub fn assume_flushed(&self) {
+        self.raw.assume_flushed()
+    }
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    pub fn evade_limbo(self) {
+        self.assume_flushed();
     }
 }
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {

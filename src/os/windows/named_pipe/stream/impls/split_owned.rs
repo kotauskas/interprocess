@@ -131,6 +131,22 @@ impl<Rm: PipeModeTag> AsHandle for RecvHalf<Rm> {
 derive_asraw!(windows: {Rm: PipeModeTag} RecvHalf<Rm>);
 
 impl<Sm: PipeModeTag> SendHalf<Sm> {
+    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its entirety).
+    ///
+    /// Only available on streams that have a send mode.
+    #[inline]
+    pub fn flush(&self) -> io::Result<()> {
+        self.raw.flush()
+    }
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    #[inline]
+    pub fn assume_flushed(&self) {
+        self.raw.assume_flushed()
+    }
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    pub fn evade_limbo(self) {
+        self.assume_flushed();
+    }
     /// Attempts to reunite this send half with the given recieve half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {

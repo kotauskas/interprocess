@@ -167,6 +167,9 @@ impl RawPipeStream {
             .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
     }
+    fn assume_flushed(&self) {
+        self.needs_flush.store(false, Ordering::Release);
+    }
 
     fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
         let mut size = 0;
@@ -438,6 +441,19 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
             self.raw.needs_flush.store(true, Ordering::Release);
         }
         rslt
+    }
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    ///
+    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
+    #[inline]
+    pub fn assume_flushed(&self) {
+        self.raw.assume_flushed()
+    }
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    ///
+    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
+    pub fn evade_limbo(self) {
+        self.assume_flushed();
     }
 }
 
