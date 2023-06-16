@@ -1,4 +1,5 @@
 mod impls;
+mod limbo;
 mod wrapper_fns;
 pub(crate) use wrapper_fns::*;
 
@@ -12,7 +13,7 @@ use std::{
     fmt::{self, Display, Formatter},
     io,
     marker::PhantomData,
-    sync::Arc,
+    sync::{atomic::AtomicBool, Arc},
 };
 use tokio::{
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
@@ -98,7 +99,12 @@ pub struct SendHalf<Sm: PipeModeTag> {
     _phantom: PhantomData<Sm>,
 }
 
-pub(crate) enum RawPipeStream {
+pub(crate) struct RawPipeStream {
+    inner: Option<InnerTokio>,
+    // Cleared by the generic pipes rather than the raw pipe stream unlike in sync land.
+    needs_flush: AtomicBool,
+}
+enum InnerTokio {
     Server(TokioNPServer),
     Client(TokioNPClient),
 }

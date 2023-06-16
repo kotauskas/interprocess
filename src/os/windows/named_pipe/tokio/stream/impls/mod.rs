@@ -2,6 +2,10 @@
 
 mod split_owned;
 
+use super::{
+    limbo::{send_off, Corpse},
+    *,
+};
 use crate::{
     os::windows::{
         downgrade_eof, downgrade_poll_eof,
@@ -11,7 +15,6 @@ use crate::{
                 block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
                 UNWRAP_FAIL_MSG,
             },
-            tokio::stream::*,
             PipeMode, PmtNotNone,
         },
         winprelude::*,
@@ -28,6 +31,7 @@ use std::{
     mem::{ManuallyDrop, MaybeUninit},
     ops::Deref,
     pin::Pin,
+    sync::atomic::Ordering,
     task::{Context, Poll},
 };
 use tokio::{
@@ -46,8 +50,8 @@ use winapi::{
 macro_rules! same_clsrv {
     ($nm:ident in $var:expr => $e:expr) => {
         match $var {
-            RawPipeStream::Client($nm) => $e,
-            RawPipeStream::Server($nm) => $e,
+            InnerTokio::Server($nm) => $e,
+            InnerTokio::Client($nm) => $e,
         }
     };
 }
@@ -57,7 +61,35 @@ struct AssertHandleSyncSend(HANDLE);
 unsafe impl Sync for AssertHandleSyncSend {}
 unsafe impl Send for AssertHandleSyncSend {}
 
+static LIMBO_ERR: &str = "attempt to perform operation on pipe stream which has been sent off to limbo";
 impl RawPipeStream {
+    fn new(inner: InnerTokio) -> Self {
+        Self {
+            inner: Some(inner),
+            needs_flush: AtomicBool::new(false),
+        }
+    }
+    pub(crate) fn new_server(server: TokioNPServer) -> Self {
+        Self::new(InnerTokio::Server(server))
+    }
+    fn new_client(client: TokioNPClient) -> Self {
+        Self::new(InnerTokio::Client(client))
+    }
+
+    fn inner(&self) -> &InnerTokio {
+        self.inner.as_ref().expect(LIMBO_ERR)
+    }
+    fn inner_mut(&mut self) -> &mut InnerTokio {
+        self.inner.as_mut().expect(LIMBO_ERR)
+    }
+
+    fn reap(&mut self) -> Corpse {
+        self.inner
+            .take()
+            .map(Corpse)
+            .expect("attempt to bury same pipe stream twice")
+    }
+
     async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
         tokio::task::spawn_blocking(move || {
             block_for_server(&path, WaitTimeout::DEFAULT)?;
@@ -82,11 +114,11 @@ impl RawPipeStream {
                 not_waiting => break not_waiting?,
             }
         };
-        Ok(Self::Client(client))
+        Ok(Self::new_client(client))
     }
 
     fn poll_read_readbuf(&mut self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        downgrade_poll_eof(same_clsrv!(x in self => Pin::new(x).poll_read(cx, buf)))
+        downgrade_poll_eof(same_clsrv!(x in self.inner_mut() => Pin::new(x).poll_read(cx, buf)))
     }
 
     // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
@@ -103,9 +135,9 @@ impl RawPipeStream {
 
     fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
-            let prr = same_clsrv!(x in self => x.poll_read_ready(cx));
+            let prr = same_clsrv!(x in self.inner() => x.poll_read_ready(cx));
             ready!(downgrade_poll_eof(prr))?;
-            match downgrade_eof(same_clsrv!(x in self => x.try_read(buf))) {
+            match downgrade_eof(same_clsrv!(x in self.inner() => x.try_read(buf))) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 els => return Poll::Ready(els),
             }
@@ -114,16 +146,26 @@ impl RawPipeStream {
 
     fn poll_write(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         loop {
-            ready!(same_clsrv!(x in self => x.poll_write_ready(cx)))?;
-            match same_clsrv!(x in self => x.try_write(buf)) {
+            ready!(same_clsrv!(x in self.inner() => x.poll_write_ready(cx)))?;
+            match same_clsrv!(x in self.inner() => x.try_write(buf)) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                els => return Poll::Ready(els),
+                els => {
+                    self.needs_flush.store(true, Ordering::Release);
+                    return Poll::Ready(els);
+                }
             }
         }
     }
     #[inline]
     fn write<'a>(&'a self, buf: &'a [u8]) -> Write<'a> {
         Write(self, buf)
+    }
+
+    /// Removes the needs-flush flag if it is set, returning its previous value.
+    fn cas_flush(&self) -> bool {
+        self.needs_flush
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
     }
 
     fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
@@ -154,22 +196,15 @@ impl RawPipeStream {
         Poll::Ready(Ok(TryRecvResult { size, fit }))
     }
 
-    fn disconnect(&self) -> io::Result<()> {
-        match self {
-            Self::Server(s) => s.disconnect(),
-            Self::Client(_) => Ok(()),
-        }
-    }
-
     fn fill_fields<'a, 'b, 'c>(
         &self,
         dbst: &'a mut DebugStruct<'b, 'c>,
         readmode: Option<PipeMode>,
         writemode: Option<PipeMode>,
     ) -> &'a mut DebugStruct<'b, 'c> {
-        let (tokio_object, is_server) = match self {
-            RawPipeStream::Server(s) => (s as _, true),
-            RawPipeStream::Client(c) => (c as _, false),
+        let (tokio_object, is_server) = match self.inner() {
+            InnerTokio::Server(s) => (s as _, true),
+            InnerTokio::Client(c) => (c as _, false),
         };
         if let Some(readmode) = readmode {
             dbst.field("read_mode", &readmode);
@@ -182,13 +217,22 @@ impl RawPipeStream {
 }
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
-        self.disconnect().expect("failed to disconnect server from client");
+        let corpse = self.reap();
+        if *self.needs_flush.get_mut() {
+            send_off(corpse);
+        }
+    }
+}
+impl AsHandle for InnerTokio {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        same_clsrv!(x in self => x.as_handle())
     }
 }
 impl AsHandle for RawPipeStream {
     #[inline]
     fn as_handle(&self) -> BorrowedHandle<'_> {
-        same_clsrv!(x in self => x.as_handle())
+        self.inner().as_handle()
     }
 }
 impl TryFrom<OwnedHandle> for RawPipeStream {
@@ -211,12 +255,12 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
 
         let tkresult = unsafe {
             match is_server {
-                true => TokioNPServer::from_raw_handle(rh).map(Self::Server),
-                false => TokioNPClient::from_raw_handle(rh).map(Self::Client),
+                true => TokioNPServer::from_raw_handle(rh).map(InnerTokio::Server),
+                false => TokioNPClient::from_raw_handle(rh).map(InnerTokio::Client),
             }
         };
         match tkresult {
-            Ok(s) => Ok(s),
+            Ok(s) => Ok(Self::new(s)),
             Err(e) => Err(FromHandleError {
                 kind: FromHandleErrorKind::TokioError,
                 io_error: e,
@@ -336,7 +380,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
-        matches!(self.raw, RawPipeStream::Server(..))
+        matches!(self.raw.inner(), &InnerTokio::Server(..))
     }
     /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
     #[inline]
@@ -371,6 +415,11 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     ///
     /// Only available on streams that have a send mode.
     pub async fn flush(&self) -> io::Result<()> {
+        if !self.raw.cas_flush() {
+            // No flush required.
+            return Ok(());
+        }
+
         let mut slf_flush = self.flush.lock().await;
         let rslt = loop {
             match slf_flush.as_mut() {
@@ -385,6 +434,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
             }
         };
         *slf_flush = None;
+        if rslt.is_err() {
+            self.raw.needs_flush.store(true, Ordering::Release);
+        }
         rslt
     }
 }
@@ -413,6 +465,11 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
         self.raw.poll_write(cx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if !self.raw.cas_flush() {
+            // No flush required.
+            return Poll::Ready(Ok(()));
+        }
+
         let mut lockfut = self.flush.lock();
         let lfpin = unsafe {
             // SAFETY: i promise,,,
@@ -426,6 +483,9 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
             }
         };
         *slf_flush = None;
+        if rslt.is_err() {
+            self.raw.needs_flush.store(true, Ordering::Release);
+        }
         Poll::Ready(rslt)
     }
     #[inline(always)]

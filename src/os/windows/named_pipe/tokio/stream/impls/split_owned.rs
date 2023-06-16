@@ -44,7 +44,7 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
     /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
-        matches!(&*self.raw, RawPipeStream::Server(..))
+        matches!(self.raw.inner(), InnerTokio::Server(..))
     }
     /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
     #[inline]
@@ -171,7 +171,7 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
-        matches!(&*self.raw, RawPipeStream::Server(..))
+        matches!(self.raw.inner(), InnerTokio::Server(..))
     }
     /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
     #[inline]
@@ -192,6 +192,11 @@ impl AsyncWrite for &SendHalf<pipe_mode::Bytes> {
         self.raw.poll_write(cx, buf)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if !self.raw.cas_flush() {
+            // No flush required.
+            return Poll::Ready(Ok(()));
+        }
+
         let mut lockfut = self.flush.lock();
         let lfpin = unsafe {
             // SAFETY: i promise,,,
@@ -205,6 +210,9 @@ impl AsyncWrite for &SendHalf<pipe_mode::Bytes> {
             }
         };
         *slf_flush = None;
+        if rslt.is_err() {
+            self.raw.needs_flush.store(true, Ordering::Release);
+        }
         Poll::Ready(rslt)
     }
     #[inline(always)]

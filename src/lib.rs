@@ -92,3 +92,21 @@ mod sealed;
 pub(crate) use sealed::Sealed;
 
 pub mod reliable_recv_msg;
+
+trait DebugExpectExt: Sized {
+    fn debug_expect(self, msg: &str);
+}
+impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
+    fn debug_expect(self, msg: &str) {
+        if cfg!(debug_assertions) {
+            self.expect(msg);
+        }
+    }
+}
+impl<T> DebugExpectExt for Option<T> {
+    fn debug_expect(self, msg: &str) {
+        if cfg!(debug_assertions) {
+            self.expect(msg);
+        }
+    }
+}

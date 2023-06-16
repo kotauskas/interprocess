@@ -3,7 +3,10 @@
 mod split_owned;
 pub(crate) use split_owned::UNWRAP_FAIL_MSG;
 
-use super::*;
+use super::{
+    limbo::{send_off, Corpse},
+    *,
+};
 use crate::{
     os::windows::{
         named_pipe::{path_conversion, set_nonblocking_for_stream, PipeMode},
@@ -19,15 +22,13 @@ use std::{
     mem::MaybeUninit,
     os::windows::prelude::*,
     slice,
+    sync::atomic::Ordering,
 };
 use winapi::{
     shared::winerror::ERROR_MORE_DATA,
-    um::{
-        namedpipeapi::DisconnectNamedPipe,
-        winbase::{
-            GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
-            GetNamedPipeServerSessionId,
-        },
+    um::winbase::{
+        GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
+        GetNamedPipeServerSessionId,
     },
 };
 
@@ -39,23 +40,77 @@ pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
 }
 
 impl RawPipeStream {
+    pub(crate) fn new(handle: FileHandle, is_server: bool) -> Self {
+        Self {
+            handle: Some(handle),
+            is_server,
+            needs_flush: AtomicBool::new(false),
+        }
+    }
+    pub(crate) fn new_server(handle: FileHandle) -> Self {
+        Self::new(handle, true)
+    }
+    pub(crate) fn new_client(handle: FileHandle) -> Self {
+        Self::new(handle, false)
+    }
+
+    fn file_handle(&self) -> &FileHandle {
+        self.handle
+            .as_ref()
+            .expect("attempt to perform operation on pipe stream which has been sent off to limbo")
+    }
+
+    fn reap(&mut self) -> Corpse {
+        Corpse {
+            handle: self.handle.take().expect("attempt to bury same pipe stream twice"),
+            is_server: self.is_server,
+        }
+    }
+
     fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
         let path = path_conversion::convert_and_encode_path(pipename, hostname);
         let handle = _connect(&path, read, write, WaitTimeout::DEFAULT)?;
-        Ok(Self {
-            handle,
-            is_server: false,
-        })
+        Ok(Self::new_client(handle))
+    }
+
+    fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read_to_uninit(weaken_buf_init(buf))
+    }
+    fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+        self.file_handle().read(buf)
+    }
+    fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        let r = self.file_handle().write(buf);
+        if r.is_ok() {
+            self.needs_flush.store(true, Ordering::Release);
+        }
+        r
+    }
+
+    fn flush(&self) -> io::Result<()> {
+        if self
+            .needs_flush
+            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            let r = self.file_handle().flush();
+            if r.is_err() {
+                self.needs_flush.store(true, Ordering::Release);
+            }
+            r
+        } else {
+            Ok(())
+        }
     }
 
     fn try_recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         let mut size = 0;
         let mut fit = false;
         while size == 0 {
-            size = peek_msg_len(self.handle.as_handle())?;
+            size = peek_msg_len(self.as_handle())?;
             fit = buf.len() >= size;
             if fit {
-                match self.handle.read(&mut buf[0..size]) {
+                match self.file_handle().read(&mut buf[0..size]) {
                     // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the `.read()`
                     // to block until a message arrives, so that we could figure out for real if it fits or not.
                     // It doesn't mean that the message gets torn, as it normally does if the buffer given to the
@@ -78,7 +133,7 @@ impl RawPipeStream {
             let mut buf = Vec::with_capacity(size);
             debug_assert!(buf.capacity() >= size);
 
-            size = self.handle.read(vec_as_uninit(&mut buf))?;
+            size = self.file_handle().read(vec_as_uninit(&mut buf))?;
             unsafe {
                 // SAFETY: Win32 guarantees that at least this much is initialized.
                 buf.set_len(size)
@@ -88,12 +143,7 @@ impl RawPipeStream {
     }
 
     fn set_nonblocking(&self, readmode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
-        unsafe { set_nonblocking_for_stream(self.handle.as_handle(), readmode, nonblocking) }
-    }
-
-    fn disconnect(&self) -> io::Result<()> {
-        let success = unsafe { DisconnectNamedPipe(self.as_raw_handle()) != 0 };
-        ok_or_ret_errno!(success => ())
+        unsafe { set_nonblocking_for_stream(self.as_handle(), readmode, nonblocking) }
     }
 
     fn fill_fields<'a, 'b, 'c>(
@@ -113,18 +163,16 @@ impl RawPipeStream {
 }
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
-        if self.is_server {
-            let r = self.disconnect();
-            if cfg!(debug_assert) {
-                r.expect("failed to disconnect server from client");
-            }
+        let corpse = self.reap();
+        if *self.needs_flush.get_mut() {
+            send_off(corpse);
         }
     }
 }
 impl AsHandle for RawPipeStream {
     #[inline]
     fn as_handle(&self) -> BorrowedHandle<'_> {
-        self.handle.as_handle()
+        self.file_handle().as_handle()
     }
 }
 derive_asraw!(RawPipeStream);
@@ -148,10 +196,7 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
                 })
             }
         };
-        Ok(Self {
-            handle: FileHandle(handle),
-            is_server,
-        })
+        Ok(Self::new(FileHandle(handle), is_server))
     }
 }
 
@@ -171,14 +216,14 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.raw.handle.write(buf)
+        self.raw.write(buf)
     }
 }
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
     #[inline]
     pub fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        self.raw.handle.read(buf)
+        self.raw.read_to_uninit(buf)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
@@ -269,13 +314,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     /// Only available on streams that have a send mode.
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
-        self.raw.handle.flush()
+        self.raw.flush()
     }
 }
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.raw.handle.read(weaken_buf_init(buf))
+        self.raw.read(buf)
     }
 }
 impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
@@ -287,11 +332,11 @@ impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
 impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.raw.handle.write(buf)
+        self.raw.write(buf)
     }
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        (*self).flush()
+        self.raw.flush()
     }
 }
 impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {

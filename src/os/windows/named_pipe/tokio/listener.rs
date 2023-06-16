@@ -117,7 +117,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
             replace(&mut *stored_instance, new_instance)
         };
 
-        let raw = RawPipeStream::Server(instance_to_hand_out);
+        let raw = RawPipeStream::new_server(instance_to_hand_out);
         Ok(PipeStream::new(raw))
     }
 

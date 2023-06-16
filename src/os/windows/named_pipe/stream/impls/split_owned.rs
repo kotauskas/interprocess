@@ -85,13 +85,13 @@ impl RecvHalf<pipe_mode::Bytes> {
     /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
     #[inline]
     pub fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        self.raw.handle.read(buf)
+        self.raw.read_to_uninit(buf)
     }
 }
 impl Read for &RecvHalf<pipe_mode::Bytes> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.raw.handle.read(weaken_buf_init(buf))
+        self.raw.read(buf)
     }
 }
 impl Read for RecvHalf<pipe_mode::Bytes> {
@@ -182,15 +182,15 @@ impl SendHalf<pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.raw.handle.write(buf)
+        self.raw.write(buf)
     }
 }
 impl Write for &SendHalf<pipe_mode::Bytes> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.raw.handle.write(buf)
+        self.raw.write(buf)
     }
     fn flush(&mut self) -> io::Result<()> {
-        self.raw.handle.flush()
+        self.raw.flush()
     }
 }
 impl Write for SendHalf<pipe_mode::Bytes> {

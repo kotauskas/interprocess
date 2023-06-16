@@ -2,6 +2,7 @@ mod enums;
 pub use enums::*;
 
 mod impls;
+mod limbo;
 mod wrapper_fns;
 pub(crate) use {impls::*, wrapper_fns::*};
 
@@ -12,7 +13,7 @@ use std::{
     io,
     marker::PhantomData,
     os::windows::prelude::*,
-    sync::Arc,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong to different pipe stream objects";
@@ -123,8 +124,9 @@ pub struct SendHalf<Sm: PipeModeTag> {
 }
 
 pub(crate) struct RawPipeStream {
-    pub(crate) handle: FileHandle,
-    pub(crate) is_server: bool,
+    handle: Option<FileHandle>,
+    is_server: bool,
+    needs_flush: AtomicBool,
 }
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
