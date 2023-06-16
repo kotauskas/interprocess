@@ -4,7 +4,7 @@
 [![Build Status](https://github.com/kotauskas/interprocess/workflows/Checks%20and%20tests/badge.svg)](https://github.com/kotauskas/interprocess/actions "GitHub Actions page for Interprocess")
 ![maintenance-status](https://img.shields.io/badge/maintenance-actively%20developed-brightgreen)
 
-[![Rust version: 1.66+](https://img.shields.io/badge/rust%20version-1.66+-orange)](https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html)
+[![Rust version: 1.70+](https://img.shields.io/badge/rust%20version-1.70+-orange)][blogpost]
 
 Interprocess communication toolkit for Rust programs. The crate aims to expose as many platform-specific features as possible while maintaining a uniform interface for all platforms.
 
@@ -34,5 +34,6 @@ Currently, only Tokio for local sockets, Unix domain sockets and Windows named p
 ## License
 This crate, along with all community contributions made to it, is dual-licensed under the terms of either the [MIT license] or the [Apache 2.0 license].
 
-[MIT license]: https://choosealicense.com/licenses/mit/ " "
-[Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/ " "
+[MIT license]: https://choosealicense.com/licenses/mit/
+[Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
+[blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
