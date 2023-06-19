@@ -8,32 +8,30 @@ use {
     },
 };
 
-pub struct LocalSocketListener {
-    inner: UdStreamListener,
-}
+pub struct LocalSocketListener(UdStreamListener);
 impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
         let inner = UdStreamListener::bind(path)?;
-        Ok(Self { inner })
+        Ok(Self(inner))
     }
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
-        let inner = self.inner.accept().await?;
-        Ok(LocalSocketStream { inner })
+        let inner = self.0.accept().await?;
+        Ok(LocalSocketStream(inner))
     }
 }
 impl From<UdStreamListener> for LocalSocketListener {
     #[inline]
     fn from(inner: UdStreamListener) -> Self {
-        Self { inner }
+        Self(inner)
     }
 }
 impl Debug for LocalSocketListener {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSocketListener")
-            .field("fd", &self.inner.as_raw_fd())
+            .field("fd", &self.0.as_raw_fd())
             .finish()
     }
 }
-forward_as_handle!(unix: LocalSocketListener, inner);
-forward_try_handle!(unix: LocalSocketListener, inner, UdStreamListener);
+forward_as_handle!(unix: LocalSocketListener);
+forward_try_handle!(unix: LocalSocketListener, UdStreamListener);

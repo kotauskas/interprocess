@@ -9,14 +9,12 @@ use {
     },
 };
 
-pub struct OwnedWriteHalf {
-    pub(super) inner: OwnedWriteHalfImpl,
-}
+pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
 impl OwnedWriteHalf {
     pub fn peer_pid(&self) -> io::Result<u32> {
         #[cfg(uds_peerucred)]
         {
-            self.inner.get_peer_credentials().map(|ucred| ucred.pid as u32)
+            self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
         }
         #[cfg(not(uds_peerucred))]
         {
@@ -25,7 +23,7 @@ impl OwnedWriteHalf {
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 impl AsyncWrite for OwnedWriteHalf {
@@ -52,9 +50,7 @@ impl AsyncWrite for OwnedWriteHalf {
 }
 impl Debug for OwnedWriteHalf {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("local_socket::OwnedWriteHalf")
-            .field(&self.inner)
-            .finish()
+        f.debug_tuple("local_socket::OwnedWriteHalf").field(&self.0).finish()
     }
 }
-forward_as_handle!(OwnedWriteHalf, inner);
+forward_as_handle!(OwnedWriteHalf);

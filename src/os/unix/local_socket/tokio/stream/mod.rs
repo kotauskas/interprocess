@@ -17,22 +17,20 @@ use {
     },
 };
 
-pub struct LocalSocketStream {
-    pub(super) inner: UdStream,
-}
+pub struct LocalSocketStream(pub(super) UdStream);
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
         UdStream::connect(path).await.map(Self::from)
     }
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        let (r, w) = self.inner.into_split();
-        (OwnedReadHalf { inner: r }, OwnedWriteHalf { inner: w })
+        let (r, w) = self.0.into_split();
+        (OwnedReadHalf(r), OwnedWriteHalf(w))
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
         #[cfg(uds_peerucred)]
         {
-            self.inner.get_peer_credentials().map(|ucred| ucred.pid as u32)
+            self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
         }
         #[cfg(not(uds_peerucred))]
         {
@@ -40,13 +38,13 @@ impl LocalSocketStream {
         }
     }
     fn pinproj(&mut self) -> Pin<&mut UdStream> {
-        Pin::new(&mut self.inner)
+        Pin::new(&mut self.0)
     }
 }
 impl From<UdStream> for LocalSocketStream {
     #[inline]
     fn from(inner: UdStream) -> Self {
-        Self { inner }
+        Self(inner)
     }
 }
 impl AsyncRead for LocalSocketStream {
@@ -89,10 +87,10 @@ impl AsyncWrite for LocalSocketStream {
 impl Debug for LocalSocketStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSocketStream")
-            .field("fd", &self.inner.as_raw_fd())
+            .field("fd", &self.0.as_raw_fd())
             .finish()
     }
 }
 
-forward_as_handle!(unix: LocalSocketStream, inner);
-forward_try_handle!(unix: LocalSocketStream, inner, UdStream);
+forward_as_handle!(unix: LocalSocketStream);
+forward_try_handle!(unix: LocalSocketStream, UdStream);

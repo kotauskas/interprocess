@@ -23,12 +23,8 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
         unsafe {
             // SAFETY: we just created both of those file descriptors, which means that neither of
             // them can be in use elsewhere.
-            let reader = PubReader {
-                inner: UnnamedPipeReader::from_raw_fd(fds[0]),
-            };
-            let writer = PubWriter {
-                inner: UnnamedPipeWriter::from_raw_fd(fds[1]),
-            };
+            let reader = PubReader(UnnamedPipeReader::from_raw_fd(fds[0]));
+            let writer = PubWriter(UnnamedPipeWriter::from_raw_fd(fds[1]));
             Ok((writer, reader))
         }
     } else {

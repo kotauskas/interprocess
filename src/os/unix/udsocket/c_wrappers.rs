@@ -18,8 +18,8 @@ pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
     let fd = create_uds_raw(ty)?;
     #[cfg(not(target_os = "linux"))]
     {
-        set_nonblocking(&fd, nonblocking)?;
-        set_cloexec(&fd, true)?;
+        set_nonblocking(fd.0.as_fd(), nonblocking)?;
+        set_cloexec(fd.0.as_fd(), true)?;
     }
     Ok(fd)
 }
