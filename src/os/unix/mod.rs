@@ -20,6 +20,8 @@ pub(self) use fdops::*;
 
 pub mod fifo_file;
 
+mod c_wrappers;
+
 #[cfg(uds_supported)]
 pub mod udsocket;
 

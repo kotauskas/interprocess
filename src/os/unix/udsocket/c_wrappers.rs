@@ -2,6 +2,9 @@ use crate::os::unix::{unixprelude::*, FdOps};
 use libc::{sockaddr, sockaddr_un, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
 use std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr};
 
+#[cfg_attr(target_os = "linux", allow(unused))]
+pub(super) use crate::os::unix::c_wrappers::*;
+
 pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
     #[allow(unused_mut, clippy::let_and_return)]
     let ty = {
@@ -162,30 +165,3 @@ pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
     let success = unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 };
     ok_or_ret_errno!(success => ())
 }
-
-#[cfg(not(target_os = "linux"))]
-mod non_linux {
-    use super::*;
-    use libc::{FD_CLOEXEC, F_GETFD, F_SETFD};
-    pub(super) fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<i32> {
-        let (val, success) = unsafe {
-            let ret = libc::fcntl(fd.as_raw_fd(), F_GETFD, 0);
-            (ret, ret != -1)
-        };
-        ok_or_ret_errno!(success => val)
-    }
-    pub(super) fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
-        let success = unsafe { libc::fcntl(fd.as_raw_fd(), F_SETFD, flags) != -1 };
-        ok_or_ret_errno!(success => ())
-    }
-    pub(super) fn set_cloexec(fd: BorrowedFd<'_>, cloexec: bool) -> io::Result<()> {
-        let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
-        if cloexec {
-            flags |= FD_CLOEXEC;
-        }
-        set_fdflags(fd, flags)?;
-        Ok(())
-    }
-}
-#[cfg(not(target_os = "linux"))]
-use non_linux::*;
