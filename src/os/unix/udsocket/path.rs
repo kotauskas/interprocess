@@ -24,7 +24,7 @@ use std::{
 ///
 /// ## `File`
 /// All sockets identified this way are located on the main filesystem and exist as persistent files until deletion, preventing servers from using the same socket without deleting it from the filesystem first. This variant is available on all POSIX-compilant systems.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UdSocketPath<'a> {
     /// An unnamed socket, identified only by its file descriptor. This is an invalid path value for creating sockets – all attempts to use such a value will result in an error.
     Unnamed,
@@ -331,17 +331,6 @@ impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
             addr.sun_family = AF_UNIX as _;
             path.write_self_to_sockaddr_un(&mut addr)?;
             Ok(addr)
-        }
-    }
-}
-impl<'a> ToOwned for UdSocketPath<'a> {
-    type Owned = Self;
-    fn to_owned(&self) -> UdSocketPath<'a> {
-        match self {
-            Self::File(f) => UdSocketPath::File(Cow::Owned(f.as_ref().to_owned())),
-            #[cfg(uds_linux_namespace)]
-            Self::Namespaced(n) => UdSocketPath::Namespaced(Cow::Owned(n.as_ref().to_owned())),
-            Self::Unnamed => UdSocketPath::Unnamed,
         }
     }
 }
