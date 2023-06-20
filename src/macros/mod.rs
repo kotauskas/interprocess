@@ -6,6 +6,8 @@ mod ok_or_ret_errno;
 mod derive_raw;
 #[macro_use]
 mod forward_handle_and_fd;
+#[macro_use]
+mod forward_try_clone;
 
 macro_rules! impmod {
     ($($osmod:ident)::+, $($orig:ident $(as $into:ident)?),* $(,)?) => {
