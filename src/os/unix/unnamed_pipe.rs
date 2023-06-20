@@ -20,13 +20,16 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
         (result == 0, fds)
     };
     if success {
-        unsafe {
+        let (w, r) = unsafe {
             // SAFETY: we just created both of those file descriptors, which means that neither of
             // them can be in use elsewhere.
-            let reader = PubReader(UnnamedPipeReader::from_raw_fd(fds[0]));
-            let writer = PubWriter(UnnamedPipeWriter::from_raw_fd(fds[1]));
-            Ok((writer, reader))
-        }
+            let w = OwnedFd::from_raw_fd(fds[1]);
+            let r = OwnedFd::from_raw_fd(fds[0]);
+            (w, r)
+        };
+        let w = PubWriter(UnnamedPipeWriter(FdOps(w)));
+        let r = PubReader(UnnamedPipeReader(FdOps(r)));
+        Ok((w, r))
     } else {
         Err(io::Error::last_os_error())
     }
@@ -67,12 +70,10 @@ impl From<OwnedFd> for UnnamedPipeReader {
 impl Debug for UnnamedPipeReader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
-            .field("fd", &self.as_raw_fd())
+            .field("fd", &self.0 .0.as_raw_fd())
             .finish()
     }
 }
-// TODO move from here to public API
-derive_raw!(unix: UnnamedPipeReader);
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Write for &UnnamedPipeWriter {
@@ -117,8 +118,7 @@ impl From<OwnedFd> for UnnamedPipeWriter {
 impl Debug for UnnamedPipeWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
-            .field("fd", &self.as_raw_fd())
+            .field("fd", &self.0 .0.as_raw_fd())
             .finish()
     }
 }
-derive_raw!(unix: UnnamedPipeWriter);
