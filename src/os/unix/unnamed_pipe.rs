@@ -74,6 +74,7 @@ impl Debug for UnnamedPipeReader {
             .finish()
     }
 }
+forward_try_clone!(UnnamedPipeReader);
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Write for &UnnamedPipeWriter {
@@ -122,3 +123,4 @@ impl Debug for UnnamedPipeWriter {
             .finish()
     }
 }
+forward_try_clone!(UnnamedPipeWriter);

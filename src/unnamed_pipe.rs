@@ -48,6 +48,7 @@ impl fmt::Debug for UnnamedPipeReader {
     }
 }
 forward_handle!(UnnamedPipeReader);
+forward_try_clone!(UnnamedPipeReader);
 derive_raw!(UnnamedPipeReader);
 
 /// A handle to the writing end of an unnamed pipe, created by the [`pipe`] function together with the [reading end].
@@ -79,4 +80,5 @@ impl fmt::Debug for UnnamedPipeWriter {
     }
 }
 forward_handle!(UnnamedPipeWriter);
+forward_try_clone!(UnnamedPipeWriter);
 derive_raw!(UnnamedPipeWriter);

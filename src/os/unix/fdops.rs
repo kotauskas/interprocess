@@ -1,4 +1,5 @@
-use super::unixprelude::*;
+use super::{c_wrappers, unixprelude::*};
+use crate::TryClone;
 use std::{
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::fd::OwnedFd,
@@ -59,5 +60,12 @@ impl FromRawFd for FdOps {
     #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Self {
         Self(unsafe { OwnedFd::from_raw_fd(fd) })
+    }
+}
+
+impl TryClone for FdOps {
+    fn try_clone(&self) -> std::io::Result<Self> {
+        let fd = c_wrappers::duplicate_fd(self.0.as_fd())?;
+        Ok(Self(fd))
     }
 }
