@@ -1,5 +1,8 @@
 use super::{c_wrappers, PathDropGuard, ToUdSocketPath, UdSocketPath, UdStream};
-use crate::os::unix::{unixprelude::*, FdOps};
+use crate::{
+    os::unix::{unixprelude::*, FdOps},
+    TryClone,
+};
 use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -209,6 +212,15 @@ impl From<OwnedFd> for UdStreamListener {
             _drop_guard: PathDropGuard::dummy(),
             fd: FdOps(fd),
         }
+    }
+}
+impl TryClone for UdStreamListener {
+    fn try_clone(&self) -> io::Result<Self> {
+        let s = Self {
+            _drop_guard: self._drop_guard.clone(),
+            fd: self.fd.try_clone()?,
+        };
+        Ok(s)
     }
 }
 derive_raw!(unix: UdStreamListener);

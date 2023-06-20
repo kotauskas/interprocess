@@ -2,7 +2,7 @@ use super::UdSocketPath;
 use crate::os::unix::unixprelude::*;
 use std::{ffi::OsStr, fs::remove_file, ops::Drop};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PathDropGuard<'a> {
     pub path: UdSocketPath<'a>,
     pub enabled: bool,
