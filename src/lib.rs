@@ -93,6 +93,9 @@ pub mod os;
 mod sealed;
 pub(crate) use sealed::Sealed;
 
+mod try_clone;
+pub use try_clone::*;
+
 pub mod reliable_recv_msg;
 
 trait DebugExpectExt: Sized {
