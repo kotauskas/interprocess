@@ -87,6 +87,7 @@ pub mod local_socket;
 pub mod unnamed_pipe;
 //pub mod shared_memory;
 
+pub mod error;
 pub mod os;
 
 mod sealed;
