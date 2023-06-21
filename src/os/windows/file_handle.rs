@@ -1,4 +1,5 @@
-use super::{downgrade_eof, winprelude::*};
+use super::{c_wrappers, downgrade_eof, winprelude::*};
+use crate::TryClone;
 use std::{io, mem::MaybeUninit, ptr};
 use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
 
@@ -57,6 +58,11 @@ impl FileHandle {
     pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
         let success = unsafe { FlushFileBuffers(handle) != 0 };
         downgrade_eof(ok_or_ret_errno!(success => ()))
+    }
+}
+impl TryClone for FileHandle {
+    fn try_clone(&self) -> io::Result<Self> {
+        c_wrappers::duplicate_handle(self.0.as_handle()).map(Self)
     }
 }
 forward_handle!(FileHandle);

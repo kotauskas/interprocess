@@ -27,48 +27,37 @@ mod winprelude {
 }
 use winprelude::*;
 
-use winapi::{
-    shared::winerror::ERROR_PIPE_NOT_CONNECTED,
-    um::{
-        handleapi::{DuplicateHandle, INVALID_HANDLE_VALUE},
-        processthreadsapi::GetCurrentProcess,
-    },
-};
+mod c_wrappers;
 
 /// Objects which own handles which can be shared with another processes.
 ///
-/// On Windows, like with most other operating systems, handles belong to specific processes. You shouldn't just send the value of a handle to another process (with a named pipe, for example) and expect it to work on the other side. For this to work, you need [`DuplicateHandle`] – the Win32 API function which duplicates a handle into the handle table of the specified process (the reciever is referred to by its handle). This trait exposes the `DuplicateHandle` functionality in a safe manner. If the handle is *inheritable*, however, all child processes of a process inherit the handle and thus can use the same value safely without the need to share it. *All Windows handle objects created by this crate are inheritable.*
+/// On Windows, like with most other operating systems, handles belong to specific processes. You shouldn't just send
+/// the value of a handle to another process (with a named pipe, for example) and expect it to work on the other side.
+/// For this to work, you need [`DuplicateHandle`](winapi::um::handleapi::DuplicateHandle) – the Win32 API function
+/// which duplicates a handle into the handle table of the specified process (the receiver is referred to by its
+/// handle). This trait exposes the `DuplicateHandle` functionality in a safe manner.
 ///
-/// **Implemented for all types inside this crate which implement [`AsRawHandle`] and are supposed to be shared between processes.**
+/// Note that the resulting handle is expected not to be inheritable. It is a logic error to have the output of
+/// `.share()` to be inheritable, but it is not UB.
 ///
-/// [`DuplicateHandle`]: https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-duplicatehandle " "
-/// [`AsRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html " "
-pub trait ShareHandle: AsRawHandle {
-    /// Duplicates the handle to make it accessible in the specified process (taken as a handle to that process) and returns the raw value of the handle which can then be sent via some form of IPC, typically named pipes. This is the only way to use any form of IPC other than named pipes to communicate between two processes which do not have a parent-child relationship or if the handle wasn't created as inheritable, therefore named pipes paired with this are a hard requirement in order to communicate between processes if one wasn't spawned by another.
+/// **Implemented for all types inside this crate which implement [`AsHandle`] and are supposed to be shared between
+/// processes.**
+pub trait ShareHandle: AsHandle {
+    /// Duplicates the handle to make it accessible in the specified process (taken as a handle to that process) and
+    /// returns the raw value of the handle which can then be sent via some form of IPC, typically named pipes. This is
+    /// the only way to use any form of IPC other than named pipes to communicate between two processes which do not
+    /// have a parent-child relationship or if the handle wasn't created as inheritable.
     ///
-    /// Backed by [`DuplicateHandle`]. Doesn't require unsafe code since `DuplicateHandle` never leads to undefined behavior if the `lpTargetHandle` parameter is a valid pointer, only creates an error.
+    /// Backed by [`DuplicateHandle`](winapi::um::handleapi::DuplicateHandle). Doesn't require unsafe code since
+    /// `DuplicateHandle` never leads to undefined behavior if the `lpTargetHandle` parameter is a valid pointer, only
+    /// creates an error.
     #[allow(clippy::not_unsafe_ptr_arg_deref)] // Handles are not pointers, they have handle checks
-    fn share(&self, reciever: BorrowedHandle<'_>) -> io::Result<HANDLE> {
-        let (success, new_handle) = unsafe {
-            let mut new_handle = INVALID_HANDLE_VALUE;
-            let success = DuplicateHandle(
-                GetCurrentProcess(),
-                self.as_raw_handle(),
-                reciever.as_raw_handle(),
-                &mut new_handle,
-                0,
-                1,
-                0,
-            );
-            (success != 0, new_handle)
-        };
-        ok_or_ret_errno!(success => new_handle)
+    fn share(&self, receiver: BorrowedHandle<'_>) -> io::Result<HANDLE> {
+        c_wrappers::duplicate_handle_to_foreign(self.as_handle(), receiver)
     }
 }
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
-impl ShareHandle for unnamed_pipe::UnnamedPipeReader {}
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
-impl ShareHandle for unnamed_pipe::UnnamedPipeWriter {}
 
 #[inline(always)]
 fn weaken_buf_init(buf: &mut [u8]) -> &mut [MaybeUninit<u8>] {
@@ -80,7 +69,8 @@ fn weaken_buf_init(buf: &mut [u8]) -> &mut [MaybeUninit<u8>] {
 }
 
 fn is_eof_like(e: &io::Error) -> bool {
-    e.kind() == io::ErrorKind::BrokenPipe || e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _)
+    e.kind() == io::ErrorKind::BrokenPipe
+        || e.raw_os_error() == Some(winapi::shared::winerror::ERROR_PIPE_NOT_CONNECTED as _)
 }
 
 #[allow(unused)]
