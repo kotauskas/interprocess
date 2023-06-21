@@ -22,8 +22,6 @@ pub const DUMMY_MSGHDR: msghdr = msghdr {
     msg_flags: 0,
 };
 
-// TODO add type of cmsg_len
-
 cfg_if! {
     if #[cfg(uds_msghdr_iovlen_c_int)] {
         pub type MsghdrIovlen = c_int;
