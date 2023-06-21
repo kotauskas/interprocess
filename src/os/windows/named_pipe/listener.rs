@@ -1,5 +1,5 @@
 use super::{path_conversion, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
-use crate::os::windows::{winprelude::*, FileHandle};
+use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
     ffi::OsStr,
@@ -238,23 +238,32 @@ cannot create pipe server that has byte type but reads messages – have you for
         let path = path_conversion::convert_and_encode_path(&self.name, None);
         let open_mode = self.open_mode(first, role, overlapped);
         let pipe_mode = self.pipe_mode(read_mode, nonblocking);
+
+        let mut sa = init_security_attributes();
+        sa.bInheritHandle = 0;
+        // TODO security descriptor
+
+        let max_instances = match self.instance_limit.map(NonZeroU8::get) {
+            Some(255) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
+                ))
+            }
+            Some(x) => x.to::<DWORD>(),
+            None => 255,
+        };
+
         let (handle, success) = unsafe {
-            // TODO security attributes
             let handle = CreateNamedPipeW(
                 path.as_ptr(),
                 open_mode,
                 pipe_mode,
-                self.instance_limit.map_or(255, |x| {
-                    assert!(
-                        x.get() != 255,
-                        "cannot set 255 as the named pipe instance limit due to 255 being a reserved value"
-                    );
-                    x.get().to::<DWORD>()
-                }),
+                max_instances,
                 self.output_buffer_size_hint,
                 self.input_buffer_size_hint,
                 self.wait_timeout.get(),
-                ptr::null_mut(),
+                &mut sa as *mut _,
             );
             (handle, handle != INVALID_HANDLE_VALUE)
         };
