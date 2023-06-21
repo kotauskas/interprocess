@@ -163,6 +163,7 @@ impl Display for FromHandleErrorKind {
 /// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.
 ///
 /// Not to be confused with the Tokio version.
+// TODO remove in favor of ConversionError
 #[derive(Debug)]
 pub struct FromHandleError {
     /// The stage at which the error occurred.
