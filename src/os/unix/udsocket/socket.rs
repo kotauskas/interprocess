@@ -4,7 +4,10 @@ use super::{
     util::{make_msghdr_r, make_msghdr_w},
     PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
-use crate::os::unix::{unixprelude::*, FdOps};
+use crate::{
+    os::unix::{unixprelude::*, FdOps},
+    TryClone,
+};
 #[cfg(target_os = "linux")]
 use crate::{
     reliable_recv_msg::{ReliableRecvMsg, TryRecvResult},
@@ -30,7 +33,7 @@ pub struct UdSocket {
 impl UdSocket {
     /// Creates a new socket that can be referred to by the specified path.
     ///
-    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using the [socket namespace][nmspc]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
     ///
     /// After the socket is dropped, the socket file will be left over. Use [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics (if unwinding is enabled).
     ///
@@ -41,9 +44,8 @@ impl UdSocket {
     /// - `socket`
     /// - `bind`
     ///
-    /// [maximum socket path length]: const.MAX_UDSOCKET_PATH_LEN.html " "
-    /// [socket namespace]: enum.UdSocketPath.html#namespaced " "
-    /// [`ToUdSocketPath`]: trait.ToUdSocketPath.html " "
+    /// [mspl]: super::MAX_UDSOCKET_PATH_LEN
+    /// [nmspc]: super::UdSocketPath::Namespaced
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_bind(path.to_socket_path()?, false)
     }
@@ -367,6 +369,15 @@ impl ReliableRecvMsg for UdSocket {
 }
 #[cfg(target_os = "linux")]
 impl Sealed for UdSocket {}
+
+impl TryClone for UdSocket {
+    fn try_clone(&self) -> io::Result<Self> {
+        Ok(Self {
+            _drop_guard: self._drop_guard.clone(),
+            fd: self.fd.try_clone()?,
+        })
+    }
+}
 
 impl AsFd for UdSocket {
     #[inline]
