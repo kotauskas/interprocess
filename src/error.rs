@@ -16,7 +16,9 @@ use std::{
 ///
 /// All those conversion have one thing in common: they consume ownership of one object and return ownership of its new
 /// form. If the conversion fails, it would be invaluably useful in some cases to return ownership of the original
-/// object back to the caller, so that it could use it in some other way.
+/// object back to the caller, so that it could use it in some other way. The `source` field allows for that, but also
+/// reserves the callee's freedom not to do so. (Hey, it's not like I *wanted* it to be like this, Tokio just doesn't
+/// have `.try_clone()` and returns [`io::Error`]. Oh well, unwrapping's always an option.)
 ///
 /// Many (but not all) of those conversions also have an OS error they can attribute the failure to.
 ///
@@ -29,15 +31,32 @@ pub struct ConversionError<S, E = NoDetails> {
     /// The underlying OS error, if any.
     pub cause: Option<io::Error>,
     /// Ownership of the input of the conversion.
-    pub source: S,
+    pub source: Option<S>,
 }
 impl<S, E: Default> ConversionError<S, E> {
+    /// Constructs an error value without an OS cause and with default contents for the "details" field.
+    pub fn from_source(source: S) -> Self {
+        Self {
+            details: Default::default(),
+            cause: None,
+            source: Some(source),
+        }
+    }
+    /// Constructs an error value that doesn't return input ownership, with default contents for the "details" field and
+    /// an OS cause.
+    pub fn from_cause(cause: io::Error) -> Self {
+        Self {
+            details: Default::default(),
+            cause: Some(cause),
+            source: None,
+        }
+    }
     /// Constructs an error value from a given OS cause, filling the "details" field with its default value.
     pub fn from_source_and_cause(source: S, cause: io::Error) -> Self {
         Self {
             details: Default::default(),
             cause: Some(cause),
-            source,
+            source: Some(source),
         }
     }
 }
@@ -47,7 +66,15 @@ impl<S, E> ConversionError<S, E> {
         Self {
             details,
             cause: None,
-            source,
+            source: Some(source),
+        }
+    }
+    /// Constructs an error value that doesn't return input ownership.
+    pub fn from_cause_and_details(cause: io::Error, details: E) -> Self {
+        Self {
+            details,
+            cause: Some(cause),
+            source: None,
         }
     }
     /// Maps the type with which ownership over the input is returned using the given closure.
@@ -79,20 +106,19 @@ impl<S, E: Display> ConversionError<S, E> {
         io::Error::new(io::ErrorKind::Other, msg)
     }
 }
-/// Constructs an error value without an OS cause and with default contents for the "details" field.
-impl<S, E: Default> From<S> for ConversionError<S, E> {
-    fn from(source: S) -> Self {
-        Self {
-            details: Default::default(),
-            cause: None,
-            source,
-        }
-    }
-}
 /// Boxes the error into an `io::Error`, dropping the retained file descriptor in the process.
 impl<S, E: Display> From<ConversionError<S, E>> for io::Error {
     fn from(e: ConversionError<S, E>) -> Self {
         e.to_io_error()
+    }
+}
+impl<S, E: Default> Default for ConversionError<S, E> {
+    fn default() -> Self {
+        Self {
+            details: Default::default(),
+            cause: None,
+            source: None,
+        }
     }
 }
 impl<S, E: Display> Display for ConversionError<S, E> {
