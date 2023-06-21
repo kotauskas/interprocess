@@ -403,6 +403,7 @@ impl<'a> TryFrom<&'a mut [MaybeUninit<u8>]> for CmsgMut<'a> {
     type Error = BufferTooBig<&'a mut [MaybeUninit<u8>], MaybeUninit<u8>>;
     #[inline]
     fn try_from(buf: &'a mut [MaybeUninit<u8>]) -> Result<Self, Self::Error> {
+        #[allow(clippy::useless_conversion)]
         if CmsghdrLen::try_from(buf.len()).is_err() {
             return Err(BufferTooBig(buf));
         }
