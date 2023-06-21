@@ -81,7 +81,7 @@ impl UdStream {
     }
     async fn _connect(path: &UdSocketPath<'_>) -> io::Result<Self> {
         let stream = ConnectFuture { path }.await?;
-        Self::from_sync(stream)
+        Self::try_from(stream).map_err(|e| e.cause.unwrap())
     }
 
     /// Borrows a stream into a read half and a write half, which can be used to read and write the stream concurrently.
@@ -104,7 +104,7 @@ impl UdStream {
     pub fn reunite(read: OwnedReadHalf, write: OwnedWriteHalf) -> Result<Self, ReuniteError> {
         let (read_tok, write_tok) = (read.0, write.0);
         let stream_tok = read_tok.reunite(write_tok)?;
-        Ok(Self::from_tokio(stream_tok))
+        Ok(Self::from(stream_tok))
     }
 
     /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].
@@ -138,10 +138,6 @@ impl UdStream {
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStream> {
         Pin::new(&mut self.get_mut().0)
     }
-    tokio_wrapper_conversion_methods!(
-        sync SyncUdStream,
-        std StdUdStream,
-        tokio TokioUdStream);
 }
 tokio_wrapper_trait_impls!(
     for UdStream,
@@ -202,15 +198,15 @@ impl fmt::Display for ReuniteError {
 }
 impl From<TokioReuniteError> for ReuniteError {
     fn from(TokioReuniteError(read, write): TokioReuniteError) -> Self {
-        let read = OwnedReadHalf::from_tokio(read);
-        let write = OwnedWriteHalf::from_tokio(write);
+        let read = OwnedReadHalf::from(read);
+        let write = OwnedWriteHalf::from(write);
         Self(read, write)
     }
 }
 impl From<ReuniteError> for TokioReuniteError {
     fn from(ReuniteError(read, write): ReuniteError) -> Self {
-        let read = read.into_tokio();
-        let write = write.into_tokio();
+        let read = read.into();
+        let write = write.into();
         Self(read, write)
     }
 }

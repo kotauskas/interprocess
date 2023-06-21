@@ -58,8 +58,6 @@ impl<'a> BorrowedReadHalf<'a> {
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamReadHalf<'a>> {
         Pin::new(&mut self.get_mut().0)
     }
-
-    tokio_wrapper_conversion_methods!(tokio TokioUdStreamReadHalf<'a>);
 }
 
 impl TokioAsyncRead for BorrowedReadHalf<'_> {
@@ -136,8 +134,6 @@ impl OwnedReadHalf {
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamOwnedReadHalf> {
         Pin::new(&mut self.get_mut().0)
     }
-
-    tokio_wrapper_conversion_methods!(tokio TokioUdStreamOwnedReadHalf);
 }
 
 impl TokioAsyncRead for OwnedReadHalf {

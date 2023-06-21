@@ -186,10 +186,6 @@ impl UdSocket {
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.0.as_fd())
     }
-    tokio_wrapper_conversion_methods!(
-        sync SyncUdSocket,
-        std StdUdSocket,
-        tokio TokioUdSocket);
 }
 
 tokio_wrapper_trait_impls!(

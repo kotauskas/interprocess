@@ -58,8 +58,6 @@ impl<'a> BorrowedWriteHalf<'a> {
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamWriteHalf<'a>> {
         Pin::new(&mut self.get_mut().0)
     }
-
-    tokio_wrapper_conversion_methods!(tokio TokioUdStreamWriteHalf<'a>);
 }
 
 impl TokioAsyncWrite for BorrowedWriteHalf<'_> {
@@ -146,8 +144,6 @@ impl OwnedWriteHalf {
     fn pinproject(self: Pin<&mut Self>) -> Pin<&mut TokioUdStreamOwnedWriteHalf> {
         Pin::new(&mut self.get_mut().0)
     }
-
-    tokio_wrapper_conversion_methods!(tokio TokioUdStreamOwnedWriteHalf);
 }
 
 impl TokioAsyncWrite for OwnedWriteHalf {

@@ -113,16 +113,12 @@ impl UdStreamListener {
     }
     fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
         let listener = SyncUdStreamListener::_bind(path, false, true)?;
-        Self::from_sync(listener)
+        Self::try_from(listener).map_err(Into::into)
     }
     /// Listens for incoming connections to the socket, asynchronously waiting a client is connected.
     pub async fn accept(&self) -> io::Result<UdStream> {
         Ok(self.0.accept().await?.0.into())
     }
-    tokio_wrapper_conversion_methods!(
-        sync SyncUdStreamListener,
-        std StdUdStreamListener,
-        tokio TokioUdStreamListener);
 }
 tokio_wrapper_trait_impls!(
     for UdStreamListener,
