@@ -1,5 +1,5 @@
 use super::{util::*, NameGen};
-use anyhow::Context;
+use color_eyre::eyre::Context;
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
     io::{self, BufRead, BufReader, Write},

@@ -28,9 +28,9 @@ use {
     to_method::*,
 };
 
-pub type TestResult = anyhow::Result<()>;
+pub type TestResult = color_eyre::eyre::Result<()>;
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the follower. Captures Anyhow errors on both sides and panics if any occur, reporting which side produced the error.
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
 pub fn drive_pair<T, Ld, Fl>(leader: Ld, leader_name: &str, follower: Fl, follower_name: &str)
 where
     T: Send + 'static,
@@ -90,7 +90,7 @@ where
         for client in client_threads {
             client.join().expect("Client panicked")?; // Early-return the first error
         }
-        Ok::<(), anyhow::Error>(())
+        Ok::<(), color_eyre::eyre::Error>(())
     };
     let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
 

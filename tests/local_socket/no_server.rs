@@ -1,6 +1,9 @@
 //! Tests what happens when a client attempts to connect to a local socket that doesn't exist.
 
-use {super::util::*, anyhow::*, interprocess::local_socket::LocalSocketStream, std::io};
+use super::util::*;
+use color_eyre::eyre::*;
+use interprocess::local_socket::LocalSocketStream;
+use std::io;
 
 pub fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
     use io::ErrorKind::*;

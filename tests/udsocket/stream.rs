@@ -1,12 +1,10 @@
-use {
-    super::util::*,
-    anyhow::Context,
-    interprocess::os::unix::udsocket::{UdStream, UdStreamListener},
-    std::{
-        io::{self, BufRead, BufReader, Read, Write},
-        net::Shutdown,
-        sync::{mpsc::Sender, Arc},
-    },
+use super::util::*;
+use color_eyre::eyre::Context;
+use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
+use std::{
+    io::{self, BufRead, BufReader, Read, Write},
+    net::Shutdown,
+    sync::{mpsc::Sender, Arc},
 };
 
 static SERVER_MSG: &str = "Hello from server!\n";

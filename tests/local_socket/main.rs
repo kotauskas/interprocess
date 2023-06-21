@@ -11,6 +11,7 @@ use interprocess::local_socket::NameTypeSupport;
 #[test]
 fn local_socket_stream() {
     use stream::*;
+    color_eyre::install().unwrap();
     // If only one name type is supported, this one will choose the supported one. If both are
     // supported, this will try paths first.
     util::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);
@@ -21,6 +22,7 @@ fn local_socket_stream() {
 }
 #[test]
 fn local_socket_no_server() -> TestResult {
+    color_eyre::install().unwrap();
     // Same as above.
     no_server::run_and_verify_error(false)?;
     if NameTypeSupport::query() == NameTypeSupport::Both {

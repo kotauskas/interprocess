@@ -1,17 +1,16 @@
-use {
-    super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS},
-    anyhow::Context,
-    std::{convert::TryInto, future::Future, sync::Arc},
-    tokio::{
-        sync::{
-            oneshot::{channel, Sender},
-            Semaphore,
-        },
-        task, try_join,
+use super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
+use color_eyre::eyre::Context;
+use std::{convert::TryInto, future::Future, sync::Arc};
+use tokio::{
+    sync::{
+        oneshot::{channel, Sender},
+        Semaphore,
     },
+    task, try_join,
 };
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the follower. Captures Anyhow errors on both sides and panics if any occur, reporting which side produced the error.
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the
+/// follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
 pub async fn drive_pair<T, Ld, Ldf, Fl, Flf>(
     leader: Ld,
     leader_name: &str,
@@ -67,7 +66,7 @@ where
         for client in client_tasks {
             client.await.expect("Client panicked")?; // Early-return the first error
         }
-        Ok::<(), anyhow::Error>(())
+        Ok::<(), color_eyre::eyre::Error>(())
     };
     let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
 

@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    anyhow::Context,
+    color_eyre::eyre::Context,
     futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream},
     std::{convert::TryInto, io, sync::Arc},

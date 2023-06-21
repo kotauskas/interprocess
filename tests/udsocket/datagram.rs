@@ -1,5 +1,5 @@
 use super::util::*;
-use anyhow::Context;
+use color_eyre::eyre::Context;
 use interprocess::os::unix::udsocket::UdSocket;
 use std::{io, sync::mpsc::Sender};
 

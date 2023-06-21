@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    anyhow::Context,
+    color_eyre::eyre::Context,
     interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, RecvPipeStream},
     std::{
         ffi::OsStr,

@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    anyhow::Context,
+    color_eyre::eyre::Context,
     futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     interprocess::os::windows::named_pipe::{
         pipe_mode,
