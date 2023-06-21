@@ -1,10 +1,5 @@
-use crate::os::unix::udsocket::util::to_cmsghdr_len;
-
-use super::{
-    super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
-    ancillary::ToCmsg,
-    *,
-};
+use super::{ancillary::ToCmsg, *};
+use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, CmsghdrLen, DUMMY_MSGHDR};
 use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
 use std::{
     io,
@@ -29,7 +24,6 @@ impl<'a> CmsgMut<'a> {
     /// # Panics
     /// The buffer's length must not overflow `isize`.
     pub fn new(buf: &'a mut [MaybeUninit<u8>]) -> Self {
-        // TODO check against real type of controllen and not isize
         Self::try_from(buf).expect("buffer size overflowed `isize`")
     }
 
@@ -409,7 +403,7 @@ impl<'a> TryFrom<&'a mut [MaybeUninit<u8>]> for CmsgMut<'a> {
     type Error = BufferTooBig<&'a mut [MaybeUninit<u8>], MaybeUninit<u8>>;
     #[inline]
     fn try_from(buf: &'a mut [MaybeUninit<u8>]) -> Result<Self, Self::Error> {
-        if buf.len() > isize::MAX as usize {
+        if CmsghdrLen::try_from(buf.len()).is_err() {
             return Err(BufferTooBig(buf));
         }
         Ok(Self {
