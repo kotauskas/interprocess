@@ -6,7 +6,7 @@ mod limbo;
 mod wrapper_fns;
 pub(crate) use {impls::*, wrapper_fns::*};
 
-use crate::os::windows::FileHandle;
+use crate::{error::ConversionError, os::windows::FileHandle};
 use std::{
     error::Error,
     fmt::{self, Debug, Display, Formatter},
@@ -142,9 +142,6 @@ pub enum FromHandleErrorKind {
     NoMessageBoundaries,
 }
 impl FromHandleErrorKind {
-    fn should_display_io_error(self) -> bool {
-        !matches!(self, Self::NoMessageBoundaries)
-    }
     const fn msg(self) -> &'static str {
         use FromHandleErrorKind::*;
         match self {
@@ -154,50 +151,21 @@ impl FromHandleErrorKind {
         }
     }
 }
+impl From<FromHandleErrorKind> for io::Error {
+    fn from(e: FromHandleErrorKind) -> Self {
+        io::Error::new(io::ErrorKind::Other, e.msg())
+    }
+}
 impl Display for FromHandleErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.pad(self.msg())
+        f.write_str(self.msg())
     }
 }
 
 /// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.
 ///
 /// Not to be confused with the Tokio version.
-// TODO remove in favor of ConversionError
-#[derive(Debug)]
-pub struct FromHandleError {
-    /// The stage at which the error occurred.
-    pub kind: FromHandleErrorKind,
-    /// The underlying OS error.
-    pub io_error: io::Error,
-    /// Ownership of the handle, so that it could be repurposed.
-    pub handle: OwnedHandle,
-}
-impl Display for FromHandleError {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        display_from_handle_error(
-            f,
-            self.kind.msg(),
-            self.kind.should_display_io_error(),
-            &self.io_error,
-            self.handle.as_raw_handle(),
-        )
-    }
-}
-pub(crate) fn display_from_handle_error(
-    f: &mut fmt::Formatter<'_>,
-    kind: &'static str,
-    should_display_io_error: bool,
-    io_error: &io::Error,
-    handle: RawHandle,
-) -> fmt::Result {
-    f.write_str(kind)?;
-    if should_display_io_error {
-        write!(f, ": {}", &io_error)?;
-    }
-    write!(f, " (handle: {handle:?})")
-}
+pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
 
 /// Error type for `.reunite()` on split receive and send halves.
 ///

@@ -1,4 +1,5 @@
 use crate::{
+    error::FromHandleError,
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{pipe_mode, DuplexPipeStream},
 };
@@ -57,11 +58,16 @@ impl Write for LocalSocketStream {
 forward_as_handle!(LocalSocketStream);
 forward_into_handle!(LocalSocketStream);
 impl TryFrom<OwnedHandle> for LocalSocketStream {
-    type Error = (OwnedHandle, io::Error);
+    type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        PipeStream::try_from(handle)
-            .map(Self)
-            .map_err(|e| (e.handle, e.io_error))
+        match PipeStream::try_from(handle) {
+            Ok(s) => Ok(Self(s)),
+            Err(e) => Err(FromHandleError {
+                details: Default::default(),
+                cause: Some(e.details.into()),
+                source: e.source,
+            }),
+        }
     }
 }

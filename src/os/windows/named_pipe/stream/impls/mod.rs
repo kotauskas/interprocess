@@ -192,11 +192,11 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
         let is_server = match is_server_from_sys(handle.as_handle()) {
             Ok(b) => b,
-            Err(io_error) => {
+            Err(e) => {
                 return Err(FromHandleError {
-                    kind: FromHandleErrorKind::IsServerCheckFailed,
-                    io_error,
-                    handle,
+                    details: FromHandleErrorKind::IsServerCheckFailed,
+                    cause: Some(e),
+                    source: Some(handle),
                 })
             }
         };
@@ -410,20 +410,19 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
         if Rm::MODE == Some(PipeMode::Messages) {
             let msg_bnd = match has_msg_boundaries_from_sys(raw.as_handle()) {
                 Ok(b) => b,
-                Err(io_error) => {
+                Err(e) => {
                     return Err(FromHandleError {
-                        kind: FromHandleErrorKind::MessageBoundariesCheckFailed,
-                        io_error,
-                        handle: raw.into(),
+                        details: FromHandleErrorKind::MessageBoundariesCheckFailed,
+                        cause: Some(e),
+                        source: Some(raw.into()),
                     })
                 }
             };
             if !msg_bnd {
-                let kind = FromHandleErrorKind::NoMessageBoundaries;
                 return Err(FromHandleError {
-                    kind,
-                    io_error: io::Error::new(io::ErrorKind::InvalidInput, kind.msg()),
-                    handle: raw.into(),
+                    details: FromHandleErrorKind::NoMessageBoundaries,
+                    cause: None,
+                    source: Some(raw.into()),
                 });
             }
         }

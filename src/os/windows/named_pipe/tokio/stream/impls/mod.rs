@@ -246,9 +246,9 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
             Ok(b) => b,
             Err(e) => {
                 return Err(FromHandleError {
-                    kind: FromHandleErrorKind::IsServerCheckFailed,
-                    io_error: e,
-                    handle,
+                    details: FromHandleErrorKind::IsServerCheckFailed,
+                    cause: Some(e),
+                    source: Some(handle),
                 })
             }
         };
@@ -265,9 +265,9 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
         match tkresult {
             Ok(s) => Ok(Self::new(s)),
             Err(e) => Err(FromHandleError {
-                kind: FromHandleErrorKind::TokioError,
-                io_error: e,
-                handle: ManuallyDrop::into_inner(handle),
+                details: FromHandleErrorKind::TokioError,
+                cause: Some(e),
+                source: Some(ManuallyDrop::into_inner(handle)),
             }),
         }
     }
@@ -582,18 +582,17 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
                 Ok(b) => b,
                 Err(e) => {
                     return Err(FromHandleError {
-                        kind: FromHandleErrorKind::MessageBoundariesCheckFailed,
-                        io_error: e,
-                        handle,
+                        details: FromHandleErrorKind::MessageBoundariesCheckFailed,
+                        cause: Some(e),
+                        source: Some(handle),
                     })
                 }
             };
             if !msg_bnd {
-                let kind = FromHandleErrorKind::NoMessageBoundaries;
                 return Err(FromHandleError {
-                    kind,
-                    io_error: io::Error::new(io::ErrorKind::InvalidInput, kind.msg()),
-                    handle,
+                    details: FromHandleErrorKind::NoMessageBoundaries,
+                    cause: None,
+                    source: Some(handle),
                 });
             }
         }

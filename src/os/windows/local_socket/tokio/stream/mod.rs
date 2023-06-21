@@ -6,6 +6,7 @@ pub use write_half::*;
 // TODO reunite
 
 use crate::{
+    error::FromHandleError,
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream},
 };
@@ -75,11 +76,16 @@ impl AsyncWrite for LocalSocketStream {
 }
 forward_as_handle!(LocalSocketStream);
 impl TryFrom<OwnedHandle> for LocalSocketStream {
-    type Error = (OwnedHandle, io::Error);
+    type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        StreamImpl::try_from(handle)
-            .map(Self)
-            .map_err(|e| (e.handle, e.io_error))
+        match StreamImpl::try_from(handle) {
+            Ok(s) => Ok(Self(s)),
+            Err(e) => Err(FromHandleError {
+                details: Default::default(),
+                cause: Some(e.details.into()),
+                source: e.source,
+            }),
+        }
     }
 }
