@@ -4,7 +4,10 @@ use super::{
     util::{make_msghdr_r, make_msghdr_w},
     ToUdSocketPath, UdSocketPath,
 };
-use crate::os::unix::{unixprelude::*, FdOps};
+use crate::{
+    os::unix::{unixprelude::*, FdOps},
+    TryClone,
+};
 use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -30,9 +33,7 @@ use to_method::To;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 // TODO update with comments and stuff
-pub struct UdStream {
-    fd: FdOps,
-}
+pub struct UdStream(FdOps);
 impl UdStream {
     /// Connects to a Unix domain socket server at the specified path.
     ///
@@ -58,25 +59,9 @@ impl UdStream {
         }
         c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
-        Ok(Self { fd })
+        Ok(Self(fd))
     }
 
-    /// Receives bytes from the socket stream.
-    ///
-    /// # System calls
-    /// - `read`
-    pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.fd).read(buf)
-    }
-    /// Receives bytes from the socket stream, making use of [scatter input] for the main data.
-    ///
-    /// # System calls
-    /// - `readv`
-    ///
-    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn recv_vectored(&self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        (&self.fd).read_vectored(bufs)
-    }
     /// Receives both bytes and ancillary data from the socket stream.
     ///
     /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, mutable slices of bytes (`u8` values) can be passed directly.
@@ -109,22 +94,6 @@ impl UdStream {
         ok_or_ret_errno!(success => (bytes_read, hdr.msg_controllen as _))
     }
 
-    /// Sends bytes into the socket stream.
-    ///
-    /// # System calls
-    /// - `write`
-    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        (&self.fd).write(buf)
-    }
-    /// Sends bytes into the socket stream, making use of [gather output] for the main data.
-    ///
-    /// # System calls
-    /// - `writev`
-    ///
-    /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn send_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        (&self.fd).write_vectored(bufs)
-    }
     /// Sends bytes and ancillary data into the socket stream.
     ///
     /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, slices and `Vec`s of `AncillaryData` can be passed directly.
@@ -159,24 +128,20 @@ impl UdStream {
     /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
     #[inline]
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        c_wrappers::shutdown(self.fd.0.as_fd(), how)
+        c_wrappers::shutdown(self.as_fd(), how)
     }
 
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
-    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one byte of data to become available; calls to `send…` methods and the `Write` trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the meantime.
-    ///
-    /// [`accept`]: #method.accept " "
-    /// [`incoming`]: #method.incoming " "
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    /// In nonblocking mode, calls to the `recv…` methods and the [`Read`] trait methods will never wait for at least one byte of data to become available; calls to `send…` methods and the [`Write`] trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`](io::ErrorKind::WouldBlock) error immediately, allowing the thread to perform other useful operations in the meantime.
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking(self.fd.0.as_fd(), nonblocking)
+        c_wrappers::set_nonblocking(self.as_fd(), nonblocking)
     }
     /// Checks whether the stream is currently in nonblocking mode or not.
     #[inline]
     pub fn is_nonblocking(&self) -> io::Result<bool> {
-        c_wrappers::get_nonblocking(self.fd.0.as_fd())
+        c_wrappers::get_nonblocking(self.as_fd())
     }
 
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
@@ -199,29 +164,69 @@ impl UdStream {
         )))
     )]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.fd.0.as_fd())
+        c_wrappers::get_peer_ucred(self.as_fd())
     }
 }
 
+/// A list of used system calls is available.
+impl Read for &UdStream {
+    /// # System calls
+    /// - `read`
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        (&self.0).read(buf)
+    }
+    /// # System calls
+    /// - `readv`
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        (&self.0).read_vectored(bufs)
+    }
+}
+/// A list of used system calls is available.
 impl Read for UdStream {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.recv(buf)
+        (&*self).read(buf)
     }
     #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.recv_vectored(bufs)
+        (&*self).read_vectored(bufs)
     }
 }
+/// A list of used system calls is available.
+impl Write for &UdStream {
+    /// # System calls
+    /// - `write`
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        (&self.0).write(buf)
+    }
+    /// # System calls
+    /// - `writev`
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        (&self.0).write_vectored(bufs)
+    }
+    /// # System calls
+    /// None performed.
+    fn flush(&mut self) -> io::Result<()> {
+        // You cannot flush a socket
+        Ok(())
+    }
+}
+/// A list of used system calls is available.
 impl Write for UdStream {
+    /// # System calls
+    /// - `write`
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.send(buf)
+        (&*self).write(buf)
     }
+    /// # System calls
+    /// - `writev`
     #[inline]
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.send_vectored(bufs)
+        (&*self).write_vectored(bufs)
     }
+    /// # System calls
+    /// None performed.
     fn flush(&mut self) -> io::Result<()> {
         // You cannot flush a socket
         Ok(())
@@ -230,26 +235,32 @@ impl Write for UdStream {
 
 impl Debug for UdStream {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UdStream").field("fd", &self.as_raw_fd()).finish()
+        f.debug_tuple("UdStream").field(&self.as_raw_fd()).finish()
+    }
+}
+
+impl TryClone for UdStream {
+    fn try_clone(&self) -> io::Result<Self> {
+        self.0.try_clone().map(Self)
     }
 }
 
 impl AsFd for UdStream {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        self.fd.0.as_fd()
+        self.0 .0.as_fd()
     }
 }
 impl From<UdStream> for OwnedFd {
     #[inline]
     fn from(x: UdStream) -> Self {
-        x.fd.0
+        x.0 .0
     }
 }
 impl From<OwnedFd> for UdStream {
     #[inline]
     fn from(fd: OwnedFd) -> Self {
-        UdStream { fd: FdOps(fd) }
+        UdStream(FdOps(fd))
     }
 }
 
