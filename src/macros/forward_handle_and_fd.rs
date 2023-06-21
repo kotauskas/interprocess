@@ -92,7 +92,7 @@ macro_rules! forward_try_into_handle {
         /// If called outside the async runtime that corresponds to this type.
         #[cfg($cfg)]
         impl ::std::convert::TryFrom<$ty> for ::std::os::$cfg::io::$hty {
-            type Error = <$fldt as ::std::convert::TryFrom<::std::os::$cfg::io::$hty>>::Error;
+            type Error = <::std::os::$cfg::io::$hty as ::std::convert::TryFrom<$fldt>>::Error;
             #[inline]
             fn try_from(x: $ty) -> Result<Self, Self::Error> {
                 ::std::convert::TryFrom::try_from(x.0)
