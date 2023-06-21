@@ -2,6 +2,11 @@
 #![allow(dead_code)]
 
 mod choke;
+use std::sync::atomic::{
+    AtomicBool,
+    Ordering::{AcqRel, Acquire},
+};
+
 use choke::*;
 
 mod xorshift;
@@ -104,4 +109,14 @@ pub fn message(server: bool, terminator: Option<char>) -> String {
         msg.push(t);
     }
     msg
+}
+
+static COLOR_EYRE_INSTALLED: AtomicBool = AtomicBool::new(false);
+pub fn install_color_eyre() {
+    if COLOR_EYRE_INSTALLED
+        .compare_exchange(false, true, AcqRel, Acquire)
+        .is_ok()
+    {
+        let _ = color_eyre::install();
+    }
 }

@@ -11,7 +11,7 @@ mod stream;
 #[test]
 fn udsocket_stream() {
     use stream::*;
-    color_eyre::install().unwrap();
+    install_color_eyre();
     run_with_namegen(NameGen::new(make_id!(), false));
     if cfg!(target_os = "linux") {
         run_with_namegen(NameGen::new(make_id!(), true));
@@ -21,7 +21,7 @@ fn udsocket_stream() {
 #[test]
 fn udsocket_datagram() {
     use datagram::*;
-    color_eyre::install().unwrap();
+    install_color_eyre();
     run_with_namegen(NameGen::new(make_id!(), false));
     if cfg!(target_os = "linux") {
         run_with_namegen(NameGen::new(make_id!(), true));

@@ -2,7 +2,7 @@
 #[path = "../util/mod.rs"]
 #[macro_use]
 mod util;
-use util::TestResult;
+use util::{install_color_eyre, TestResult};
 
 mod no_server;
 mod stream;
@@ -12,6 +12,7 @@ use {interprocess::local_socket::NameTypeSupport, tokio::try_join};
 #[tokio::test]
 async fn tokio_local_socket_stream() -> TestResult {
     use stream::*;
+    install_color_eyre();
     // If only one name type is supported, this one will choose the supported one. If both are
     // supported, this will try paths first.
     let f1 = util::tokio::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);
@@ -26,6 +27,7 @@ async fn tokio_local_socket_stream() -> TestResult {
 }
 #[tokio::test]
 async fn tokio_local_socket_no_server() -> TestResult {
+    install_color_eyre();
     // Same as above.
     let f1 = no_server::run_and_verify_error(false);
     if NameTypeSupport::query() == NameTypeSupport::Both {
