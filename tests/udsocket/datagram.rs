@@ -1,83 +1,64 @@
-use {
-    super::util::*,
-    anyhow::Context,
-    interprocess::os::unix::udsocket::{UdStream, UdStreamListener},
-    std::{
-        io,
-        sync::{mpsc::Sender, Arc},
-    },
-};
+use super::util::*;
+use anyhow::Context;
+use interprocess::os::unix::udsocket::UdSocket;
+use std::{io, sync::mpsc::Sender};
 
-const SERVER_MSG_1: &[u8] = b"First server message";
-const SERVER_MSG_2: &[u8] = b"Second server message";
+pub(super) fn run_with_namegen(mut namegen: NameGen) {
+    let (a_name, a_socket) = make_socket(&mut namegen).expect("failed to make side A socket");
+    let (b_name, b_socket) = make_socket(&mut namegen).expect("failed to make side B socket");
 
-const CLIENT_MSG_1: &[u8] = b"First client message";
-const CLIENT_MSG_2: &[u8] = b"Second client message";
-
-pub(super) fn run_with_namegen(namegen: NameGen) {
-    drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen), client);
+    let side_a = move |s| side(a_socket, Some(s), b_name);
+    let side_b = move |_| side(b_socket, None, a_name);
+    drive_pair(side_a, "side A", side_b, "side B");
 }
 
-fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen) -> TestResult {
-    let (name, listener) = namegen
+fn make_message(side_name: char, second: bool) -> Vec<u8> {
+    let fs = if second { "Second" } else { "First" };
+    format!("{fs} message from side {side_name}").into_bytes()
+}
+
+fn make_socket(namegen: &mut NameGen) -> io::Result<(String, UdSocket)> {
+    namegen
         .find_map(|nm| {
-            let l = match UdStreamListener::bind(&*nm) {
-                Ok(l) => l,
+            let s = match UdSocket::bind(&*nm) {
+                Ok(s) => s,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
                 Err(e) => return Some(Err(e)),
             };
-            Some(Ok((nm, l)))
+            Some(Ok((nm, s)))
         })
         .unwrap()
-        .context("Listener bind failed")?;
-
-    let _ = name_sender.send(name);
-
-    for _ in 0..num_clients {
-        let conn = match listener.accept() {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
-        };
-
-        let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
-
-        let read = conn.recv(&mut buf1).context("First socket receive failed")?;
-        assert_eq!(read, CLIENT_MSG_1.len());
-        assert_eq!(&buf1[0..read], CLIENT_MSG_1);
-
-        let read = conn.recv(&mut buf2).context("Second socket receive failed")?;
-        assert_eq!(read, CLIENT_MSG_2.len());
-        assert_eq!(&buf2[0..read], CLIENT_MSG_2);
-
-        let written = conn.send(SERVER_MSG_1).context("First socket send failed")?;
-        assert_eq!(written, SERVER_MSG_1.len());
-
-        let written = conn.send(SERVER_MSG_2).context("Second socket send failed")?;
-        assert_eq!(written, SERVER_MSG_2.len());
-    }
-    Ok(())
 }
 
-fn client(name: Arc<String>) -> TestResult {
-    let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
-    let conn = UdStream::connect(name.as_str()).context("Connect failed")?;
+fn side(sock: UdSocket, notifier: Option<Sender<()>>, other_name: String) -> TestResult {
+    let (mut buf1, mut buf2) = ([0; 64], [0; 64]);
 
-    let written = conn.send(CLIENT_MSG_1).context("First socket send failed")?;
-    assert_eq!(written, CLIENT_MSG_1.len());
+    let (side_name, other_side_name) = if let Some(n) = notifier {
+        let _ = n.send(());
+        ('A', 'B')
+    } else {
+        ('B', 'A')
+    };
+    let own_msg_1 = make_message(side_name, false);
+    let own_msg_2 = make_message(side_name, true);
+    let other_msg_1 = make_message(other_side_name, false);
+    let other_msg_2 = make_message(other_side_name, true);
 
-    let written = conn.send(CLIENT_MSG_2).context("Second socket send failed")?;
-    assert_eq!(written, CLIENT_MSG_2.len());
+    sock.set_destination(other_name).context("Set destination failed")?;
 
-    let read = conn.recv(&mut buf1).context("First socket receive failed")?;
-    assert_eq!(read, SERVER_MSG_1.len());
-    assert_eq!(&buf1[0..read], SERVER_MSG_1);
+    let written = sock.send(&own_msg_1).context("First socket send failed")?;
+    assert_eq!(written, own_msg_1.len());
 
-    let read = conn.recv(&mut buf2).context("Second socket receive failed")?;
-    assert_eq!(read, SERVER_MSG_2.len());
-    assert_eq!(&buf2[0..read], SERVER_MSG_2);
+    let written = sock.send(&own_msg_2).context("Second socket send failed")?;
+    assert_eq!(written, own_msg_2.len());
+
+    let read = sock.recv(&mut buf1).context("First socket receive failed")?;
+    assert_eq!(read, other_msg_1.len());
+    assert_eq!(&buf1[0..read], other_msg_1);
+
+    let read = sock.recv(&mut buf2).context("Second socket receive failed")?;
+    assert_eq!(read, other_msg_2.len());
+    assert_eq!(&buf2[0..read], other_msg_2);
 
     Ok(())
 }

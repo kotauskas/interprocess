@@ -97,13 +97,10 @@ impl UdSocket {
     }
     fn _set_destination(&self, path: &UdSocketPath<'_>) -> io::Result<()> {
         let addr = path.borrow().try_to::<sockaddr_un>()?;
-
         unsafe {
             // SAFETY: addr is well-constructed
-            c_wrappers::connect(self.fd.0.as_fd(), &addr)?;
+            c_wrappers::connect(self.fd.0.as_fd(), &addr)
         }
-
-        Ok(())
     }
 
     /// Receives a single datagram from the socket, returning the size of the received datagram.
