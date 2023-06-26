@@ -1,6 +1,9 @@
 use super::{
     c_wrappers,
-    cmsg::{CmsgMut, CmsgRef},
+    cmsg::{
+        context::{Collector, DummyCollector},
+        CmsgMut, CmsgRef,
+    },
     util::{make_msghdr_r, make_msghdr_w},
     ToUdSocketPath, UdSocketPath,
 };
@@ -16,7 +19,8 @@ use std::{
 };
 use to_method::To;
 
-/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by connecting to an existing server.
+/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by
+/// connecting to an existing server.
 ///
 /// # Examples
 ///
@@ -62,9 +66,8 @@ impl UdStream {
         Ok(Self(fd))
     }
 
-    /// Receives both bytes and ancillary data from the socket stream.
-    ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, mutable slices of bytes (`u8` values) can be passed directly.
+    /// Receives both bytes and ancillary data from the socket stream. The first element of the return value
+    /// represents the read amount of the former, while the second element represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
@@ -72,60 +75,91 @@ impl UdStream {
     pub fn recv_ancillary(&self, buf: &mut [u8], abuf: &mut CmsgMut<'_>) -> io::Result<(usize, usize)> {
         self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
-    /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data.
+    /// Receives both bytes and ancillary data from the socket stream and allowing the given context collector to hook
+    /// into the process. The first element of the return value represents the read amount of the former, while the
+    /// second element represents that of the latter.
     ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, mutable slices of bytes (`u8` values) can be passed directly.
+    /// # System calls
+    /// - `recvmsg`
+    #[inline]
+    pub fn recv_ancillary_with_context(
+        &self,
+        buf: &mut [u8],
+        abuf: &mut CmsgMut<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
+        self.recv_ancillary_vectored_with_context(&mut [IoSliceMut::new(buf)], abuf, cc)
+    }
+    /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data.
+    /// The first element of the return value represents the read amount of the former, while the second element
+    /// represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn recv_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
         abuf: &mut CmsgMut<'_>,
     ) -> io::Result<(usize, usize)> {
+        self.recv_ancillary_vectored_with_context(bufs, abuf, &mut DummyCollector)
+    }
+    /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data and
+    /// allowing the given context collector to hook into the process. The first element of the return value
+    /// represents the read amount of the former, while the second element represents that of the latter.
+    ///
+    /// # System calls
+    /// - `recvmsg`
+    ///
+    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    pub fn recv_ancillary_vectored_with_context(
+        &self,
+        bufs: &mut [IoSliceMut<'_>],
+        abuf: &mut CmsgMut<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
+        let fd = self.as_fd();
 
-        let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
-            (result != -1, result as usize)
+        cc.pre_op_collect(fd, hdr.msg_flags);
+        let bytes_read = unsafe {
+            // SAFETY: make_msghdr_r is good at its job
+            c_wrappers::recvmsg(fd, &mut hdr, 0)?
         };
-        ok_or_ret_errno!(success => (bytes_read, hdr.msg_controllen as _))
+        cc.post_op_collect(fd, hdr.msg_flags);
+
+        Ok((bytes_read, hdr.msg_controllen as _))
     }
 
     /// Sends bytes and ancillary data into the socket stream.
     ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, slices and `Vec`s of `AncillaryData` can be passed directly.
-    ///
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
-
     /// Sends bytes and ancillary data into the socket stream, making use of [gather output] for the main data.
-    ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, slices and `Vec`s of `AncillaryData` can be passed directly.
     ///
     /// # System calls
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         let hdr = make_msghdr_w(bufs, abuf)?;
-
-        let (success, bytes_written) = unsafe {
-            let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
-            (result != -1, result as usize)
-        };
-        ok_or_ret_errno!(success => (bytes_written, hdr.msg_controllen as _))
+        unsafe {
+            // SAFETY: make_msghdr_w is good at its job
+            c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
+        }
     }
 
     /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].
     ///
-    /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
+    /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it
+    /// may return an error the second time it is called, depending on the platform. You must either avoid using the
+    /// same value twice or ignore the error entirely.
     #[inline]
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         c_wrappers::shutdown(self.as_fd(), how)
@@ -133,7 +167,11 @@ impl UdStream {
 
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
-    /// In nonblocking mode, calls to the `recv…` methods and the [`Read`] trait methods will never wait for at least one byte of data to become available; calls to `send…` methods and the [`Write`] trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`](io::ErrorKind::WouldBlock) error immediately, allowing the thread to perform other useful operations in the meantime.
+    /// In nonblocking mode, calls to the `recv…` methods and the [`Read`] trait methods will never wait for at least
+    /// one byte of data to become available; calls to `send…` methods and the [`Write`] trait methods will never wait
+    /// for the other side to remove enough bytes from the buffer for the write operation to be performed. Those
+    /// operations will instead return a [`WouldBlock`](io::ErrorKind::WouldBlock) error immediately, allowing the
+    /// thread to perform other useful operations in the meantime.
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         c_wrappers::set_nonblocking(self.as_fd(), nonblocking)
@@ -144,7 +182,8 @@ impl UdStream {
         c_wrappers::get_nonblocking(self.as_fd())
     }
 
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
+    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure
+    /// contains the process identifier, user identifier and group identifier of the peer.
     #[cfg(uds_peerucred)]
     #[cfg_attr( // uds_peerucred template
         feature = "doc_cfg",

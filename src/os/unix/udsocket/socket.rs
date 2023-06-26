@@ -1,6 +1,9 @@
 use super::{
     c_wrappers,
-    cmsg::{CmsgMut, CmsgRef},
+    cmsg::{
+        context::{Collector, DummyCollector},
+        CmsgMut, CmsgRef,
+    },
     util::{make_msghdr_r, make_msghdr_w},
     PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
@@ -33,9 +36,13 @@ pub struct UdSocket {
 impl UdSocket {
     /// Creates a new socket that can be referred to by the specified path.
     ///
-    /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using the [socket namespace][nmspc]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using
+    /// the [socket namespace][nmspc]), an error is returned. Errors can also be produced for different reasons, i.e.
+    /// errors should always be handled regardless of whether the path is known to be short enough or not.
     ///
-    /// After the socket is dropped, the socket file will be left over. Use [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics (if unwinding is enabled).
+    /// After the socket is dropped, the socket file will be left over. Use
+    /// [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics
+    /// (if unwinding is enabled).
     ///
     /// # Example
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
@@ -49,7 +56,8 @@ impl UdSocket {
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_bind(path.to_socket_path()?, false)
     }
-    /// Creates a new socket that can be referred to by the specified path, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
+    /// Creates a new socket that can be referred to by the specified path, remembers the address, and installs a drop
+    /// guard that will delete the socket file once the socket is dropped.
     ///
     /// See the documentation of [`bind()`](Self::bind).
     pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
@@ -76,7 +84,8 @@ impl UdSocket {
 
         Ok(Self { fd, _drop_guard: dg })
     }
-    /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead, but supplying the address to the kernel once is more efficient.
+    /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead,
+    /// but supplying the address to the kernel once is more efficient.
     ///
     /// # Example
     /// ```no_run
@@ -112,7 +121,8 @@ impl UdSocket {
         (&self.fd).read(buf)
     }
 
-    /// Receives a single datagram from the socket, making use of [scatter input] and returning the size of the received datagram.
+    /// Receives a single datagram from the socket, making use of [scatter input] and returning the size of the received
+    /// datagram.
     ///
     /// # System calls
     /// - `readv`
@@ -123,45 +133,82 @@ impl UdSocket {
         (&self.fd).read_vectored(bufs)
     }
 
-    /// Receives a single datagram and ancillary data from the socket. The return value is in the following order:
-    /// - How many bytes of the datagram were received
-    /// - How many bytes of ancillary data were received
+    /// Receives a single datagram and ancillary data from the socket. The first element of the return value represents
+    /// the read amount of the former, while the second element represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn recv_ancillary(&self, buf: &mut [u8], abuf: &mut CmsgMut<'_>) -> io::Result<(usize, usize)> {
-        self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
+        self.recv_ancillary_with_context(buf, abuf, &mut DummyCollector)
+    }
+    /// Receives a single datagram and ancillary data from the socket and allowing the given context collector to hook
+    /// into the process. The first element of the return value represents the read amount of the former, while the
+    /// second element represents that of the latter.
+    ///
+    /// # System calls
+    /// - `recvmsg`
+    ///
+    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
+    pub fn recv_ancillary_with_context(
+        &self,
+        buf: &mut [u8],
+        abuf: &mut CmsgMut<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
+        self.recv_ancillary_vectored_with_context(&mut [IoSliceMut::new(buf)], abuf, cc)
     }
 
-    /// Receives a single datagram and ancillary data from the socket, making use of [scatter input]. The return value is in the following order:
-    /// - How many bytes of the datagram were received
-    /// - How many bytes of ancillary data were received
+    /// Receives a single datagram and ancillary data from the socket, making use of [scatter input]. The first element
+    /// of the return value represents the read amount of the former, while the second element represents that of the
+    /// latter.
     ///
     /// # System calls
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn recv_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
         abuf: &mut CmsgMut<'_>,
     ) -> io::Result<(usize, usize)> {
-        let mut hdr = make_msghdr_r(bufs, abuf)?;
-
-        let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
-            (result != -1, result as usize)
-        };
-        ok_or_ret_errno!(success => (bytes_read, hdr.msg_controllen as _))
+        self.recv_ancillary_vectored_with_context(bufs, abuf, &mut DummyCollector)
     }
-
-    /// Receives a single datagram and the source address from the socket, returning how much of the buffer was filled out.
+    /// Receives a single datagram and ancillary data from the socket, making use of [scatter input] and allowing the
+    /// given context collector to hook into the process. The first element of the return value represents the read
+    /// amount of the former, while the second element represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
-    ///     - Future versions of `interprocess` may use `recvfrom` instead; for now, this method is a wrapper around [`recv_from_vectored`].
+    ///
+    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    pub fn recv_ancillary_vectored_with_context(
+        &self,
+        bufs: &mut [IoSliceMut<'_>],
+        abuf: &mut CmsgMut<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
+        let mut hdr = make_msghdr_r(bufs, abuf)?;
+        let fd = self.as_fd();
+
+        cc.pre_op_collect(fd, hdr.msg_flags);
+        let bytes_read = unsafe { c_wrappers::recvmsg(fd, &mut hdr, 0)? };
+        cc.post_op_collect(fd, hdr.msg_flags);
+
+        Ok((bytes_read, hdr.msg_controllen as _))
+    }
+
+    /// Receives a single datagram and the source address from the socket, returning how much of the buffer was filled
+    /// out.
+    ///
+    /// # System calls
+    /// - `recvmsg`
+    ///     - Future versions of `interprocess` may use `recvfrom` instead; for now, this method is a wrapper around
+    /// [`recv_from_vectored`].
     ///
     /// [`recv_from_vectored`]: #method.recv_from_vectored " "
     // TODO use recvfrom
@@ -169,7 +216,8 @@ impl UdSocket {
         self.recv_from_vectored(&mut [IoSliceMut::new(buf)], addr_buf)
     }
 
-    /// Receives a single datagram and the source address from the socket, making use of [scatter input] and returning how much of the buffer was filled out.
+    /// Receives a single datagram and the source address from the socket, making use of [scatter input] and returning
+    /// how much of the buffer was filled out.
     ///
     /// # System calls
     /// - `recvmsg`
@@ -184,9 +232,8 @@ impl UdSocket {
             .map(|x| x.0)
     }
 
-    /// Receives a single datagram, ancillary data and the source address from the socket. The return value is in the following order:
-    /// - How many bytes of the datagram were received
-    /// - How many bytes of ancillary data were received
+    /// Receives a single datagram, ancillary data and the source address from the socket. The first element of the
+    /// return value represents the read amount of the former, while the second element represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
@@ -197,24 +244,59 @@ impl UdSocket {
         abuf: &mut CmsgMut<'_>,
         addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
-        self.recv_from_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf, addr_buf)
+        self.recv_from_ancillary_with_context(buf, abuf, addr_buf, &mut DummyCollector)
+    }
+    /// Receives a single datagram, ancillary data and the source address from the socket and allowing the given context
+    /// collector to hook into the process. The first element of the return value represents the read amount of the
+    /// former, while the second element represents that of the latter.
+    ///
+    /// # System calls
+    /// - `recvmsg`
+    #[inline]
+    pub fn recv_from_ancillary_with_context(
+        &self,
+        buf: &mut [u8],
+        abuf: &mut CmsgMut<'_>,
+        addr_buf: &mut UdSocketPath<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
+        self.recv_from_ancillary_vectored_with_context(&mut [IoSliceMut::new(buf)], abuf, addr_buf, cc)
     }
 
-    /// Receives a single datagram, ancillary data and the source address from the socket, making use of [scatter input]. The return value is in the following order:
-    /// - How many bytes of the datagram were received
-    /// - How many bytes of ancillary data were received
+    /// Receives a single datagram, ancillary data and the source address from the socket, making use of
+    /// [scatter input]. The first element of the return value represents the read amount of the former, while the
+    /// second element represents that of the latter.
     ///
     /// # System calls
     /// - `recvmsg`
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn recv_from_ancillary_vectored(
         &self,
         bufs: &mut [IoSliceMut<'_>],
         abuf: &mut CmsgMut<'_>,
         addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
+        self.recv_from_ancillary_vectored_with_context(bufs, abuf, addr_buf, &mut DummyCollector)
+    }
+    /// Receives a single datagram, ancillary data and the source address from the socket, making use of
+    /// [scatter input] and allowing the given context collector to hook into the process. The first element of the
+    /// return value represents the read amount of the former, while the second element represents that of the latter.
+    ///
+    /// # System calls
+    /// - `recvmsg`
+    ///
+    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    pub fn recv_from_ancillary_vectored_with_context(
+        &self,
+        bufs: &mut [IoSliceMut<'_>],
+        abuf: &mut CmsgMut<'_>,
+        addr_buf: &mut UdSocketPath<'_>,
+        cc: &mut impl Collector,
+    ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
+        let fd = self.as_fd();
 
         // SAFETY: sockaddr_un is POD
         let mut addr_buf_staging = unsafe { zeroed::<sockaddr_un>() };
@@ -224,22 +306,18 @@ impl UdSocket {
             hdr.msg_namelen = size_of_val(&addr_buf_staging).try_into().unwrap();
         }
 
-        let (success, bytes_read) = unsafe {
-            let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
-            (result != -1, result as usize)
-        };
-        let path_length = hdr.msg_namelen as usize;
-        if success {
-            addr_buf.write_sockaddr_un_to_self(&addr_buf_staging, path_length);
-            Ok((bytes_read, hdr.msg_controllen as _))
-        } else {
-            Err(io::Error::last_os_error())
-        }
+        cc.pre_op_collect(fd, hdr.msg_flags);
+        let bytes_read = unsafe { c_wrappers::recvmsg(fd, &mut hdr, 0)? };
+        cc.post_op_collect(fd, hdr.msg_flags);
+
+        addr_buf.write_sockaddr_un_to_self(&addr_buf_staging, hdr.msg_namelen as _);
+        Ok((bytes_read, hdr.msg_controllen as _))
     }
 
     /// Returns the size of the next datagram available on the socket without discarding it.
     ///
-    /// This method is only available on Linux since kernel version 2.2. On lower kernel versions, it will fail; on other platforms, it's absent and thus any usage of it will result in a compile-time error.
+    /// This method is only available on Linux.2. On other platforms, it's absent and thus any usage of it will result
+    /// in a compile-time error.
     ///
     /// # System calls
     /// - `recv`
@@ -281,35 +359,33 @@ impl UdSocket {
     }
     /// Sends a datagram and ancillary data into the socket.
     ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, slices and `Vec`s of `AncillaryData` can be passed directly.
-    ///
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
     /// Sends a datagram and ancillary data into the socket, making use of [gather output] for the main data.
-    ///
-    /// The ancillary data buffer is automatically converted from the supplied value, if possible. For that reason, slices and `Vec`s of `AncillaryData` can be passed directly.
     ///
     /// # System calls
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<(usize, usize)> {
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         let hdr = make_msghdr_w(bufs, abuf)?;
-
-        let (success, bytes_written) = unsafe {
-            let result = libc::sendmsg(self.as_raw_fd(), &hdr as *const _, 0);
-            (result != -1, result as usize)
-        };
-        ok_or_ret_errno!(success => (bytes_written, hdr.msg_controllen as _))
+        unsafe {
+            // SAFETY: make_msghdr_w is good at its job
+            c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
+        }
     }
 
     /// Enables or disables the nonblocking mode for the socket. By default, it is disabled.
     ///
-    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one message to become available; calls to `send…` methods and the `Write` trait methods will never wait for the other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the meantime.
+    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one
+    /// message to become available; calls to `send…` methods and the `Write` trait methods will never wait for the
+    /// other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will
+    /// instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the
+    /// meantime.
     ///
     /// [`accept`]: #method.accept " "
     /// [`incoming`]: #method.incoming " "
@@ -322,7 +398,8 @@ impl UdSocket {
         c_wrappers::get_nonblocking(self.fd.0.as_fd())
     }
 
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
+    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure
+    /// contains the process identifier, user identifier and group identifier of the peer.
     #[cfg(uds_peerucred)]
     #[cfg_attr( // uds_peerucred template
         feature = "doc_cfg",
