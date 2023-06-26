@@ -134,7 +134,12 @@ impl<S, E: Display> Display for ConversionError<S, E> {
         Ok(())
     }
 }
-impl<S: Debug, E: Debug + Display> Error for ConversionError<S, E> {}
+impl<S: Debug, E: Error + 'static> Error for ConversionError<S, E> {
+    #[inline]
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause.as_ref().map(|r| r as &_)
+    }
+}
 
 /// Thunk type used to specialize on the type of `details`, preventing ": " from being at the beginning of the output
 /// with nothing preceding it.
