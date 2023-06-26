@@ -123,7 +123,7 @@ impl UdStream {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
         let fd = self.as_fd();
 
-        cc.pre_op_collect(fd, hdr.msg_flags);
+        cc.pre_op_collect(fd);
         let bytes_read = unsafe {
             // SAFETY: make_msghdr_r is good at its job
             c_wrappers::recvmsg(fd, &mut hdr, 0)?

@@ -195,7 +195,7 @@ impl UdSocket {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
         let fd = self.as_fd();
 
-        cc.pre_op_collect(fd, hdr.msg_flags);
+        cc.pre_op_collect(fd);
         let bytes_read = unsafe { c_wrappers::recvmsg(fd, &mut hdr, 0)? };
         cc.post_op_collect(fd, hdr.msg_flags);
 
@@ -306,7 +306,7 @@ impl UdSocket {
             hdr.msg_namelen = size_of_val(&addr_buf_staging).try_into().unwrap();
         }
 
-        cc.pre_op_collect(fd, hdr.msg_flags);
+        cc.pre_op_collect(fd);
         let bytes_read = unsafe { c_wrappers::recvmsg(fd, &mut hdr, 0)? };
         cc.post_op_collect(fd, hdr.msg_flags);
 
