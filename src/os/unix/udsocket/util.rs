@@ -109,10 +109,6 @@ pub fn make_msghdr_r(bufs: &mut [IoSliceMut<'_>], abuf: &mut CmsgMut<'_>) -> io:
         to_msghdr_iovlen(bufs.len())?,
     );
     abuf.fill_msghdr(&mut hdr, true)?;
-    #[cfg(target_os = "linux")]
-    {
-        hdr.msg_flags |= libc::MSG_CMSG_CLOEXEC;
-    }
     Ok(hdr)
 }
 pub fn make_msghdr_w(bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<msghdr> {

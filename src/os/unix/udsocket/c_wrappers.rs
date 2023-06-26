@@ -1,5 +1,5 @@
 use crate::os::unix::{unixprelude::*, FdOps};
-use libc::{sockaddr, sockaddr_un, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
+use libc::{msghdr, sockaddr, sockaddr_un, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
 use std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr};
 
 #[cfg_attr(target_os = "linux", allow(unused))]
@@ -40,6 +40,36 @@ fn create_uds_raw(ty: c_int) -> io::Result<FdOps> {
     } else {
         Err(io::Error::last_os_error())
     }
+}
+
+/// Reads stream data and ancillary data from the given socket. Pointers are supplied directly via the `msghdr`.
+///
+/// # Safety
+/// Pointers in `hdr` must not dangle, and ancillary data must be correct.
+#[allow(unused_mut)]
+pub(super) unsafe fn recvmsg(fd: BorrowedFd<'_>, hdr: &mut msghdr, mut flags: c_int) -> io::Result<usize> {
+    #[cfg(target_os = "linux")]
+    {
+        flags |= libc::MSG_CMSG_CLOEXEC;
+    }
+
+    let (success, bytes_read) = unsafe {
+        let result = libc::recvmsg(fd.as_raw_fd(), hdr, flags);
+        (result != -1, result as usize)
+    };
+
+    ok_or_ret_errno!(success => bytes_read)
+}
+/// Writes stream data and ancillary data from the given socket. Pointers are supplied directly via the `msghdr`.
+///
+/// # Safety
+/// Pointers in `hdr` must not dangle, and ancillary data must be correct.
+pub(super) unsafe fn sendmsg(fd: BorrowedFd<'_>, hdr: &msghdr, flags: c_int) -> io::Result<usize> {
+    let (success, bytes_written) = unsafe {
+        let result = libc::sendmsg(fd.as_raw_fd(), hdr, flags);
+        (result != -1, result as usize)
+    };
+    ok_or_ret_errno!(success => bytes_written)
 }
 
 /// Binds the specified Ud-socket file descriptor to the given address.
