@@ -22,6 +22,7 @@ fn is_unix() -> bool {
 ///     - `uds_scm_credentials` ("passcred")
 /// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
+///     - `uds_cmsgcred`
 ///     - `uds_sockcred`
 /// - Socket options for retrieving peer credentials:
 ///     - `uds_peerucred`
@@ -70,16 +71,13 @@ fn collect_uds_features(target: &TargetTriplet) {
             "uds_peereid",
             "uds_sun_len",
         ]);
-        // FIXME sockcred platforms are really fucked, like actually messed up in the head. They make my brain hurt
-        // in one of the worst ways imaginable. They disgust me beyond human belief. Just read the fucking FreeBSD
-        // manpage and you'll start wishing for a legally forced removal of Unix from human life. I've never been losing
-        // my shit over software this hard in my life. Anyway, if you want to fix this functionality, please make a PR.
-        // I'm not touching this again.
 
-        // Commented out to pretend it's not real.
-        // if !target.os_any(&["macos", "ios"]) {
-        //     define("uds_sockcred");
-        // }
+        if target.os_any(&["freebsd", "dragonfly"]) {
+            define("uds_cmsgcred");
+            if target.os("freebsd") {
+                define("uds_sockcred");
+            }
+        }
         if target.os("netbsd") {
             define("uds_unpcbid");
         } else {
