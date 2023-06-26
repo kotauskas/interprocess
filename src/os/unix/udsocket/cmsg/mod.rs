@@ -1,11 +1,15 @@
 //! Socket control message manipulation.
 //!
-//! This module contains a generic safe framework for control messages – not just for Unix domain sockets, but for any `recvmsg`/`sendmsg`-based API in the Unix socket architecture.
+//! This module contains a generic safe framework for control messages – not just for Unix domain sockets, but for any
+//! `recvmsg`/`sendmsg`-based API in the Unix socket architecture.
 //!
-//! The [`ancillary`] module contains safe wrappers that can help you correctly initialize and parse ancillary data control messages; its types can then be fed into [`CmsgBuffer`] or [`CmsgMut`] via the `.add_message()` method on both of those structs.
+//! The [`ancillary`] module contains safe wrappers that can help you correctly initialize and parse ancillary data
+//! control messages; its types can then be fed into [`CmsgBuffer`] or [`CmsgMut`] via the `.add_message()` method on
+//! both of those structs.
 // TODO parser
 
 pub mod ancillary;
+pub mod context;
 
 mod buffer;
 mod mmut;
