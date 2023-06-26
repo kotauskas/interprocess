@@ -1,6 +1,8 @@
-//! Serialization and deserialization of Unix domain socket ancillary data.
+//! Zero-copy serialization and deserialization of Unix domain socket ancillary data.
 //!
-//! This module features safe wrappers for well-defined types of Unix domain socket control messages, allowing for their serialization without the use of unsafe code. It also includes parsers for those types of control messages and a catch-all parser that can parse all control message types that are known to this module.
+//! This module features safe wrappers for well-defined types of Unix domain socket control messages, allowing for their
+//! serialization without the use of unsafe code. It also includes parsers for those types of control messages and a
+//! catch-all parser that can parse all control message types that are known to this module.
 
 // TODO SCM_CREDS2 from FreeBSD
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
@@ -8,15 +10,7 @@
 #[cfg_attr( // uds_ucred template
     feature = "doc_cfg",
     doc(cfg(any(
-        all(
-            target_os = "linux",
-            any(
-                target_env = "gnu",
-                target_env = "musl",
-                target_env = "musleabi",
-                target_env = "musleabihf"
-            )
-        ),
+        target_os = "linux",
         target_os = "emscripten",
         target_os = "redox"
     )))

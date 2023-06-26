@@ -4,15 +4,7 @@
 #[cfg_attr( // uds_ucred template
     feature = "doc_cfg",
     doc(cfg(any(
-        all(
-            target_os = "linux",
-            any(
-                target_env = "gnu",
-                target_env = "musl",
-                target_env = "musleabi",
-                target_env = "musleabihf"
-            )
-        ),
+        target_os = "linux",
         target_os = "emscripten",
         target_os = "redox"
     )))
