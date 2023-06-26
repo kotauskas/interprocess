@@ -219,7 +219,10 @@ impl UdSocket {
         // SAFETY: sockaddr_un is POD
         let mut addr_buf_staging = unsafe { zeroed::<sockaddr_un>() };
         hdr.msg_name = (&mut addr_buf_staging as *mut sockaddr_un).cast::<c_void>();
-        hdr.msg_namelen = size_of_val(&addr_buf_staging).try_to::<u32>().unwrap();
+        #[allow(clippy::useless_conversion)]
+        {
+            hdr.msg_namelen = size_of_val(&addr_buf_staging).try_into().unwrap();
+        }
 
         let (success, bytes_read) = unsafe {
             let result = libc::recvmsg(self.as_raw_fd(), &mut hdr as *mut _, 0);
@@ -247,7 +250,7 @@ impl UdSocket {
         let (success, size) = unsafe {
             let size = libc::recv(
                 self.as_raw_fd(),
-                buffer.as_mut_ptr() as *mut _,
+                buffer.as_mut_ptr().cast(),
                 buffer.len(),
                 libc::MSG_TRUNC | libc::MSG_PEEK,
             );
