@@ -23,6 +23,7 @@ pub(super) fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
     let success = unsafe { libc::fcntl(fd.as_raw_fd(), F_SETFD, flags) != -1 };
     ok_or_ret_errno!(success => ())
 }
+// TODO make always true
 pub(super) fn set_cloexec(fd: BorrowedFd<'_>, cloexec: bool) -> io::Result<()> {
     let mut flags = get_fdflags(fd)? & (!FD_CLOEXEC); // Mask out cloexec to set it to a new value
     if cloexec {
@@ -30,4 +31,26 @@ pub(super) fn set_cloexec(fd: BorrowedFd<'_>, cloexec: bool) -> io::Result<()> {
     }
     set_fdflags(fd, flags)?;
     Ok(())
+}
+
+pub(super) fn get_uid(ruid: bool) -> uid_t {
+    unsafe {
+        if ruid {
+            libc::getuid()
+        } else {
+            libc::geteuid()
+        }
+    }
+}
+pub(super) fn get_gid(rgid: bool) -> gid_t {
+    unsafe {
+        if rgid {
+            libc::getgid() // more like git gud am i right
+        } else {
+            libc::getegid()
+        }
+    }
+}
+pub(super) fn get_pid() -> pid_t {
+    unsafe { libc::getpid() }
 }
