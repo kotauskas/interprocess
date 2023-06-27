@@ -108,7 +108,7 @@ impl UdStream {
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
         self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
     /// Sends bytes and ancillary data into the socket stream, making use of [gather output] for the main data.
@@ -117,7 +117,7 @@ impl UdStream {
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
         let hdr = make_msghdr_w(bufs, abuf)?;
         unsafe {
             // SAFETY: make_msghdr_w is good at its job

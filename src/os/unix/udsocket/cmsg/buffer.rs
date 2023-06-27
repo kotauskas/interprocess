@@ -62,10 +62,10 @@ impl<C> CmsgBuffer<C> {
 
     /// Borrows the control message buffer. The resulting type retains the validity guarantee.
     #[inline(always)]
-    pub fn as_ref(&self) -> CmsgRef<'_> {
+    pub fn as_ref(&self) -> CmsgRef<'_, '_, C> {
         unsafe {
             // SAFETY: validity guarantee is enforced by CmsgBuffer as well
-            CmsgRef::new_unchecked(self.buf.as_ref()).expect("Vec allocation length erroneously overflowed `isize`")
+            CmsgRef::new_unchecked_with_context(self.buf.as_ref(), &self.context_collector)
         }
     }
     /// Mutably borrows the control message buffer. The resulting type retains the validity guarantee, but does not feed

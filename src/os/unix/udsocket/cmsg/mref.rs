@@ -1,6 +1,7 @@
 use super::{
     super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
     ancillary::{Ancillary, FromCmsg, MalformedPayload, ParseError},
+    context::{DummyCollector, DUMMY_COLLECTOR},
     *,
 };
 use libc::{c_void, cmsghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_NXTHDR};
@@ -12,60 +13,92 @@ use std::{cmp::min, io, slice};
 // TODO decoding example
 // TODO context
 #[derive(Copy, Clone, Debug)]
-pub struct CmsgRef<'a>(&'a [u8]);
-impl<'a> CmsgRef<'a> {
+pub struct CmsgRef<'b, 'c, C = DummyCollector> {
+    buf: &'b [u8],
+    /// A borrow of the context collector stored alongside the buffer reference.
+    ///
+    /// Iteration over the buffer using `Cmsgs` provides access to this field, which is later used when deserializing
+    /// them into ancillary data structs.
+    pub context_collector: &'c C,
+}
+impl<'b> CmsgRef<'b, 'static> {
     /// Creates an empty `CmsgRef`.
     #[inline]
     pub const fn empty() -> Self {
-        Self(&[])
+        Self {
+            buf: &[],
+            context_collector: &DUMMY_COLLECTOR,
+        }
     }
     /// Creates a `CmsgRef` from the given byte buffer.
     ///
-    /// # Errors
-    /// An error is returned if the size of the buffer overflows `isize`.
+    /// # Safety
+    /// - The contents of `buf` must be valid control messages. Those could be encoded by [`CmsgBuffer`]/[`CmsgMut`] or
+    /// returned to the program from a system call.
+    /// - The length of `buf` must not overflow `isize`.
+    #[inline]
+    pub unsafe fn new_unchecked(buf: &'b [u8]) -> Self {
+        Self {
+            buf,
+            context_collector: &DUMMY_COLLECTOR,
+        }
+    }
+}
+impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
+    /// Creates an empty `CmsgRef` with the given context.
+    #[inline]
+    pub fn empty_with_context(context_collector: &'c C) -> Self {
+        Self {
+            buf: &[],
+            context_collector,
+        }
+    }
+    /// Creates a `CmsgRef` from the given byte buffer and context.
     ///
     /// # Safety
-    /// The contents of `buf` must be valid control messages. Those could be encoded by [`CmsgBuffer`]/[`CmsgMut`] or returned to the program from a system call.
+    /// - The contents of `buf` must be valid control messages. Those could be encoded by [`CmsgBuffer`]/[`CmsgMut`] or
+    /// returned to the program from a system call.
+    /// - The length of `buf` must not overflow `isize`.
     #[inline]
-    pub unsafe fn new_unchecked(buf: &'a [u8]) -> Result<Self, BufferTooBig<&'a [u8], u8>> {
-        if buf.len() > isize::MAX as usize {
-            return Err(BufferTooBig(buf));
-        }
-        Ok(Self(buf))
+    pub unsafe fn new_unchecked_with_context(buf: &'b [u8], context_collector: &'c C) -> Self {
+        Self { buf, context_collector }
     }
 
     /// Borrows the buffer, allowing inspection of the underlying data.
     #[inline]
     pub fn inner(&self) -> &[u8] {
-        self.0
+        self.buf
     }
 
     /// Returns an iterator over the control messages of the buffer.
     #[inline]
-    pub fn cmsgs(self) -> Cmsgs<'a> {
+    pub fn cmsgs(self) -> Cmsgs<'b, 'c, C> {
         Cmsgs::new(self)
     }
     /// Returns an iterator that wraps [`cmsgs()`](Self::cmsgs) and decodes them into [`Ancillary`] structs.
     #[inline]
-    pub fn decode(self) -> impl Iterator<Item = Result<Ancillary<'a>, ParseError<'a, MalformedPayload>>> {
+    pub fn decode(self) -> impl Iterator<Item = Result<Ancillary<'b>, ParseError<'b, MalformedPayload>>> + 'c
+    where
+        'b: 'c,
+    {
         self.cmsgs().map(Ancillary::try_parse)
     }
 
     pub(crate) fn fill_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
-        hdr.msg_control = self.0.as_ptr().cast::<c_void>().cast_mut();
-        hdr.msg_controllen = to_msghdr_controllen(self.0.len())?;
+        hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
+        hdr.msg_controllen = to_msghdr_controllen(self.buf.len())?;
         Ok(())
     }
 }
 
 /// Iterator over the control messages in a [`CmsgRef`].
-pub struct Cmsgs<'a> {
-    buf: CmsgRef<'a>,
+pub struct Cmsgs<'b, 'c, C> {
+    buf: CmsgRef<'b, 'c, C>,
     cur: *const cmsghdr,
     dummy: msghdr,
 }
-impl<'a> Cmsgs<'a> {
-    fn new(buf: CmsgRef<'a>) -> Self {
+impl<'b, 'c, C> Cmsgs<'b, 'c, C> {
+    fn new(buf: CmsgRef<'b, 'c, C>) -> Self {
         let mut dummy = DUMMY_MSGHDR;
         buf.fill_msghdr(&mut dummy).unwrap();
 
@@ -79,11 +112,11 @@ impl<'a> Cmsgs<'a> {
         }
     }
 }
-impl<'a> Iterator for Cmsgs<'a> {
-    type Item = Cmsg<'a>;
+impl<'b, 'c, C> Iterator for Cmsgs<'b, 'c, C> {
+    type Item = Cmsg<'b>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let buf = self.buf.0;
+        let buf = self.buf.buf;
         let one_past_end = buf.as_ptr_range().end;
 
         if self.cur.is_null() || self.cur.cast::<u8>() >= one_past_end {

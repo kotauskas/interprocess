@@ -1,5 +1,5 @@
 use super::{ancillary::ToCmsg, context::DummyCollector, *};
-use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, CmsghdrLen, DUMMY_MSGHDR};
+use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, DUMMY_MSGHDR};
 use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
 use std::{
     io,
@@ -55,8 +55,7 @@ impl<'b, C> CmsgMut<'b, C> {
         }
     }
     fn validate_buf(buf: &'b mut [MUu8]) -> Result<&'b mut [MUu8], BufferTooBig<&'b mut [MUu8], MUu8>> {
-        #[allow(clippy::useless_conversion)]
-        if CmsghdrLen::try_from(buf.len()).is_ok() {
+        if isize::try_from(buf.len()).is_ok() {
             Ok(buf)
         } else {
             Err(BufferTooBig(buf))
@@ -64,7 +63,7 @@ impl<'b, C> CmsgMut<'b, C> {
     }
 
     /// Immutably borrows the initialized part of the control message buffer.
-    pub fn as_ref(&self) -> CmsgRef<'_> {
+    pub fn as_ref(&self) -> CmsgRef<'_, '_, C> {
         let init_part = &self.buf[..self.init_len];
         let immslc = unsafe {
             // SAFETY: the init cursor doesn't lie, does it?
@@ -72,9 +71,8 @@ impl<'b, C> CmsgMut<'b, C> {
         };
         unsafe {
             // SAFETY: the validity guarantee is that `add_raw_message()` is correctly implemented and that its input
-            // is validated by the unsafe Cmsg factory function. As for the `.unwrap_unchecked()`, that's a superfluous
-            // check for what we're already ensuring in `CmsgMut::new()`.
-            CmsgRef::new_unchecked(immslc).unwrap_unchecked()
+            // is validated by the unsafe Cmsg factory function.
+            CmsgRef::new_unchecked_with_context(immslc, &self.context_collector)
         }
     }
 

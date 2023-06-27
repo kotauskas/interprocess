@@ -111,7 +111,7 @@ pub fn make_msghdr_r<E>(bufs: &mut [IoSliceMut<'_>], abuf: &mut CmsgMut<'_, E>) 
     abuf.fill_msghdr(&mut hdr, true)?;
     Ok(hdr)
 }
-pub fn make_msghdr_w(bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<msghdr> {
+pub fn make_msghdr_w(bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<msghdr> {
     let mut hdr = DUMMY_MSGHDR;
     _fill_out_msghdr(
         &mut hdr,

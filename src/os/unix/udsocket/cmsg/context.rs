@@ -51,6 +51,7 @@ impl<T: Collector> Collector for Box<T> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Hash)]
 pub struct DummyCollector;
 impl Collector for DummyCollector {}
+pub(super) const DUMMY_COLLECTOR: DummyCollector = DummyCollector;
 
 /// A [`Collector`] that diverts to given closures.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Hash)]
