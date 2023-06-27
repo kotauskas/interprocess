@@ -28,7 +28,7 @@ impl<'a> Ancillary<'a> {
     fn parse_fd(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
         FileDescriptors::try_parse(cmsg)
             .map(Self::FileDescriptors)
-            .map_err(|e| e.map_payload_err(MalformedPayload::from))
+            .map_err(|e| e.map_payload_err(MalformedPayload::FileDescriptors))
     }
     #[cfg(uds_ucred)]
     fn parse_credentials(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
@@ -71,6 +71,7 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
 #[derive(Debug)]
 #[allow(missing_docs)] // Self-explanatory
 pub enum MalformedPayload {
+    FileDescriptors(SizeMismatch),
     #[cfg_attr( // uds_ucred template
         feature = "doc_cfg",
         doc(cfg(any(
@@ -85,6 +86,7 @@ pub enum MalformedPayload {
 impl Display for MalformedPayload {
     fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
+            Self::FileDescriptors(e) => Display::fmt(&e, _f),
             #[cfg(uds_ucred)]
             Self::Credentials(e) => Display::fmt(&e, _f),
         }

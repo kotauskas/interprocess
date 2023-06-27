@@ -1,7 +1,7 @@
 //! [`FileDescriptors`] and associated helper types.
 use super::*;
 use std::{
-    mem::{size_of, transmute},
+    mem::{align_of, size_of, transmute},
     os::fd::{BorrowedFd, FromRawFd, OwnedFd, RawFd},
     slice,
 };
@@ -40,24 +40,19 @@ impl ToCmsg for FileDescriptors<'_> {
         add_fn(cmsg);
     }
 }
+/// Only errors with `MalformedPayload` if the length isn't aligned to the size of a file descriptor.
 impl<'a> FromCmsg<'a> for FileDescriptors<'a> {
-    type MalformedPayloadError = Infallible;
+    type MalformedPayloadError = SizeMismatch;
 
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
-        use ParseErrorKind::*;
-        let (lvl, ty) = (cmsg.cmsg_level(), cmsg.cmsg_type());
-        if lvl != LEVEL {
-            return Err(WrongLevel {
-                expected: Some(LEVEL),
-                got: lvl,
-            }
-            .wrap(cmsg));
-        }
-        if ty != Self::TYPE {
-            return Err(WrongType {
-                expected: Some(Self::TYPE),
-                got: ty,
-            }
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+        cmsg = check_level_and_type(cmsg, Self::TYPE)?;
+        let unalign_mask = (1_usize << align_of::<c_int>()) - 1;
+        let len = cmsg.data().len();
+        if len & unalign_mask != 0 {
+            return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
+                expected: len + 1,
+                got: len,
+            })
             .wrap(cmsg));
         }
 
