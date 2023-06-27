@@ -1,9 +1,6 @@
 use super::{
     c_wrappers,
-    cmsg::{
-        context::{Collector, DummyCollector},
-        CmsgMut, CmsgRef,
-    },
+    cmsg::{context::Collector, CmsgMut, CmsgRef},
     util::{make_msghdr_r, make_msghdr_w},
     ToUdSocketPath, UdSocketPath,
 };
@@ -72,23 +69,12 @@ impl UdStream {
     /// # System calls
     /// - `recvmsg`
     #[inline]
-    pub fn recv_ancillary(&self, buf: &mut [u8], abuf: &mut CmsgMut<'_>) -> io::Result<(usize, usize)> {
-        self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
-    }
-    /// Receives both bytes and ancillary data from the socket stream and allowing the given context collector to hook
-    /// into the process. The first element of the return value represents the read amount of the former, while the
-    /// second element represents that of the latter.
-    ///
-    /// # System calls
-    /// - `recvmsg`
-    #[inline]
-    pub fn recv_ancillary_with_context(
+    pub fn recv_ancillary<E: Collector>(
         &self,
         buf: &mut [u8],
-        abuf: &mut CmsgMut<'_>,
-        cc: &mut impl Collector,
+        abuf: &mut CmsgMut<'_, E>,
     ) -> io::Result<(usize, usize)> {
-        self.recv_ancillary_vectored_with_context(&mut [IoSliceMut::new(buf)], abuf, cc)
+        self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
     /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data.
     /// The first element of the return value represents the read amount of the former, while the second element
@@ -99,36 +85,20 @@ impl UdStream {
     ///
     /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[inline]
-    pub fn recv_ancillary_vectored(
+    pub fn recv_ancillary_vectored<E: Collector>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut CmsgMut<'_>,
-    ) -> io::Result<(usize, usize)> {
-        self.recv_ancillary_vectored_with_context(bufs, abuf, &mut DummyCollector)
-    }
-    /// Receives bytes and ancillary data from the socket stream, making use of [scatter input] for the main data and
-    /// allowing the given context collector to hook into the process. The first element of the return value
-    /// represents the read amount of the former, while the second element represents that of the latter.
-    ///
-    /// # System calls
-    /// - `recvmsg`
-    ///
-    /// [scatter input]: https://en.wikipedia.org/wiki/Vectored_I/O " "
-    pub fn recv_ancillary_vectored_with_context(
-        &self,
-        bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut CmsgMut<'_>,
-        cc: &mut impl Collector,
+        abuf: &mut CmsgMut<'_, E>,
     ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
         let fd = self.as_fd();
 
-        cc.pre_op_collect(fd);
+        abuf.context_collector.pre_op_collect(fd);
         let bytes_read = unsafe {
             // SAFETY: make_msghdr_r is good at its job
             c_wrappers::recvmsg(fd, &mut hdr, 0)?
         };
-        cc.post_op_collect(fd, hdr.msg_flags);
+        abuf.context_collector.post_op_collect(fd, hdr.msg_flags);
 
         Ok((bytes_read, hdr.msg_controllen as _))
     }

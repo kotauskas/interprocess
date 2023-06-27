@@ -1,4 +1,4 @@
-use super::{ancillary::ToCmsg, *};
+use super::{ancillary::ToCmsg, context::DummyCollector, *};
 use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, CmsghdrLen, DUMMY_MSGHDR};
 use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
 use std::{
@@ -8,23 +8,59 @@ use std::{
     ptr, slice,
 };
 
+type MUu8 = MaybeUninit<u8>;
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
 #[derive(Debug)]
-pub struct CmsgMut<'a> {
-    // TODO idea for how to fix the sockcred/cmsgcred debacle (aliasing of SCM_CREDS for two types of struct): add an
-    // "interpretation context" field that stores necessary state (such as the value of `LOCAL_CREDS`) to disambiguate
-    // without straying too far from what the manpage says is permissible
-    buf: &'a mut [MaybeUninit<u8>],
+pub struct CmsgMut<'b, C = DummyCollector> {
+    buf: &'b mut [MaybeUninit<u8>],
     init_len: usize,
     cmsghdr_offset: Option<NonZeroUsize>,
+    /// The context collector stored alongside the buffer reference. Usually this should be a mutable reference.
+    ///
+    /// Any I/O operation on a Ud-socket that takes a `CmsgMut` will allow this field to hook into the process and
+    /// collect context.
+    pub context_collector: C,
 }
-impl<'a> CmsgMut<'a> {
+impl<'b> CmsgMut<'b> {
     /// Creates a control message buffer from the given uninitialized slice.
     ///
     /// # Panics
     /// The buffer's length must not overflow `isize`.
-    pub fn new(buf: &'a mut [MaybeUninit<u8>]) -> Self {
-        Self::try_from(buf).expect("buffer size overflowed `isize`")
+    pub fn new(buf: &'b mut [MaybeUninit<u8>]) -> Self {
+        Self {
+            buf: Self::validate_buf(buf).expect("buffer size overflowed `isize`"),
+            init_len: 0,
+            cmsghdr_offset: None,
+            context_collector: DummyCollector,
+        }
+    }
+}
+impl<'b> From<&'b mut [MaybeUninit<u8>]> for CmsgMut<'b> {
+    #[inline]
+    fn from(buf: &'b mut [MaybeUninit<u8>]) -> Self {
+        Self::new(buf)
+    }
+}
+impl<'b, C> CmsgMut<'b, C> {
+    /// Creates a control message buffer from the given uninitialized slice and with the given context collector.
+    ///
+    /// # Panics
+    /// The buffer's length must not overflow `isize`.
+    pub fn new_with_collector(buf: &'b mut [MaybeUninit<u8>], context_collector: C) -> Self {
+        Self {
+            buf: Self::validate_buf(buf).expect("buffer size overflowed `isize`"),
+            init_len: 0,
+            cmsghdr_offset: None,
+            context_collector,
+        }
+    }
+    fn validate_buf(buf: &'b mut [MUu8]) -> Result<&'b mut [MUu8], BufferTooBig<&'b mut [MUu8], MUu8>> {
+        #[allow(clippy::useless_conversion)]
+        if CmsghdrLen::try_from(buf.len()).is_ok() {
+            Ok(buf)
+        } else {
+            Err(BufferTooBig(buf))
+        }
     }
 
     /// Immutably borrows the initialized part of the control message buffer.
@@ -397,20 +433,5 @@ impl<'a> CmsgMut<'a> {
 
         self.init_len += init_cur_incr;
         init_cur_incr
-    }
-}
-impl<'a> TryFrom<&'a mut [MaybeUninit<u8>]> for CmsgMut<'a> {
-    type Error = BufferTooBig<&'a mut [MaybeUninit<u8>], MaybeUninit<u8>>;
-    #[inline]
-    fn try_from(buf: &'a mut [MaybeUninit<u8>]) -> Result<Self, Self::Error> {
-        #[allow(clippy::useless_conversion)]
-        if CmsghdrLen::try_from(buf.len()).is_err() {
-            return Err(BufferTooBig(buf));
-        }
-        Ok(Self {
-            buf,
-            init_len: 0,
-            cmsghdr_offset: None,
-        })
     }
 }

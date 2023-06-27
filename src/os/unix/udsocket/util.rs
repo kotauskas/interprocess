@@ -101,7 +101,7 @@ pub fn empty_cstr() -> &'static CStr {
     }
 }
 
-pub fn make_msghdr_r(bufs: &mut [IoSliceMut<'_>], abuf: &mut CmsgMut<'_>) -> io::Result<msghdr> {
+pub fn make_msghdr_r<E>(bufs: &mut [IoSliceMut<'_>], abuf: &mut CmsgMut<'_, E>) -> io::Result<msghdr> {
     let mut hdr = DUMMY_MSGHDR;
     _fill_out_msghdr(
         &mut hdr,

@@ -10,6 +10,7 @@ use std::{cmp::min, io, slice};
 ///
 /// The [`decode()`](Self::decode) iterator allows for easy decoding, while [`cmsgs()`](Self::cmsgs) provides low-level access to the raw ancillary message data.
 // TODO decoding example
+// TODO context
 #[derive(Copy, Clone, Debug)]
 pub struct CmsgRef<'a>(&'a [u8]);
 impl<'a> CmsgRef<'a> {
