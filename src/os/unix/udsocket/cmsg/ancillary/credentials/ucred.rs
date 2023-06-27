@@ -1,32 +1,54 @@
 use super::*;
-use crate::os::unix::udsocket::cmsg::{ancillary::*, Cmsg};
+use crate::os::unix::{
+    c_wrappers,
+    udsocket::cmsg::{ancillary::*, Cmsg},
+};
 use libc::{gid_t, pid_t, ucred, uid_t};
 use std::{marker::PhantomData, mem::size_of, slice};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(super) struct Credentials<'a>(pub &'a ucred_packed);
+pub(super) enum Credentials<'a> {
+    Borrowed(&'a ucred_packed),
+    Owned(ucred),
+}
 impl<'a> Credentials<'a> {
     pub const TYPE: c_int = libc::SCM_CREDENTIALS;
-    pub fn new(creds: &'a ucred) -> Self {
-        Self(creds.as_ref())
+    pub fn new_auto(ruid: bool, rgid: bool) -> Self {
+        Self::Owned(ucred {
+            pid: c_wrappers::get_pid(),
+            uid: c_wrappers::get_uid(ruid),
+            gid: c_wrappers::get_gid(rgid),
+        })
+    }
+    pub fn new_borrowed(creds: &'a ucred) -> Self {
+        Self::Borrowed(creds.as_ref())
     }
     pub fn euid(self) -> Option<uid_t> {
-        Some(self.0.uid)
+        Some(self.as_ref().uid)
     }
     pub fn ruid(self) -> Option<uid_t> {
         None
     }
     pub fn egid(self) -> Option<gid_t> {
-        Some(self.0.gid)
+        Some(self.as_ref().gid)
     }
     pub fn rgid(self) -> Option<gid_t> {
         None
     }
     pub fn pid(self) -> Option<pid_t> {
-        Some(self.0.pid)
+        Some(self.as_ref().pid)
     }
     pub fn groups(&self) -> Groups<'a> {
         Groups(PhantomData)
+    }
+}
+impl AsRef<ucred_packed> for Credentials<'_> {
+    #[inline]
+    fn as_ref(&self) -> &ucred_packed {
+        match self {
+            Self::Borrowed(b) => b,
+            Self::Owned(o) => o.as_ref(),
+        }
     }
 }
 
@@ -34,7 +56,7 @@ impl<'a> ToCmsg for Credentials<'a> {
     fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>)) {
         let st_bytes = unsafe {
             // SAFETY: well-initialized POD struct with #[repr(C)]
-            slice::from_raw_parts(<*const _>::cast(self.0), size_of::<ucred>())
+            slice::from_raw_parts(<*const _>::cast(self.as_ref()), size_of::<ucred>())
         };
         let cmsg = unsafe {
             // SAFETY: we've got checks to ensure that we're not using the wrong struct
@@ -76,7 +98,7 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
             &*cmsg.data().as_ptr().cast::<ucred>()
         }
         .as_ref();
-        Ok(Self(creds))
+        Ok(Self::Borrowed(creds))
     }
 }
 

@@ -1,7 +1,6 @@
 //! [`Credentials`] and associated helper types.
 
 // FIXME uds_sockcred is disabled in build.rs for reasons outlined there.
-// TODO Cowify
 
 #[cfg(uds_cmsgcred)]
 mod freebsdlike;
@@ -30,7 +29,9 @@ use std::{
 pub struct Credentials<'a>(CredentialsImpl<'a>);
 impl<'a> Credentials<'a> {
     pub(super) const TYPE: c_int = CredentialsImpl::TYPE;
-    /// Creates a `Credentials` ancillary data struct to be sent as a control message. This allows for impersonation of other processes, users and groups given sufficient privileges, and is not necessary for the other end to recieve this type of ancillary data. Only available on `ucred` platforms.
+    /// Creates a `Credentials` ancillary data struct to be sent as a control message from a borrow. This allows for
+    /// impersonation of other processes, users and groups given sufficient privileges, and is not strictly necessary
+    /// for the other end to recieve this type of ancillary data.
     // TODO mention kernel checks
     #[cfg_attr( // uds_ucred template
         feature = "doc_cfg",
@@ -42,8 +43,40 @@ impl<'a> Credentials<'a> {
     )]
     #[cfg(uds_ucred)]
     #[inline]
-    pub fn new_sendable(creds: &'a libc::ucred) -> Self {
-        Self(CredentialsImpl::new(creds))
+    pub fn from_ucred_ref(creds: &'a libc::ucred) -> Self {
+        Self(CredentialsImpl::new_borrowed(creds))
+    }
+    /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
+    /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
+    /// necessary for the other end to recieve this type of ancillary data.
+    #[cfg_attr( // uds_ucred template
+        feature = "doc_cfg",
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
+    )]
+    #[cfg(uds_ucred)]
+    #[inline]
+    pub fn from_ucred(creds: libc::ucred) -> Self {
+        Self(CredentialsImpl::Owned(creds))
+    }
+    /// Creates a `Credentials` ancillary data struct to be sent as a control message by automatically filling in the
+    /// underlying `ucred` structure with the PID, effective UID and effective GID of the calling process. The two
+    /// boolean paramaters allow the real UID and real GID to be used instead.
+    #[cfg_attr( // uds_ucred template
+        feature = "doc_cfg",
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "emscripten",
+            target_os = "redox"
+        )))
+    )]
+    #[cfg(uds_ucred)]
+    #[inline]
+    pub fn new_ucred(ruid: bool, rgid: bool) -> Self {
+        Self(CredentialsImpl::new_auto(ruid, rgid))
     }
     /// Returns the **effective** user ID stored in the credentials table, or `None` if no such information is
     /// available.
@@ -66,6 +99,17 @@ impl<'a> Credentials<'a> {
     pub fn ruid(&self) -> Option<uid_t> {
         self.0.ruid()
     }
+    /// Returns the **closest thing to the real user ID** among what's stored in the credentials table. If a real UID is
+    /// not present, the effective UID is returned instead.
+    ///
+    /// This method is intended to be used by daemons which need to verify user input for security purposes and would
+    /// like to see past elevation via `setuid` programs if possible.
+    pub fn best_effort_ruid(&self) -> uid_t {
+        match (self.euid(), self.ruid()) {
+            (Some(id), ..) | (None, Some(id)) => id,
+            (None, None) => unreachable!(),
+        }
+    }
     /// Returns the **effective** group ID stored in the credentials table, or `None` if no such information is
     /// available.
     ///
@@ -86,6 +130,17 @@ impl<'a> Credentials<'a> {
     #[inline]
     pub fn rgid(&self) -> Option<gid_t> {
         self.0.rgid()
+    }
+    /// Returns the **closest thing to the real group ID** among what's stored in the credentials table. If a real GID
+    /// is not present, the effective GID is returned instead.
+    ///
+    /// This method is intended to be used by daemons which need to verify user input for security purposes and would
+    /// like to see past elevation via `setuid` programs if possible.
+    pub fn best_effort_rgid(&self) -> gid_t {
+        match (self.egid(), self.rgid()) {
+            (Some(id), ..) | (None, Some(id)) => id,
+            (None, None) => unreachable!(),
+        }
     }
     /// Returns the process ID stored in the credentials table, or `None` if no such information is available.
     ///
@@ -110,11 +165,6 @@ impl<'a> Credentials<'a> {
     #[inline]
     pub fn groups(&self) -> Groups<'a> {
         Groups(self.0.groups())
-        // Groups {
-        //     cur: (&self.0.sc_groups as *const [gid_t; 1]).cast::<u8>(),
-        //     i: 0,
-        //     cred: self,
-        // }
     }
 }
 
