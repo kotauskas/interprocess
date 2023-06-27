@@ -23,6 +23,7 @@ pub mod file_descriptors;
 mod dispatcher;
 pub use dispatcher::*;
 
+use self::credentials::SizeMismatch;
 use super::*;
 use std::{
     convert::Infallible,
@@ -38,6 +39,7 @@ pub trait ToCmsg {
     ///
     /// It's a logic error for this function to not call `add_fn`, and an unconditional assertion will panic in the circumstance when it doesn't.
     fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>));
+    // FIXME is the closure necessary?
 }
 
 /// An ancillary data wrapper than can be parsed from a control message.
@@ -141,3 +143,38 @@ impl<E: Display> Display for ParseErrorKind<E> {
     }
 }
 impl<E: Debug + Display> Error for ParseErrorKind<E> {}
+
+fn check_level<E>(cmsg: Cmsg<'_>) -> ParseResult<'_, Cmsg<'_>, E> {
+    let got = cmsg.cmsg_level();
+    if got != LEVEL {
+        return Err(ParseErrorKind::WrongLevel {
+            expected: Some(LEVEL),
+            got,
+        }
+        .wrap(cmsg));
+    }
+    Ok(cmsg)
+}
+fn check_type<E>(cmsg: Cmsg<'_>, expected: c_int) -> ParseResult<'_, Cmsg<'_>, E> {
+    let got = cmsg.cmsg_type();
+    if got != expected {
+        return Err(ParseErrorKind::WrongType {
+            expected: Some(expected),
+            got,
+        }
+        .wrap(cmsg));
+    }
+    Ok(cmsg)
+}
+fn check_level_and_type<E>(mut cmsg: Cmsg<'_>, expected: c_int) -> ParseResult<'_, Cmsg<'_>, E> {
+    cmsg = check_level(cmsg)?;
+    check_type(cmsg, expected)
+}
+
+fn check_size<E: From<SizeMismatch>>(cmsg: Cmsg<'_>, expected: usize) -> ParseResult<'_, Cmsg<'_>, E> {
+    let got = cmsg.data().len();
+    if got != expected {
+        return Err(ParseErrorKind::MalformedPayload(E::from(SizeMismatch { expected, got })).wrap(cmsg));
+    }
+    Ok(cmsg)
+}

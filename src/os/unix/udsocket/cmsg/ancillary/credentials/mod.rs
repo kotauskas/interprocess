@@ -196,8 +196,11 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
 /// A [`MalformedPayload`](ParseErrorKind::MalformedPayload) error indicating that the ancillary message size dosen't match that of the platform-specific credentials structure.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SizeMismatch {
-    expected: usize,
-    got: usize,
+    /// Expected size of the ancillary message. This value may or may not be derived from some of the message's
+    /// contents.
+    pub expected: usize,
+    /// Actual size of the ancillary message.
+    pub got: usize,
 }
 impl Display for SizeMismatch {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

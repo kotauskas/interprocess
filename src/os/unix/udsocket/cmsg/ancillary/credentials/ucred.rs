@@ -69,29 +69,9 @@ impl<'a> ToCmsg for Credentials<'a> {
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
 
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
-        use ParseErrorKind::*;
-        let (lvl, ty) = (cmsg.cmsg_level(), cmsg.cmsg_type());
-        if lvl != LEVEL {
-            return Err(WrongLevel {
-                expected: Some(LEVEL),
-                got: lvl,
-            }
-            .wrap(cmsg));
-        }
-        if ty != Self::TYPE {
-            return Err(WrongType {
-                expected: Some(Self::TYPE),
-                got: ty,
-            }
-            .wrap(cmsg));
-        }
-
-        let sz = cmsg.data().len();
-        let expected = size_of::<ucred>();
-        if sz != expected {
-            return Err(MalformedPayload(SizeMismatch { expected, got: sz }).wrap(cmsg));
-        }
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
+        cmsg = check_level_and_type(cmsg, Self::TYPE)?;
+        cmsg = check_size(cmsg, size_of::<ucred>())?;
 
         let creds = unsafe {
             // SAFETY: POD

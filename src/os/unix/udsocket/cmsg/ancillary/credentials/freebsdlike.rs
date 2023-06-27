@@ -76,6 +76,35 @@ impl<'a> Credentials<'a> {
     }
 }
 
+impl<'a> ToCmsg for Credentials<'a> {
+    fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>)) {
+        let st_bytes = unsafe {
+            // SAFETY: well-initialized POD struct with #[repr(C)]
+            slice::from_raw_parts(match self {
+                Credentials::Cmsgcred(c) => (<*const _>::cast(c), size_of::<cmsgcred>()),
+                #[cfg(uds_sockcred)]
+                Credentials::Sockcred(c) => (<*const _>::cast(c), libc::SOCKCREDSIZE(c.cmcred_ngroups)),
+            })
+        };
+        let cmsg = unsafe {
+            // SAFETY: we've got checks to ensure that we're not using the wrong struct
+            Cmsg::new(LEVEL, Self::TYPE, st_bytes)
+        };
+        add_fn(cmsg);
+    }
+}
+
+impl<'a> FromCmsg<'a> for Credentials<'a> {
+    type MalformedPayloadError = SizeMismatch;
+
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
+        cmsg = check_level_and_type(cmsg, Self::TYPE)?;
+        todo!()
+    }
+}
+
+// TODO don't forget FromCmsg size checks
+
 #[allow(non_camel_case_types)]
 type gid_packed = [u8; size_of::<gid_t>()];
 
