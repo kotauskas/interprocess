@@ -19,14 +19,14 @@ fn is_unix() -> bool {
 /// - `uds_sun_len` on platforms that have the stupid as fuck `sun_len` field (to correct max length calculation)
 /// - Ancillary data support:
 ///     - `uds_scm_rights` ("passfd")
-///     - `uds_scm_credentials` ("passcred")
 /// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
 ///     - `uds_cmsgcred`
-///     - `uds_sockcred`
+///     - `uds_sockcred` TODO: distinguish FreeBSD and NetBSD flavors of this; the NetBSD thing is more like cmsgcred
 /// - Socket options for retrieving peer credentials:
 ///     - `uds_peerucred`
-///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to Linux)
+///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to
+///       Linux)
 ///     - `uds_unpcbid`, as seen on NetBSD
 ///     - `uds_xucred`, as seen on all BSDs except for NetBSD
 /// - `msghdr`'s `msg_iovlen` type:
@@ -46,7 +46,7 @@ fn collect_uds_features(target: &TargetTriplet) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
         uds = true;
         if !target.os("emscripten") {
-            ldefine(&["uds_ucred", "uds_scm_credentials", "uds_peerucred"]);
+            ldefine(&["uds_ucred", "uds_peerucred"]);
         }
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
