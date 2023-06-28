@@ -15,10 +15,7 @@ fn is_unix() -> bool {
 }
 
 /// This can define the following:
-/// - `uds_supported`
 /// - `uds_sun_len` on platforms that have the stupid as fuck `sun_len` field (to correct max length calculation)
-/// - Ancillary data support:
-///     - `uds_scm_rights` ("passfd")
 /// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
 ///     - `uds_cmsgcred`
@@ -31,20 +28,19 @@ fn is_unix() -> bool {
 ///     - `uds_xucred`, as seen on all BSDs except for NetBSD
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
-///     - `uds_msghdr_iovlen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
+///     - `uds_msghdr_iovlen_size_t`
 /// - `msghdr`'s `msg_controllen` type:
 ///     - `uds_msghdr_controllen_socklen_t`
-///     - `uds_msghdr_controllen_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
+///     - `uds_msghdr_controllen_size_t`
 /// - `cmsghdr`'s `cmsg_len` type:
 ///     - `uds_cmsghdr_len_socklen_t`
-///     - `uds_cmsghdr_len_size_t`, on Linux with GNU, AIX, Android, uClibc MIPS64, and uClibc x86-64
+///     - `uds_cmsghdr_len_size_t`
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
-    let (mut uds, mut scm_rights, mut size_t_madness) = (false, true, false);
+    let mut size_t_madness = false;
     if (target.os("linux") && target.env_any(&["gnu", "musl", "musleabi", "musleabihf"]))
     || target.os_any(&["android", "emscripten", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
-        uds = true;
         if !target.os("emscripten") {
             ldefine(&["uds_ucred", "uds_peerucred"]);
         }
@@ -58,15 +54,11 @@ fn collect_uds_features(target: &TargetTriplet) {
             define("uds_linux_namespace");
         }
     } else if target.os_any(&["aix", "nto"]) || (target.env("newlib") && target.arch("xtensa")) {
-        uds = true;
         if target.os("nto") {
             define("uds_peerucred");
-        } else if target.env("newlib") && target.arch("xtensa") {
-            scm_rights = false;
         }
     } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
         // The BSD OS family
-        uds = true;
         ldefine(&[
             "uds_peereid",
             "uds_sun_len",
@@ -84,27 +76,19 @@ fn collect_uds_features(target: &TargetTriplet) {
             define("uds_xucred");
         }
     } else if target.os_any(&["solaris", "illumos"]) {
-        uds = true;
         define("uds_getpeerucred");
     } else if target.os("haiku") {
-        uds = true;
         ldefine(&["uds_ucred", "uds_peerucred"]);
     }
 
-    if uds {
-        define("uds_supported");
-
-        if scm_rights { define("uds_scm_rights") };
-
-        if size_t_madness {
-            ldefine(&[
-                "uds_msghdr_iovlen_size_t", "uds_msghdr_controllen_size_t", "uds_cmsghdr_len_size_t"
-            ]);
-        } else {
-            ldefine(&[
-                "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
-            ])
-        }
+    if size_t_madness {
+        ldefine(&[
+            "uds_msghdr_iovlen_size_t", "uds_msghdr_controllen_size_t", "uds_cmsghdr_len_size_t"
+        ]);
+    } else {
+        ldefine(&[
+            "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
+        ])
     }
 }
 
