@@ -121,6 +121,7 @@ pub(super) unsafe fn set_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, opti
     ok_or_ret_errno!(success => ())
 }
 
+#[cfg(any(uds_ucred, uds_sockcred))]
 pub(super) fn get_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, option: c_int, buf: &mut T) -> io::Result<usize> {
     let ptr = <*mut _>::cast::<c_void>(buf);
     let mut len = socklen_t::try_from(size_of_val(buf)).unwrap();
