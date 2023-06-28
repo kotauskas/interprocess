@@ -44,6 +44,33 @@ pub trait UdSocket: AsFd {
     fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_fd())
     }
+    /// Enables or disables continous reception of credentials via ancillary data.
+    ///
+    /// After this option is set to `true`, every ancillary-enabled receive call will return a table of credentials of
+    /// the process on the other side, directly associated with the data being received.
+    ///
+    /// Note that this has absolutely no effect on explicit sending of credentials – that can be done regardless of
+    /// whether this option is enabled.
+    #[cfg_attr(
+        feature = "doc_cfg",
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "redox",
+            target_os = "freebsd",
+        )))
+    )]
+    #[cfg(any(uds_ucred, uds_sockcred))]
+    #[inline]
+    fn set_continuous_ancillary_credentials(&self, val: bool) -> io::Result<()> {
+        c_wrappers::set_continuous_ancillary_cred(self.as_fd(), val)
+    }
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "freebsd")))]
+    #[cfg(uds_sockcred)]
+    #[inline]
+    fn set_oneshot_ancillary_credentials(&self, val: bool) -> io::Result<()> {
+        c_wrappers::set_
+    }
 }
 
 impl UdSocket for UdStream {}

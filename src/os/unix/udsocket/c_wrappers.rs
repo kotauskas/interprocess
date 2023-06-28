@@ -142,7 +142,7 @@ fn set_local_creds_persistent(fd: BorrowedFd<'_>, creds: bool) -> io::Result<()>
     unsafe { set_socket_option(fd, libc::SOL_SOCKET, libc::LOCAL_CREDS_PERSISTENT, &creds.to::<c_int>()) }
 }
 #[cfg(any(uds_ucred, uds_sockcred))]
-pub(super) fn set_persistent_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
+pub(super) fn set_continuous_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
     #[cfg(uds_ucred)]
     {
         unsafe { set_socket_option(fd, libc::SOL_SOCKET, libc::SO_PASSCRED, &val.to::<c_int>()) }
