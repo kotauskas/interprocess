@@ -1,13 +1,10 @@
 use crate::os::unix::{unixprelude::*, FdOps};
-use libc::{
-    msghdr, sockaddr, sockaddr_un, socklen_t, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR,
-};
+use libc::{msghdr, sockaddr, sockaddr_un, socklen_t, AF_UNIX, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
 use std::{
     ffi::c_void,
     io,
     mem::{size_of, size_of_val},
     net::Shutdown,
-    ptr,
 };
 use to_method::To;
 
@@ -28,10 +25,9 @@ pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
         ty
     };
     let fd = create_uds_raw(ty)?;
-    #[cfg(not(target_os = "linux"))]
-    {
+    if !cfg!(target_os = "linux") {
         set_nonblocking(fd.0.as_fd(), nonblocking)?;
-        set_cloexec(fd.0.as_fd(), true)?;
+        set_cloexec(fd.0.as_fd())?;
     }
     Ok(fd)
 }
@@ -169,20 +165,13 @@ pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
     Ok(cred)
 }
 fn get_status_flags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
-    let (flags, success) = unsafe {
-        // SAFETY: nothing too unsafe about this function. One thing to note is that we're passing
-        // it a null pointer, which is, for some reason, required yet ignored for F_GETFL.
-        let result = libc::fcntl(fd.as_raw_fd(), F_GETFL, ptr::null::<c_void>());
-        (result, result != -1)
-    };
-    ok_or_ret_errno!(success => flags)
+    unsafe { fcntl_noarg(fd, libc::F_GETFL) }
 }
 fn set_status_flags(fd: BorrowedFd<'_>, new_flags: c_int) -> io::Result<()> {
-    let success = unsafe {
-        // SAFETY: new_flags is a c_int, as documented in the manpage.
-        libc::fcntl(fd.as_raw_fd(), F_SETFL, new_flags)
-    } != -1;
-    ok_or_ret_errno!(success => ())
+    unsafe {
+        fcntl_int(fd, libc::F_SETFL, new_flags)?;
+    }
+    Ok(())
 }
 pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
     let old_flags = get_status_flags(fd)?;
