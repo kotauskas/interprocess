@@ -1,17 +1,18 @@
-use crate::os::unix::udsocket::{ToUdSocketPath, UdSocket as SyncUdSocket, UdSocketPath};
+use crate::os::unix::udsocket::{ToUdSocketPath, UdDatagram as SyncUdDatagram, UdSocketPath};
 #[cfg(uds_peerucred)]
 use crate::os::unix::{udsocket::c_wrappers, unixprelude::*};
 use std::{
     future::Future,
     io,
     net::Shutdown,
-    os::unix::net::UnixDatagram as StdUdSocket,
+    os::unix::net::UnixDatagram as StdUdDatagram,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
+use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdDatagram};
 
-/// A Unix domain datagram socket, obtained either from [`UdSocketListener`](super::UdSocketListener) or by connecting to an existing server.
+/// A Unix domain datagram socket, obtained either from [`UdSocketListener`](super::UdSocketListener) or by connecting
+/// to an existing server.
 ///
 /// # Examples
 ///
@@ -24,7 +25,7 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 /// use tokio::{io::ReadBuf, try_join};
 ///
 /// // Socket creation happens immediately, no futures here.
-/// let socket = UdSocket::bind("/tmp/example_side_a.sock")?;
+/// let socket = UdDatagram::bind("/tmp/example_side_a.sock")?;
 ///
 /// // This is the part where you tell the other side
 /// // that you've spun up a socket, if you need to.
@@ -61,11 +62,11 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdSocket};
 /// ```
 // TODO update..?
 #[derive(Debug)]
-pub struct UdSocket(TokioUdSocket);
-impl UdSocket {
+pub struct UdDatagram(TokioUdDatagram);
+impl UdDatagram {
     /// Creates an unnamed datagram socket.
     pub fn unbound() -> io::Result<Self> {
-        let socket = TokioUdSocket::unbound()?;
+        let socket = TokioUdDatagram::unbound()?;
         Ok(Self(socket))
     }
     /// Creates a named datagram socket assigned to the specified path. This will be the "home" of this socket. Then, packets from somewhere else directed to this socket with [`.send_to()`] or [`.connect()`](Self::connect) will go here.
@@ -75,7 +76,7 @@ impl UdSocket {
         Self::_bind(path.to_socket_path()?)
     }
     fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
-        let socket = TokioUdSocket::bind(path.as_osstr())?;
+        let socket = TokioUdDatagram::bind(path.as_osstr())?;
         Ok(Self(socket))
     }
     /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead, but supplying the address to the kernel once is more efficient.
@@ -99,7 +100,7 @@ impl UdSocket {
     pub async fn recv(&self, buf: &mut TokioReadBuf<'_>) -> io::Result<()> {
         // Tokio's .recv() uses &mut [u8] instead of &mut TokioReadBuf<'_> for some
         // reason, this works around that
-        struct WrapperFuture<'a, 'b, 'c>(&'a UdSocket, &'b mut TokioReadBuf<'c>);
+        struct WrapperFuture<'a, 'b, 'c>(&'a UdDatagram, &'b mut TokioReadBuf<'c>);
         impl Future for WrapperFuture<'_, '_, '_> {
             type Output = io::Result<()>;
             fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -189,8 +190,8 @@ impl UdSocket {
 }
 
 tokio_wrapper_trait_impls!(
-    for UdSocket,
-    sync SyncUdSocket,
-    std StdUdSocket,
-    tokio TokioUdSocket);
-derive_asraw!(unix: UdSocket);
+    for UdDatagram,
+    sync SyncUdDatagram,
+    std StdUdDatagram,
+    tokio TokioUdDatagram);
+derive_asraw!(unix: UdDatagram);

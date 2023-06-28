@@ -1,6 +1,6 @@
 use super::util::*;
 use color_eyre::eyre::Context;
-use interprocess::os::unix::udsocket::UdSocket;
+use interprocess::os::unix::udsocket::UdDatagram;
 use std::{io, sync::mpsc::Sender};
 
 pub(super) fn run_with_namegen(mut namegen: NameGen) {
@@ -17,10 +17,10 @@ fn make_message(side_name: char, second: bool) -> Vec<u8> {
     format!("{fs} message from side {side_name}").into_bytes()
 }
 
-fn make_socket(namegen: &mut NameGen) -> io::Result<(String, UdSocket)> {
+fn make_socket(namegen: &mut NameGen) -> io::Result<(String, UdDatagram)> {
     namegen
         .find_map(|nm| {
-            let s = match UdSocket::bind(&*nm) {
+            let s = match UdDatagram::bind(&*nm) {
                 Ok(s) => s,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
                 Err(e) => return Some(Err(e)),
@@ -30,7 +30,7 @@ fn make_socket(namegen: &mut NameGen) -> io::Result<(String, UdSocket)> {
         .unwrap()
 }
 
-fn side(sock: UdSocket, notifier: Option<Sender<()>>, other_name: String) -> TestResult {
+fn side(sock: UdDatagram, notifier: Option<Sender<()>>, other_name: String) -> TestResult {
     let (mut buf1, mut buf2) = ([0; 64], [0; 64]);
 
     let (side_name, other_side_name) = if let Some(n) = notifier {

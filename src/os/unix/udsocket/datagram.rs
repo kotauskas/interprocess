@@ -25,12 +25,13 @@ use to_method::To;
 /// A datagram socket in the Unix domain.
 ///
 /// All such sockets have the `SOCK_DGRAM` socket type; in other words, this is the Unix domain version of a UDP socket.
-pub struct UdSocket {
+// TODO derive Debug
+pub struct UdDatagram {
     // TODO make this not 'static
     _drop_guard: PathDropGuard<'static>,
     fd: FdOps,
 }
-impl UdSocket {
+impl UdDatagram {
     /// Creates a new socket that can be referred to by the specified path.
     ///
     /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using
@@ -85,9 +86,9 @@ impl UdSocket {
     ///
     /// # Example
     /// ```no_run
-    /// use interprocess::os::unix::udsocket::UdSocket;
+    /// use interprocess::os::unix::udsocket::UdDatagram;
     ///
-    /// let conn = UdSocket::bind("/tmp/side_a.sock")?;
+    /// let conn = UdDatagram::bind("/tmp/side_a.sock")?;
     /// conn.set_destination("/tmp/side_b.sock")?;
     /// // Communicate with datagrams here!
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -357,9 +358,9 @@ impl UdSocket {
     }
 }
 
-impl Debug for UdSocket {
+impl Debug for UdDatagram {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UdSocket")
+        f.debug_struct("UdDatagram")
             .field("fd", &self.as_raw_fd())
             .field("has_drop_guard", &self._drop_guard.enabled)
             .finish()
@@ -368,20 +369,20 @@ impl Debug for UdSocket {
 
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "linux")))]
-impl ReliableRecvMsg for UdSocket {
+impl ReliableRecvMsg for UdDatagram {
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
         let mut size = self.peek_msg_size()?;
         let fit = size > buf.len();
         if fit {
-            size = UdSocket::recv(self, buf)?;
+            size = UdDatagram::recv(self, buf)?;
         }
         Ok(TryRecvResult { size, fit })
     }
 }
 #[cfg(target_os = "linux")]
-impl Sealed for UdSocket {}
+impl Sealed for UdDatagram {}
 
-impl TryClone for UdSocket {
+impl TryClone for UdDatagram {
     fn try_clone(&self) -> io::Result<Self> {
         Ok(Self {
             _drop_guard: self._drop_guard.clone(),
@@ -390,24 +391,24 @@ impl TryClone for UdSocket {
     }
 }
 
-impl AsFd for UdSocket {
+impl AsFd for UdDatagram {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.0.as_fd()
     }
 }
-impl From<UdSocket> for OwnedFd {
+impl From<UdDatagram> for OwnedFd {
     #[inline]
-    fn from(x: UdSocket) -> Self {
+    fn from(x: UdDatagram) -> Self {
         x.fd.0
     }
 }
-impl From<OwnedFd> for UdSocket {
+impl From<OwnedFd> for UdDatagram {
     fn from(fd: OwnedFd) -> Self {
-        UdSocket {
+        UdDatagram {
             _drop_guard: PathDropGuard::dummy(),
             fd: FdOps(fd),
         }
     }
 }
-derive_raw!(unix: UdSocket);
+derive_raw!(unix: UdDatagram);
