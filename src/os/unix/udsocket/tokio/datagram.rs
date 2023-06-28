@@ -1,10 +1,7 @@
 use crate::os::unix::udsocket::{ToUdSocketPath, UdDatagram as SyncUdDatagram, UdSocketPath};
-#[cfg(uds_ucred)]
-use crate::os::unix::{udsocket::c_wrappers, unixprelude::*};
 use std::{
     future::Future,
     io,
-    net::Shutdown,
     os::unix::net::UnixDatagram as StdUdDatagram,
     pin::Pin,
     task::{Context, Poll},
@@ -69,13 +66,15 @@ impl UdDatagram {
         let socket = TokioUdDatagram::unbound()?;
         Ok(Self(socket))
     }
-    /// Creates a named datagram socket assigned to the specified path. This will be the "home" of this socket. Then, packets from somewhere else directed to this socket with [`.send_to()`] or [`.connect()`](Self::connect) will go here.
+    /// Creates a named datagram socket assigned to the specified path. This will be the "home" of this socket. Then,
+    /// packets from somewhere else directed to this socket with [`.send_to()`](Self::send_to) or
+    /// [`.connect()`](Self::connect) will go here.
     ///
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
-    pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?)
+    pub fn bound<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_bound(path.to_socket_path()?)
     }
-    fn _bind(path: UdSocketPath<'_>) -> io::Result<Self> {
+    fn _bound(path: UdSocketPath<'_>) -> io::Result<Self> {
         let socket = TokioUdDatagram::bind(path.as_osstr())?;
         Ok(Self(socket))
     }
@@ -87,12 +86,6 @@ impl UdDatagram {
     }
     fn _set_destination(&self, path: UdSocketPath<'_>) -> io::Result<()> {
         self.0.connect(path.as_osstr())
-    }
-    /// Shuts down the read, write, or both halves of the socket. See [`Shutdown`].
-    ///
-    /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it may return an error the second time it is called, depending on the platform. You must either avoid using the same value twice or ignore the error entirely.
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        self.0.shutdown(how)
     }
     /// Receives a single datagram from the socket, advancing the `ReadBuf` cursor by the datagram length.
     ///
@@ -164,20 +157,6 @@ impl UdDatagram {
     }
     fn _poll_send_to(&self, cx: &mut Context<'_>, buf: &[u8], path: &UdSocketPath<'_>) -> Poll<io::Result<usize>> {
         self.0.poll_send_to(cx, buf, path.as_osstr())
-    }
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg_attr( // uds_ucred template
-        feature = "doc_cfg",
-        doc(cfg(any(
-            target_os = "linux",
-            target_os = "android",
-            target_os = "redox",
-        )))
-    )]
-    #[cfg(uds_ucred)]
-    #[inline]
-    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.0.as_fd())
     }
 }
 

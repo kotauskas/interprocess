@@ -48,3 +48,7 @@ pub trait UdSocket: AsFd {
 
 impl UdSocket for UdStream {}
 impl UdSocket for UdDatagram {}
+#[cfg(feature = "tokio")]
+impl UdSocket for super::tokio::UdStream {}
+#[cfg(feature = "tokio")]
+impl UdSocket for super::tokio::UdDatagram {}
