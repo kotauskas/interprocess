@@ -68,7 +68,6 @@ impl UdSocket {
             // SAFETY: addr is well-constructed
             c_wrappers::bind(fd.0.as_fd(), &addr)?;
         }
-        c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
         let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
             PathDropGuard {

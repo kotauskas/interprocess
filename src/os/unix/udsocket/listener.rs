@@ -93,7 +93,6 @@ impl UdStreamListener {
         // document the method's behavior on this matter explicitly; otherwise, add
         // an option to change this value.
         c_wrappers::listen(fd.0.as_fd(), 128)?;
-        c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
         let dg = if keep_drop_guard {
             PathDropGuard {

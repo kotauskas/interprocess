@@ -58,7 +58,6 @@ impl UdStream {
             // SAFETY: addr is well-constructed
             c_wrappers::connect(fd.0.as_fd(), &addr)?;
         }
-        c_wrappers::set_passcred(fd.0.as_fd(), true)?;
 
         Ok(Self(fd))
     }

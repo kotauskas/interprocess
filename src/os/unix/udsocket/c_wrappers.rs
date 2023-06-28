@@ -1,6 +1,15 @@
 use crate::os::unix::{unixprelude::*, FdOps};
-use libc::{msghdr, sockaddr, sockaddr_un, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR};
-use std::{ffi::c_void, io, mem::size_of, net::Shutdown, ptr};
+use libc::{
+    msghdr, sockaddr, sockaddr_un, socklen_t, AF_UNIX, F_GETFL, F_SETFL, O_NONBLOCK, SHUT_RD, SHUT_RDWR, SHUT_WR,
+};
+use std::{
+    ffi::c_void,
+    io,
+    mem::{size_of, size_of_val},
+    net::Shutdown,
+    ptr,
+};
+use to_method::To;
 
 #[cfg_attr(target_os = "linux", allow(unused))]
 pub(super) use crate::os::unix::c_wrappers::*;
@@ -109,51 +118,55 @@ pub(super) fn listen(fd: BorrowedFd<'_>, backlog: c_int) -> io::Result<()> {
     ok_or_ret_errno!(success => ())
 }
 
-pub(super) fn set_passcred(fd: BorrowedFd<'_>, passcred: bool) -> io::Result<()> {
-    #[cfg(uds_scm_credentials)]
-    {
-        use libc::{SOL_SOCKET, SO_PASSCRED};
-        use std::mem::size_of_val;
+#[allow(dead_code)]
+pub(super) unsafe fn set_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, option: c_int, val: &T) -> io::Result<()> {
+    let ptr = <*const _>::cast::<c_void>(val);
+    let len = socklen_t::try_from(size_of_val(val)).unwrap();
+    let success = unsafe { libc::setsockopt(fd.as_raw_fd(), level, option, ptr, len) != -1 };
+    ok_or_ret_errno!(success => ())
+}
 
-        let passcred = passcred as c_int;
-        let success = unsafe {
-            libc::setsockopt(
-                fd.as_raw_fd(),
-                SOL_SOCKET,
-                SO_PASSCRED,
-                &passcred as *const _ as *const _,
-                size_of_val(&passcred) as u32,
-            ) != -1
-        };
-        ok_or_ret_errno!(success => ())
-    }
-    #[cfg(not(uds_scm_credentials))]
+pub(super) fn get_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, option: c_int, buf: &mut T) -> io::Result<usize> {
+    let ptr = <*mut _>::cast::<c_void>(buf);
+    let mut len = socklen_t::try_from(size_of_val(buf)).unwrap();
+    let success = unsafe { libc::getsockopt(fd.as_raw_fd(), level, option, ptr, &mut len) != -1 };
+    ok_or_ret_errno!(success => len.try_into().unwrap())
+}
+
+#[cfg(uds_sockcred)]
+fn set_local_creds(fd: BorrowedFd<'_>, creds: bool) -> io::Result<()> {
+    unsafe { set_socket_option(fd, libc::SOL_SOCKET, libc::LOCAL_CREDS, &creds.to::<c_int>()) }
+}
+#[cfg(uds_sockcred)]
+fn set_local_creds_persistent(fd: BorrowedFd<'_>, creds: bool) -> io::Result<()> {
+    unsafe { set_socket_option(fd, libc::SOL_SOCKET, libc::LOCAL_CREDS_PERSISTENT, &creds.to::<c_int>()) }
+}
+#[cfg(any(uds_ucred, uds_sockcred))]
+pub(super) fn set_persistent_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
+    #[cfg(uds_ucred)]
     {
-        let _ = (fd, passcred);
-        Ok(())
+        unsafe { set_socket_option(fd, libc::SOL_SOCKET, libc::SO_PASSCRED, &val.to::<c_int>()) }
     }
+    #[cfg(uds_sockcred)]
+    {
+        // TODO SCM_CREDS2
+        set_local_creds_persistent(fd, val)
+    }
+}
+#[cfg(uds_sockcred)]
+pub(super) fn set_oneshot_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
+    if val {
+        // LOCAL_CREDS and LOCAL_CREDS_PERSISTENT are mutually exclusive
+        let _ = set_local_creds_persistent(fd, false);
+    }
+    set_local_creds(fd, val)
 }
 #[cfg(uds_peerucred)]
 pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
-    use libc::{socklen_t, ucred, SOL_SOCKET, SO_PEERCRED};
-    use std::mem::zeroed;
-
-    let mut cred = unsafe {
-        // SAFETY: it's safe for the ucred structure to be zero-initialized, since
-        // it only contains integers
-        zeroed::<ucred>()
-    };
-    let mut cred_len = size_of::<ucred>() as socklen_t;
-    let success = unsafe {
-        libc::getsockopt(
-            fd.as_raw_fd(),
-            SOL_SOCKET,
-            SO_PEERCRED,
-            &mut cred as *mut _ as *mut _,
-            &mut cred_len as *mut _,
-        )
-    } != -1;
-    ok_or_ret_errno!(success => cred)
+    use libc::ucred;
+    let mut cred = ucred { pid: 0, uid: 0, gid: 0 };
+    get_socket_option(fd, libc::SOL_SOCKET, libc::SO_PEERCRED, &mut cred)?;
+    Ok(cred)
 }
 fn get_status_flags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
     let (flags, success) = unsafe {
