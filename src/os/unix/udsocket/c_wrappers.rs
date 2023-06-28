@@ -161,7 +161,7 @@ pub(super) fn set_oneshot_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::R
     }
     set_local_creds(fd, val)
 }
-#[cfg(uds_peerucred)]
+#[cfg(uds_ucred)]
 pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
     use libc::ucred;
     let mut cred = ucred { pid: 0, uid: 0, gid: 0 };

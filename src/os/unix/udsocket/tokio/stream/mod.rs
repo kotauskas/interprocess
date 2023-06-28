@@ -114,24 +114,16 @@ impl UdStream {
         c_wrappers::shutdown(self.0.as_fd(), how)
     }
     /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(uds_peerucred)]
-    #[cfg_attr( // uds_peerucred template
+    #[cfg_attr( // uds_ucred template
         feature = "doc_cfg",
         doc(cfg(any(
-            all(
-                target_os = "linux",
-                any(
-                    target_env = "gnu",
-                    target_env = "musl",
-                    target_env = "musleabi",
-                    target_env = "musleabihf"
-                )
-            ),
-            target_os = "emscripten",
+            target_os = "linux",
+            target_os = "android",
             target_os = "redox",
-            target_os = "haiku"
         )))
     )]
+    #[cfg(uds_ucred)]
+    #[inline]
     pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.0.as_fd())
     }

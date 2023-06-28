@@ -21,7 +21,6 @@ fn is_unix() -> bool {
 ///     - `uds_cmsgcred`
 ///     - `uds_sockcred` TODO: distinguish FreeBSD and NetBSD flavors of this; the NetBSD thing is more like cmsgcred
 /// - Socket options for retrieving peer credentials:
-///     - `uds_peerucred`
 ///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to
 ///       Linux)
 ///     - `uds_unpcbid`, as seen on NetBSD
@@ -38,12 +37,9 @@ fn is_unix() -> bool {
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
     let mut size_t_madness = false;
-    if (target.os("linux") && target.env_any(&["gnu", "musl", "musleabi", "musleabihf"]))
-    || target.os_any(&["android", "emscripten", "fuchsia", "redox"]) {
+    if target.os_any(&["linux", "android", "haiku", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
-        if !target.os("emscripten") {
-            ldefine(&["uds_ucred", "uds_peerucred"]);
-        }
+        define("uds_ucred");
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
         || target.os("android") {
@@ -52,10 +48,6 @@ fn collect_uds_features(target: &TargetTriplet) {
         if target.os_any(&["linux", "android"]) {
             // Only actual Linux has that... I think? lmao
             define("uds_linux_namespace");
-        }
-    } else if target.os_any(&["aix", "nto"]) || (target.env("newlib") && target.arch("xtensa")) {
-        if target.os("nto") {
-            define("uds_peerucred");
         }
     } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
         // The BSD OS family
@@ -77,8 +69,6 @@ fn collect_uds_features(target: &TargetTriplet) {
         }
     } else if target.os_any(&["solaris", "illumos"]) {
         define("uds_getpeerucred");
-    } else if target.os("haiku") {
-        ldefine(&["uds_ucred", "uds_peerucred"]);
     }
 
     if size_t_madness {
@@ -98,10 +88,8 @@ fn define(cfg: &str) {
 fn ldefine(cfgs: &[&str]) {
     let stdout_ = io::stdout();
     let mut stdout = stdout_.lock();
-    for i in cfgs {
-        stdout.write_all(b"cargo:rustc-cfg=").unwrap();
-        stdout.write_all(i.as_ref()).unwrap();
-        stdout.write_all(b"\n").unwrap();
+    for &i in cfgs {
+        writeln!(stdout, "cargo:rustc-cfg={i}").unwrap();
     }
 }
 
@@ -119,14 +107,14 @@ impl TargetTriplet {
             env: env_var("CARGO_CFG_TARGET_ENV").ok(),
         }
     }
-    fn arch(&self, arch: &str) -> bool { self.arch == arch }
+    // fn arch(&self, arch: &str) -> bool { self.arch == arch }
     fn arch_any(&self, arches: &[&str]) -> bool { arches.iter().copied().any(|x| x == self.arch) }
     fn os(&self, os: &str) -> bool { self.os == os }
     fn os_any(&self, oses: &[&str]) -> bool { oses.iter().copied().any(|x| x == self.os) }
     fn env(&self, env: &str) -> bool { self.env.as_deref() == Some(env) }
-    fn env_any(&self, envs: &[&str]) -> bool {
-        if let Some(env) = self.env.as_deref() {
-            envs.iter().copied().any(|x| x == env)
-        } else { false }
-    }
+    // fn env_any(&self, envs: &[&str]) -> bool {
+    //     if let Some(env) = self.env.as_deref() {
+    //         envs.iter().copied().any(|x| x == env)
+    //     } else { false }
+    // }
 }

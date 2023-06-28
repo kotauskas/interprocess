@@ -28,11 +28,11 @@ impl LocalSocketStream {
         (OwnedReadHalf(r), OwnedWriteHalf(w))
     }
     pub fn peer_pid(&self) -> io::Result<u32> {
-        #[cfg(uds_peerucred)]
+        #[cfg(uds_ucred)]
         {
             self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
         }
-        #[cfg(not(uds_peerucred))]
+        #[cfg(not(uds_ucred))]
         {
             Err(io::Error::new(io::ErrorKind::Other, "not supported"))
         }
