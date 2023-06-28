@@ -20,7 +20,7 @@ use to_method::To;
 ///
 /// ## Basic server
 /// ```no_run
-/// use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
+/// use interprocess::os::unix::udsocket::{UdSocket, UdStream, UdStreamListener};
 /// use std::{io::{self, prelude::*}, net::Shutdown};
 ///
 /// fn handle_error(result: io::Result<UdStream>) -> Option<UdStream> {
