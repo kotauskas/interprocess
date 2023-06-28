@@ -365,7 +365,7 @@ impl TryFrom<UdSocketPath<'_>> for sockaddr_un {
 ///
 /// # Example
 /// The following example uses the `UdStreamListener::bind` method, but `UdStream::connect` and
-/// `UdDatagram::bind`/`UdDatagram::connect` accept the same argument types too.
+/// `UdDatagram::bound`/`UdDatagram::connect` accept the same argument types too.
 /// ```no_run
 /// use interprocess::os::unix::udsocket::{UdStreamListener, UdSocketPath};
 /// use std::{ffi::{CStr, CString}, path::{Path, PathBuf}, borrow::Cow};

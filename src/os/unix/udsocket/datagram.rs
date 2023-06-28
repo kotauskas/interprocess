@@ -32,6 +32,62 @@ pub struct UdDatagram {
     fd: FdOps,
 }
 impl UdDatagram {
+    /// Creates an unnamed datagram socket.
+    ///
+    /// # System calls
+    /// - `socket`
+    pub fn unbound() -> io::Result<Self> {
+        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
+        Ok(Self {
+            _drop_guard: PathDropGuard::dummy(),
+            fd,
+        })
+    }
+    /// Binds an existing socket created by [`unbound()`](Self::unbound) to the specified path.
+    ///
+    /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using
+    /// the [socket namespace][nmspc]), an error is returned. Errors can also be produced for different reasons, i.e.
+    /// errors should always be handled regardless of whether the path is known to be short enough or not.
+    ///
+    /// After the socket is dropped, the socket file will be left over. Use
+    /// [`bound_with_drop_guard()`](Self::bound_with_drop_guard) to mitigate this automatically, even during panics
+    /// (if unwinding is enabled).
+    ///
+    /// # Example
+    /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
+    ///
+    /// # System calls
+    /// - `bind`
+    ///
+    /// [mspl]: super::MAX_UDSOCKET_PATH_LEN
+    /// [nmspc]: super::UdSocketPath::Namespaced
+    pub fn bind<'a>(&self, path: impl ToUdSocketPath<'a>) -> io::Result<()> {
+        self._bind(path.to_socket_path()?)
+    }
+    fn _bind(&self, path: UdSocketPath<'_>) -> io::Result<()> {
+        let addr = path.borrow().try_to::<sockaddr_un>()?;
+        unsafe {
+            // SAFETY: addr is well-constructed
+            c_wrappers::bind(self.as_fd(), &addr)
+        }
+    }
+    /// Binds an existing socket created by [`unbound()`](Self::unbound) to the specified path, remembers the address,
+    /// and installs a drop guard that will delete the socket file once the socket is dropped.
+    ///
+    /// See the documentation of [`bind()`](Self::bind).
+    pub fn bind_with_drop_guard<'a>(&mut self, path: impl ToUdSocketPath<'a>) -> io::Result<()> {
+        self._bind_with_drop_guard(path.to_socket_path()?)
+    }
+    fn _bind_with_drop_guard(&mut self, path: UdSocketPath<'_>) -> io::Result<()> {
+        self._bind(path.clone())?;
+        if matches!(path, UdSocketPath::File(..)) {
+            self._drop_guard = PathDropGuard {
+                path: path.upgrade(),
+                enabled: true,
+            };
+        }
+        Ok(())
+    }
     /// Creates a new socket that can be referred to by the specified path.
     ///
     /// If the socket path exceeds the [maximum socket path length][mspl] (which includes the first 0 byte when using
@@ -39,7 +95,7 @@ impl UdDatagram {
     /// errors should always be handled regardless of whether the path is known to be short enough or not.
     ///
     /// After the socket is dropped, the socket file will be left over. Use
-    /// [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics
+    /// [`bound_with_drop_guard()`](Self::bound_with_drop_guard) to mitigate this automatically, even during panics
     /// (if unwinding is enabled).
     ///
     /// # Example
@@ -51,35 +107,26 @@ impl UdDatagram {
     ///
     /// [mspl]: super::MAX_UDSOCKET_PATH_LEN
     /// [nmspc]: super::UdSocketPath::Namespaced
-    pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?, false)
+    pub fn bound<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_bound(path.to_socket_path()?, false)
     }
     /// Creates a new socket that can be referred to by the specified path, remembers the address, and installs a drop
     /// guard that will delete the socket file once the socket is dropped.
     ///
-    /// See the documentation of [`bind()`](Self::bind).
-    pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
-        Self::_bind(path.to_socket_path()?, true)
+    /// See the documentation of [`bound()`](Self::bound).
+    pub fn bound_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
+        Self::_bound(path.to_socket_path()?, true)
     }
-    fn _bind(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
-        let addr = path.borrow().try_to::<sockaddr_un>()?;
+    fn _bound(path: UdSocketPath<'_>, keep_drop_guard: bool) -> io::Result<Self> {
+        let mut socket = Self::unbound()?;
 
-        let fd = c_wrappers::create_uds(SOCK_DGRAM, false)?;
-        unsafe {
-            // SAFETY: addr is well-constructed
-            c_wrappers::bind(fd.0.as_fd(), &addr)?;
+        if keep_drop_guard {
+            socket._bind_with_drop_guard(path)?;
+        } else {
+            socket._bind(path)?;
         }
 
-        let dg = if keep_drop_guard && matches!(path, UdSocketPath::File(..)) {
-            PathDropGuard {
-                path: path.upgrade(),
-                enabled: true,
-            }
-        } else {
-            PathDropGuard::dummy()
-        };
-
-        Ok(Self { fd, _drop_guard: dg })
+        Ok(socket)
     }
     /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead,
     /// but supplying the address to the kernel once is more efficient.
@@ -88,7 +135,7 @@ impl UdDatagram {
     /// ```no_run
     /// use interprocess::os::unix::udsocket::UdDatagram;
     ///
-    /// let conn = UdDatagram::bind("/tmp/side_a.sock")?;
+    /// let conn = UdDatagram::bound("/tmp/side_a.sock")?;
     /// conn.set_destination("/tmp/side_b.sock")?;
     /// // Communicate with datagrams here!
     /// # Ok::<(), Box<dyn std::error::Error>>(())

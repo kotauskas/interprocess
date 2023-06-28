@@ -22,7 +22,7 @@ use tokio::{io::ReadBuf as TokioReadBuf, net::UnixDatagram as TokioUdDatagram};
 /// use tokio::{io::ReadBuf, try_join};
 ///
 /// // Socket creation happens immediately, no futures here.
-/// let socket = UdDatagram::bind("/tmp/example_side_a.sock")?;
+/// let socket = UdDatagram::bound("/tmp/example_side_a.sock")?;
 ///
 /// // This is the part where you tell the other side
 /// // that you've spun up a socket, if you need to.

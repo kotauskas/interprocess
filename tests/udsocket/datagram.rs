@@ -20,7 +20,7 @@ fn make_message(side_name: char, second: bool) -> Vec<u8> {
 fn make_socket(namegen: &mut NameGen) -> io::Result<(String, UdDatagram)> {
     namegen
         .find_map(|nm| {
-            let s = match UdDatagram::bind(&*nm) {
+            let s = match UdDatagram::bound(&*nm) {
                 Ok(s) => s,
                 Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
                 Err(e) => return Some(Err(e)),
