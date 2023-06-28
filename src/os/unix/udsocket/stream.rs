@@ -12,7 +12,6 @@ use libc::{sockaddr_un, SOCK_STREAM};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, IoSlice, IoSliceMut, Read, Write},
-    net::Shutdown,
 };
 use to_method::To;
 
@@ -123,49 +122,6 @@ impl UdStream {
             c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
         }
     }
-
-    /// Shuts down the read, write, or both halves of the stream. See [`Shutdown`].
-    ///
-    /// Attempting to call this method with the same `how` argument multiple times may return `Ok(())` every time or it
-    /// may return an error the second time it is called, depending on the platform. You must either avoid using the
-    /// same value twice or ignore the error entirely.
-    #[inline]
-    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
-        c_wrappers::shutdown(self.as_fd(), how)
-    }
-
-    /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
-    ///
-    /// In nonblocking mode, calls to the `recv…` methods and the [`Read`] trait methods will never wait for at least
-    /// one byte of data to become available; calls to `send…` methods and the [`Write`] trait methods will never wait
-    /// for the other side to remove enough bytes from the buffer for the write operation to be performed. Those
-    /// operations will instead return a [`WouldBlock`](io::ErrorKind::WouldBlock) error immediately, allowing the
-    /// thread to perform other useful operations in the meantime.
-    #[inline]
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking(self.as_fd(), nonblocking)
-    }
-    /// Checks whether the stream is currently in nonblocking mode or not.
-    #[inline]
-    pub fn is_nonblocking(&self) -> io::Result<bool> {
-        c_wrappers::get_nonblocking(self.as_fd())
-    }
-
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure
-    /// contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg_attr( // uds_ucred template
-        feature = "doc_cfg",
-        doc(cfg(any(
-            target_os = "linux",
-            target_os = "android",
-            target_os = "redox",
-        )))
-    )]
-    #[cfg(uds_ucred)]
-    #[inline]
-    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_fd())
-    }
 }
 
 /// A list of used system calls is available.
@@ -183,10 +139,14 @@ impl Read for &UdStream {
 }
 /// A list of used system calls is available.
 impl Read for UdStream {
+    /// # System calls
+    /// - `read`
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         (&*self).read(buf)
     }
+    /// # System calls
+    /// - `readv`
     #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         (&*self).read_vectored(bufs)

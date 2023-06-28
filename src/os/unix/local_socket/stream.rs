@@ -1,6 +1,9 @@
 use {
     super::local_socket_name_to_ud_socket_path,
-    crate::{local_socket::ToLocalSocketName, os::unix::udsocket::UdStream},
+    crate::{
+        local_socket::ToLocalSocketName,
+        os::unix::udsocket::{UdSocket, UdStream},
+    },
     std::{
         fmt::{self, Debug, Formatter},
         io::{self, prelude::*, IoSlice, IoSliceMut},

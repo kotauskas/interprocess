@@ -1,6 +1,6 @@
 use super::util::*;
 use color_eyre::eyre::Context;
-use interprocess::os::unix::udsocket::{UdStream, UdStreamListener};
+use interprocess::os::unix::udsocket::{UdSocket, UdStream, UdStreamListener};
 use std::{
     io::{self, BufRead, BufReader, Read, Write},
     net::Shutdown,

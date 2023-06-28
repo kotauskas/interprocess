@@ -313,40 +313,6 @@ impl UdDatagram {
             c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
         }
     }
-
-    /// Enables or disables the nonblocking mode for the socket. By default, it is disabled.
-    ///
-    /// In nonblocking mode, calls to the `recv…` methods and the `Read` trait methods will never wait for at least one
-    /// message to become available; calls to `send…` methods and the `Write` trait methods will never wait for the
-    /// other side to remove enough bytes from the buffer for the write operation to be performed. Those operations will
-    /// instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations in the
-    /// meantime.
-    ///
-    /// [`accept`]: #method.accept " "
-    /// [`incoming`]: #method.incoming " "
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking(self.fd.0.as_fd(), nonblocking)
-    }
-    /// Checks whether the socket is currently in nonblocking mode or not.
-    pub fn is_nonblocking(&self) -> io::Result<bool> {
-        c_wrappers::get_nonblocking(self.fd.0.as_fd())
-    }
-
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure
-    /// contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg(uds_ucred)]
-    #[cfg_attr( // uds_ucred template
-        feature = "doc_cfg",
-        doc(cfg(any(
-            target_os = "linux",
-            target_os = "android",
-            target_os = "redox",
-        )))
-    )]
-    pub fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.fd.0.as_fd())
-    }
 }
 
 impl Debug for UdDatagram {

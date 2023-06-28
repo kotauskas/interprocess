@@ -24,10 +24,11 @@ pub mod tokio;
 mod datagram;
 mod listener;
 mod path;
+mod socket_trait;
 mod stream;
 #[macro_use]
 mod util;
-pub use {datagram::*, listener::*, path::*, stream::*};
+pub use {datagram::*, listener::*, path::*, socket_trait::*, stream::*};
 
 mod path_drop_guard;
 use path_drop_guard::*;
