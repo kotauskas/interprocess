@@ -164,6 +164,14 @@ impl AsRef<cmsgcred_packed> for cmsgcred {
         }
     }
 }
+static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
+    cmcred_pid: 0,
+    cmcred_uid: 0,
+    cmcred_euid: 0,
+    cmcred_gid: 0,
+    cmcred_ngroups: 0,
+    cmcred_groups: [0; libc::CMGROUP_MAX],
+};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -190,3 +198,12 @@ impl AsRef<sockcred_packed> for sockcred {
         }
     }
 }
+#[cfg(uds_sockcred)]
+static ZEROED_SOCKCRED: sockcred = sockcred {
+    sc_uid: 0,
+    sc_euid: 0,
+    sc_gid: 0,
+    sc_egid: 0,
+    sc_ngroups: 0,
+    sc_groups: [0],
+};
