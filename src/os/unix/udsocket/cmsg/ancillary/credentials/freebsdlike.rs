@@ -2,7 +2,7 @@ use super::*;
 #[cfg(uds_sockcred)]
 use libc::sockcred;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
-use std::{marker::PhantomData, mem::size_of, ptr::addr_of};
+use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
 use to_method::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,7 +57,7 @@ impl<'a> Credentials<'a> {
     }
     pub fn groups(&self) -> Groups<'a> {
         let n_groups = match self {
-            Credentials::Cmsgcred(c) => c.cmcred_ngroups.to::<c_int>(),
+            Credentials::Cmsgcred(c) => min(c.cmcred_ngroups.to::<c_int>(), libc::CMGROUP_MAX),
             #[cfg(uds_sockcred)]
             Credentials::Sockcred(c) => c.sc_ngroups,
         }
@@ -149,7 +149,7 @@ pub(super) struct cmsgcred_packed {
     pub cmcred_euid: uid_t,
     pub cmcred_gid: gid_t,
     pub cmcred_ngroups: c_short,
-    pub cmcred_groups: [gid_t; 16],
+    pub cmcred_groups: [gid_t; libc::CMGROUP_MAX],
 }
 impl AsRef<cmsgcred_packed> for cmsgcred {
     fn as_ref(&self) -> &cmsgcred_packed {
