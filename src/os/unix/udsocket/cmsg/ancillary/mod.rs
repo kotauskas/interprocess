@@ -7,23 +7,23 @@
 // TODO SCM_CREDS2 from FreeBSD
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
 
-#[cfg_attr( // uds_ucred template
+#[cfg_attr(
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
         target_os = "emscripten",
-        target_os = "redox"
+        target_os = "redox",
+        target_os = "freebsd",
+        target_os = "dragonfly",
     )))
 )]
-#[cfg(uds_ucred)]
-// FIXME only enabled on ucred, sockcred is disabled
+#[cfg(any(uds_ucred, uds_cmsgcred))]
 pub mod credentials;
 pub mod file_descriptors;
 
 mod dispatcher;
 pub use dispatcher::*;
 
-use self::credentials::SizeMismatch;
 use super::*;
 use std::{
     convert::Infallible,
@@ -143,6 +143,24 @@ impl<E: Display> Display for ParseErrorKind<E> {
     }
 }
 impl<E: Debug + Display> Error for ParseErrorKind<E> {}
+
+/// A [`MalformedPayload`](ParseErrorKind::MalformedPayload) error indicating that the ancillary message size dosen't
+/// match that of the platform-specific credentials structure.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SizeMismatch {
+    /// Expected size of the ancillary message. This value may or may not be derived from some of the message's
+    /// contents.
+    pub expected: usize,
+    /// Actual size of the ancillary message.
+    pub got: usize,
+}
+impl Display for SizeMismatch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self { expected, got } = self;
+        write!(f, "ancillary payload size mismatch (expected {expected}, got {got})")
+    }
+}
+impl Error for SizeMismatch {}
 
 fn check_level<E>(cmsg: Cmsg<'_>) -> ParseResult<'_, Cmsg<'_>, E> {
     let got = cmsg.cmsg_level();

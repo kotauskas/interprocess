@@ -1,6 +1,8 @@
 #[cfg(uds_ucred)]
-use super::credentials::{Credentials, SizeMismatch};
-use super::{file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, LEVEL};
+use super::credentials::Credentials;
+use super::{
+    file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, SizeMismatch, LEVEL,
+};
 use std::{
     convert::Infallible,
     error::Error,

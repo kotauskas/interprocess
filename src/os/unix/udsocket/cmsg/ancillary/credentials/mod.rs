@@ -16,11 +16,7 @@ cfg_if::cfg_if! {
 
 use super::*;
 use libc::{c_int, gid_t, pid_t, uid_t};
-use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    iter::FusedIterator,
-};
+use std::iter::FusedIterator;
 
 /// Ancillary data message that allows receiving the credentials of the peer process and, on some systems, setting the
 /// contents of this ancillary message that the other process will receive.
@@ -28,6 +24,7 @@ use std::{
 /// To receive this message, the `SO_PASSCRED` socket option must be enabled. After it's enabled, every receive
 /// operation that provides an ancillary data buffer will receive an instance of this message.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+// TODO move out of ancillary and reexport here instead
 pub struct Credentials<'a>(CredentialsImpl<'a>);
 impl<'a> Credentials<'a> {
     pub(super) const TYPE: c_int = CredentialsImpl::TYPE;
@@ -249,23 +246,6 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
         CredentialsImpl::try_parse(cmsg).map(Self)
     }
 }
-
-/// A [`MalformedPayload`](ParseErrorKind::MalformedPayload) error indicating that the ancillary message size dosen't match that of the platform-specific credentials structure.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct SizeMismatch {
-    /// Expected size of the ancillary message. This value may or may not be derived from some of the message's
-    /// contents.
-    pub expected: usize,
-    /// Actual size of the ancillary message.
-    pub got: usize,
-}
-impl Display for SizeMismatch {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self { expected, got } = self;
-        write!(f, "ancillary payload size mismatch (expected {expected}, got {got})")
-    }
-}
-impl Error for SizeMismatch {}
 
 /// An iterator over supplementary groups stored in [`Credentials`].
 ///
