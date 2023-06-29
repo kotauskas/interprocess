@@ -93,6 +93,14 @@ impl<T: Collector + 'static> Container for CollectorContainer<T> {
         (&self.0 as &dyn Any).downcast_ref()
     }
 }
+impl<T: Collector> Collector for CollectorContainer<T> {
+    fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
+        self.0.pre_op_collect(socket);
+    }
+    fn post_op_collect(&mut self, socket: BorrowedFd<'_>, msghdr_flags: c_int) {
+        self.0.post_op_collect(socket, msghdr_flags);
+    }
+}
 
 /// A [`Collector`] that does nothing.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
