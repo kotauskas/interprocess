@@ -35,23 +35,26 @@ const LEVEL: c_int = libc::SOL_SOCKET;
 
 /// An ancillary data wrapper that can be converted to a control message.
 pub trait ToCmsg {
-    /// Invokes the conversion to an ancillary message. The provided closure will receive the conversion result ephemerally.
+    /// Invokes the conversion to an ancillary message.
     ///
-    /// It's a logic error for this function to not call `add_fn`, and an unconditional assertion will panic in the circumstance when it doesn't.
-    fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>));
-    // FIXME is the closure necessary?
+    /// The resulting value may contain unmanaged ownership of resources – dropping it without sending may leak those
+    /// resources.
+    fn to_cmsg(&self) -> Cmsg<'_>;
 }
 
 /// An ancillary data wrapper than can be parsed from a control message.
 ///
 /// As a trait bound, this will typically require the use of an HRTB: `T: for<'a> FromCmsg<'a>`.
 ///
-/// Implementations of this trait are expected to return correct error information in good faith. Returning the wrong expected ancillary message type/level in [`WrongType`](ParseErrorKind::WrongType)/[`WrongLevel`](ParseErrorKind::WrongLevel) can lead to an infinite loop.
+/// Implementations of this trait are expected to return correct error information in good faith. Returning the wrong
+/// expected ancillary message type/level in
+/// [`WrongType`](ParseErrorKind::WrongType)/[`WrongLevel`](ParseErrorKind::WrongLevel) can lead to an infinite loop.
 pub trait FromCmsg<'a>: Sized {
     /// The error type produced for malformed payloads, typically [`Infallible`].
     type MalformedPayloadError;
 
-    /// Attempts to extract data from `cmsg` into a new instance of `Self`, returning `None` if the control message is of the wrong level, type or has malformed content.
+    /// Attempts to extract data from `cmsg` into a new instance of `Self`, returning `None` if the control message is
+    /// of the wrong level, type or has malformed content.
     fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError>;
 }
 
@@ -102,11 +105,13 @@ pub enum ParseErrorKind<E = Infallible> {
         /// The `cmsg_type` that was received.
         got: c_int,
     },
-    /// The control message data does not conform to the format of the ancillary data message type, with an explanatory error value.
+    /// The control message data does not conform to the format of the ancillary data message type, with an explanatory
+    /// error value.
     MalformedPayload(E),
 }
 impl<E> ParseErrorKind<E> {
-    /// Wraps up the error into a [`ParseError`], with the given `cmsg` as the return-to-caller control message ownership item.
+    /// Wraps up the error into a [`ParseError`], with the given `cmsg` as the return-to-caller control message
+    /// ownership item.
     #[inline]
     pub fn wrap(self, cmsg: Cmsg<'_>) -> ParseError<'_, E> {
         ParseError { cmsg, kind: self }

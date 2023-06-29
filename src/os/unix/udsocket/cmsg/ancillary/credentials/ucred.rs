@@ -52,17 +52,16 @@ impl AsRef<ucred_packed> for Credentials<'_> {
     }
 }
 
-impl<'a> ToCmsg for Credentials<'a> {
-    fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>)) {
+impl ToCmsg for Credentials<'_> {
+    fn to_cmsg(&self) -> Cmsg<'_> {
         let st_bytes = unsafe {
             // SAFETY: well-initialized POD struct with #[repr(C)]
             slice::from_raw_parts(<*const _>::cast(self.as_ref()), size_of::<ucred>())
         };
-        let cmsg = unsafe {
+        unsafe {
             // SAFETY: we've got checks to ensure that we're not using the wrong struct
             Cmsg::new(LEVEL, Self::TYPE, st_bytes)
-        };
-        add_fn(cmsg);
+        }
     }
 }
 

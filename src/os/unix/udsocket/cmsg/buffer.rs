@@ -85,9 +85,7 @@ impl<C> CmsgBuffer<C> {
     /// Using the return value isn't strictly necessary – calling `.add_message()` again will correctly add one more
     /// message to the buffer.
     pub fn add_message(&mut self, msg: &impl ToCmsg) -> usize {
-        let mut ret = 0;
-        msg.add_to_buffer(|cmsg| ret = self.add_raw_message(cmsg));
-        ret
+        self.add_raw_message(msg.to_cmsg())
     }
     /// Adds the specified control message to the buffer, advances the initialization cursor of `self` such that the
     /// next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how

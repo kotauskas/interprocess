@@ -235,8 +235,8 @@ impl<'a> Credentials<'a> {
 /// simply return an error.
 // TODO platform-specific?
 impl ToCmsg for Credentials<'_> {
-    fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>)) {
-        self.0.add_to_buffer(add_fn)
+    fn to_cmsg(&self) -> Cmsg<'_> {
+        self.0.to_cmsg()
     }
 }
 impl<'a> FromCmsg<'a> for Credentials<'a> {

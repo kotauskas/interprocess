@@ -31,13 +31,11 @@ impl<'a> FileDescriptors<'a> {
     }
 }
 impl ToCmsg for FileDescriptors<'_> {
-    fn add_to_buffer(&self, add_fn: impl FnOnce(Cmsg<'_>)) {
-        let cmsg = unsafe {
+    fn to_cmsg(&self) -> Cmsg<'_> {
+        unsafe {
             // SAFETY: a bunch of file descriptors is all you need for a SCM_RIGHTS control message
             Cmsg::new(LEVEL, Self::TYPE, self.0.as_bytes())
-        };
-
-        add_fn(cmsg);
+        }
     }
 }
 /// Only errors with `MalformedPayload` if the length isn't aligned to the size of a file descriptor.
