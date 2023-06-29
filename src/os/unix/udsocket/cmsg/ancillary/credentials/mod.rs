@@ -241,9 +241,10 @@ impl ToCmsg for Credentials<'_> {
 }
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
+    type Context = (); // TODO
     #[inline]
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
-        CredentialsImpl::try_parse(cmsg).map(Self)
+    fn try_parse(cmsg: Cmsg<'a>, ctx: &Self::Context) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+        CredentialsImpl::try_parse(cmsg, ctx).map(Self)
     }
 }
 

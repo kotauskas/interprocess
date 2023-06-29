@@ -1,18 +1,18 @@
 use super::{
     super::util::{to_msghdr_controllen, DUMMY_MSGHDR},
-    ancillary::{Ancillary, FromCmsg, MalformedPayload, ParseError},
+    ancillary::{FromCmsg, ParseError},
     context::{DummyCollector, DUMMY_COLLECTOR},
     *,
 };
 use libc::{c_void, cmsghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_NXTHDR};
-use std::{cmp::min, io, slice};
+use std::{cmp::min, io, iter::FusedIterator, slice};
 
 /// An immutable reference to a control message buffer that allows for decoding of ancillary data messages.
 ///
 /// The [`decode()`](Self::decode) iterator allows for easy decoding, while [`cmsgs()`](Self::cmsgs) provides low-level access to the raw ancillary message data.
 // TODO decoding example
 // TODO context
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub struct CmsgRef<'b, 'c, C = DummyCollector> {
     buf: &'b [u8],
     /// A borrow of the context collector stored alongside the buffer reference.
@@ -72,16 +72,19 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
 
     /// Returns an iterator over the control messages of the buffer.
     #[inline]
-    pub fn cmsgs(self) -> Cmsgs<'b, 'c, C> {
-        Cmsgs::new(self)
+    pub fn cmsgs(&self) -> Cmsgs<'b, 'c, C> {
+        Cmsgs::new(*self)
     }
     /// Returns an iterator that wraps [`cmsgs()`](Self::cmsgs) and decodes them into [`Ancillary`] structs.
     #[inline]
-    pub fn decode(self) -> impl Iterator<Item = Result<Ancillary<'b>, ParseError<'b, MalformedPayload>>> + 'c
+    pub fn decode<'slf: 'c, A: FromCmsg<'b, Context = C>>(&'slf self) -> Decode<'b, 'c, A>
     where
         'b: 'c,
     {
-        self.cmsgs().map(Ancillary::try_parse)
+        Decode {
+            cmsgs: self.cmsgs(),
+            context: self.context_collector,
+        }
     }
 
     pub(crate) fn fill_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
@@ -90,8 +93,19 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
         Ok(())
     }
 }
+impl<C> Copy for CmsgRef<'_, '_, C> {}
+impl<C> Clone for CmsgRef<'_, '_, C> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 /// Iterator over the control messages in a [`CmsgRef`].
+///
+/// Created by the [`cmsgs()`](CmsgRef::cmsgs) method.
+///
+/// You probably want to use [`Decode`] instead.
 pub struct Cmsgs<'b, 'c, C> {
     buf: CmsgRef<'b, 'c, C>,
     cur: *const cmsghdr,
@@ -158,4 +172,39 @@ impl<'b, 'c, C> Iterator for Cmsgs<'b, 'c, C> {
 
         Some(cmsg)
     }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        todo!()
+    }
 }
+impl<'b, 'c, C> ExactSizeIterator for Cmsgs<'b, 'c, C> {
+    fn len(&self) -> usize {
+        todo!()
+    }
+}
+impl<'b, 'c, C> FusedIterator for Cmsgs<'b, 'c, C> {}
+
+/// Iterator that zero-copy deserializes control messages from a [`CmsgRef`].
+///
+/// Created by the [`decode()`](CmsgRef::decode) method.
+pub struct Decode<'b, 'c, A: FromCmsg<'b>> {
+    cmsgs: Cmsgs<'b, 'c, A::Context>,
+    context: &'c A::Context,
+}
+impl<'b, 'c, A: FromCmsg<'b>> Iterator for Decode<'b, 'c, A> {
+    type Item = Result<A, ParseError<'b, A::MalformedPayloadError>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(A::try_parse(self.cmsgs.next()?, self.context))
+    }
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.cmsgs.size_hint()
+    }
+}
+impl<'b, 'c, A: FromCmsg<'b>> ExactSizeIterator for Decode<'b, 'c, A> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.cmsgs.len()
+    }
+}
+impl<'b, 'c, A: FromCmsg<'b>> FusedIterator for Decode<'b, 'c, A> {}

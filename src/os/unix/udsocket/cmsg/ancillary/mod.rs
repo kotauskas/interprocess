@@ -44,7 +44,8 @@ pub trait ToCmsg {
 
 /// An ancillary data wrapper than can be parsed from a control message.
 ///
-/// As a trait bound, this will typically require the use of an HRTB: `T: for<'a> FromCmsg<'a>`.
+/// As a trait bound, this will typically require the use of an explicit generic lifetime. For example, for some `'a`,
+/// `FileDescriptors<'a>` only implements `FromCmsg<'a>`.
 ///
 /// Implementations of this trait are expected to return correct error information in good faith. Returning the wrong
 /// expected ancillary message type/level in
@@ -52,10 +53,12 @@ pub trait ToCmsg {
 pub trait FromCmsg<'a>: Sized {
     /// The error type produced for malformed payloads, typically [`Infallible`].
     type MalformedPayloadError;
+    /// The context required to decode the message.
+    type Context;
 
     /// Attempts to extract data from `cmsg` into a new instance of `Self`, returning `None` if the control message is
     /// of the wrong level, type or has malformed content.
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError>;
+    fn try_parse(cmsg: Cmsg<'a>, ctx: &Self::Context) -> ParseResult<'a, Self, Self::MalformedPayloadError>;
 }
 
 /// The result type for [`FromCmsg`].

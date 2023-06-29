@@ -28,20 +28,21 @@ pub enum Ancillary<'a> {
 }
 impl<'a> Ancillary<'a> {
     fn parse_fd(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
-        FileDescriptors::try_parse(cmsg)
+        FileDescriptors::try_parse(cmsg, &())
             .map(Self::FileDescriptors)
             .map_err(|e| e.map_payload_err(MalformedPayload::FileDescriptors))
     }
     #[cfg(uds_ucred)]
     fn parse_credentials(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
-        Credentials::try_parse(cmsg)
+        Credentials::try_parse(cmsg, &())
             .map(Self::Credentials)
             .map_err(|e| e.map_payload_err(MalformedPayload::Credentials))
     }
 }
 impl<'a> FromCmsg<'a> for Ancillary<'a> {
     type MalformedPayloadError = MalformedPayload;
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
+    type Context = (); // TODO
+    fn try_parse(cmsg: Cmsg<'a>, _ctx: &()) -> ParseResult<'a, Self, MalformedPayload> {
         let (cml, cmt) = (cmsg.cmsg_level(), cmsg.cmsg_type());
         if cml != LEVEL {
             return Err(ParseError {

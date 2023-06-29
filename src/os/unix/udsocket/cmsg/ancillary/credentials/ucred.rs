@@ -67,8 +67,9 @@ impl ToCmsg for Credentials<'_> {
 
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
+    type Context = (); // TODO
 
-    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
+    fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &()) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::TYPE)?;
         cmsg = check_size(cmsg, size_of::<ucred>())?;
 
