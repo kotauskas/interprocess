@@ -156,7 +156,7 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     pub fn evade_limbo(self) {
         self.assume_flushed();
     }
-    /// Attempts to reunite this send half with the given recieve half to yield the original stream back, returning both halves as an error if they belong to different streams.
+    /// Attempts to reunite this send half with the given receive half to yield the original stream back, returning both halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(other, self)

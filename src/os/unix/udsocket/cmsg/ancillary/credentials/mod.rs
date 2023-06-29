@@ -30,7 +30,7 @@ impl<'a> Credentials<'a> {
     pub(super) const TYPE: c_int = CredentialsImpl::TYPE;
     /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
     /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
-    /// necessary for the other end to recieve this type of ancillary data.
+    /// necessary for the other end to receive this type of ancillary data.
     ///
     /// # Validity
     /// If the given `ucred` structure is filled out incorrectly, sending this message will fail with an error. The
@@ -57,7 +57,7 @@ impl<'a> Credentials<'a> {
     }
     /// Creates a `Credentials` ancillary data struct to be sent as a control message from a borrow. This allows for
     /// impersonation of other processes, users and groups given sufficient privileges, and is not strictly necessary
-    /// for the other end to recieve this type of ancillary data.
+    /// for the other end to receive this type of ancillary data.
     ///
     /// If the given `ucred` structure is filled out incorrectly, sending this message will fail with an error. See the
     /// documentation on [`from_ucred()`](Self::from_ucred) for more details.
