@@ -16,6 +16,10 @@
 //! collectors, if such a need ever arises.
 
 use crate::os::unix::unixprelude::*;
+use std::{
+    any::Any,
+    mem::{size_of, MaybeUninit},
+};
 
 /// A context collector to hook into a Ud-socket read/write operation.
 #[allow(unused_variables)]
@@ -47,10 +51,62 @@ impl<T: Collector> Collector for Box<T> {
     }
 }
 
+/// A context container that can provide information about an I/O call to the ancillary message parsers that read its
+/// output.
+pub trait Container {
+    /// Retrieves the context collector of the given type or returns `None` if no such context is available.
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C>;
+}
+impl<T: Container> Container for &T {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (*self).get_context()
+    }
+}
+impl<T: Container> Container for &mut T {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (**self).get_context()
+    }
+}
+impl<T: Container> Container for Box<T> {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (**self).get_context()
+    }
+}
+impl<T: Container> Container for std::rc::Rc<T> {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (**self).get_context()
+    }
+}
+impl<T: Container> Container for std::sync::Arc<T> {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (**self).get_context()
+    }
+}
+
+/// A [`Container`] that only contains the [`Collector`] `T` and no other type.
+///
+/// This type is useful for when you only need one context collector.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct CollectorContainer<T>(pub T);
+impl<T: Collector + 'static> Container for CollectorContainer<T> {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        (&self.0 as &dyn Any).downcast_ref()
+    }
+}
+
 /// A [`Collector`] that does nothing.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct DummyCollector;
 impl Collector for DummyCollector {}
+impl Container for DummyCollector {
+    fn get_context<C: Collector + 'static>(&self) -> Option<&C> {
+        if size_of::<C>() == 0 {
+            Some(mkzst())
+        } else {
+            None
+        }
+    }
+}
 pub(super) const DUMMY_COLLECTOR: DummyCollector = DummyCollector;
 
 /// A [`Collector`] that diverts to given closures.
@@ -117,4 +173,24 @@ where
             c.post_op_collect(socket, msghdr_flags);
         }
     }
+}
+
+impl<C, I: Collector + 'static> Container for IterCollector<C>
+where
+    for<'a> &'a C: IntoIterator<Item = &'a I>,
+{
+    fn get_context<Ci: Collector + 'static>(&self) -> Option<&Ci> {
+        (&self.0)
+            .into_iter()
+            .map(|x| x as &dyn Any)
+            .find_map(<dyn Any>::downcast_ref)
+    }
+}
+
+#[track_caller]
+#[inline(always)]
+#[allow(clippy::uninit_assumed_init)] // Wow! Epic fail!
+fn mkzst<T>() -> T {
+    assert_eq!(size_of::<T>(), 0, "not a ZST");
+    unsafe { MaybeUninit::uninit().assume_init() }
 }
