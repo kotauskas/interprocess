@@ -1,9 +1,13 @@
-use crate::os::unix::udsocket::{
-    cmsg::{ancillary::*, Cmsg},
-    credentials::ucred::*,
+use super::Context;
+use crate::os::unix::{
+    udsocket::{
+        cmsg::{ancillary::*, context::Collector, Cmsg},
+        credentials::freebsdlike::*,
+    },
+    unixprelude::*,
 };
-use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
-use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
+use libc::cmsgcred;
+use std::{mem::size_of, slice};
 use to_method::*;
 
 #[cfg(uds_sockcred)]
@@ -45,6 +49,7 @@ impl<'a> ToCmsg for Credentials<'a> {
 
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
+    type Context = Context;
 
     fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
@@ -54,7 +59,7 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
 
 // TODO don't forget FromCmsg size checks
 
-static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
+pub(super) static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
     cmcred_pid: 0,
     cmcred_uid: 0,
     cmcred_euid: 0,
@@ -63,7 +68,7 @@ static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
     cmcred_groups: [0; libc::CMGROUP_MAX],
 };
 #[cfg(uds_sockcred)]
-static ZEROED_SOCKCRED: sockcred = sockcred {
+pub(super) static ZEROED_SOCKCRED: sockcred = sockcred {
     sc_uid: 0,
     sc_euid: 0,
     sc_gid: 0,

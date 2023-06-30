@@ -72,7 +72,7 @@ pub trait UdSocket: AsFd {
     #[cfg(uds_sockcred)]
     #[inline]
     fn set_oneshot_ancillary_credentials(&self, val: bool) -> io::Result<()> {
-        c_wrappers::set_
+        c_wrappers::set_oneshot_ancillary_cred(self.as_fd(), val)
     }
 }
 

@@ -1,9 +1,7 @@
-use super::*;
 #[cfg(uds_sockcred)]
 use libc::sockcred;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
 use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
-use to_method::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Credentials<'a> {
