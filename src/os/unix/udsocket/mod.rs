@@ -21,38 +21,48 @@ pub mod cmsg;
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
+#[macro_use]
+mod util;
+
 mod datagram;
 mod listener;
 mod path;
 mod socket_trait;
 mod stream;
-#[macro_use]
-mod util;
+
 pub use {datagram::*, listener::*, path::*, socket_trait::*, stream::*};
+
+#[cfg_attr(
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "redox",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    )))
+)]
+#[cfg(any(uds_ucred, uds_cmsgcred))]
+mod credentials;
+#[cfg(any(uds_ucred, uds_cmsgcred))]
+pub use credentials::*;
 
 mod path_drop_guard;
 use path_drop_guard::*;
 
 mod c_wrappers;
 
-use libc::{sa_family_t, sockaddr_un};
-use std::mem::size_of;
-
-/// The maximum path length for Unix domain sockets. [`UdStreamListener::bind`] panics if the specified path exceeds
+/// The maximum path length for Unix domain sockets. [`UdStreamListener::bind()`] panics if the specified path exceeds
 /// this value.
 ///
-/// When using the [socket namespace], this value is reduced by 1, since enabling the usage of that namespace takes up
-/// one character.
+/// When using the [socket namespace](UdSocketPath::Namespaced), this value is reduced by 1, since enabling the usage of
+/// that namespace takes up one character.
 ///
 /// ## Value
 /// The following platforms define the value of this constant as **108**:
 /// - Linux
 ///     - includes Android
-/// - Emscripten
 /// - Redox
-/// - HermitCore
-/// - Solaris
-///     - Illumos
 ///
 /// The following platforms define the value of this constant as **104**:
 /// - FreeBSD
@@ -61,13 +71,10 @@ use std::mem::size_of;
 /// - DragonflyBSD
 /// - macOS
 /// - iOS
-///
-/// The following platforms define the value of this constant as **126**:
-/// - Haiku
-///
-/// [`UdStreamListener::bind`]: struct.UdStreamListener.html#method.bind " "
-/// [socket namespace]: enum.UdSocketPath.html#namespaced " "
 pub const MAX_UDSOCKET_PATH_LEN: usize = {
+    use libc::{sa_family_t, sockaddr_un};
+    use std::mem::size_of;
+
     const LENGTH: usize = {
         let mut length = size_of::<sockaddr_un>() - size_of::<sa_family_t>();
         if cfg!(uds_sun_len) {
