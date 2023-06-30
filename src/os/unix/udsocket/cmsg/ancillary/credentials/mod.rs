@@ -15,7 +15,7 @@ pub use crate::os::unix::udsocket::credentials::*;
 
 /// Functions for creating tables of credentials to be sent as ancillary messages.
 impl<'a> Credentials<'a> {
-    pub(super) const TYPE: c_int = CredentialsImpl::ANCTYPE;
+    pub(super) const ANCTYPE: c_int = CredentialsImpl::ANCTYPE;
     /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
     /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
     /// necessary for the other end to receive this type of ancillary data.

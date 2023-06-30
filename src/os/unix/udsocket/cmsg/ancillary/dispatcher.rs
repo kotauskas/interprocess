@@ -56,9 +56,9 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
 
         // let's get down to jump tables
         match cmsg.cmsg_type() {
-            FileDescriptors::TYPE => Self::parse_fd(cmsg),
+            FileDescriptors::ANCTYPE => Self::parse_fd(cmsg),
             #[cfg(uds_ucred)]
-            Credentials::TYPE => Self::parse_credentials(cmsg),
+            Credentials::ANCTYPE => Self::parse_credentials(cmsg),
             _ => Err(ParseError {
                 cmsg,
                 kind: ParseErrorKind::WrongType {

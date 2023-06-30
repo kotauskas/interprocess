@@ -12,7 +12,7 @@ use std::{
 #[derive(Debug, Default)]
 pub struct FileDescriptors<'a>(UnalignedFdSlice<'a>);
 impl<'a> FileDescriptors<'a> {
-    pub(super) const TYPE: c_int = libc::SCM_RIGHTS;
+    pub(super) const ANCTYPE: c_int = libc::SCM_RIGHTS;
 
     /// Constructs the ancillary data message from a slice of [borrowed file descriptors](BorrowedFd).
     ///
@@ -34,7 +34,7 @@ impl ToCmsg for FileDescriptors<'_> {
     fn to_cmsg(&self) -> Cmsg<'_> {
         unsafe {
             // SAFETY: a bunch of file descriptors is all you need for a SCM_RIGHTS control message
-            Cmsg::new(LEVEL, Self::TYPE, self.0.as_bytes())
+            Cmsg::new(LEVEL, Self::ANCTYPE, self.0.as_bytes())
         }
     }
 }
@@ -44,7 +44,7 @@ impl<'a> FromCmsg<'a> for FileDescriptors<'a> {
     type Context = ();
 
     fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &()) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
-        cmsg = check_level_and_type(cmsg, Self::TYPE)?;
+        cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
         let unalign_mask = (1_usize << align_of::<c_int>()) - 1;
         let len = cmsg.data().len();
         if len & unalign_mask != 0 {
