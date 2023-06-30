@@ -36,10 +36,10 @@ fn is_unix() -> bool {
 ///     - `uds_cmsghdr_len_size_t`
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
-    let mut size_t_madness = false;
-    if target.os_any(&["linux", "android", "haiku", "fuchsia", "redox"]) {
+    let [mut size_t_madness, mut ucred, mut cmsgcred, mut sockcred] = [false; 4];
+    if target.os_any(&["linux", "android", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
-        define("uds_ucred");
+        ucred = true;
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
         || target.os("android") {
@@ -57,17 +57,20 @@ fn collect_uds_features(target: &TargetTriplet) {
         ]);
 
         if target.os_any(&["freebsd", "dragonfly"]) {
-            define("uds_cmsgcred");
+            cmsgcred = true;
             if target.os("freebsd") {
-                define("uds_sockcred");
+                sockcred = true;
             }
         }
         if target.os("netbsd") {
+            // TODO
             define("uds_unpcbid");
         } else {
+            // TODO
             define("uds_xucred");
         }
     } else if target.os_any(&["solaris", "illumos"]) {
+        // TODO
         define("uds_getpeerucred");
     }
 
@@ -79,6 +82,18 @@ fn collect_uds_features(target: &TargetTriplet) {
         ldefine(&[
             "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
         ])
+    }
+    if ucred || cmsgcred || sockcred {
+        define("uds_credentials");
+        if ucred {
+            define("uds_ucred");
+        }
+        if cmsgcred {
+            define("uds_cmsgcred");
+        }
+        if sockcred {
+            define("uds_sockcred");
+        }
     }
 }
 

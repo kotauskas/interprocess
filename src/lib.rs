@@ -55,7 +55,7 @@
 //! - Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 //!
 //! ## Support by association
-//! *OSes at this level: **Redox**, **Android***
+//! *OSes at this level: **Redox**, **Android**, **Fuchsia***
 //!
 //! - Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
 //! - No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
