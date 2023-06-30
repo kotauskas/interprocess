@@ -8,7 +8,6 @@ use crate::os::unix::{
 };
 use libc::cmsgcred;
 use std::{mem::size_of, slice};
-use to_method::*;
 
 #[cfg(uds_sockcred)]
 use {crate::os::unix::udsocket::c_wrappers, libc::sockcred};
@@ -33,12 +32,13 @@ impl Credentials<'_> {
 impl<'a> ToCmsg for Credentials<'a> {
     fn to_cmsg(&self) -> Cmsg<'_> {
         let st_bytes = unsafe {
-            // SAFETY: well-initialized POD struct with #[repr(C)]
-            slice::from_raw_parts(match self {
+            let (ptr, len) = match self {
                 Credentials::Cmsgcred(c) => (<*const _>::cast(c), size_of::<cmsgcred>()),
                 #[cfg(uds_sockcred)]
-                Credentials::Sockcred(c) => (<*const _>::cast(c), libc::SOCKCREDSIZE(c.cmcred_ngroups)),
-            })
+                Credentials::Sockcred(c) => (<*const _>::cast(c), libc::SOCKCREDSIZE(c.sc_ngroups as _)),
+            };
+            // SAFETY: well-initialized POD struct with #[repr(C)]
+            slice::from_raw_parts(ptr, len)
         };
         unsafe {
             // SAFETY: we've got checks to ensure that we're not using the wrong struct
@@ -51,7 +51,7 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
     type Context = Context;
 
-    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
+    fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
         todo!()
     }

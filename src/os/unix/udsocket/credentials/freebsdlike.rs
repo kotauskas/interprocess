@@ -2,6 +2,7 @@
 use libc::sockcred;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
 use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
+use to_method::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Credentials<'a> {
@@ -54,9 +55,9 @@ impl<'a> Credentials<'a> {
     }
     pub fn groups(&self) -> Groups<'a> {
         let n_groups = match self {
-            Credentials::Cmsgcred(c) => min(c.cmcred_ngroups.to::<c_int>(), libc::CMGROUP_MAX),
+            Credentials::Cmsgcred(c) => min(c.cmcred_ngroups, libc::CMGROUP_MAX as _).to::<c_int>(),
             #[cfg(uds_sockcred)]
-            Credentials::Sockcred(c) => c.sc_ngroups,
+            Credentials::Sockcred(c) => c.sc_ngroups.to::<c_int>(),
         }
         .try_to::<usize>()
         .unwrap();
@@ -117,7 +118,8 @@ pub(crate) struct cmsgcred_packed {
     pub cmcred_euid: uid_t,
     pub cmcred_gid: gid_t,
     pub cmcred_ngroups: c_short,
-    pub cmcred_groups: [gid_t; libc::CMGROUP_MAX],
+    pub __pad0: c_short,
+    pub cmcred_groups: [gid_t; 16],
 }
 impl AsRef<cmsgcred_packed> for cmsgcred {
     fn as_ref(&self) -> &cmsgcred_packed {
@@ -137,12 +139,12 @@ impl AsRef<cmsgcred_packed> for cmsgcred {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg(uds_sockcred)]
 pub(crate) struct sockcred_packed {
-    sc_uid: uid_t,
-    sc_euid: uid_t,
-    sc_gid: gid_t,
-    sc_egid: gid_t,
-    sc_ngroups: c_int,
-    sc_groups: [gid_t; 1],
+    pub sc_uid: uid_t,
+    pub sc_euid: uid_t,
+    pub sc_gid: gid_t,
+    pub sc_egid: gid_t,
+    pub sc_ngroups: c_int,
+    pub sc_groups: [gid_t; 1],
 }
 #[cfg(uds_sockcred)]
 impl AsRef<sockcred_packed> for sockcred {

@@ -110,7 +110,7 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_cmsgcred)]
     #[inline]
     pub fn sendable_cmsgcred() -> Self {
-        Self(CredentialsImpl::Cmsgcred(freebsdlike::ZEROED_CMSGCRED))
+        Self(CredentialsImpl::Cmsgcred(freebsdlike::ZEROED_CMSGCRED.as_ref()))
     }
     /// Creates a `Credentials` ancillary data struct of the `sockcred` variety to be sent as a control message. The
     /// underlying value is zeroed out and automatically filled in by the kernel.
@@ -129,7 +129,7 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_sockcred)]
     #[inline]
     pub fn sendable_sockcred() -> Self {
-        Self(CredentialsImpl::Sockcred(freebsdlike::ZEROED_SOCKCRED))
+        Self(CredentialsImpl::Sockcred(freebsdlike::ZEROED_SOCKCRED.as_ref()))
     }
 }
 

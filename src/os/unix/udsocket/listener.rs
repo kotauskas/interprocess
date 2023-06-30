@@ -92,6 +92,11 @@ impl UdStreamListener {
         // number, why? If std has solid reasons to do this, remove this notice and
         // document the method's behavior on this matter explicitly; otherwise, add
         // an option to change this value.
+        // UPD: the value of 128 is actually the typical one for SOMAXCONN, but that
+        // constant is unavailable at least on Redox (and possibly on other systems
+        // too). TODO add a conditional-compilation-powered way to set this to the
+        // absolute highest possible value, or maybe provide a method with a parameter
+        // to customize it.
         c_wrappers::listen(fd.0.as_fd(), 128)?;
 
         let dg = if keep_drop_guard {
