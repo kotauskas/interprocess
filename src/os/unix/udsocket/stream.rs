@@ -9,10 +9,7 @@ use crate::{
     TryClone,
 };
 use libc::{sockaddr_un, SOCK_STREAM};
-use std::{
-    fmt::{self, Debug, Formatter},
-    io::{self, IoSlice, IoSliceMut, Read, Write},
-};
+use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use to_method::To;
 
 /// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by
@@ -33,6 +30,7 @@ use to_method::To;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 // TODO update with comments and stuff
+#[derive(Debug)]
 pub struct UdStream(FdOps);
 impl UdStream {
     /// Connects to a Unix domain socket server at the specified path.
@@ -190,12 +188,6 @@ impl Write for UdStream {
     fn flush(&mut self) -> io::Result<()> {
         // You cannot flush a socket
         Ok(())
-    }
-}
-
-impl Debug for UdStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("UdStream").field(&self.as_raw_fd()).finish()
     }
 }
 

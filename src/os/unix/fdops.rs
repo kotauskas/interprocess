@@ -1,6 +1,7 @@
 use super::{c_wrappers, unixprelude::*};
 use crate::TryClone;
 use std::{
+    fmt::{self, Debug, Formatter},
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::fd::OwnedFd,
 };
@@ -52,6 +53,12 @@ impl Write for &FdOps {
     fn flush(&mut self) -> io::Result<()> {
         let success = unsafe { libc::fsync(self.0.as_raw_fd()) >= 0 };
         ok_or_ret_errno!(success => ())
+    }
+}
+impl Debug for FdOps {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&self.0, f)
     }
 }
 

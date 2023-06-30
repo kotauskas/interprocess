@@ -15,7 +15,6 @@ use crate::{
 };
 use libc::{sockaddr_un, SOCK_DGRAM};
 use std::{
-    fmt::{self, Debug, Formatter},
     io::{self, prelude::*, IoSlice, IoSliceMut},
     mem::{size_of_val, zeroed},
     os::raw::c_void,
@@ -25,7 +24,7 @@ use to_method::To;
 /// A datagram socket in the Unix domain.
 ///
 /// All such sockets have the `SOCK_DGRAM` socket type; in other words, this is the Unix domain version of a UDP socket.
-// TODO derive Debug
+#[derive(Debug)]
 pub struct UdDatagram {
     // TODO make this not 'static
     _drop_guard: PathDropGuard<'static>,
@@ -359,15 +358,6 @@ impl UdDatagram {
             // SAFETY: make_msghdr_w is good at its job
             c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
         }
-    }
-}
-
-impl Debug for UdDatagram {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UdDatagram")
-            .field("fd", &self.as_raw_fd())
-            .field("has_drop_guard", &self._drop_guard.enabled)
-            .finish()
     }
 }
 
