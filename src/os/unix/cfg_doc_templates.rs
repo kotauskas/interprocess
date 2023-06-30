@@ -5,8 +5,9 @@
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
+        target_os = "redox",
         target_os = "android",
-        target_os = "redox"
+        target_os = "fuchsia",
     )))
 )]
 
@@ -14,7 +15,20 @@
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "freebsd",
-        target_os = "dragonfly"
+        target_os = "dragonfly",
+    )))
+)]
+
+
+#[cfg_attr( // uds_credentials template
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "freebsd",
+        target_os = "dragonfly",
     )))
 )]
 

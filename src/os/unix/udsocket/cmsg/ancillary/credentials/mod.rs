@@ -43,8 +43,9 @@ impl<'a> Credentials<'a> {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "emscripten",
-            target_os = "redox"
+            target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]
@@ -62,8 +63,9 @@ impl<'a> Credentials<'a> {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "emscripten",
-            target_os = "redox"
+            target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]
@@ -81,8 +83,9 @@ impl<'a> Credentials<'a> {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "emscripten",
-            target_os = "redox"
+            target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]
@@ -101,7 +104,7 @@ impl<'a> Credentials<'a> {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "freebsd",
-            target_os = "dragonfly"
+            target_os = "dragonfly",
         )))
     )]
     #[cfg(uds_cmsgcred)]
@@ -119,12 +122,9 @@ impl<'a> Credentials<'a> {
     /// The `LOCAL_CREDS` option must be *enabled* for this ancillary data struct to be sent.
     ///
     /// [mp]: https://man.freebsd.org/cgi/man.cgi?query=unix&sektion=0&manpath=FreeBSD+13.2-RELEASE+and+Ports
-    #[cfg_attr( // uds_cmsgcred template
+    #[cfg_attr( // uds_sockcred template
         feature = "doc_cfg",
-        doc(cfg(any(
-            target_os = "freebsd",
-            target_os = "dragonfly"
-        )))
+        doc(cfg(any(target_os = "freebsd")))
     )]
     #[cfg(uds_sockcred)]
     #[inline]
@@ -162,12 +162,13 @@ impl Collector for Context {
 ///
 /// It's impossible to cause undefined behavior in sound code by sending wrong values, and the send operation will
 /// simply return an error.
-#[cfg_attr(
+#[cfg_attr( // uds_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
-        target_os = "android",
         target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
         target_os = "freebsd",
         target_os = "dragonfly",
     )))
@@ -177,12 +178,13 @@ impl ToCmsg for Credentials<'_> {
         self.0.to_cmsg()
     }
 }
-#[cfg_attr(
+#[cfg_attr( // uds_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
-        target_os = "android",
         target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
         target_os = "freebsd",
         target_os = "dragonfly",
     )))

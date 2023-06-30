@@ -7,12 +7,13 @@
 // TODO SCM_CREDS2 from FreeBSD
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
 
-#[cfg_attr(
+#[cfg_attr( // uds_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
-        target_os = "emscripten",
         target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
         target_os = "freebsd",
         target_os = "dragonfly",
     )))

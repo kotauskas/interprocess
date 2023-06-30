@@ -35,8 +35,9 @@ pub trait UdSocket: AsFd {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "android",
             target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]
@@ -51,16 +52,18 @@ pub trait UdSocket: AsFd {
     ///
     /// Note that this has absolutely no effect on explicit sending of credentials – that can be done regardless of
     /// whether this option is enabled.
-    #[cfg_attr(
+    #[cfg_attr( // uds_credentials template
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "android",
             target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
             target_os = "freebsd",
+            target_os = "dragonfly",
         )))
     )]
-    #[cfg(any(uds_ucred, uds_sockcred))]
+    #[cfg(uds_credentials)]
     #[inline]
     fn set_continuous_ancillary_credentials(&self, val: bool) -> io::Result<()> {
         c_wrappers::set_continuous_ancillary_cred(self.as_fd(), val)
