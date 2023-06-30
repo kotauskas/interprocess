@@ -108,6 +108,8 @@ pub enum ParseErrorKind<E = Infallible> {
         /// The `cmsg_type` that was received.
         got: c_int,
     },
+    /// Necessary context was not collected.
+    InsufficientContext,
     /// The control message data does not conform to the format of the ancillary data message type, with an explanatory
     /// error value.
     MalformedPayload(E),
@@ -126,6 +128,7 @@ impl<E> ParseErrorKind<E> {
             Self::MalformedPayload(e) => ParseErrorKind::MalformedPayload(f(e)),
             Self::WrongLevel { expected, got } => ParseErrorKind::WrongLevel { expected, got },
             Self::WrongType { expected, got } => ParseErrorKind::WrongType { expected, got },
+            Self::InsufficientContext => ParseErrorKind::InsufficientContext,
         }
     }
 }
@@ -135,6 +138,7 @@ impl<E: Display> Display for ParseErrorKind<E> {
         let msg_base = match self {
             WrongLevel { .. } => "wrong cmsg_level",
             WrongType { .. } => "wrong cmsg_type",
+            InsufficientContext => "insufficient context",
             MalformedPayload(..) => "malformed control message",
         };
 
@@ -147,6 +151,7 @@ impl<E: Display> Display for ParseErrorKind<E> {
                 write!(f, "got {got}")
             }
             MalformedPayload(e) => write!(f, "{msg_base}: {e}"),
+            _ => f.write_str(msg_base),
         }
     }
 }
