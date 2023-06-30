@@ -1,3 +1,8 @@
+//! Credential table for portable secure authentication.
+//!
+//! [`Credentials`] is the table type itself – see its own documentation for more on where and how it is used.
+//! [`Groups`] is an iterator produced by `Credentials` that enumerates supplementary groups stored in the table.
+
 #[cfg(uds_cmsgcred)]
 pub(super) mod freebsdlike;
 #[cfg(uds_ucred)]

@@ -17,6 +17,10 @@
 //! UDP-like datagrams or TCP-like byte streams.
 
 pub mod cmsg;
+
+#[cfg(any(uds_ucred, uds_cmsgcred))]
+pub mod credentials;
+
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
@@ -42,18 +46,13 @@ pub use {datagram::*, listener::*, path::*, socket_trait::*, stream::*};
         target_os = "dragonfly",
     )))
 )]
-#[cfg(any(uds_ucred, uds_cmsgcred))]
-mod credentials;
-#[cfg(any(uds_ucred, uds_cmsgcred))]
-pub use credentials::*;
-
 mod path_drop_guard;
 use path_drop_guard::*;
 
 mod c_wrappers;
 
-/// The maximum path length for Unix domain sockets. [`UdStreamListener::bind()`] panics if the specified path exceeds
-/// this value.
+/// The maximum path length for Unix domain sockets. [`UdStreamListener::bind()`] panics if the length of the specified
+/// path exceeds this value.
 ///
 /// When using the [socket namespace](UdSocketPath::Namespaced), this value is reduced by 1, since enabling the usage of
 /// that namespace takes up one character.
