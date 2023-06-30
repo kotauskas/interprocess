@@ -2,11 +2,25 @@ use crate::os::unix::udsocket::{
     cmsg::{ancillary::*, Cmsg},
     credentials::ucred::*,
 };
-#[cfg(uds_sockcred)]
-use libc::sockcred;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
 use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
 use to_method::*;
+
+#[cfg(uds_sockcred)]
+use {crate::os::unix::udsocket::c_wrappers, libc::sockcred};
+
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub(super) struct CredsOptContext {
+    local_creds: bool,
+}
+impl Collector for CredsOptContext {
+    fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
+        #[cfg(uds_sockcred)]
+        if let Ok(val) = c_wrappers::get_local_creds(socket) {
+            self.local_creds = val;
+        }
+    }
+}
 
 impl Credentials<'_> {
     pub const ANCTYPE: c_int = libc::SCM_CREDS;

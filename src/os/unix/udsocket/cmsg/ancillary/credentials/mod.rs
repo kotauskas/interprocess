@@ -1,15 +1,24 @@
 //! [`Credentials`] as an ancillary message type.
 //!
-//! Provided for consistency with [`FileDescriptors`](super::file_descriptors). There is absolutely nothing special
-//! about this re-export – it's the exact same thing as
-//! [`udsocket::credentials`](crate::os::unix::udsocket::credentials).
+//! In addition to what's re-exported from [`udsocket::credentials`](crate::os::unix::udsocket::credentials), this
+//! module contains the context type required to deserialize ancillary messages of the [`Credentials`] variety.
 
 #[cfg(uds_cmsgcred)]
 mod freebsdlike;
 #[cfg(uds_ucred)]
 mod ucred;
 
+cfg_if::cfg_if! {
+    if #[cfg(uds_sockcred)] {
+        use freebsdlike::CredsOptContext as PlatformContext;
+    } else {
+        use crate::os::unix::udsocket::cmsg::context::DummyCollector as PlatformContext;
+    }
+}
+
 use super::*;
+use crate::os::unix::{udsocket::cmsg::context::Collector, unixprelude::*};
+use std::cell::Cell;
 
 pub use crate::os::unix::udsocket::credentials::*;
 
@@ -124,6 +133,26 @@ impl<'a> Credentials<'a> {
     }
 }
 
+/// A context [`Collector`] required for parsing of [`Credentials`].
+///
+/// Allowing this collector to collect the necessary context is mandatory on all platforms on which `Credentials`
+/// exists, but it only serves a purpose on FreeBSD: obtaining the value of the `LOCAL_CREDS` socket option to
+/// disambiguate `cmsgcred` and `sockcred`.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct Context {
+    fresh: Cell<bool>,
+    platform: PlatformContext,
+}
+impl Collector for Context {
+    fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
+        self.platform.pre_op_collect(socket);
+    }
+    fn post_op_collect(&mut self, socket: BorrowedFd<'_>, msghdr_flags: c_int) {
+        self.fresh.set(true);
+        self.platform.post_op_collect(socket, msghdr_flags);
+    }
+}
+
 /// Sending will set the credentials that the receieving end will read with `SO_PASSCRED`.
 ///
 /// The kernel checks the contents of those ancillary messages to make sure that unprivileged processes can't
@@ -133,17 +162,41 @@ impl<'a> Credentials<'a> {
 ///
 /// It's impossible to cause undefined behavior in sound code by sending wrong values, and the send operation will
 /// simply return an error.
-// TODO platform-specific?
+#[cfg_attr(
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "redox",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    )))
+)]
 impl ToCmsg for Credentials<'_> {
     fn to_cmsg(&self) -> Cmsg<'_> {
         self.0.to_cmsg()
     }
 }
+#[cfg_attr(
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "redox",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    )))
+)]
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
-    type Context = (); // TODO
+    type Context = Context;
     #[inline]
     fn try_parse(cmsg: Cmsg<'a>, ctx: &Self::Context) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+        if !ctx.fresh.get() {
+            // Give me downstream portability or give me death!
+            return Err(ParseErrorKind::InsufficientContext.wrap(cmsg));
+        }
+        ctx.fresh.set(false);
         CredentialsImpl::try_parse(cmsg, ctx).map(Self)
     }
 }

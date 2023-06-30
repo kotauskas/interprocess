@@ -157,6 +157,12 @@ pub(super) fn set_oneshot_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::R
     }
     set_local_creds(fd, val)
 }
+#[cfg(uds_sockcred)]
+pub(super) fn get_local_creds(fd: BorrowedFd<'_>) -> io::Result<bool> {
+    let mut out: c_int = 0;
+    get_socket_option(fd, libc::SOL_SOCKET, libc::LOCAL_CREDS, &mut out)?;
+    Ok(out != 0)
+}
 #[cfg(uds_ucred)]
 pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
     use libc::ucred;
