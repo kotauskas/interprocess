@@ -75,7 +75,8 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
     pub fn cmsgs(&self) -> Cmsgs<'b, 'c, C> {
         Cmsgs::new(*self)
     }
-    /// Returns an iterator that wraps [`cmsgs()`](Self::cmsgs) and decodes them into [`Ancillary`] structs.
+    /// Returns an iterator that wraps [`cmsgs()`](Self::cmsgs) and decodes them into the ancillary type of your
+    /// choosing. (A handy choice is [`Ancillary`](super::ancillary::Ancillary).)
     #[inline]
     pub fn decode<'slf: 'c, A: FromCmsg<'b, Context = C>>(&'slf self) -> Decode<'b, 'c, A>
     where

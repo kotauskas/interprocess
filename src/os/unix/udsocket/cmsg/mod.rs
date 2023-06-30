@@ -26,7 +26,10 @@ use std::{
 
 /// A **c**ontrol **m**e**s**sa**g**e, consisting of a level, type and its payload.
 ///
-/// The type encodes the memory safety of the control message with the specified level, type and payload being sent, in the form of a safety guarantee. It intentionally does not implement [`Copy`] and [`Clone`] because control messages, as exemplified by [`ancillary::FileDescriptors`], can transfer ownership over resources, which requires that only move semantics be provided.
+/// The type encodes the memory safety of the control message with the specified level, type and payload being sent, in
+/// the form of a safety guarantee. It intentionally does not implement [`Copy`] and [`Clone`] because control messages,
+/// as exemplified by [`ancillary::FileDescriptors`](ancillary::file_descriptors::FileDescriptors), can transfer
+/// ownership over resources, which requires that only move semantics be provided.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Cmsg<'a> {
     cmsg_level: c_int,
@@ -75,7 +78,11 @@ impl<'a> Cmsg<'a> {
     /// Clones the control message. No special treatment of the contained data is performed, and the struct is simply copied bitwise, with the data slice pointing to the same memory.
     ///
     /// # Safety
-    /// As outlined in the [struct-level documentation](Cmsg), control messages can potentially and unknowingly have ownership over resources (such as [file descriptors](ancillary::FileDescriptors)), which means that cloning the raw control message and then parsing it twice can lead to a double-free scenario. This method should only be called if the original copy then never gets parsed, is known to not own any resources as per `cmsg_level` and `cmsg_type` or if the potential unsafe double-free outcome is averted by some other means.
+    /// As outlined in the [struct-level documentation](Cmsg), control messages can potentially and unknowingly have
+    /// ownership over resources (such as [file descriptors](ancillary::file_descriptors::FileDescriptors)), which means
+    /// that cloning the raw control message and then parsing it twice can lead to a double-free scenario. This method
+    /// should only be called if the original copy then never gets parsed, is known to not own any resources as per
+    /// `cmsg_level` and `cmsg_type` or if the potential unsafe double-free outcome is averted by some other means.
     #[inline(always)]
     pub const unsafe fn clone_unchecked(&self) -> Self {
         Self {

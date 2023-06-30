@@ -22,6 +22,9 @@ use std::{
 };
 
 /// A context collector to hook into a Ud-socket read/write operation.
+///
+/// To later use the gathered context during zero-copy deserialization of ancillary messages, it is necessary to wrap
+/// objects that implement this trait into a [`Container`], such as the [`CollectorContainer`].
 #[allow(unused_variables)]
 pub trait Collector {
     /// Called right before the call to `recvmsg` or `sendmsg`, providing a borrow of the file descriptor of the socket.
@@ -53,6 +56,9 @@ impl<T: Collector> Collector for Box<T> {
 
 /// A context container that can provide information about an I/O call to the ancillary message parsers that read its
 /// output.
+/// 
+/// Types that implement this trait can be used during zero-copy deserialization of ancillary messages. They normally
+/// also implement `Collector`, but since that is a functionally separate.
 pub trait Container {
     /// Retrieves the context collector of the given type or returns `None` if no such context is available.
     fn get_context<C: Collector + 'static>(&self) -> Option<&C>;
