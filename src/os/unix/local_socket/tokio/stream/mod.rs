@@ -4,17 +4,15 @@ pub use read_half::*;
 mod write_half;
 pub use write_half::*;
 
-use {
-    super::super::local_socket_name_to_ud_socket_path,
-    crate::{local_socket::ToLocalSocketName, os::unix::udsocket::tokio::UdStream},
-    futures_io::{AsyncRead, AsyncWrite},
-    std::{
-        fmt::{self, Debug, Formatter},
-        io::{self, IoSlice, IoSliceMut},
-        os::unix::io::AsRawFd,
-        pin::Pin,
-        task::{Context, Poll},
-    },
+use super::super::local_socket_name_to_ud_socket_path;
+use crate::{local_socket::ToLocalSocketName, os::unix::udsocket::tokio::UdStream};
+use futures_io::{AsyncRead, AsyncWrite};
+use std::{
+    fmt::{self, Debug, Formatter},
+    io::{self, IoSlice, IoSliceMut},
+    os::unix::io::AsRawFd,
+    pin::Pin,
+    task::{Context, Poll},
 };
 
 pub struct LocalSocketStream(pub(super) UdStream);
@@ -26,16 +24,6 @@ impl LocalSocketStream {
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         let (r, w) = self.0.into_split();
         (OwnedReadHalf(r), OwnedWriteHalf(w))
-    }
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        #[cfg(uds_ucred)]
-        {
-            self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
-        }
-        #[cfg(not(uds_ucred))]
-        {
-            Err(io::Error::new(io::ErrorKind::Other, "not supported"))
-        }
     }
     fn pinproj(&mut self) -> Pin<&mut UdStream> {
         Pin::new(&mut self.0)

@@ -11,16 +11,6 @@ use {
 
 pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
 impl OwnedWriteHalf {
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        #[cfg(uds_ucred)]
-        {
-            self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
-        }
-        #[cfg(not(uds_ucred))]
-        {
-            Err(io::Error::new(io::ErrorKind::Other, "not supported"))
-        }
-    }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
         Pin::new(&mut self.0)

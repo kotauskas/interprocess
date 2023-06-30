@@ -18,16 +18,6 @@ impl LocalSocketStream {
         let inner = UdStream::connect(path)?;
         Ok(Self(inner))
     }
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        #[cfg(uds_ucred)]
-        {
-            self.0.get_peer_credentials().map(|ucred| ucred.pid as u32)
-        }
-        #[cfg(not(uds_ucred))]
-        {
-            Err(io::Error::new(io::ErrorKind::Other, "not supported"))
-        }
-    }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }

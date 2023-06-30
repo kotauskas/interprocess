@@ -64,21 +64,14 @@ impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         Ok(Self(LocalSocketStreamImpl::connect(name)?))
     }
-    /// Retrieves the identifier of the process on the opposite end of the local socket connection.
-    ///
-    /// # Platform-specific behavior
-    /// ## macOS and iOS
-    /// Not supported by the OS, will always generate an error at runtime.
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        self.0.peer_pid()
-    }
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
-    /// In nonblocking mode, reading and writing will immediately return with the [`WouldBlock`] error in situations when they would normally block for an uncontrolled amount of time. The specific situations are:
+    /// In nonblocking mode, reading and writing will immediately return with the
+    /// [`WouldBlock`](io::ErrorKind::WouldBlock) error in situations when they would normally block for an uncontrolled
+    /// amount of time. The specific situations are:
     /// - When reading is attempted and there is no new data available;
-    /// - When writing is attempted and the buffer is full due to the other side not yet having read previously sent data.
-    ///
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
+    /// - When writing is attempted and the buffer is full due to the other side not yet having read previously sent
+    /// data.
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }

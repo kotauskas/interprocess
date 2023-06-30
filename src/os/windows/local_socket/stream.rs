@@ -18,13 +18,6 @@ impl LocalSocketStream {
         Ok(Self(inner))
     }
     #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.0.is_server() {
-            true => self.0.client_process_id(),
-            false => self.0.server_process_id(),
-        }
-    }
-    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }

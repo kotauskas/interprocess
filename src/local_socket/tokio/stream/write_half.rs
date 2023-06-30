@@ -20,15 +20,6 @@ impmod! {local_socket::tokio,
 /// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
 pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
 impl OwnedWriteHalf {
-    /// Retrieves the identifier of the process on the opposite end of the local socket connection.
-    ///
-    /// # Platform-specific behavior
-    /// ## macOS and iOS
-    /// Not supported by the OS, will always generate an error at runtime.
-    #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        self.0.peer_pid()
-    }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
         Pin::new(&mut self.0)

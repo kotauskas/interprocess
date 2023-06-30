@@ -86,15 +86,6 @@ impl LocalSocketStream {
         let (r, w) = self.0.into_split();
         (OwnedReadHalf(r), OwnedWriteHalf(w))
     }
-    /// Retrieves the identifier of the process on the opposite end of the local socket connection.
-    ///
-    /// # Platform-specific behavior
-    /// ## macOS and iOS
-    /// Not supported by the OS, will always generate an error at runtime.
-    #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        self.0.peer_pid()
-    }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
         Pin::new(&mut self.0)

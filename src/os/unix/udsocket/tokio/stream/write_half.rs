@@ -25,8 +25,9 @@ impl<'a> BorrowedWriteHalf<'a> {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "android",
             target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]
@@ -102,8 +103,9 @@ impl OwnedWriteHalf {
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
-            target_os = "android",
             target_os = "redox",
+            target_os = "android",
+            target_os = "fuchsia",
         )))
     )]
     #[cfg(uds_ucred)]

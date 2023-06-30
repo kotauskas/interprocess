@@ -13,13 +13,6 @@ type WriteHalfImpl = SendHalf<pipe_mode::Bytes>;
 
 pub struct OwnedWriteHalf(pub(super) WriteHalfImpl);
 impl OwnedWriteHalf {
-    #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.0.is_server() {
-            true => self.0.client_process_id(),
-            false => self.0.server_process_id(),
-        }
-    }
     fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
         Pin::new(&mut self.0)
     }

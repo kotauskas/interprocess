@@ -29,13 +29,6 @@ impl LocalSocketStream {
         Ok(Self(inner))
     }
     #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.0.is_server() {
-            true => self.0.client_process_id(),
-            false => self.0.server_process_id(),
-        }
-    }
-    #[inline]
     pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
         let (r, w) = self.0.split();
         (OwnedReadHalf(r), OwnedWriteHalf(w))

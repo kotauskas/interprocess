@@ -13,13 +13,6 @@ type ReadHalfImpl = RecvHalf<pipe_mode::Bytes>;
 
 pub struct OwnedReadHalf(pub(super) ReadHalfImpl);
 impl OwnedReadHalf {
-    #[inline]
-    pub fn peer_pid(&self) -> io::Result<u32> {
-        match self.0.is_server() {
-            true => self.0.client_process_id(),
-            false => self.0.server_process_id(),
-        }
-    }
     fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
         Pin::new(&mut self.0)
     }
