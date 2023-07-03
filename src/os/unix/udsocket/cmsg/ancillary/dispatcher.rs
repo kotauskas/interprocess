@@ -1,4 +1,4 @@
-#[cfg(any(uds_ucred, uds_cmsgcred))]
+#[cfg(uds_credentials)]
 use super::credentials::{Context as CredentialsContext, Credentials};
 use super::{
     file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, SizeMismatch, LEVEL,
@@ -58,7 +58,7 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
         // let's get down to jump tables
         match cmsg.cmsg_type() {
             FileDescriptors::ANCTYPE => Self::parse_fd(cmsg),
-            #[cfg(any(uds_ucred, uds_cmsgcred))]
+            #[cfg(uds_credentials)]
             Credentials::ANCTYPE => Self::parse_credentials(cmsg, &ctx.credentials),
             _ => Err(ParseError {
                 cmsg,

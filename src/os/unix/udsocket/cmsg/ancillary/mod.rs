@@ -18,7 +18,7 @@
         target_os = "dragonfly",
     )))
 )]
-#[cfg(any(uds_ucred, uds_cmsgcred))]
+#[cfg(uds_credentials)]
 pub mod credentials;
 pub mod file_descriptors;
 
@@ -203,7 +203,7 @@ fn check_level_and_type<E>(mut cmsg: Cmsg<'_>, expected: c_int) -> ParseResult<'
     check_type(cmsg, expected)
 }
 
-#[cfg(any(uds_ucred, uds_cmsgcred))]
+#[cfg(uds_credentials)]
 fn check_size<E: From<SizeMismatch>>(cmsg: Cmsg<'_>, expected: usize) -> ParseResult<'_, Cmsg<'_>, E> {
     let got = cmsg.data().len();
     if got != expected {
