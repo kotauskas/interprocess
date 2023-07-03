@@ -13,10 +13,8 @@
 pub(crate) mod imports;
 
 mod fdops;
-// pub(self) is just a fancy way of saying priv (i.e. no access modifier), but
-// we want to make it clear that we're exporting to child modules here rather
-// than importing for use within this module.
-pub(self) use fdops::*;
+// Exported into child modules specifically, not this file.
+use fdops::*;
 
 pub mod fifo_file;
 
