@@ -51,13 +51,59 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
     type Context = Context;
 
-    fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
+    fn try_parse(mut cmsg: Cmsg<'a>, ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
-        todo!()
+        if ctx.platform.local_creds {
+            // LOCAL_CREDS is set
+            #[cfg(not(uds_sockcred))]
+            {
+                unreachable!("corrupted context (LOCAL_CREDS reported set on a platform that doesn't support it)")
+            }
+            #[cfg(uds_sockcred)]
+            {
+                let min_expected = size_of::<sockcred>();
+                let len = cmsg.data().len();
+                if len < min_expected {
+                    // If this is false, we can't even do the reinterpret and figure out the number
+                    // of supplementary groups; prioritize formal soundness over error reporting
+                    // precision in this niche case and claim to expect the base size of sockcred.
+                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
+                        expected: min_expected,
+                        got: len,
+                    })
+                   .wrap(cmsg));
+                }
+
+                let creds = unsafe {
+                    // SAFETY: POD
+                    &*cmsg.data().as_ptr().cast::<sockcred>()
+                };
+
+                let expected = unsafe { libc::SOCKCREDSIZE(creds.sc_ngroups as _) };
+                if len != expected {
+                    // The rest of the size error reporting process happens here.
+                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
+                        expected: min_expected,
+                        got: len,
+                    })
+                   .wrap(cmsg));
+                }
+
+                Ok(Self::Sockcred(creds.as_ref()))
+            }
+        } else {
+            // TODO unify with ucred deserialization
+            cmsg = check_size(cmsg, size_of::<cmsgcred>())?;
+
+            let creds = unsafe {
+                // SAFETY: POD
+                &*cmsg.data().as_ptr().cast::<cmsgcred>()
+            }
+            .as_ref();
+            Ok(Self::Cmsgcred(creds))
+        }
     }
 }
-
-// TODO don't forget FromCmsg size checks
 
 pub(super) static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
     cmcred_pid: 0,
