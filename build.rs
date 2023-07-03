@@ -84,15 +84,21 @@ fn collect_uds_features(target: &TargetTriplet) {
         ])
     }
     if ucred || cmsgcred || sockcred {
+        let mut contcred = false;
         define("uds_credentials");
         if ucred {
+            contcred = true;
             define("uds_ucred");
         }
         if cmsgcred {
             define("uds_cmsgcred");
+            if sockcred {
+                contcred = true;
+                define("uds_sockcred");
+            }
         }
-        if sockcred {
-            define("uds_sockcred");
+        if contcred {
+            define("uds_cont_credentials");
         }
     }
 }

@@ -52,7 +52,7 @@ pub trait UdSocket: AsFd {
     ///
     /// Note that this has absolutely no effect on explicit sending of credentials – that can be done regardless of
     /// whether this option is enabled.
-    #[cfg_attr( // uds_credentials template
+    #[cfg_attr( // uds_cont_credentials template
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
@@ -60,14 +60,21 @@ pub trait UdSocket: AsFd {
             target_os = "android",
             target_os = "fuchsia",
             target_os = "freebsd",
-            target_os = "dragonfly",
         )))
     )]
-    #[cfg(uds_credentials)]
+    #[cfg(uds_cont_credentials)]
     #[inline]
     fn set_continuous_ancillary_credentials(&self, val: bool) -> io::Result<()> {
         c_wrappers::set_continuous_ancillary_cred(self.as_fd(), val)
     }
+    /// Enables or disables one-time reception of credentials via ancillary data.
+    ///
+    /// After this option is set to `true`, the next ancillary-enabled receive call will return a table of credentials
+    /// of the process on the other side, directly associated with the data being received. The operation, upon
+    /// successful return from the kernel, will already have atomically set this option back to `false`.
+    ///
+    /// Note that this has absolutely no effect on explicit sending of credentials – that can be done regardless of
+    /// whether this option is enabled.
     #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "freebsd")))]
     #[cfg(uds_sockcred)]
     #[inline]
