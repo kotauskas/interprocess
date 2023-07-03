@@ -29,7 +29,7 @@ use super::*;
 use std::{
     convert::Infallible,
     error::Error,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
 };
 
 const LEVEL: c_int = libc::SOL_SOCKET;

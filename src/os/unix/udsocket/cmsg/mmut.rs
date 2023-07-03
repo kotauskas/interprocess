@@ -1,7 +1,9 @@
+// TODO rewrite this garbage
 use super::{ancillary::ToCmsg, context::DummyCollector, *};
 use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, DUMMY_MSGHDR};
 use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
 use std::{
+    borrow::BorrowMut,
     io,
     mem::{size_of, transmute, zeroed, MaybeUninit},
     num::NonZeroUsize,
@@ -9,7 +11,6 @@ use std::{
     ptr, slice,
 };
 
-type MUu8 = MaybeUninit<u8>;
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
 #[derive(Debug)]
 pub struct CmsgMut<'b, C = DummyCollector> {
@@ -29,7 +30,7 @@ impl<'b> CmsgMut<'b> {
     /// The buffer's length must not overflow `isize`.
     pub fn new(buf: &'b mut [MaybeUninit<u8>]) -> Self {
         Self {
-            buf: Self::validate_buf(buf).expect("buffer size overflowed `isize`"),
+            buf,
             init_len: 0,
             cmsghdr_offset: None,
             context_collector: DummyCollector,
@@ -44,22 +45,12 @@ impl<'b> From<&'b mut [MaybeUninit<u8>]> for CmsgMut<'b> {
 }
 impl<'b, C> CmsgMut<'b, C> {
     /// Creates a control message buffer from the given uninitialized slice and with the given context collector.
-    ///
-    /// # Panics
-    /// The buffer's length must not overflow `isize`.
     pub fn new_with_collector(buf: &'b mut [MaybeUninit<u8>], context_collector: C) -> Self {
         Self {
-            buf: Self::validate_buf(buf).expect("buffer size overflowed `isize`"),
+            buf,
             init_len: 0,
             cmsghdr_offset: None,
             context_collector,
-        }
-    }
-    fn validate_buf(buf: &'b mut [MUu8]) -> Result<&'b mut [MUu8], BufferTooBig<&'b mut [MUu8], MUu8>> {
-        if isize::try_from(buf.len()).is_ok() {
-            Ok(buf)
-        } else {
-            Err(BufferTooBig(buf))
         }
     }
 
@@ -75,6 +66,61 @@ impl<'b, C> CmsgMut<'b, C> {
             // is validated by the unsafe Cmsg factory function.
             CmsgRef::new_unchecked_with_context(immslc, &self.context_collector)
         }
+    }
+
+    /// Splits the buffer into two parts: one filled to the brim with ancillary data and without a context collector,
+    /// the other completely uninitialized and with the source buffer's context collector inherited, ready to be used
+    /// for reads. Either of the two may be empty depending on the state of the buffer.
+    pub fn split_at_init<NC>(&mut self) -> (CmsgMut<'_>, CmsgMut<'_, &mut NC>)
+    where
+        C: BorrowMut<NC>,
+    {
+        let Range { start, end } = self.buf.as_mut_ptr_range();
+
+        // Must first fill real buffer size for borrow_next_cmsghdr to read later
+        let hdr = Self::make_msghdr(self);
+
+        let base = unsafe {
+            // SAFETY: we just filled out the msghdr correctly with fill_dummy_msghdr()
+            match self.borrow_next_cmsghdr(&hdr) {
+                Some(c) => (c as *mut MaybeUninit<_>).cast::<MaybeUninit<u8>>(),
+                None => end.cast::<MaybeUninit<u8>>(),
+            }
+        };
+        let len_left = unsafe {
+            // SAFETY: borrow_next_cmsghdr() would never return a pointer outside the buffer, would it?
+            base.offset_from(start)
+        };
+        let len_right = unsafe {
+            // SAFETY: same here.
+            end.offset_from(base)
+        };
+        debug_assert!(len_left >= 0);
+        debug_assert!(len_right >= 0);
+
+        let left = unsafe {
+            // SAFETY: both are inside the original buffer.
+            slice::from_raw_parts_mut(start, len_left as usize)
+        };
+        let right = unsafe {
+            // SAFETY: same here.
+            slice::from_raw_parts_mut(base, len_right as usize)
+        };
+
+        (
+            CmsgMut {
+                buf: left,
+                init_len: self.init_len,
+                cmsghdr_offset: None, // FIXME could reuse from self by handling edge cases
+                context_collector: DummyCollector,
+            },
+            CmsgMut {
+                buf: right,
+                init_len: 0,
+                cmsghdr_offset: None,
+                context_collector: self.context_collector.borrow_mut(),
+            },
+        )
     }
 
     /// Assumes that the first `len` bytes of the buffer are well-initialized and valid control message buffer data.
@@ -109,28 +155,8 @@ impl<'b, C> CmsgMut<'b, C> {
     }
 
     pub(crate) fn fill_real_msghdr(&mut self, hdr: &mut msghdr) -> io::Result<()> {
-        let Range { start, end } = self.buf.as_mut_ptr_range();
-        self.fill_dummy_msghdr(hdr)?; // Must first fill real buffer size for prepare_cmsghdr to read later
-        let base = unsafe {
-            // SAFETY: we just filled out the msghdr correctly with fill_dummy_msghdr()
-            match self.prepare_cmsghdr(hdr) {
-                Some(c) => (c as *mut MaybeUninit<_>).cast::<c_void>(),
-                None => {
-                    // It's good, I checked the kernel sources
-                    hdr.msg_control = start.cast();
-                    hdr.msg_controllen = 0;
-                    return Ok(());
-                }
-            }
-        };
-        let len = unsafe {
-            // SAFETY: prepare_cmsghdr() would never return a pointer outside the buffer, would it?
-            end.offset_from(base.cast::<MaybeUninit<u8>>())
-        };
-        debug_assert!(len >= 0);
-        hdr.msg_control = base;
-        hdr.msg_controllen = to_msghdr_controllen(len as usize)?;
-        Ok(())
+        // The operation we want is equivalent to Filling the entirety of the right side of the split into the msghdr
+        self.split_at_init().1.fill_dummy_msghdr(hdr)
     }
     fn fill_dummy_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
         hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
@@ -139,7 +165,7 @@ impl<'b, C> CmsgMut<'b, C> {
     }
     fn make_msghdr(&self) -> msghdr {
         let mut hdr = DUMMY_MSGHDR;
-        self.fill_dummy_msghdr(&mut hdr).expect("too big");
+        self.fill_dummy_msghdr(&mut hdr).expect("failed to fill dummy msghdr");
         hdr
     }
 
@@ -156,6 +182,7 @@ impl<'b, C> CmsgMut<'b, C> {
         if buf.len() < size_of::<cmsghdr>() {
             return None;
         }
+        // FIXME CMSG_FIRSTHDR assumes proper alignment
         let first_ptr = unsafe { CMSG_FIRSTHDR(dummy_msghdr) }.cast::<MaybeUninit<_>>();
         if first_ptr.is_null() {
             return None;
@@ -280,34 +307,20 @@ impl<'b, C> CmsgMut<'b, C> {
         }
     }
     /// Returns a reference to the next `cmsghdr`, depending on the value of `self.cmghdr_offset`: if it's `None`, uses
-    /// `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`.
+    /// `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`. Does not adjust `cmsghdr_offset`.
     ///
     /// # Safety
     /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
-    unsafe fn prepare_cmsghdr<'x>(&'x mut self, dummy_msghdr: &msghdr) -> Option<&'x mut MaybeUninit<cmsghdr>> {
-        let origin = self.buf.as_ptr_range().start;
-
-        let cmsghdr = unsafe {
+    unsafe fn borrow_next_cmsghdr(&mut self, dummy_msghdr: &msghdr) -> Option<&mut MaybeUninit<cmsghdr>> {
+        unsafe {
             if self.cmsghdr_offset.is_none() && self.init_len != 0 {
                 self.find_cmsghdr_offset_from_init(dummy_msghdr);
             }
             match self.cmsghdr_offset {
                 None => Self::prepare_first_cmsghdr(self.buf, dummy_msghdr),
                 Some(offset) => Self::next_cmsghdr(self.buf, dummy_msghdr, offset.get()),
-            }?
-        };
-
-        let offset = unsafe {
-            // SAFETY: the prepare methods return references within the slice, I promise!
-            (cmsghdr as *mut MaybeUninit<cmsghdr>)
-                .cast::<MaybeUninit<u8>>()
-                .offset_from(origin)
-        };
-        debug_assert!(offset >= 0);
-        let offset = offset as usize;
-
-        self.cmsghdr_offset = Some(NonZeroUsize::new(offset).unwrap());
-        Some(cmsghdr)
+            }
+        }
     }
     fn fill_cmsghdr(
         rhdr: &mut MaybeUninit<cmsghdr>,
@@ -448,6 +461,8 @@ impl<'b, C> CmsgMut<'b, C> {
     ///
     /// If there isn't enough space, 0 is returned.
     pub fn add_raw_message(&mut self, cmsg: Cmsg<'_>) -> usize {
+        let Range { start, .. } = self.buf.as_mut_ptr_range();
+
         let uninit_buf_len = self.buf.len() - self.init_len;
         if uninit_buf_len < size_of::<cmsghdr>() {
             return 0;
@@ -460,11 +475,21 @@ impl<'b, C> CmsgMut<'b, C> {
             .expect("could not convert message length to `unsigned int`");
 
         let dummy_msghdr = self.make_msghdr();
-        let cmsghdr = match unsafe { self.prepare_cmsghdr(&dummy_msghdr) } {
+        let cmsghdr = match unsafe { self.borrow_next_cmsghdr(&dummy_msghdr) } {
             Some(h) => h,
             None => return 0,
         };
+
+        let cmsghdr_offset = unsafe {
+            // SAFETY: the prepare methods return references within the slice, I promise!
+            (cmsghdr as *mut MaybeUninit<cmsghdr>)
+                .cast::<MaybeUninit<u8>>()
+                .offset_from(start)
+        };
+        debug_assert!(cmsghdr_offset > 0);
         let cmsghdr: *const _ = &*Self::fill_cmsghdr(cmsghdr, msg_len, cmsg.cmsg_level(), cmsg.cmsg_type());
+
+        self.cmsghdr_offset = NonZeroUsize::new(cmsghdr_offset as usize);
 
         let data = match unsafe {
             // SAFETY: the only contract here is that the cmsghdr pointer is valid (lifetime bypass)

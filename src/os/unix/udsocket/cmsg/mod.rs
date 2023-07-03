@@ -18,11 +18,6 @@ mod mref;
 pub use {buffer::*, mmut::*, mref::*};
 
 use libc::{c_int, c_uint, msghdr, CMSG_SPACE};
-use std::{
-    error::Error,
-    fmt::{self, Debug, Display, Formatter},
-    ops::Deref,
-};
 
 /// A **c**ontrol **m**e**s**sa**g**e, consisting of a level, type and its payload.
 ///
@@ -92,21 +87,3 @@ impl<'a> Cmsg<'a> {
         }
     }
 }
-
-/// The error type for the construction of [`CmsgMut`] from a slice, indicating that the slice size overflowed `isize`.
-pub struct BufferTooBig<T: Deref<Target = [E]>, E>(T);
-impl<T: Deref<Target = [E]>, E> Debug for BufferTooBig<T, E> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let buf = self.0.deref();
-        f.debug_struct("BufferTooBig")
-            .field("base", &buf.as_ptr())
-            .field("length", &buf.len())
-            .finish()
-    }
-}
-impl<T: Deref<Target = [E]>, E> Display for BufferTooBig<T, E> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "buffer with length {} overflowed `isize`", self.0.deref().len())
-    }
-}
-impl<T: Deref<Target = [E]>, E> Error for BufferTooBig<T, E> {}
