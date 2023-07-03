@@ -211,3 +211,19 @@ fn check_size<E: From<SizeMismatch>>(cmsg: Cmsg<'_>, expected: usize) -> ParseRe
     }
     Ok(cmsg)
 }
+
+/// Performs a size check and deserializes the given ancillary message's contents into the given struct type, returning
+/// a reference to it that borrows from the ancillary message's buffer.
+///
+/// # Safety
+/// The control message must really contain a sufficiently initialized struct with that size and alignment. No level or
+/// type check is performed.
+#[cfg(uds_credentials)]
+unsafe fn into_fixed_size_contents<T>(mut cmsg: Cmsg<'_>) -> ParseResult<'_, &T, SizeMismatch> {
+    cmsg = check_size(cmsg, std::mem::size_of::<T>())?;
+
+    Ok(unsafe {
+        // SAFETY: forwarded as contract
+        &*cmsg.data().as_ptr().cast::<T>()
+    })
+}

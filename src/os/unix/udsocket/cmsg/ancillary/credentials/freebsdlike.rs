@@ -71,7 +71,7 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
                         expected: min_expected,
                         got: len,
                     })
-                   .wrap(cmsg));
+                    .wrap(cmsg));
                 }
 
                 let creds = unsafe {
@@ -86,21 +86,13 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
                         expected: min_expected,
                         got: len,
                     })
-                   .wrap(cmsg));
+                    .wrap(cmsg));
                 }
 
                 Ok(Self::Sockcred(creds.as_ref()))
             }
         } else {
-            // TODO unify with ucred deserialization
-            cmsg = check_size(cmsg, size_of::<cmsgcred>())?;
-
-            let creds = unsafe {
-                // SAFETY: POD
-                &*cmsg.data().as_ptr().cast::<cmsgcred>()
-            }
-            .as_ref();
-            Ok(Self::Cmsgcred(creds))
+            unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(Self::Cmsgcred)
         }
     }
 }

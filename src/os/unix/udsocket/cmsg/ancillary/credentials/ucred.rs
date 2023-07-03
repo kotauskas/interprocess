@@ -42,13 +42,6 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
 
     fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
-        cmsg = check_size(cmsg, size_of::<ucred>())?;
-
-        let creds = unsafe {
-            // SAFETY: POD
-            &*cmsg.data().as_ptr().cast::<ucred>()
-        }
-        .as_ref();
-        Ok(Self::Borrowed(creds))
+        unsafe { into_fixed_size_contents::<ucred_packed>(cmsg) }.map(Self::Borrowed)
     }
 }
