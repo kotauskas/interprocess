@@ -5,6 +5,7 @@ use std::{
     io,
     mem::{size_of, transmute, zeroed, MaybeUninit},
     num::NonZeroUsize,
+    ops::Range,
     ptr, slice,
 };
 
@@ -85,7 +86,8 @@ impl<'b, C> CmsgMut<'b, C> {
         debug_assert!(len <= self.buf.len());
         self.init_len = len;
     }
-    /// Returns the amount of bytes starting from the beginning of the buffer that are well-initialized and valid control message buffer data.
+    /// Returns the amount of bytes starting from the beginning of the buffer that are well-initialized and valid
+    /// control message buffer data.
     #[inline]
     pub fn init_len(&self) -> usize {
         self.init_len
@@ -99,28 +101,52 @@ impl<'b, C> CmsgMut<'b, C> {
     /// Mutably borrows the buffer, allowing arbitrary modifications.
     ///
     /// # Safety
-    /// The modifications done to the buffer through the return value, if any, must not amount to invalidation of the control message buffer.
+    /// The modifications done to the buffer through the return value, if any, must not amount to invalidation of the
+    /// control message buffer.
     #[inline]
     pub unsafe fn inner_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         self.buf
     }
 
-    pub(crate) fn fill_msghdr(&self, hdr: &mut msghdr, full_length: bool) -> io::Result<()> {
-        hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
-        let len = if full_length { self.buf.len() } else { self.init_len };
-        hdr.msg_controllen = to_msghdr_controllen(len)?;
+    pub(crate) fn fill_real_msghdr(&mut self, hdr: &mut msghdr) -> io::Result<()> {
+        let Range { start, end } = self.buf.as_mut_ptr_range();
+        self.fill_dummy_msghdr(hdr)?; // Must first fill real buffer size for prepare_cmsghdr to read later
+        let base = unsafe {
+            // SAFETY: we just filled out the msghdr correctly with fill_dummy_msghdr()
+            match self.prepare_cmsghdr(hdr) {
+                Some(c) => (c as *mut MaybeUninit<_>).cast::<c_void>(),
+                None => {
+                    // It's good, I checked the kernel sources
+                    hdr.msg_control = start.cast();
+                    hdr.msg_controllen = 0;
+                    return Ok(());
+                }
+            }
+        };
+        let len = unsafe {
+            // SAFETY: prepare_cmsghdr() would never return a pointer outside the buffer, would it?
+            end.offset_from(base.cast::<MaybeUninit<u8>>())
+        };
+        debug_assert!(len >= 0);
+        hdr.msg_control = base;
+        hdr.msg_controllen = to_msghdr_controllen(len as usize)?;
         Ok(())
     }
-    fn make_msghdr(&self, full_length: bool) -> msghdr {
+    fn fill_dummy_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
+        hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
+        hdr.msg_controllen = to_msghdr_controllen(self.buf.len())?;
+        Ok(())
+    }
+    fn make_msghdr(&self) -> msghdr {
         let mut hdr = DUMMY_MSGHDR;
-        self.fill_msghdr(&mut hdr, full_length).expect("too big");
+        self.fill_dummy_msghdr(&mut hdr).expect("too big");
         hdr
     }
 
     /// Finds the first `cmsghdr` with zeroes and returns a reference to it.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
     unsafe fn first_cmsghdr<'x>(
         buf: &'x mut [MaybeUninit<u8>],
         dummy_msghdr: &msghdr,
@@ -147,7 +173,7 @@ impl<'b, C> CmsgMut<'b, C> {
     /// Fills bytes until the first `cmsghdr` with zeroes and returns a reference to it.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
     unsafe fn prepare_first_cmsghdr<'x>(
         buf: &'x mut [MaybeUninit<u8>],
         dummy_msghdr: &msghdr,
@@ -174,42 +200,65 @@ impl<'b, C> CmsgMut<'b, C> {
         Some(first)
     }
 
-    /// Returns a reference to the next `cmsghdr` after the one specified by `offset`.
+    /// Returns the location of the next `cmsghdr` after the one specified by `offset` as an offset from the beginning
+    /// of the buffer.
     ///
     /// # Safety
-    /// `offset` must point to a `cmsghdr`, be within `self.buf` and fit into an `isize`.
-    unsafe fn next_cmsghdr<'x>(
-        buf: &'x mut [MaybeUninit<u8>],
-        dummy_msghdr: &msghdr,
-        offset: usize,
-    ) -> Option<&'x mut MaybeUninit<cmsghdr>> {
-        let origin = buf.as_ptr_range().start.cast::<u8>();
+    /// `offset` must point to a `cmsghdr`, be within `self.buf` and fit into an `isize`. `dummy_msghdr` must correctly
+    /// reflect the buffer passed.
+    unsafe fn next_cmsghdr_offset(buf: &[MaybeUninit<u8>], dummy_msghdr: &msghdr, offset: usize) -> Option<usize> {
+        let Range { start, end } = buf.as_ptr_range();
+        let [start, end] = [start.cast::<u8>(), end.cast()];
 
         let p_cmsghdr = unsafe {
             // SAFETY: as per safety contract
-            origin.add(offset).cast::<cmsghdr>()
+            start.add(offset).cast::<cmsghdr>()
         };
-        let next_ptr = unsafe { CMSG_NXTHDR(dummy_msghdr, p_cmsghdr) }.cast::<MaybeUninit<cmsghdr>>();
+        let next_ptr = unsafe { CMSG_NXTHDR(dummy_msghdr, p_cmsghdr) }
+            .cast::<u8>()
+            .cast_const();
         if next_ptr.is_null() {
             // Return early, since we have absolutely nothing to do if there's no next cmsghdr
             return None;
         }
         debug_assert!(
-            next_ptr.cast::<u8>().cast_const() >= origin,
+            next_ptr >= start && next_ptr < end,
             "CMSG_NXTHDR gave a pointer outside of the buffer"
         );
 
-        // No zero-fill here, `initialize_post_payload()` does that bit.
-
         unsafe {
             // SAFETY: we trust the implementation of CMSG_NXTHDR to do its thing correctly
-            Some(&mut *next_ptr)
+            Some(next_ptr.offset_from(start) as usize)
         }
     }
-    /// Finds the last `cmsghdr` in a buffer that was previously initialized by some other routine, most likely the kernel (via `recv_ancillary`).
+    /// Returns a reference to the next `cmsghdr` after the one specified by `offset`.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
+    /// `offset` must point to a `cmsghdr`, be within `self.buf` and fit into an `isize`. `dummy_msghdr` must correctly
+    /// reflect the buffer passed.
+    unsafe fn next_cmsghdr<'x>(
+        buf: &'x mut [MaybeUninit<u8>],
+        dummy_msghdr: &msghdr,
+        offset: usize,
+    ) -> Option<&'x mut MaybeUninit<cmsghdr>> {
+        let offset = unsafe {
+            // SAFETY: same contract
+            Self::next_cmsghdr_offset(buf, dummy_msghdr, offset)?
+        };
+        let ptr = unsafe {
+            // SAFETY: we trust next_cmsghdr_offset to do its thing correctly
+            buf.as_mut_ptr().add(offset).cast::<MaybeUninit<cmsghdr>>()
+        };
+
+        // No zero-fill here, `initialize_post_payload()` does that bit.
+
+        Some(unsafe { &mut *ptr })
+    }
+    /// Finds the last `cmsghdr` in a buffer that was previously initialized by some other routine, most likely the
+    /// kernel (via `recv_ancillary`).
+    ///
+    /// # Safety
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
     unsafe fn find_cmsghdr_offset_from_init(&mut self, dummy_msghdr: &msghdr) {
         let origin = self.buf.as_ptr_range().start;
 
@@ -230,10 +279,11 @@ impl<'b, C> CmsgMut<'b, C> {
             self.cmsghdr_offset = NonZeroUsize::new(voffset);
         }
     }
-    /// Returns a reference to the next `cmsghdr`, depending on the value of `self.cmghdr_offset`: if it's `None`, uses `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`.
+    /// Returns a reference to the next `cmsghdr`, depending on the value of `self.cmghdr_offset`: if it's `None`, uses
+    /// `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`.
     ///
     /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr(true)` on the same bytecrop of `self`.
+    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
     unsafe fn prepare_cmsghdr<'x>(&'x mut self, dummy_msghdr: &msghdr) -> Option<&'x mut MaybeUninit<cmsghdr>> {
         let origin = self.buf.as_ptr_range().start;
 
@@ -281,7 +331,8 @@ impl<'b, C> CmsgMut<'b, C> {
             rhdr.assume_init_mut()
         }
     }
-    /// Fills bytes between the `cmsghdr` and the beginning of the payload range with zeroes and returns a reference to it.
+    /// Fills bytes between the `cmsghdr` and the beginning of the payload range with zeroes and returns a reference to
+    /// it.
     unsafe fn prepare_data_range(&mut self, hdr: *const cmsghdr, msg_len: usize) -> Option<&mut [MaybeUninit<u8>]> {
         assert_eq!(
             size_of::<c_char>(),
@@ -326,12 +377,16 @@ impl<'b, C> CmsgMut<'b, C> {
             slice::from_raw_parts_mut(data_start.cast::<MaybeUninit<u8>>(), msg_len)
         })
     }
-    /// Initializes the bytes that are either padding between the current control message and the next or dead space at the end of the buffer, returning how much `self`'s init cursor needs to be advanced by.
+    /// Initializes the bytes that are either padding between the current control message and the next or dead space at
+    /// the end of the buffer, returning how much `self`'s init cursor needs to be advanced by.
     ///
     /// # Safety
-    /// - The dummy `msghdr` must be the product of `make_msghdr(true)` called on the exact same bytecrop of `self` (same base address, same length).
-    /// - `cmsghdr` must be non-null, must point somewhere within `self`'s buffer and must be, well, the `cmsghdr` the payload of which has just been filled in.
-    /// - `one_past_end_of_payload` must be a pointer to the byte directly past the end of the data payload, the base address of which is the output of `CMSG_DATA` and the length of which is the output of `CMSG_LEN`.
+    /// - The dummy `msghdr` must be the product of `make_msghdr` called on the exact same bytecrop of `self` (same base
+    /// address, same length).
+    /// - `cmsghdr` must be non-null, must point somewhere within `self`'s buffer and must be, well, the `cmsghdr` the
+    /// payload of which has just been filled in.
+    /// - `one_past_end_of_payload` must be a pointer to the byte directly past the end of the data payload, the base
+    /// address of which is the output of `CMSG_DATA` and the length of which is the output of `CMSG_LEN`.
     unsafe fn initialize_post_payload(
         &mut self,
         dummy_msghdr: &msghdr,
@@ -379,13 +434,17 @@ impl<'b, C> CmsgMut<'b, C> {
         init_cur_offset as usize
     }
 
-    /// Converts the given message object to a [`Cmsg`] and adds it to the buffer, advances the initialization cursor of `self` such that the next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
+    /// Converts the given message object to a [`Cmsg`] and adds it to the buffer, advances the initialization cursor of
+    /// `self` such that the next message, if one is added, will appear after it, and returns how much the cursor was
+    /// advanced by (i.e. how many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
     ///
     /// If there isn't enough space, 0 is returned.
     pub fn add_message(&mut self, msg: &impl ToCmsg) -> usize {
         self.add_raw_message(msg.to_cmsg())
     }
-    /// Adds the specified control message to the buffer, advances the initialization cursor of `self` such that the next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
+    /// Adds the specified control message to the buffer, advances the initialization cursor of `self` such that the
+    /// next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how
+    /// many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
     ///
     /// If there isn't enough space, 0 is returned.
     pub fn add_raw_message(&mut self, cmsg: Cmsg<'_>) -> usize {
@@ -400,7 +459,7 @@ impl<'b, C> CmsgMut<'b, C> {
             .try_into()
             .expect("could not convert message length to `unsigned int`");
 
-        let dummy_msghdr = self.make_msghdr(true);
+        let dummy_msghdr = self.make_msghdr();
         let cmsghdr = match unsafe { self.prepare_cmsghdr(&dummy_msghdr) } {
             Some(h) => h,
             None => return 0,
