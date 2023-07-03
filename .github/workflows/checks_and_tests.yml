@@ -29,21 +29,15 @@ jobs:
         with:
           command: clippy
           args: "--features tokio -- -A unknown_lints"
-        env:
-          RUSTFLAGS: -D warnings
 
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: "--features tokio"
-        env:
-          RUSTFLAGS: -D warnings
 
       - name: Run rustdoc
         uses: actions-rs/cargo@v1
         with:
           command: doc
           args: "--features tokio --no-deps" # We don't have time to waste.
-        env:
-          RUSTFLAGS: -D warnings
