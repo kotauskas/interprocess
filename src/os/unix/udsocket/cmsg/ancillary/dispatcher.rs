@@ -44,6 +44,11 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
     type MalformedPayloadError = MalformedPayload;
     type Context = Context;
     fn try_parse(cmsg: Cmsg<'a>, ctx: &Context) -> ParseResult<'a, Self, MalformedPayload> {
+        #[cfg(not(uds_credentials))]
+        {
+            // macOS thinks that `ctx` is useless
+            let _ = ctx;
+        }
         let (cml, cmt) = (cmsg.cmsg_level(), cmsg.cmsg_type());
         if cml != LEVEL {
             return Err(ParseError {
