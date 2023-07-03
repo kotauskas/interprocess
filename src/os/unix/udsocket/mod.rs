@@ -18,7 +18,18 @@
 
 pub mod cmsg;
 
-#[cfg(any(uds_ucred, uds_cmsgcred))]
+#[cfg_attr( // uds_credentials template
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    )))
+)]
+#[cfg(uds_credentials)]
 pub mod credentials;
 
 #[cfg(feature = "tokio")]
@@ -36,17 +47,6 @@ mod stream;
 
 pub use {datagram::*, listener::*, path::*, socket_trait::*, stream::*};
 
-#[cfg_attr( // uds_credentials template
-    feature = "doc_cfg",
-    doc(cfg(any(
-        target_os = "linux",
-        target_os = "redox",
-        target_os = "android",
-        target_os = "fuchsia",
-        target_os = "freebsd",
-        target_os = "dragonfly",
-    )))
-)]
 mod path_drop_guard;
 use path_drop_guard::*;
 
