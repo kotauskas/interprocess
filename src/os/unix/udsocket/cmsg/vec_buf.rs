@@ -2,7 +2,7 @@ use super::{ancillary::ToCmsg, context::DummyCollector, *};
 use std::{mem::MaybeUninit, slice};
 
 /// A **c**ontrol **m**e**s**sa**g**e buffer, used to store the encoded form of ancillary data.
-pub struct CmsgBuffer<C = DummyCollector> {
+pub struct CmsgVecBuf<C = DummyCollector> {
     buf: Vec<u8>,
     /// The context collector stored alongside the buffer.
     ///
@@ -10,7 +10,7 @@ pub struct CmsgBuffer<C = DummyCollector> {
     /// collection respectively.
     pub context_collector: C,
 }
-impl CmsgBuffer {
+impl CmsgVecBuf {
     /// Creates a buffer with the specified capacity. Using a capacity of 0 makes for a useless buffer, but does not
     /// allocate.
     #[inline]
@@ -34,7 +34,7 @@ impl CmsgBuffer {
         }
     }
 }
-impl<C> CmsgBuffer<C> {
+impl<C> CmsgVecBuf<C> {
     /// Creates a buffer with the specified capacity and an owned context collector. Using a capacity of 0 makes for a
     /// useless buffer, but does not allocate.
     #[inline]
@@ -70,12 +70,13 @@ impl<C> CmsgBuffer<C> {
     }
     /// Mutably borrows the control message buffer. The resulting type retains the validity guarantee, but does not feed
     /// the initialization cursor back into the owned buffer object.
+    // TODO banish
     #[inline(always)]
-    pub fn as_mut(&mut self) -> CmsgMut<'_, &mut C> {
+    pub fn as_mut(&mut self) -> CmsgMutBuf<'_, &mut C> {
         // This is unsafe in the public interface, but not for the internals. The non-method borrow is to allow struct
         // fields to be mutably borrowed independently.
         let buf = Self::vec_as_uninit_slice_mut(&mut self.buf);
-        CmsgMut::new_with_collector(buf, &mut self.context_collector)
+        CmsgMutBuf::new_with_collector(buf, &mut self.context_collector)
     }
 
     /// Returns the amount of bytes the buffer can hold without reallocating.
@@ -182,7 +183,7 @@ impl<C> CmsgBuffer<C> {
         }
     }
 }
-impl From<Vec<u8>> for CmsgBuffer {
+impl From<Vec<u8>> for CmsgVecBuf {
     #[inline]
     fn from(buf: Vec<u8>) -> Self {
         Self::from_buf(buf)

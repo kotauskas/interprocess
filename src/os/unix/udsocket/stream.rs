@@ -1,6 +1,6 @@
 use super::{
     c_wrappers,
-    cmsg::{context::Collector, CmsgMut, CmsgRef},
+    cmsg::{context::Collector, CmsgMutBuf, CmsgRef},
     util::{make_msghdr_r, make_msghdr_w},
     ToUdSocketPath, UdSocketPath,
 };
@@ -68,7 +68,7 @@ impl UdStream {
     pub fn recv_ancillary<E: Collector>(
         &self,
         buf: &mut [u8],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
     ) -> io::Result<(usize, usize)> {
         self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
@@ -84,7 +84,7 @@ impl UdStream {
     pub fn recv_ancillary_vectored<E: Collector>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
     ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
         let fd = self.as_fd();

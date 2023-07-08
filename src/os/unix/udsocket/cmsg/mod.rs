@@ -11,11 +11,11 @@
 pub mod ancillary;
 pub mod context;
 
-mod buffer;
-mod mmut;
 mod mref;
+mod mut_buf;
+mod vec_buf;
 
-pub use {buffer::*, mmut::*, mref::*};
+pub use {mref::*, mut_buf::*, vec_buf::*};
 
 use libc::{c_int, c_uint, msghdr, CMSG_SPACE};
 

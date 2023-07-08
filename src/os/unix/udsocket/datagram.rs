@@ -1,6 +1,6 @@
 use super::{
     c_wrappers,
-    cmsg::{context::Collector, CmsgMut, CmsgRef},
+    cmsg::{context::Collector, CmsgMutBuf, CmsgRef},
     util::{make_msghdr_r, make_msghdr_w},
     PathDropGuard, ToUdSocketPath, UdSocketPath,
 };
@@ -187,7 +187,7 @@ impl UdDatagram {
     pub fn recv_ancillary<E: Collector>(
         &self,
         buf: &mut [u8],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
     ) -> io::Result<(usize, usize)> {
         self.recv_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf)
     }
@@ -204,7 +204,7 @@ impl UdDatagram {
     pub fn recv_ancillary_vectored<E: Collector>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
     ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;
         let fd = self.as_fd();
@@ -242,7 +242,7 @@ impl UdDatagram {
         bufs: &mut [IoSliceMut<'_>],
         addr_buf: &'b mut UdSocketPath<'a>,
     ) -> io::Result<usize> {
-        self.recv_from_ancillary_vectored(bufs, &mut CmsgMut::new(&mut []), addr_buf)
+        self.recv_from_ancillary_vectored(bufs, &mut CmsgMutBuf::new(&mut []), addr_buf)
             .map(|x| x.0)
     }
 
@@ -255,7 +255,7 @@ impl UdDatagram {
     pub fn recv_from_ancillary<E: Collector>(
         &self,
         buf: &mut [u8],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
         addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
         self.recv_from_ancillary_vectored(&mut [IoSliceMut::new(buf)], abuf, addr_buf)
@@ -273,7 +273,7 @@ impl UdDatagram {
     pub fn recv_from_ancillary_vectored<E: Collector>(
         &self,
         bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut CmsgMut<'_, E>,
+        abuf: &mut CmsgMutBuf<'_, E>,
         addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<(usize, usize)> {
         let mut hdr = make_msghdr_r(bufs, abuf)?;

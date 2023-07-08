@@ -12,8 +12,10 @@ use std::{
 };
 
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
+// TODO finish rename, separate entirely from VecBuf:w
+
 #[derive(Debug)]
-pub struct CmsgMut<'b, C = DummyCollector> {
+pub struct CmsgMutBuf<'b, C = DummyCollector> {
     buf: &'b mut [MaybeUninit<u8>],
     init_len: usize,
     cmsghdr_offset: Option<NonZeroUsize>,
@@ -23,7 +25,7 @@ pub struct CmsgMut<'b, C = DummyCollector> {
     /// collect context.
     pub context_collector: C,
 }
-impl<'b> CmsgMut<'b> {
+impl<'b> CmsgMutBuf<'b> {
     /// Creates a control message buffer from the given uninitialized slice.
     ///
     /// # Panics
@@ -37,13 +39,13 @@ impl<'b> CmsgMut<'b> {
         }
     }
 }
-impl<'b> From<&'b mut [MaybeUninit<u8>]> for CmsgMut<'b> {
+impl<'b> From<&'b mut [MaybeUninit<u8>]> for CmsgMutBuf<'b> {
     #[inline]
     fn from(buf: &'b mut [MaybeUninit<u8>]) -> Self {
         Self::new(buf)
     }
 }
-impl<'b, C> CmsgMut<'b, C> {
+impl<'b, C> CmsgMutBuf<'b, C> {
     /// Creates a control message buffer from the given uninitialized slice and with the given context collector.
     pub fn new_with_collector(buf: &'b mut [MaybeUninit<u8>], context_collector: C) -> Self {
         Self {
@@ -71,7 +73,7 @@ impl<'b, C> CmsgMut<'b, C> {
     /// Splits the buffer into two parts: one filled to the brim with ancillary data and without a context collector,
     /// the other completely uninitialized and with the source buffer's context collector inherited, ready to be used
     /// for reads. Either of the two may be empty depending on the state of the buffer.
-    pub fn split_at_init<NC>(&mut self) -> (CmsgMut<'_>, CmsgMut<'_, &mut NC>)
+    pub fn split_at_init<NC>(&mut self) -> (CmsgMutBuf<'_>, CmsgMutBuf<'_, &mut NC>)
     where
         C: BorrowMut<NC>,
     {
@@ -108,13 +110,13 @@ impl<'b, C> CmsgMut<'b, C> {
         };
 
         (
-            CmsgMut {
+            CmsgMutBuf {
                 buf: left,
                 init_len: self.init_len,
                 cmsghdr_offset: None, // FIXME could reuse from self by handling edge cases
                 context_collector: DummyCollector,
             },
-            CmsgMut {
+            CmsgMutBuf {
                 buf: right,
                 init_len: 0,
                 cmsghdr_offset: None,
