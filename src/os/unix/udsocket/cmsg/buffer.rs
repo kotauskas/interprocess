@@ -54,7 +54,7 @@ impl<C> CmsgBuffer<C> {
     /// The given context collector is also added into the mix.
     ///
     /// # Safety
-    /// Having arbitrary data in the buffer will lead to invalid memory accesses inside the system C library.
+    /// Having arbitrary data in the buffer may lead to invalid memory accesses inside the system C library.
     #[inline]
     pub unsafe fn from_buf_with_collector_unchecked(buf: Vec<u8>, context_collector: C) -> Self {
         Self { buf, context_collector }
@@ -76,6 +76,53 @@ impl<C> CmsgBuffer<C> {
         // fields to be mutably borrowed independently.
         let buf = Self::vec_as_uninit_slice_mut(&mut self.buf);
         CmsgMut::new_with_collector(buf, &mut self.context_collector)
+    }
+
+    /// Returns the amount of bytes the buffer can hold without reallocating.
+    #[inline(always)]
+    pub fn capacity(&self) -> usize {
+        self.buf.capacity()
+    }
+
+    /// Allocates additional space in the buffer for the specified amount of ancillary data in bytes, or possibly more,
+    /// at the underlying [`Vec`]'s discretion.
+    ///
+    /// Delegates to [`Vec::reserve()`].
+    #[inline(always)]
+    pub fn reserve(&mut self, additional: usize) {
+        self.buf.reserve(additional)
+    }
+    /// Allocates exactly the given amount of additional space for ancillary data in bytes.
+    ///
+    /// Delegates to [`Vec::reserve_exact()`].
+    #[inline(always)]
+    pub fn reserve_exact(&mut self, additional: usize) {
+        self.buf.reserve_exact(additional)
+    }
+
+    /// Allocates additional space in the buffer such that its total capacity (counting both existing capacity and the
+    /// amount by which the buffer will be grown) reaches or exceeds the given value, at the underlying [`Vec`]'s
+    /// discretion or due to the buffer already being large enough.
+    ///
+    /// Delegates to [`Vec::reserve()`].
+    #[inline]
+    pub fn reserve_up_to(&mut self, target: usize) {
+        let additional = target.saturating_sub(self.capacity());
+        if additional != 0 {
+            self.reserve(additional);
+        }
+    }
+    /// Allocates additional space in the buffer such that its total capacity (counting both existing capacity and the
+    /// amount by which the buffer will be grown) reaches the given value. if the buffer is already large enough, its
+    /// size will not increase.
+    ///
+    /// Delegates to [`Vec::reserve_exact()`].
+    #[inline]
+    pub fn reserve_up_to_exact(&mut self, target: usize) {
+        let additional = target.saturating_sub(self.capacity());
+        if additional != 0 {
+            self.reserve_exact(additional);
+        }
     }
 
     /// Converts the given message object to a [`Cmsg`] and adds it to the buffer, advances the initialization cursor of
