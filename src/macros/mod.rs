@@ -8,6 +8,8 @@ mod derive_raw;
 mod forward_handle_and_fd;
 #[macro_use]
 mod forward_try_clone;
+#[macro_use]
+mod forward_trait_method;
 
 macro_rules! impmod {
     ($($osmod:ident)::+, $($orig:ident $(as $into:ident)?),* $(,)?) => {
