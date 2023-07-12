@@ -59,15 +59,6 @@ pub trait ShareHandle: AsHandle {
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
 
-#[inline(always)]
-fn weaken_buf_init(buf: &mut [u8]) -> &mut [MaybeUninit<u8>] {
-    unsafe {
-        // SAFETY: types are layout-compatible, only difference
-        // is a relaxation of the init guarantee.
-        transmute(buf)
-    }
-}
-
 fn is_eof_like(e: &io::Error) -> bool {
     e.kind() == io::ErrorKind::BrokenPipe
         || e.raw_os_error() == Some(winapi::shared::winerror::ERROR_PIPE_NOT_CONNECTED as _)

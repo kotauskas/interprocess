@@ -102,10 +102,10 @@ impl Read for RecvHalf<pipe_mode::Bytes> {
 }
 impl ReliableRecvMsg for &RecvHalf<pipe_mode::Messages> {
     fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.recv_to_uninit(weaken_buf_init(buf))
+        self.recv_to_uninit(weaken_buf_init_mut(buf))
     }
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.try_recv_to_uninit(weaken_buf_init(buf))
+        self.try_recv_to_uninit(weaken_buf_init_mut(buf))
     }
 }
 impl ReliableRecvMsg for RecvHalf<pipe_mode::Messages> {

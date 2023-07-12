@@ -10,9 +10,10 @@ use super::{
 use crate::{
     os::windows::{
         named_pipe::{path_conversion, set_nonblocking_for_stream, PipeMode},
-        weaken_buf_init, FileHandle,
+        FileHandle,
     },
     reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
+    weaken_buf_init_mut,
 };
 use std::{
     ffi::OsStr,
@@ -74,7 +75,7 @@ impl RawPipeStream {
     }
 
     fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.read_to_uninit(weaken_buf_init(buf))
+        self.read_to_uninit(weaken_buf_init_mut(buf))
     }
     fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         self.file_handle().read(buf)
@@ -364,10 +365,10 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
 }
 impl<Sm: PipeModeTag> ReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.recv_to_uninit(weaken_buf_init(buf))
+        self.recv_to_uninit(weaken_buf_init_mut(buf))
     }
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.try_recv_to_uninit(weaken_buf_init(buf))
+        self.try_recv_to_uninit(weaken_buf_init_mut(buf))
     }
 }
 impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {

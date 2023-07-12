@@ -137,3 +137,21 @@ impl<T> DebugExpectExt for Option<T> {
         }
     }
 }
+
+use std::mem::{transmute, MaybeUninit};
+#[inline(always)]
+#[allow(dead_code)]
+fn weaken_buf_init<T>(r: &[T]) -> &[MaybeUninit<T>] {
+    unsafe {
+        // SAFETY: same slice, weaker refinement
+        transmute(r)
+    }
+}
+#[inline(always)]
+#[allow(dead_code)]
+fn weaken_buf_init_mut<T>(r: &mut [T]) -> &mut [MaybeUninit<T>] {
+    unsafe {
+        // SAFETY: same here
+        transmute(r)
+    }
+}

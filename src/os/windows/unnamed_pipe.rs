@@ -6,8 +6,8 @@
 
 // TODO add examples
 
-use super::{c_wrappers::init_security_attributes, weaken_buf_init, winprelude::*, FileHandle};
-use crate::unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
+use super::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
+use crate::unnamed_pipe::{weaken_buf_init_mut, UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
@@ -158,7 +158,7 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
 pub(crate) struct UnnamedPipeReader(FileHandle);
 impl Read for UnnamedPipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(weaken_buf_init(buf))
+        self.0.read(weaken_buf_init_mut(buf))
     }
 }
 impl Debug for UnnamedPipeReader {
