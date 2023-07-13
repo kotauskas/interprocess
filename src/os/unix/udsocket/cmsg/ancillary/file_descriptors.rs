@@ -21,7 +21,8 @@ impl<'a> FileDescriptors<'a> {
     pub const fn new(descriptors: &[BorrowedFd<'a>]) -> Self {
         Self(UnalignedFdSlice::from_borrowed_fd_slice(descriptors))
     }
-    /// Constructs the ancillary data message from a slice of [raw file descriptors](RawFd). If `owned` is true, they will be dropped together with the whole struct.
+    /// Constructs the ancillary data message from a slice of [raw file descriptors](RawFd). If `owned` is true, they
+    /// will be dropped together with the whole struct.
     ///
     /// # Safety
     /// The file descriptors must be valid. If `owned` is true, there must not be another owner.

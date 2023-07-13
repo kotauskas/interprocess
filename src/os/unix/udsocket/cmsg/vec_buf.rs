@@ -1,5 +1,8 @@
-use super::{ancillary::ToCmsg, context::DummyCollector, *};
-use std::{mem::MaybeUninit, slice};
+use super::{
+    context::{Collector, DummyCollector},
+    *,
+};
+use std::{collections::TryReserveError, mem::MaybeUninit, slice};
 
 /// A **c**ontrol **m**e**s**sa**g**e buffer, used to store the encoded form of ancillary data.
 pub struct CmsgVecBuf<C = DummyCollector> {
@@ -33,8 +36,16 @@ impl CmsgVecBuf {
             context_collector: DummyCollector,
         }
     }
+    #[inline]
+    /// Attaches a context collector to a `CmsgVecBuf` that doesn't have one.
+    pub fn add_collector<C>(self, context_collector: C) -> CmsgVecBuf<C> {
+        CmsgVecBuf {
+            buf: self.buf,
+            context_collector,
+        }
+    }
 }
-impl<C> CmsgVecBuf<C> {
+impl<C: Collector> CmsgVecBuf<C> {
     /// Creates a buffer with the specified capacity and an owned context collector. Using a capacity of 0 makes for a
     /// useless buffer, but does not allocate.
     #[inline]
@@ -59,128 +70,49 @@ impl<C> CmsgVecBuf<C> {
     pub unsafe fn from_buf_with_collector_unchecked(buf: Vec<u8>, context_collector: C) -> Self {
         Self { buf, context_collector }
     }
-
-    /// Borrows the control message buffer. The resulting type retains the validity guarantee.
-    #[inline(always)]
-    pub fn as_ref(&self) -> CmsgRef<'_, '_, C> {
-        unsafe {
-            // SAFETY: validity guarantee is enforced by CmsgBuffer as well
-            CmsgRef::new_unchecked_with_context(self.buf.as_ref(), &self.context_collector)
-        }
-    }
-    /// Mutably borrows the control message buffer. The resulting type retains the validity guarantee, but does not feed
-    /// the initialization cursor back into the owned buffer object.
-    // TODO banish
-    #[inline(always)]
-    pub fn as_mut(&mut self) -> CmsgMutBuf<'_, &mut C> {
-        // This is unsafe in the public interface, but not for the internals. The non-method borrow is to allow struct
-        // fields to be mutably borrowed independently.
-        let buf = Self::vec_as_uninit_slice_mut(&mut self.buf);
-        CmsgMutBuf::new_with_collector(buf, &mut self.context_collector)
-    }
-
-    /// Returns the amount of bytes the buffer can hold without reallocating.
-    #[inline(always)]
-    pub fn capacity(&self) -> usize {
-        self.buf.capacity()
-    }
-
-    /// Allocates additional space in the buffer for the specified amount of ancillary data in bytes, or possibly more,
-    /// at the underlying [`Vec`]'s discretion.
-    ///
-    /// Delegates to [`Vec::reserve()`].
-    #[inline(always)]
-    pub fn reserve(&mut self, additional: usize) {
-        self.buf.reserve(additional)
-    }
-    /// Allocates exactly the given amount of additional space for ancillary data in bytes.
-    ///
-    /// Delegates to [`Vec::reserve_exact()`].
-    #[inline(always)]
-    pub fn reserve_exact(&mut self, additional: usize) {
-        self.buf.reserve_exact(additional)
-    }
-
-    /// Allocates additional space in the buffer such that its total capacity (counting both existing capacity and the
-    /// amount by which the buffer will be grown) reaches or exceeds the given value, at the underlying [`Vec`]'s
-    /// discretion or due to the buffer already being large enough.
-    ///
-    /// Delegates to [`Vec::reserve()`].
+    /// Transforms a `CmsgVecBuf` with one context collector type to a `CmsgVecBuf` with a different one via the given
+    /// closure.
     #[inline]
-    pub fn reserve_up_to(&mut self, target: usize) {
-        let additional = target.saturating_sub(self.capacity());
-        if additional != 0 {
-            self.reserve(additional);
+    pub fn map_collector<C2>(self, f: impl FnOnce(C) -> C2) -> CmsgVecBuf<C2> {
+        CmsgVecBuf {
+            buf: self.buf,
+            context_collector: f(self.context_collector),
         }
     }
-    /// Allocates additional space in the buffer such that its total capacity (counting both existing capacity and the
-    /// amount by which the buffer will be grown) reaches the given value. if the buffer is already large enough, its
-    /// size will not increase.
-    ///
-    /// Delegates to [`Vec::reserve_exact()`].
-    #[inline]
-    pub fn reserve_up_to_exact(&mut self, target: usize) {
-        let additional = target.saturating_sub(self.capacity());
-        if additional != 0 {
-            self.reserve_exact(additional);
-        }
+}
+unsafe impl<C: Collector> CmsgMut for CmsgVecBuf<C> {
+    type Context = C;
+    #[inline(always)]
+    fn as_bytes(&self) -> &[MaybeUninit<u8>] {
+        unsafe { slice::from_raw_parts(self.buf.as_ptr().cast::<MaybeUninit<u8>>(), self.buf.capacity()) }
     }
-
-    /// Converts the given message object to a [`Cmsg`] and adds it to the buffer, advances the initialization cursor of
-    /// `self` such that the next message, if one is added, will appear after it, and returns how much the cursor was
-    /// advanced by (i.e. how many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
-    ///
-    /// Using the return value isn't strictly necessary – calling `.add_message()` again will correctly add one more
-    /// message to the buffer.
-    pub fn add_message(&mut self, msg: &impl ToCmsg) -> usize {
-        self.add_raw_message(msg.to_cmsg())
+    #[inline(always)]
+    unsafe fn as_bytes_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr().cast::<MaybeUninit<u8>>(), self.buf.capacity()) }
     }
-    /// Adds the specified control message to the buffer, advances the initialization cursor of `self` such that the
-    /// next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how
-    /// many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
-    ///
-    /// Using the return value isn't strictly necessary – calling `.add_raw_message()` again will correctly add one more
-    /// message to the buffer.
-    pub fn add_raw_message(&mut self, cmsg: Cmsg<'_>) -> usize {
-        self.buf.reserve(cmsg.space_occupied());
-        let len = self.buf.len();
-        let delta = self.as_mut().add_raw_message(cmsg);
-        unsafe {
-            // SAFETY: we trust add_raw_message() to initialize that much of our buffer
-            self.set_len(len + delta);
-        };
-        delta
+    #[inline(always)]
+    fn valid_len(&self) -> usize {
+        self.buf.len()
     }
-
-    /// Assumes that the first `len` bytes of the buffer are initialized memory and valid ancillary data.
-    ///
-    /// # Safety
-    /// See [`Vec::set_len()`] and [`Cmsg::new()`].
-    pub unsafe fn set_len(&mut self, len: usize) {
-        assert!(
-            len <= self.buf.capacity(),
-            "cannot set initialized length past buffer capacity"
-        );
-        unsafe {
-            self.buf.set_len(len);
-        }
+    #[inline(always)]
+    unsafe fn set_len(&mut self, new_len: usize) {
+        unsafe { self.buf.set_len(new_len) }
     }
-    /// Exclusively borrows the whole buffer as a slice of possibly uninitialized bytes.
-    ///
-    /// # Safety
-    /// The contents of the buffer must not be modified in a way which could invalidate the ancillary data contained and
-    /// cause undefined behavior via the system C library entering an out-of-bounds condition or otherwise violating the
-    /// guarantees of a Rust type.
-    #[inline]
-    pub unsafe fn as_uninit_slice_mut(&mut self) -> &mut [MaybeUninit<u8>] {
-        Self::vec_as_uninit_slice_mut(&mut self.buf)
+    #[inline(always)]
+    fn context(&self) -> &Self::Context {
+        &self.context_collector
+    }
+    #[inline(always)]
+    fn context_mut(&mut self) -> &mut Self::Context {
+        &mut self.context_collector
     }
     #[inline]
-    fn vec_as_uninit_slice_mut(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
-        unsafe {
-            // SAFETY: we're just turning the whole Vec buffer into a `MaybeUninit` slice here
-            slice::from_raw_parts_mut(vec.as_mut_ptr().cast::<MaybeUninit<u8>>(), vec.capacity())
-        }
+    fn reserve(&mut self, additional: usize) -> ReserveResult {
+        self.buf.try_reserve(additional).map_err(mkerr)
+    }
+    #[inline]
+    fn reserve_exact(&mut self, additional: usize) -> ReserveResult {
+        self.buf.try_reserve_exact(additional).map_err(mkerr)
     }
 }
 impl From<Vec<u8>> for CmsgVecBuf {
@@ -188,4 +120,8 @@ impl From<Vec<u8>> for CmsgVecBuf {
     fn from(buf: Vec<u8>) -> Self {
         Self::from_buf(buf)
     }
+}
+
+fn mkerr(e: TryReserveError) -> ReserveError {
+    ReserveError::Failed(Box::new(e))
 }

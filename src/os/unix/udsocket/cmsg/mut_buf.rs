@@ -1,24 +1,16 @@
 // TODO rewrite this garbage
-use super::{ancillary::ToCmsg, context::DummyCollector, *};
-use crate::os::unix::udsocket::util::{to_cmsghdr_len, to_msghdr_controllen, DUMMY_MSGHDR};
-use libc::{c_char, c_int, c_uint, c_void, cmsghdr, msghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR};
-use std::{
-    borrow::BorrowMut,
-    io,
-    mem::{size_of, transmute, zeroed, MaybeUninit},
-    num::NonZeroUsize,
-    ops::Range,
-    ptr, slice,
+use super::{
+    context::{Collector, DummyCollector},
+    *,
 };
+use std::mem::MaybeUninit;
 
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
-// TODO finish rename, separate entirely from VecBuf:w
-
+// TODO finish rename, separate entirely from VecBuf
 #[derive(Debug)]
 pub struct CmsgMutBuf<'b, C = DummyCollector> {
     buf: &'b mut [MaybeUninit<u8>],
     init_len: usize,
-    cmsghdr_offset: Option<NonZeroUsize>,
     /// The context collector stored alongside the buffer reference. Usually this should be a mutable reference.
     ///
     /// Any I/O operation on a Ud-socket that takes a `CmsgMut` will allow this field to hook into the process and
@@ -30,12 +22,21 @@ impl<'b> CmsgMutBuf<'b> {
     ///
     /// # Panics
     /// The buffer's length must not overflow `isize`.
+    #[inline]
     pub fn new(buf: &'b mut [MaybeUninit<u8>]) -> Self {
         Self {
             buf,
             init_len: 0,
-            cmsghdr_offset: None,
             context_collector: DummyCollector,
+        }
+    }
+    /// Attaches a context collector to a `CmsgMutBuf` that doesn't have one.
+    #[inline]
+    pub fn add_collector<C>(self, context_collector: C) -> CmsgMutBuf<'b, C> {
+        CmsgMutBuf {
+            buf: self.buf,
+            init_len: self.init_len,
+            context_collector,
         }
     }
 }
@@ -47,473 +48,51 @@ impl<'b> From<&'b mut [MaybeUninit<u8>]> for CmsgMutBuf<'b> {
 }
 impl<'b, C> CmsgMutBuf<'b, C> {
     /// Creates a control message buffer from the given uninitialized slice and with the given context collector.
+    #[inline]
     pub fn new_with_collector(buf: &'b mut [MaybeUninit<u8>], context_collector: C) -> Self {
         Self {
             buf,
             init_len: 0,
-            cmsghdr_offset: None,
             context_collector,
         }
     }
-
-    /// Immutably borrows the initialized part of the control message buffer.
-    pub fn as_ref(&self) -> CmsgRef<'_, '_, C> {
-        let init_part = &self.buf[..self.init_len];
-        let immslc = unsafe {
-            // SAFETY: the init cursor doesn't lie, does it?
-            transmute::<&[MaybeUninit<u8>], &[u8]>(init_part)
-        };
-        unsafe {
-            // SAFETY: the validity guarantee is that `add_raw_message()` is correctly implemented and that its input
-            // is validated by the unsafe Cmsg factory function.
-            CmsgRef::new_unchecked_with_context(immslc, &self.context_collector)
+    /// Transforms a `CmsgMutBuf` with one context collector type to a `CmsgMutBuf` with a different one via the given
+    /// closure.
+    #[inline]
+    pub fn map_collector<C2>(self, f: impl FnOnce(C) -> C2) -> CmsgMutBuf<'b, C2> {
+        CmsgMutBuf {
+            buf: self.buf,
+            init_len: self.init_len,
+            context_collector: f(self.context_collector),
         }
     }
+}
 
-    /// Splits the buffer into two parts: one filled to the brim with ancillary data and without a context collector,
-    /// the other completely uninitialized and with the source buffer's context collector inherited, ready to be used
-    /// for reads. Either of the two may be empty depending on the state of the buffer.
-    pub fn split_at_init<NC>(&mut self) -> (CmsgMutBuf<'_>, CmsgMutBuf<'_, &mut NC>)
-    where
-        C: BorrowMut<NC>,
-    {
-        let Range { start, end } = self.buf.as_mut_ptr_range();
+unsafe impl<C: Collector> CmsgMut for CmsgMutBuf<'_, C> {
+    type Context = C;
 
-        // Must first fill real buffer size for borrow_next_cmsghdr to read later
-        let hdr = Self::make_msghdr(self);
-
-        let base = unsafe {
-            // SAFETY: we just filled out the msghdr correctly with fill_dummy_msghdr()
-            match self.borrow_next_cmsghdr(&hdr) {
-                Some(c) => (c as *mut MaybeUninit<_>).cast::<MaybeUninit<u8>>(),
-                None => end.cast::<MaybeUninit<u8>>(),
-            }
-        };
-        let len_left = unsafe {
-            // SAFETY: borrow_next_cmsghdr() would never return a pointer outside the buffer, would it?
-            base.offset_from(start)
-        };
-        let len_right = unsafe {
-            // SAFETY: same here.
-            end.offset_from(base)
-        };
-        debug_assert!(len_left >= 0);
-        debug_assert!(len_right >= 0);
-
-        let left = unsafe {
-            // SAFETY: both are inside the original buffer.
-            slice::from_raw_parts_mut(start, len_left as usize)
-        };
-        let right = unsafe {
-            // SAFETY: same here.
-            slice::from_raw_parts_mut(base, len_right as usize)
-        };
-
-        (
-            CmsgMutBuf {
-                buf: left,
-                init_len: self.init_len,
-                cmsghdr_offset: None, // FIXME could reuse from self by handling edge cases
-                context_collector: DummyCollector,
-            },
-            CmsgMutBuf {
-                buf: right,
-                init_len: 0,
-                cmsghdr_offset: None,
-                context_collector: self.context_collector.borrow_mut(),
-            },
-        )
+    #[inline(always)]
+    fn as_bytes(&self) -> &[MaybeUninit<u8>] {
+        self.buf
     }
-
-    /// Assumes that the first `len` bytes of the buffer are well-initialized and valid control message buffer data.
-    ///
-    /// # Safety
-    /// The first `len` bytes of the buffer must be well-initialized and valid control message buffer data.
-    #[inline]
-    pub unsafe fn set_init_len(&mut self, len: usize) {
-        debug_assert!(len <= self.buf.len());
-        self.init_len = len;
+    #[inline(always)]
+    unsafe fn as_bytes_mut(&mut self) -> &mut [MaybeUninit<u8>] {
+        self.buf
     }
-    /// Returns the amount of bytes starting from the beginning of the buffer that are well-initialized and valid
-    /// control message buffer data.
-    #[inline]
-    pub fn init_len(&self) -> usize {
+    #[inline(always)]
+    fn valid_len(&self) -> usize {
         self.init_len
     }
-
-    /// Immutably borrows the buffer, allowing inspection of the underlying data.
-    #[inline]
-    pub fn inner(&self) -> &[MaybeUninit<u8>] {
-        self.buf
+    #[inline(always)]
+    unsafe fn set_len(&mut self, new_len: usize) {
+        self.init_len = new_len
     }
-    /// Mutably borrows the buffer, allowing arbitrary modifications.
-    ///
-    /// # Safety
-    /// The modifications done to the buffer through the return value, if any, must not amount to invalidation of the
-    /// control message buffer.
-    #[inline]
-    pub unsafe fn inner_mut(&mut self) -> &mut [MaybeUninit<u8>] {
-        self.buf
+    #[inline(always)]
+    fn context(&self) -> &Self::Context {
+        &self.context_collector
     }
-
-    pub(crate) fn fill_real_msghdr(&mut self, hdr: &mut msghdr) -> io::Result<()> {
-        // The operation we want is equivalent to Filling the entirety of the right side of the split into the msghdr
-        self.split_at_init().1.fill_dummy_msghdr(hdr)
-    }
-    fn fill_dummy_msghdr(&self, hdr: &mut msghdr) -> io::Result<()> {
-        hdr.msg_control = self.buf.as_ptr().cast::<c_void>().cast_mut();
-        hdr.msg_controllen = to_msghdr_controllen(self.buf.len())?;
-        Ok(())
-    }
-    fn make_msghdr(&self) -> msghdr {
-        let mut hdr = DUMMY_MSGHDR;
-        self.fill_dummy_msghdr(&mut hdr).expect("failed to fill dummy msghdr");
-        hdr
-    }
-
-    /// Finds the first `cmsghdr` with zeroes and returns a reference to it.
-    ///
-    /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
-    unsafe fn first_cmsghdr<'x>(
-        buf: &'x mut [MaybeUninit<u8>],
-        dummy_msghdr: &msghdr,
-    ) -> Option<&'x mut MaybeUninit<cmsghdr>> {
-        let origin = buf.as_mut_ptr_range().start;
-
-        if buf.len() < size_of::<cmsghdr>() {
-            return None;
-        }
-        // FIXME CMSG_FIRSTHDR assumes proper alignment
-        let first_ptr = unsafe { CMSG_FIRSTHDR(dummy_msghdr) }.cast::<MaybeUninit<_>>();
-        if first_ptr.is_null() {
-            return None;
-        }
-        debug_assert!(
-            first_ptr.cast::<MaybeUninit<u8>>() >= origin,
-            "CMSG_FIRSTHDR gave a pointer outside of the buffer"
-        );
-
-        unsafe {
-            // SAFETY: we trust the implementation of CMSG_FIRSTHDR to do its thing correctly
-            Some(&mut *first_ptr)
-        }
-    }
-    /// Fills bytes until the first `cmsghdr` with zeroes and returns a reference to it.
-    ///
-    /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
-    unsafe fn prepare_first_cmsghdr<'x>(
-        buf: &'x mut [MaybeUninit<u8>],
-        dummy_msghdr: &msghdr,
-    ) -> Option<&'x mut MaybeUninit<cmsghdr>> {
-        let origin = buf.as_mut_ptr_range().start;
-
-        let first = unsafe {
-            // SAFETY: identical safety contract to this function
-            Self::first_cmsghdr(buf, dummy_msghdr)?
-        };
-        let first_bptr = (first as *mut MaybeUninit<cmsghdr>).cast::<MaybeUninit<u8>>();
-
-        if first_bptr > origin {
-            unsafe {
-                // SAFETY: since the pointer is past the start, finding the offset from the start to it is safe.
-                let fill_len = first_bptr.offset_from(origin);
-                debug_assert!(fill_len > 0);
-                // SAFETY: `start` is within bounds, `bptr` is within bounds, so everything up to `start + fill_len` is
-                // within bounds. 0 is a valid value to initialize u8s with. `start` is known to be non-null due to
-                // its origin being `.as_mut_ptr_range()`.
-                ptr::write_bytes(origin, 0, fill_len as usize);
-            }
-        }
-        Some(first)
-    }
-
-    /// Returns the location of the next `cmsghdr` after the one specified by `offset` as an offset from the beginning
-    /// of the buffer.
-    ///
-    /// # Safety
-    /// `offset` must point to a `cmsghdr`, be within `self.buf` and fit into an `isize`. `dummy_msghdr` must correctly
-    /// reflect the buffer passed.
-    unsafe fn next_cmsghdr_offset(buf: &[MaybeUninit<u8>], dummy_msghdr: &msghdr, offset: usize) -> Option<usize> {
-        let Range { start, end } = buf.as_ptr_range();
-        let [start, end] = [start.cast::<u8>(), end.cast()];
-
-        let p_cmsghdr = unsafe {
-            // SAFETY: as per safety contract
-            start.add(offset).cast::<cmsghdr>()
-        };
-        let next_ptr = unsafe { CMSG_NXTHDR(dummy_msghdr, p_cmsghdr) }
-            .cast::<u8>()
-            .cast_const();
-        if next_ptr.is_null() {
-            // Return early, since we have absolutely nothing to do if there's no next cmsghdr
-            return None;
-        }
-        debug_assert!(
-            next_ptr >= start && next_ptr < end,
-            "CMSG_NXTHDR gave a pointer outside of the buffer"
-        );
-
-        unsafe {
-            // SAFETY: we trust the implementation of CMSG_NXTHDR to do its thing correctly
-            Some(next_ptr.offset_from(start) as usize)
-        }
-    }
-    /// Returns a reference to the next `cmsghdr` after the one specified by `offset`.
-    ///
-    /// # Safety
-    /// `offset` must point to a `cmsghdr`, be within `self.buf` and fit into an `isize`. `dummy_msghdr` must correctly
-    /// reflect the buffer passed.
-    unsafe fn next_cmsghdr<'x>(
-        buf: &'x mut [MaybeUninit<u8>],
-        dummy_msghdr: &msghdr,
-        offset: usize,
-    ) -> Option<&'x mut MaybeUninit<cmsghdr>> {
-        let offset = unsafe {
-            // SAFETY: same contract
-            Self::next_cmsghdr_offset(buf, dummy_msghdr, offset)?
-        };
-        let ptr = unsafe {
-            // SAFETY: we trust next_cmsghdr_offset to do its thing correctly
-            buf.as_mut_ptr().add(offset).cast::<MaybeUninit<cmsghdr>>()
-        };
-
-        // No zero-fill here, `initialize_post_payload()` does that bit.
-
-        Some(unsafe { &mut *ptr })
-    }
-    /// Finds the last `cmsghdr` in a buffer that was previously initialized by some other routine, most likely the
-    /// kernel (via `recv_ancillary`).
-    ///
-    /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
-    unsafe fn find_cmsghdr_offset_from_init(&mut self, dummy_msghdr: &msghdr) {
-        let origin = self.buf.as_ptr_range().start;
-
-        // today I will write an unsafe closure
-        let tooffset = move |p: *mut MaybeUninit<cmsghdr>| unsafe {
-            // SAFETY: always gonna be inside the buffer
-            let offset = p.cast::<MaybeUninit<u8>>().offset_from(origin);
-            debug_assert!(offset >= 0);
-            offset as usize
-        };
-        let mut offset = unsafe {
-            // SAFETY: same contract
-            Self::first_cmsghdr(self.buf, dummy_msghdr).map(|r| tooffset(r as *mut MaybeUninit<cmsghdr>))
-        };
-        while let Some(voffset) = offset {
-            let nxt = unsafe { Self::next_cmsghdr(self.buf, dummy_msghdr, voffset) };
-            offset = nxt.map(|r| tooffset(r as *mut MaybeUninit<cmsghdr>));
-            self.cmsghdr_offset = NonZeroUsize::new(voffset);
-        }
-    }
-    /// Returns a reference to the next `cmsghdr`, depending on the value of `self.cmghdr_offset`: if it's `None`, uses
-    /// `prepare_first_cmsghdr()`, and if it's `Some`, uses `CMSG_NXTHDR()`. Does not adjust `cmsghdr_offset`.
-    ///
-    /// # Safety
-    /// `dummy_msghdr` is assumed to be filled in by a prior call of `make_msghdr` on the same bytecrop of `self`.
-    unsafe fn borrow_next_cmsghdr(&mut self, dummy_msghdr: &msghdr) -> Option<&mut MaybeUninit<cmsghdr>> {
-        unsafe {
-            if self.cmsghdr_offset.is_none() && self.init_len != 0 {
-                self.find_cmsghdr_offset_from_init(dummy_msghdr);
-            }
-            match self.cmsghdr_offset {
-                None => Self::prepare_first_cmsghdr(self.buf, dummy_msghdr),
-                Some(offset) => Self::next_cmsghdr(self.buf, dummy_msghdr, offset.get()),
-            }
-        }
-    }
-    fn fill_cmsghdr(
-        rhdr: &mut MaybeUninit<cmsghdr>,
-        msg_len: c_uint,
-        cmsg_level: c_int,
-        cmsg_type: c_int,
-    ) -> &mut cmsghdr {
-        // Zero out all of the padding first, if any is present; will be elided by the compiler if unnecessary.
-        rhdr.write(unsafe { zeroed() });
-
-        let cmsg_len = to_cmsghdr_len(unsafe { CMSG_LEN(msg_len) }).unwrap();
-        let chdr = cmsghdr {
-            cmsg_len,
-            cmsg_level,
-            cmsg_type,
-        };
-
-        rhdr.write(chdr);
-        unsafe {
-            // SAFETY: we've filled out all the padding, if any, with zeroes, and the rest with the provided values
-            rhdr.assume_init_mut()
-        }
-    }
-    /// Fills bytes between the `cmsghdr` and the beginning of the payload range with zeroes and returns a reference to
-    /// it.
-    unsafe fn prepare_data_range(&mut self, hdr: *const cmsghdr, msg_len: usize) -> Option<&mut [MaybeUninit<u8>]> {
-        assert_eq!(
-            size_of::<c_char>(),
-            size_of::<u8>(),
-            "not supported on platforms where `char` is not a byte"
-        );
-
-        // Remove MaybeUninit from the pointer type, since pointers carry no initialization guarantee
-        let one_past_end = self.buf.as_mut_ptr_range().end.cast::<u8>();
-
-        // The safety check for the final cast is done at the top of the function.
-        let data_start = unsafe { CMSG_DATA(hdr) }.cast::<u8>();
-        let data_end = data_start.wrapping_add(msg_len);
-
-        #[cfg(debug_assertions)]
-        if data_start.is_null() {
-            // We aren't actually required to do a null check, but let's do one here just in case.
-            return None;
-        }
-        if data_end >= one_past_end {
-            // The more important check here, the buffer overflow guard.
-            return None;
-        }
-
-        let one_past_hdr = unsafe {
-            // SAFETY: we checked for buffer overrun just above, so we know that the byte after the cmsghdr is inside
-            // the allocated object (besides, .offset() even allows you to go one byte past).
-            hdr.cast::<u8>().cast_mut().offset(1)
-        };
-        if data_start > one_past_hdr {
-            unsafe {
-                // SAFETY: we just ensured that both are within the same allocated object.
-                let fill_len = data_start.offset_from(one_past_hdr);
-                debug_assert!(fill_len > 0);
-                // SAFETY: see prepare_first_hdr().
-                ptr::write_bytes(one_past_hdr, 0, fill_len as usize);
-            }
-        }
-
-        Some(unsafe {
-            // SAFETY: we just checked that the message fits within the buffer
-            slice::from_raw_parts_mut(data_start.cast::<MaybeUninit<u8>>(), msg_len)
-        })
-    }
-    /// Initializes the bytes that are either padding between the current control message and the next or dead space at
-    /// the end of the buffer, returning how much `self`'s init cursor needs to be advanced by.
-    ///
-    /// # Safety
-    /// - The dummy `msghdr` must be the product of `make_msghdr` called on the exact same bytecrop of `self` (same base
-    /// address, same length).
-    /// - `cmsghdr` must be non-null, must point somewhere within `self`'s buffer and must be, well, the `cmsghdr` the
-    /// payload of which has just been filled in.
-    /// - `one_past_end_of_payload` must be a pointer to the byte directly past the end of the data payload, the base
-    /// address of which is the output of `CMSG_DATA` and the length of which is the output of `CMSG_LEN`.
-    unsafe fn initialize_post_payload(
-        &mut self,
-        dummy_msghdr: &msghdr,
-        cmsghdr: *const cmsghdr,
-        one_past_end_of_payload: *mut u8,
-    ) -> usize {
-        let origin_of_uninit = unsafe {
-            // SAFETY: the init cursor isn't borked... is it?
-            self.buf.as_ptr_range().start.cast::<u8>().add(self.init_len)
-        };
-        let next = unsafe { CMSG_NXTHDR(dummy_msghdr, cmsghdr) }.cast::<u8>();
-
-        let (fill_len, init_cur_offset) = if !next.is_null() {
-            let fill_len = unsafe {
-                // SAFETY: we made sure that both are non-null and within the same allocated object
-                next.offset_from(one_past_end_of_payload)
-            };
-            let init_cur_offset = unsafe {
-                // SAFETY: same here.
-                next.offset_from(origin_of_uninit)
-            };
-            (fill_len, init_cur_offset)
-        } else {
-            let one_past_end = self.buf.as_mut_ptr_range().end.cast::<u8>();
-            let fill_len = unsafe {
-                // SAFETY: we, again, made sure that both pointers are non-null and are within the same allocated
-                // object, but this time one of them is actually one byte past, which is fine because the .offset()
-                // family allows that.
-                one_past_end.offset_from(one_past_end_of_payload.cast_const())
-            };
-            let init_cur_offset = unsafe {
-                // SAFETY: same here.
-                one_past_end.offset_from(origin_of_uninit)
-            };
-            (fill_len, init_cur_offset)
-        };
-
-        debug_assert!(fill_len >= 0);
-        unsafe {
-            // SAFETY: pointer validity is ensured, alignment requirements are irrelevant for bytes.
-            ptr::write_bytes(one_past_end_of_payload, 0, fill_len as usize);
-        };
-
-        debug_assert!(init_cur_offset >= 0);
-        init_cur_offset as usize
-    }
-
-    /// Converts the given message object to a [`Cmsg`] and adds it to the buffer, advances the initialization cursor of
-    /// `self` such that the next message, if one is added, will appear after it, and returns how much the cursor was
-    /// advanced by (i.e. how many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
-    ///
-    /// If there isn't enough space, 0 is returned.
-    pub fn add_message(&mut self, msg: &impl ToCmsg) -> usize {
-        self.add_raw_message(msg.to_cmsg())
-    }
-    /// Adds the specified control message to the buffer, advances the initialization cursor of `self` such that the
-    /// next message, if one is added, will appear after it, and returns how much the cursor was advanced by (i.e. how
-    /// many more contiguous bytes in the beginning of `self`'s buffer are now well-initialized).
-    ///
-    /// If there isn't enough space, 0 is returned.
-    pub fn add_raw_message(&mut self, cmsg: Cmsg<'_>) -> usize {
-        let Range { start, .. } = self.buf.as_mut_ptr_range();
-
-        let uninit_buf_len = self.buf.len() - self.init_len;
-        if uninit_buf_len < size_of::<cmsghdr>() {
-            return 0;
-        }
-
-        let msg_len: c_uint = cmsg
-            .data()
-            .len()
-            .try_into()
-            .expect("could not convert message length to `unsigned int`");
-
-        let dummy_msghdr = self.make_msghdr();
-        let cmsghdr = match unsafe { self.borrow_next_cmsghdr(&dummy_msghdr) } {
-            Some(h) => h,
-            None => return 0,
-        };
-
-        let cmsghdr_offset = unsafe {
-            // SAFETY: the prepare methods return references within the slice, I promise!
-            (cmsghdr as *mut MaybeUninit<cmsghdr>)
-                .cast::<MaybeUninit<u8>>()
-                .offset_from(start)
-        };
-        debug_assert!(cmsghdr_offset > 0);
-        let cmsghdr: *const _ = &*Self::fill_cmsghdr(cmsghdr, msg_len, cmsg.cmsg_level(), cmsg.cmsg_type());
-
-        self.cmsghdr_offset = NonZeroUsize::new(cmsghdr_offset as usize);
-
-        let data = match unsafe {
-            // SAFETY: the only contract here is that the cmsghdr pointer is valid (lifetime bypass)
-            self.prepare_data_range(cmsghdr, cmsg.data().len())
-        } {
-            Some(d) => d,
-            None => return 0,
-        };
-        let msg_uninit = unsafe {
-            // SAFETY: this is a relaxation of the init guarantee
-            transmute::<&[u8], &[MaybeUninit<u8>]>(cmsg.data)
-        };
-        data.copy_from_slice(msg_uninit);
-
-        let one_past_end_of_payload = data.as_mut_ptr_range().end.cast::<u8>();
-        let init_cur_incr = unsafe {
-            // SAFETY: dummy_msghdr is the correct thing, cmsghdr is as well, one_past_end_of_payload being correct
-            // is the public API of slices
-            self.initialize_post_payload(&dummy_msghdr, cmsghdr, one_past_end_of_payload)
-        };
-
-        self.init_len += init_cur_incr;
-        init_cur_incr
+    #[inline(always)]
+    fn context_mut(&mut self) -> &mut Self::Context {
+        &mut self.context_collector
     }
 }

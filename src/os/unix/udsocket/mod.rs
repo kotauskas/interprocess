@@ -39,13 +39,14 @@ pub mod tokio;
 #[macro_use]
 mod util;
 
+mod ancillary_io;
 mod datagram;
 mod listener;
 mod path;
 mod socket_trait;
 mod stream;
 
-pub use {datagram::*, listener::*, path::*, socket_trait::*, stream::*};
+pub use {ancillary_io::*, datagram::*, listener::*, path::*, socket_trait::*, stream::*};
 
 mod path_drop_guard;
 use path_drop_guard::*;

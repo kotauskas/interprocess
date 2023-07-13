@@ -5,15 +5,20 @@ use super::{
     *,
 };
 use libc::{c_void, cmsghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_NXTHDR};
-use std::{cmp::min, io, iter::FusedIterator, slice};
+use std::{
+    cmp::min,
+    io,
+    iter::FusedIterator,
+    slice::{self, SliceIndex},
+};
 
 /// An immutable reference to a control message buffer that allows for decoding of ancillary data messages.
 ///
-/// The [`decode()`](Self::decode) iterator allows for easy decoding, while [`cmsgs()`](Self::cmsgs) provides low-level access to the raw ancillary message data.
+/// The [`decode()`](Self::decode) iterator allows for easy decoding, while [`cmsgs()`](Self::cmsgs) provides low-level
+/// access to the raw ancillary message data.
 // TODO decoding example
-// TODO context
 #[derive(Debug)]
-pub struct CmsgRef<'b, 'c, C = DummyCollector> {
+pub struct CmsgRef<'b, 'c, C: ?Sized = DummyCollector> {
     buf: &'b [u8],
     /// A borrow of the context collector stored alongside the buffer reference.
     ///
@@ -33,7 +38,7 @@ impl<'b> CmsgRef<'b, 'static> {
     /// Creates a `CmsgRef` from the given byte buffer.
     ///
     /// # Safety
-    /// - The contents of `buf` must be valid control messages. Those could be encoded by [`CmsgBuffer`]/[`CmsgMut`] or
+    /// - The contents of `buf` must be valid, well-aligned control messages. Those could be encoded via [`CmsgMut`] or
     /// returned to the program from a system call.
     /// - The length of `buf` must not overflow `isize`.
     #[inline]
@@ -44,7 +49,7 @@ impl<'b> CmsgRef<'b, 'static> {
         }
     }
 }
-impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
+impl<'b, 'c, C: ?Sized> CmsgRef<'b, 'c, C> {
     /// Creates an empty `CmsgRef` with the given context.
     #[inline]
     pub fn empty_with_context(context_collector: &'c C) -> Self {
@@ -56,7 +61,7 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
     /// Creates a `CmsgRef` from the given byte buffer and context.
     ///
     /// # Safety
-    /// - The contents of `buf` must be valid control messages. Those could be encoded by [`CmsgBuffer`]/[`CmsgMut`] or
+    /// - The contents of `buf` must be valid, well-aligned control messages. Those could be encoded via [`CmsgMut`] or
     /// returned to the program from a system call.
     /// - The length of `buf` must not overflow `isize`.
     #[inline]
@@ -68,6 +73,67 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
     #[inline]
     pub fn inner(&self) -> &[u8] {
         self.buf
+    }
+
+    /// Discards context information and returns a `CmsgRef` with [`DummyCollector`] context.
+    pub fn discard_context(&self) -> CmsgRef<'b, 'c> {
+        CmsgRef {
+            buf: self.buf,
+            context_collector: &DUMMY_COLLECTOR,
+        }
+    }
+
+    /// Subslices the buffer to the given range. Inclusive and exclusive, closed, half-open and open ranges may be used
+    /// here, as if you were slicing the `[u8]` directly.
+    ///
+    /// # Safety
+    /// The resulting subslice must contain valid ancillary data, i.e. it must be safe to call
+    /// [`new_unchecked()`](CmsgRef::new_unchecked) on it.
+    pub unsafe fn subslice(&mut self, idx: impl SliceIndex<[u8], Output = [u8]>) {
+        self.buf = &self.buf[idx];
+    }
+
+    /// Cuts off *at least* that many bytes from the beginning of the buffer, or more if the specified amount as an
+    /// index does not lie not on a control message boundary.
+    pub fn consume_bytes(&mut self, mut amount: usize) {
+        if amount == 0 {
+            return;
+        }
+        if amount == self.buf.len() {
+            self.buf = &[];
+            return;
+        }
+
+        let mut cmsgs = self.cmsgs();
+        while let Some(..) = cmsgs.next() {
+            if cmsgs.cur.is_null() {
+                return self.consume_bytes(self.buf.len());
+            }
+
+            let offset = unsafe {
+                // SAFETY: CMSG_NXTHDR can only point within the buffer or to null, and we just checked for null
+                cmsgs.cur.cast::<u8>().offset_from(self.buf.as_ptr())
+            };
+            debug_assert!(offset >= 0);
+            let offset = offset as usize;
+
+            if amount < offset {
+                // Jumped over the target index, adjust
+                amount = offset;
+            }
+
+            if amount == offset {
+                unsafe {
+                    // SAFETY: we just determined this to be the start of a control message
+                    self.subslice(offset..)
+                }
+                return;
+            }
+        }
+
+        // If we haven't jumped over or hit the specified amount, it must be somewhere after the beginning of the last
+        // control message
+        self.consume_bytes(self.buf.len())
     }
 
     /// Returns an iterator over the control messages of the buffer.
@@ -94,8 +160,8 @@ impl<'b, 'c, C> CmsgRef<'b, 'c, C> {
         Ok(())
     }
 }
-impl<C> Copy for CmsgRef<'_, '_, C> {}
-impl<C> Clone for CmsgRef<'_, '_, C> {
+impl<C: ?Sized> Copy for CmsgRef<'_, '_, C> {}
+impl<C: ?Sized> Clone for CmsgRef<'_, '_, C> {
     #[inline]
     fn clone(&self) -> Self {
         *self
@@ -107,12 +173,12 @@ impl<C> Clone for CmsgRef<'_, '_, C> {
 /// Created by the [`cmsgs()`](CmsgRef::cmsgs) method.
 ///
 /// You probably want to use [`Decode`] instead.
-pub struct Cmsgs<'b, 'c, C> {
+pub struct Cmsgs<'b, 'c, C: ?Sized> {
     buf: CmsgRef<'b, 'c, C>,
     cur: *const cmsghdr,
     dummy: msghdr,
 }
-impl<'b, 'c, C> Cmsgs<'b, 'c, C> {
+impl<'b, 'c, C: ?Sized> Cmsgs<'b, 'c, C> {
     fn new(buf: CmsgRef<'b, 'c, C>) -> Self {
         let mut dummy = DUMMY_MSGHDR;
         buf.fill_msghdr(&mut dummy).unwrap();
@@ -127,7 +193,7 @@ impl<'b, 'c, C> Cmsgs<'b, 'c, C> {
         }
     }
 }
-impl<'b, 'c, C> Iterator for Cmsgs<'b, 'c, C> {
+impl<'b, 'c, C: ?Sized> Iterator for Cmsgs<'b, 'c, C> {
     type Item = Cmsg<'b>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -173,16 +239,18 @@ impl<'b, 'c, C> Iterator for Cmsgs<'b, 'c, C> {
 
         Some(cmsg)
     }
+    #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        todo!()
+        let len = self.len();
+        (len, Some(len))
     }
 }
-impl<'b, 'c, C> ExactSizeIterator for Cmsgs<'b, 'c, C> {
+impl<'b, 'c, C: ?Sized> ExactSizeIterator for Cmsgs<'b, 'c, C> {
     fn len(&self) -> usize {
         todo!()
     }
 }
-impl<'b, 'c, C> FusedIterator for Cmsgs<'b, 'c, C> {}
+impl<'b, 'c, C: ?Sized> FusedIterator for Cmsgs<'b, 'c, C> {}
 
 /// Iterator that zero-copy deserializes control messages from a [`CmsgRef`].
 ///
