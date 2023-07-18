@@ -1,5 +1,6 @@
 //! Methods and trait implementations for `PipeStream`.
 
+// TODO rename into just split
 mod split_owned;
 
 use super::{
@@ -123,6 +124,7 @@ impl RawPipeStream {
 
     // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
     // has to be `&mut self`.
+    // TODO hack &self into existence via split()
     fn poll_read_uninit(&mut self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
         let mut readbuf = TokioReadBuf::uninit(buf);
         ready!(downgrade_poll_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
@@ -523,6 +525,7 @@ impl<Rm: PipeModeTag> AsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
         Pin::new(&mut self.deref()).poll_close(cx)
     }
 }
+// TODO TokioAsyncWrite on ref
 impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
