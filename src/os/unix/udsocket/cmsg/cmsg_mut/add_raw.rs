@@ -1,7 +1,7 @@
 //! Insertion of ancillary messages into mutable buffers.
 
 use super::{super::Cmsg, *};
-use crate::weaken_buf_init;
+use crate::{os::unix::udsocket::util::to_msghdr_controllen, weaken_buf_init};
 use libc::{cmsghdr, msghdr};
 use std::{
     ffi::c_void,
@@ -14,7 +14,7 @@ const ZEROFILL: MUu8 = MUu8::new(0);
 fn dummy_msghdr(buf: &[MUu8]) -> msghdr {
     let mut hdr = unsafe { zeroed::<msghdr>() };
     hdr.msg_control = buf.as_ptr().cast::<c_void>().cast_mut();
-    hdr.msg_controllen = buf.len();
+    hdr.msg_controllen = to_msghdr_controllen(buf.len()).expect("failed to create dummy msghdr");
     hdr
 }
 
@@ -33,7 +33,9 @@ pub(super) fn align_first(buf: &[MUu8]) -> Option<usize> {
 
     let mut hdr = dummy_msghdr(buf);
     hdr.msg_control = hdr.msg_control.wrapping_add(fwd_align);
-    hdr.msg_controllen = hdr.msg_controllen.saturating_sub(fwd_align);
+    // The cast here is fine because no one in their right mind expects the alignment adjustment to
+    // exceed the sort of integer type used for controllen
+    hdr.msg_controllen = hdr.msg_controllen.saturating_sub(fwd_align as _);
 
     let base = unsafe { libc::CMSG_FIRSTHDR(&hdr) }.cast::<MUu8>();
     if base.is_null() {
@@ -103,7 +105,7 @@ pub(super) fn add_raw_message(buf: &mut (impl CmsgMut + ?Sized), cmsg: Cmsg<'_>)
         };
 
         m_chdr.write(cmsghdr {
-            cmsg_len: cmsg.cmsg_len(),
+            cmsg_len: cmsg.cmsg_len() as _, // It does a check
             cmsg_level: cmsg.cmsg_level(),
             cmsg_type: cmsg.cmsg_type(),
         });

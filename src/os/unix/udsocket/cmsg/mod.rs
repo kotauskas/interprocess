@@ -91,6 +91,12 @@ impl<'a> Cmsg<'a> {
         }
     }
     /// Returns the `cmsg_len` of the control message.
+    ///
+    /// The type of the return value is platform-independent, but values will never overflow the actual type used in
+    /// `cmsghdr` to store `cmsg_len`. The function simply panics if an offending size is encountered.
+    ///
+    /// # Panics
+    /// If the computed size exceeds the maximum for the `cmsg_len` field on `cmsghdr`.
     #[inline(always)]
     pub const fn cmsg_len(&self) -> usize {
         // FIXME potential portability concern, Linux says that it's only planned for inclusion into POSIX
@@ -98,7 +104,7 @@ impl<'a> Cmsg<'a> {
         if len > CmsghdrLen::MAX as _ {
             panic!("cmsg_len overflowed the storage type in cmsghdr");
         }
-        len as CmsghdrLen
+        len as usize
     }
     /// Returns the `cmsg_level` of the control message.
     #[inline(always)]
