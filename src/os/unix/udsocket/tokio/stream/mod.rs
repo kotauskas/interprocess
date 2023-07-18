@@ -1,11 +1,18 @@
-use crate::os::unix::udsocket::{c_wrappers, ToUdSocketPath, UdSocket, UdSocketPath, UdStream as SyncUdStream};
+use crate::os::unix::udsocket::{
+    ancwrap, c_wrappers,
+    cmsg::{CmsgMut, CmsgRef},
+    poll::{read_in_terms_of_vectored, write_in_terms_of_vectored},
+    AsyncReadAncillary, AsyncWriteAncillary, ReadAncillarySuccess, ToUdSocketPath, UdSocket, UdSocketPath,
+    UdStream as SyncUdStream,
+};
+use futures_core::ready;
 use futures_io::{AsyncRead, AsyncWrite};
 use std::{
     error::Error,
     fmt::{self, Formatter},
     io,
     net::Shutdown,
-    os::unix::net::UnixStream as StdUdStream,
+    os::{fd::AsFd, unix::net::UnixStream as StdUdStream},
     pin::Pin,
     task::{Context, Poll},
 };
@@ -118,6 +125,7 @@ tokio_wrapper_trait_impls!(
 derive_asraw!(unix: UdStream);
 
 impl TokioAsyncRead for UdStream {
+    #[inline]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_read(cx, buf)
     }
@@ -132,29 +140,92 @@ impl AsyncRead for UdStream {
         }
     }
 }
+
+impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for UdStream {
+    #[inline]
+    fn poll_read_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        read_in_terms_of_vectored(self, cx, buf, abuf)
+    }
+    fn poll_read_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [io::IoSliceMut<'_>],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        let slf = self.get_mut();
+        loop {
+            match ancwrap::recvmsg(slf.as_fd(), bufs, abuf, None) {
+                Ok(r) => return Poll::Ready(Ok(r)),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+            ready!(slf.0.poll_read_ready(cx))?;
+        }
+    }
+}
+
 impl TokioAsyncWrite for UdStream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+    #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)
     }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_flush(cx)
     }
     /// Finishes immediately. See the `.shutdown()` method.
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    #[inline]
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_shutdown(cx)
     }
 }
 impl AsyncWrite for UdStream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+    #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)
     }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.pinproject().poll_flush(cx)
     }
     /// Finishes immediately. See the `.shutdown()` method.
-    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    #[inline]
+    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.shutdown(Shutdown::Both)?;
         Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncWriteAncillary for UdStream {
+    #[inline]
+    fn poll_write_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        write_in_terms_of_vectored(self, cx, buf, abuf)
+    }
+    fn poll_write_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        let slf = self.get_mut();
+        loop {
+            match ancwrap::sendmsg(slf.as_fd(), bufs, abuf) {
+                Ok(r) => return Poll::Ready(Ok(r)),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+            ready!(slf.0.poll_write_ready(cx))?;
+        }
     }
 }
 

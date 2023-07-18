@@ -51,6 +51,7 @@ pub use {ancillary_io::*, datagram::*, listener::*, path::*, socket_trait::*, st
 mod path_drop_guard;
 use path_drop_guard::*;
 
+mod ancwrap;
 mod c_wrappers;
 
 /// The maximum path length for Unix domain sockets. [`UdStreamListener::bind()`] panics if the length of the specified

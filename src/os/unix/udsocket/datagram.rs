@@ -1,7 +1,6 @@
 use super::{
-    c_wrappers,
-    cmsg::{context::Collector, CmsgMut, CmsgMutBuf, CmsgMutExt, CmsgRef},
-    util::{make_msghdr_r, make_msghdr_w},
+    ancwrap, c_wrappers,
+    cmsg::{CmsgMut, CmsgMutBuf, CmsgRef},
     PathDropGuard, ReadAncillarySuccess, ToUdSocketPath, UdSocketPath,
 };
 use crate::{
@@ -14,11 +13,7 @@ use crate::{
     Sealed,
 };
 use libc::sockaddr_un;
-use std::{
-    io::{self, prelude::*, IoSlice, IoSliceMut},
-    mem::{size_of_val, zeroed},
-    os::raw::c_void,
-};
+use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 use to_method::To;
 
 /// A datagram socket in the Unix domain.
@@ -201,7 +196,7 @@ impl UdDatagram {
         bufs: &mut [IoSliceMut<'_>],
         abuf: &mut impl CmsgMut,
     ) -> io::Result<ReadAncillarySuccess> {
-        self._recvmsg_impl(bufs, abuf, None)
+        ancwrap::recvmsg(self.as_fd(), bufs, abuf, None)
     }
 
     /// Receives a single datagram and the source address from the socket, returning how much of the buffer was filled
@@ -264,46 +259,7 @@ impl UdDatagram {
         abuf: &mut impl CmsgMut,
         addr_buf: &mut UdSocketPath<'_>,
     ) -> io::Result<ReadAncillarySuccess> {
-        self._recvmsg_impl(bufs, abuf, Some(addr_buf))
-    }
-
-    fn _recvmsg_impl(
-        &self,
-        bufs: &mut [IoSliceMut<'_>],
-        abuf: &mut impl CmsgMut,
-        addr_buf: Option<&mut UdSocketPath<'_>>,
-    ) -> io::Result<ReadAncillarySuccess> {
-        let mut hdr = make_msghdr_r(bufs, abuf)?;
-        let fd = self.as_fd();
-
-        // SAFETY: sockaddr_un is POD
-        let mut addr_buf_staging = unsafe { zeroed::<sockaddr_un>() };
-        if addr_buf.is_some() {
-            hdr.msg_name = (&mut addr_buf_staging as *mut sockaddr_un).cast::<c_void>();
-            #[allow(clippy::useless_conversion)]
-            {
-                hdr.msg_namelen = size_of_val(&addr_buf_staging).try_into().unwrap();
-            }
-        }
-
-        abuf.context_mut().pre_op_collect(fd);
-        let bytes_read = unsafe { c_wrappers::recvmsg(fd, &mut hdr, 0)? };
-        abuf.context_mut().post_op_collect(fd, hdr.msg_flags);
-
-        let advanc = hdr.msg_controllen as _; // FIXME as casts are bad!!
-        unsafe {
-            // SAFETY: let's hope that recvmsg doesn't just straight up lie to us on the success path
-            abuf.add_len(advanc);
-        }
-
-        if let Some(addr_buf) = addr_buf {
-            addr_buf.write_sockaddr_un_to_self(&addr_buf_staging, hdr.msg_namelen as _);
-        }
-
-        Ok(ReadAncillarySuccess {
-            main: bytes_read,
-            ancillary: advanc,
-        })
+        ancwrap::recvmsg(self.as_fd(), bufs, abuf, Some(addr_buf))
     }
 
     /// Returns the size of the next datagram available on the socket without discarding it.
@@ -363,12 +319,9 @@ impl UdDatagram {
     /// - `sendmsg`
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
+    #[inline]
     pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
-        let hdr = make_msghdr_w(bufs, abuf)?;
-        unsafe {
-            // SAFETY: make_msghdr_w is good at its job
-            c_wrappers::sendmsg(self.as_fd(), &hdr, 0)
-        }
+        ancwrap::sendmsg(self.as_fd(), bufs, abuf)
     }
 }
 

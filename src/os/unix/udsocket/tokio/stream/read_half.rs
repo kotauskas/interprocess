@@ -1,5 +1,9 @@
 use super::{c_wrappers, OwnedWriteHalf, ReuniteError, UdStream};
-use crate::os::unix::unixprelude::*;
+use crate::os::unix::{
+    udsocket::{ancwrap, cmsg::CmsgMut, poll::read_in_terms_of_vectored, AsyncReadAncillary},
+    unixprelude::*,
+};
+use futures_core::ready;
 use futures_io::AsyncRead;
 use std::{
     io,
@@ -14,6 +18,8 @@ use tokio::{
         UnixStream as TokioUdStream,
     },
 };
+
+// TODO remove borrowed halves
 
 /// Borrowed read half of a [`UdStream`](super::UdStream), created by [`.split()`](super::UdStream::split).
 #[derive(Debug)]
@@ -137,6 +143,35 @@ impl AsyncRead for OwnedReadHalf {
         }
     }
 }
+
+impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for OwnedReadHalf {
+    #[inline]
+    fn poll_read_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<crate::os::unix::udsocket::ReadAncillarySuccess>> {
+        read_in_terms_of_vectored(self, cx, buf, abuf)
+    }
+    fn poll_read_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [io::IoSliceMut<'_>],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<crate::os::unix::udsocket::ReadAncillarySuccess>> {
+        let slf = self.get_mut();
+        loop {
+            match ancwrap::recvmsg(slf.as_fd(), bufs, abuf, None) {
+                Ok(r) => return Poll::Ready(Ok(r)),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+            ready!(slf.0.as_ref().poll_read_ready(cx))?;
+        }
+    }
+}
+
 impl AsFd for OwnedReadHalf {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {

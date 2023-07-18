@@ -1,13 +1,9 @@
-use crate::os::unix::{
-    udsocket::cmsg::{cmsg_mut::read::buf_to_msghdr, CmsgMut, CmsgRef},
-    unixprelude::*,
-};
+use crate::os::unix::unixprelude::*;
 use cfg_if::cfg_if;
 use libc::{iovec, msghdr};
 use std::{
     ffi::{CStr, CString},
-    io::{self, IoSlice, IoSliceMut},
-    ptr,
+    io, ptr,
 };
 use to_method::To;
 
@@ -103,17 +99,7 @@ pub fn empty_cstr() -> &'static CStr {
     }
 }
 
-pub fn make_msghdr_r(bufs: &mut [IoSliceMut<'_>], abuf: &mut (impl CmsgMut + ?Sized)) -> io::Result<msghdr> {
-    let mut hdr = make_msghdr(bufs.as_mut_ptr().cast::<iovec>(), to_msghdr_iovlen(bufs.len())?);
-    buf_to_msghdr(abuf, &mut hdr)?;
-    Ok(hdr)
-}
-pub fn make_msghdr_w(bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<msghdr> {
-    let mut hdr = make_msghdr(bufs.as_ptr().cast_mut().cast::<iovec>(), to_msghdr_iovlen(bufs.len())?);
-    abuf.fill_msghdr(&mut hdr)?;
-    Ok(hdr)
-}
-fn make_msghdr(iov: *mut iovec, iovlen: MsghdrIovlen) -> msghdr {
+pub fn make_msghdr(iov: *mut iovec, iovlen: MsghdrIovlen) -> msghdr {
     let mut hdr = DUMMY_MSGHDR;
     hdr.msg_iov = iov;
     hdr.msg_iovlen = iovlen;

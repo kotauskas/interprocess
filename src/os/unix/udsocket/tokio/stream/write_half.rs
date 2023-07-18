@@ -1,5 +1,9 @@
 use super::{c_wrappers, OwnedReadHalf, ReuniteError, UdStream};
-use crate::os::unix::unixprelude::*;
+use crate::os::unix::{
+    udsocket::{ancwrap, cmsg::CmsgRef, poll::write_in_terms_of_vectored, AsyncWriteAncillary},
+    unixprelude::*,
+};
+use futures_core::ready;
 use futures_io::AsyncWrite;
 use std::{
     io,
@@ -146,6 +150,7 @@ impl TokioAsyncWrite for OwnedWriteHalf {
         Poll::Ready(Ok(()))
     }
 }
+
 impl AsyncWrite for OwnedWriteHalf {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproject().poll_write(cx, buf)
@@ -159,6 +164,34 @@ impl AsyncWrite for OwnedWriteHalf {
         Poll::Ready(Ok(()))
     }
 }
+
+impl AsyncWriteAncillary for OwnedWriteHalf {
+    fn poll_write_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        write_in_terms_of_vectored(self, cx, buf, abuf)
+    }
+    fn poll_write_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        let slf = self.get_mut();
+        loop {
+            match ancwrap::sendmsg(slf.as_fd(), bufs, abuf) {
+                Ok(r) => return Poll::Ready(Ok(r)),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+            ready!(slf.0.as_ref().poll_write_ready(cx))?;
+        }
+    }
+}
+
 impl AsFd for OwnedWriteHalf {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
