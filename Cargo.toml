@@ -26,7 +26,8 @@ exclude = [
 
 [features]
 default = []
-tokio = ["dep:tokio", "futures-core", "futures-io"]
+async = ["futures-core", "futures-io", "futures-util"]
+tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
 [dependencies]
@@ -39,6 +40,7 @@ tokio = { version = "1.28.0", features = [
 ], optional = true }
 futures-core = { version = "0.3.28", optional = true }
 futures-io = { version = "0.3.28", optional = true }
+futures-util = { version = "0.3.28", features = ["io"], optional = true }
 to_method = "1.1"
 cfg-if = "1.0.0"
 

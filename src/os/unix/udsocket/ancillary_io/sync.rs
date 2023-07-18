@@ -1,34 +1,9 @@
-use super::cmsg::*;
+use super::{devector, devector_mut};
+use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess};
 use std::{
     fmt::Arguments,
     io::{self, prelude::*, IoSlice, IoSliceMut},
-    ops::{Add, AddAssign},
 };
-
-/// The successful result of an ancillary-enabled read.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct ReadAncillarySuccess {
-    /// How many bytes were read to the main buffer.
-    pub main: usize,
-    /// How many bytes were read to the ancillary buffer.
-    pub ancillary: usize,
-}
-impl Add for ReadAncillarySuccess {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            main: self.main + rhs.main,
-            ancillary: self.ancillary + rhs.ancillary,
-        }
-    }
-}
-impl AddAssign for ReadAncillarySuccess {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
 
 /// An extension of [`Read`] that enables operations involving ancillary data.
 ///
@@ -48,15 +23,11 @@ pub trait ReadAncillary<AB: CmsgMut + ?Sized>: Read {
         bufs: &mut [IoSliceMut<'_>],
         abuf: &mut AB,
     ) -> io::Result<ReadAncillarySuccess> {
-        let buf = bufs
-            .iter_mut()
-            .find(|b| !b.is_empty())
-            .map_or(&mut [][..], |b| &mut **b);
-        self.read_ancillary(buf, abuf)
+        self.read_ancillary(devector_mut(bufs), abuf)
     }
 }
 
-pub(super) fn read_in_terms_of_vectored<AB: CmsgMut + ?Sized>(
+pub(crate) fn read_in_terms_of_vectored<AB: CmsgMut + ?Sized>(
     slf: &mut impl ReadAncillary<AB>,
     buf: &mut [u8],
     abuf: &mut AB,
@@ -182,7 +153,7 @@ impl<RA: ReadAncillary<AB> + ?Sized, AB: CmsgMut + ?Sized> Read for ReadAncillar
 
 /// An extension of [`Write`] that enables operations involving ancillary data.
 pub trait WriteAncillary: Write {
-    /// Analogous to [`Write::write()`], but also sends control messages from the given ancillary buffer
+    /// Analogous to [`Write::write()`], but also sends control messages from the given ancillary buffer.
     ///
     /// The return value only the amount of main-band data sent from the given regular buffer – the entirety of the
     /// given `abuf` is always sent in full.
@@ -191,8 +162,7 @@ pub trait WriteAncillary: Write {
     /// Same as [`write_ancillary`](WriteAncillary::write_ancillary), but performs a
     /// [gather write](https://en.wikipedia.org/wiki/Vectored_I%2FO) instead.
     fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
-        let buf = bufs.iter().find(|b| !b.is_empty()).map_or(&[][..], |b| &**b);
-        self.write_ancillary(buf, abuf)
+        self.write_ancillary(devector(bufs), abuf)
     }
 }
 
@@ -222,7 +192,7 @@ impl<T: WriteAncillary + ?Sized> WriteAncillary for Box<T> {
         ) -> io::Result<usize>
     );
 }
-pub(super) fn write_in_terms_of_vectored(
+pub(crate) fn write_in_terms_of_vectored(
     slf: &mut impl WriteAncillary,
     buf: &[u8],
     abuf: CmsgRef<'_, '_>,

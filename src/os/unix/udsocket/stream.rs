@@ -1,9 +1,9 @@
 use super::{
+    ancillary_io::sync::{read_in_terms_of_vectored, write_in_terms_of_vectored},
     c_wrappers,
     cmsg::{context::Collector, CmsgMut, CmsgMutExt, CmsgRef},
-    read_in_terms_of_vectored,
     util::{make_msghdr_r, make_msghdr_w},
-    write_in_terms_of_vectored, ReadAncillary, ReadAncillarySuccess, ToUdSocketPath, UdSocketPath, WriteAncillary,
+    ReadAncillary, ReadAncillarySuccess, ToUdSocketPath, UdSocketPath, WriteAncillary,
 };
 use crate::{
     os::unix::{unixprelude::*, FdOps},
