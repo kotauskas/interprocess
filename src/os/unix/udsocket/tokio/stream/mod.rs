@@ -69,7 +69,7 @@ pub use {read_half::*, write_half::*};
 /// try_join!(write, read)?;
 ///
 /// // Close the connection a bit earlier than you'd think we would. Nice practice!
-/// drop(conn);
+/// drop((reader, writer));
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());

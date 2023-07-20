@@ -50,7 +50,7 @@ use tokio::net::UnixListener as TokioUdStreamListener;
 ///     try_join!(read, write)?;
 ///
 ///     // Dispose of our connection right now and not a moment later because I want to!
-///     drop(conn);
+///     drop((reader, writer));
 ///
 ///     // Produce our output!
 ///     println!("Client answered: {}", buffer.trim());

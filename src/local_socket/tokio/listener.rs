@@ -32,7 +32,7 @@ impmod! {local_socket::tokio,
 /// async fn handle_conn(conn: LocalSocketStream) -> io::Result<()> {
 ///     // Split the connection into two halves to process
 ///     // received and sent data concurrently.
-///     let (reader, mut writer) = conn.into_split();
+///     let (reader, mut writer) = conn.split();
 ///     let mut reader = BufReader::new(reader);
 ///
 ///     // Allocate a sizeable buffer for reading.

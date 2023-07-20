@@ -51,7 +51,7 @@ impmod! {local_socket::tokio,
 ///
 /// // This consumes our connection and splits it into two halves,
 /// // so that we could concurrently act on both.
-/// let (reader, mut writer) = conn.into_split();
+/// let (reader, mut writer) = conn.split();
 /// let mut reader = BufReader::new(reader);
 ///
 /// // Allocate a sizeable buffer for reading.
