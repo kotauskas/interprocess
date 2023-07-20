@@ -80,11 +80,12 @@ impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         LocalSocketStreamImpl::connect(name).await.map(Self::from)
     }
-    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently.
+    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently
+    /// from independently spawned tasks, entailing a memory allocation.
     #[inline]
-    pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        let (r, w) = self.0.into_split();
-        (OwnedReadHalf(r), OwnedWriteHalf(w))
+    pub fn split(self) -> (ReadHalf, WriteHalf) {
+        let (r, w) = self.0.split();
+        (ReadHalf(r), WriteHalf(w))
     }
     #[inline]
     fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
@@ -98,6 +99,8 @@ impl From<LocalSocketStreamImpl> for LocalSocketStream {
         Self(inner)
     }
 }
+
+// TODO I/O by ref
 
 impl AsyncRead for LocalSocketStream {
     #[inline]

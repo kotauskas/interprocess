@@ -1,6 +1,6 @@
 use crate::os::unix::udsocket::{
     ancwrap, c_wrappers,
-    cmsg::{CmsgMut, CmsgRef},
+    cmsg::{CmsgMut, CmsgMutBuf, CmsgRef},
     poll::{read_in_terms_of_vectored, write_in_terms_of_vectored},
     AsyncReadAncillary, AsyncWriteAncillary, ReadAncillarySuccess, ToUdSocketPath, UdSocket, UdSocketPath,
     UdStream as SyncUdStream,
@@ -90,24 +90,20 @@ impl UdStream {
         Self::try_from(stream).map_err(|e| e.cause.unwrap())
     }
 
-    /// Borrows a stream into a read half and a write half, which can be used to read and write the stream concurrently.
+    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently
+    /// from independently spawned tasks, entailing a memory allocation.
     ///
-    /// This method is more efficient than [`.into_split()`](Self::into_split), but the halves cannot be moved into independently spawned tasks.
-    pub fn split(&mut self) -> (BorrowedReadHalf<'_>, BorrowedWriteHalf<'_>) {
-        let (read_tok, write_tok) = self.0.split();
-        (BorrowedReadHalf(read_tok), BorrowedWriteHalf(write_tok))
-    }
-    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently.
+    /// If borrowing is feasible, `UdStream` can simply be read from and written to by reference, no splitting required.
     ///
-    /// Unlike [`.split()`](Self::split), the owned halves can be moved to separate tasks, which comes at the cost of a heap allocation.
-    ///
-    /// Dropping either half will shut it down. This is equivalent to calling [`.shutdown()`](Self::shutdown) on the stream with the corresponding argument.
-    pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
+    /// Dropping either half will shut it down. This is equivalent to calling [`.shutdown()`](Self::shutdown) on the
+    /// stream with the corresponding argument.
+    pub fn split(self) -> (ReadHalf, WriteHalf) {
         let (read_tok, write_tok) = self.0.into_split();
-        (OwnedReadHalf(read_tok), OwnedWriteHalf(write_tok))
+        (ReadHalf(read_tok), WriteHalf(write_tok))
     }
-    /// Attempts to put two owned halves of a stream back together and recover the original stream. Succeeds only if the two halves originated from the same call to [`.into_split()`](Self::into_split).
-    pub fn reunite(read: OwnedReadHalf, write: OwnedWriteHalf) -> Result<Self, ReuniteError> {
+    /// Attempts to put two owned halves of a stream back together and recover the original stream. Succeeds only if the
+    /// two halves originated from the same call to [`.split()`](Self::split).
+    pub fn reunite(read: ReadHalf, write: WriteHalf) -> Result<Self, ReuniteError> {
         let (read_tok, write_tok) = (read.0, write.0);
         let stream_tok = read_tok.reunite(write_tok)?;
         Ok(Self::from(stream_tok))
@@ -124,24 +120,104 @@ tokio_wrapper_trait_impls!(
     tokio TokioUdStream);
 derive_asraw!(unix: UdStream);
 
-impl TokioAsyncRead for UdStream {
-    #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        self.pinproject().poll_read(cx, buf)
-    }
-}
-impl AsyncRead for UdStream {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        let mut buf = TokioReadBuf::new(buf);
-        match self.pinproject().poll_read(cx, &mut buf) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(buf.filled().len())),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
+fn poll_read_ref(slf: &TokioUdStream, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+    loop {
+        match slf.try_read_buf(buf) {
+            Ok(..) => return Poll::Ready(Ok(())),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Poll::Ready(Err(e)),
         }
+        ready!(slf.poll_read_ready(cx))?;
     }
 }
 
-impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for UdStream {
+fn poll_read_vec_ref(
+    slf: &TokioUdStream,
+    cx: &mut Context<'_>,
+    bufs: &mut [io::IoSliceMut<'_>],
+) -> Poll<io::Result<usize>> {
+    // PERF should use readv instead
+    poll_read_ancvec_ref(slf, cx, bufs, &mut CmsgMutBuf::new(&mut [])).map(|p| p.map(|s| s.main))
+}
+
+fn poll_read_ancvec_ref<AB: CmsgMut + ?Sized>(
+    slf: &TokioUdStream,
+    cx: &mut Context<'_>,
+    bufs: &mut [io::IoSliceMut<'_>],
+    abuf: &mut AB,
+) -> Poll<io::Result<ReadAncillarySuccess>> {
+    loop {
+        match ancwrap::recvmsg(slf.as_fd(), bufs, abuf, None) {
+            Ok(r) => return Poll::Ready(Ok(r)),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Poll::Ready(Err(e)),
+        }
+        ready!(slf.poll_read_ready(cx))?;
+    }
+}
+
+fn poll_write_ref(slf: &TokioUdStream, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    loop {
+        match slf.try_write(buf) {
+            Ok(s) => return Poll::Ready(Ok(s)),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Poll::Ready(Err(e)),
+        }
+        ready!(slf.poll_write_ready(cx))?;
+    }
+}
+
+fn poll_write_vec_ref(slf: &TokioUdStream, cx: &mut Context<'_>, bufs: &[io::IoSlice<'_>]) -> Poll<io::Result<usize>> {
+    loop {
+        match slf.try_write_vectored(bufs) {
+            Ok(s) => return Poll::Ready(Ok(s)),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Poll::Ready(Err(e)),
+        }
+        ready!(slf.poll_write_ready(cx))?;
+    }
+}
+
+fn poll_write_ancvec_ref(
+    slf: &TokioUdStream,
+    cx: &mut Context<'_>,
+    bufs: &[io::IoSlice<'_>],
+    abuf: CmsgRef<'_, '_>,
+) -> Poll<io::Result<usize>> {
+    loop {
+        match ancwrap::sendmsg(slf.as_fd(), bufs, abuf) {
+            Ok(r) => return Poll::Ready(Ok(r)),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Poll::Ready(Err(e)),
+        }
+        ready!(slf.poll_write_ready(cx))?;
+    }
+}
+
+impl TokioAsyncRead for &UdStream {
+    #[inline(always)]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+        poll_read_ref(&self.0, cx, buf)
+    }
+}
+
+impl AsyncRead for &UdStream {
+    #[inline]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        let mut buf = TokioReadBuf::new(buf);
+        <Self as TokioAsyncRead>::poll_read(self, cx, &mut buf).map(|p| p.map(|()| buf.filled().len()))
+    }
+    #[inline(always)]
+    fn poll_read_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [io::IoSliceMut<'_>],
+    ) -> Poll<io::Result<usize>> {
+        poll_read_vec_ref(&self.0, cx, bufs)
+    }
+}
+
+impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for &UdStream {
     #[inline]
     fn poll_read_ancillary(
         self: Pin<&mut Self>,
@@ -151,57 +227,123 @@ impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for UdStream {
     ) -> Poll<io::Result<ReadAncillarySuccess>> {
         read_in_terms_of_vectored(self, cx, buf, abuf)
     }
+    #[inline(always)]
     fn poll_read_ancillary_vectored(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &mut [io::IoSliceMut<'_>],
         abuf: &mut AB,
     ) -> Poll<io::Result<ReadAncillarySuccess>> {
-        let slf = self.get_mut();
-        loop {
-            match ancwrap::recvmsg(slf.as_fd(), bufs, abuf, None) {
-                Ok(r) => return Poll::Ready(Ok(r)),
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-            ready!(slf.0.poll_read_ready(cx))?;
-        }
+        poll_read_ancvec_ref(&self.0, cx, bufs, abuf)
     }
 }
 
-impl TokioAsyncWrite for UdStream {
-    #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.pinproject().poll_write(cx, buf)
-    }
-    #[inline]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproject().poll_flush(cx)
-    }
-    /// Finishes immediately. See the `.shutdown()` method.
-    #[inline]
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproject().poll_shutdown(cx)
+impl TokioAsyncRead for UdStream {
+    #[inline(always)]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+        self.pinproject().poll_read(cx, buf)
     }
 }
-impl AsyncWrite for UdStream {
+
+impl AsyncRead for UdStream {
     #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.pinproject().poll_write(cx, buf)
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        let mut buf = TokioReadBuf::new(buf);
+        self.pinproject()
+            .poll_read(cx, &mut buf)
+            .map(|p| p.map(|()| buf.filled().len()))
     }
-    #[inline]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproject().poll_flush(cx)
+    #[inline(always)]
+    fn poll_read_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [io::IoSliceMut<'_>],
+    ) -> Poll<io::Result<usize>> {
+        <&Self as AsyncRead>::poll_read_vectored(Pin::new(&mut &*self), cx, bufs)
+    }
+}
+
+impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for UdStream {
+    #[inline(always)]
+    fn poll_read_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        Pin::new(&mut &*self).poll_read_ancillary(cx, buf, abuf)
+    }
+    #[inline(always)]
+    fn poll_read_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [io::IoSliceMut<'_>],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        Pin::new(&mut &*self).poll_read_ancillary_vectored(cx, bufs, abuf)
+    }
+}
+
+impl TokioAsyncWrite for &UdStream {
+    #[inline(always)]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        poll_write_ref(&self.0, cx, buf)
+    }
+    /// Does nothing and finishes immediately, as sockets cannot be flushed.
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        Poll::Ready(Ok(()))
     }
     /// Finishes immediately. See the `.shutdown()` method.
+    #[inline(always)]
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.shutdown(Shutdown::Both)?;
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline(always)]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        poll_write_vec_ref(&self.0, cx, bufs)
+    }
+    /// True.
+    #[inline(always)]
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+}
+
+impl AsyncWrite for &UdStream {
     #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        <Self as TokioAsyncWrite>::poll_write(self, cx, buf)
+    }
+    /// Does nothing and finishes immediately, as sockets cannot be flushed.
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+    /// Finishes immediately. See the `.shutdown()` method.
+    #[inline(always)]
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.shutdown(Shutdown::Both)?;
         Poll::Ready(Ok(()))
     }
+
+    #[inline(always)]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        <Self as TokioAsyncWrite>::poll_write_vectored(self, cx, bufs)
+    }
 }
 
-impl AsyncWriteAncillary for UdStream {
+impl AsyncWriteAncillary for &UdStream {
     #[inline]
     fn poll_write_ancillary(
         self: Pin<&mut Self>,
@@ -211,27 +353,77 @@ impl AsyncWriteAncillary for UdStream {
     ) -> Poll<io::Result<usize>> {
         write_in_terms_of_vectored(self, cx, buf, abuf)
     }
+    #[inline(always)]
     fn poll_write_ancillary_vectored(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
         abuf: CmsgRef<'_, '_>,
     ) -> Poll<io::Result<usize>> {
-        let slf = self.get_mut();
-        loop {
-            match ancwrap::sendmsg(slf.as_fd(), bufs, abuf) {
-                Ok(r) => return Poll::Ready(Ok(r)),
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-            ready!(slf.0.poll_write_ready(cx))?;
-        }
+        poll_write_ancvec_ref(&self.0, cx, bufs, abuf)
+    }
+}
+
+impl TokioAsyncWrite for UdStream {
+    #[inline(always)]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        self.pinproject().poll_write(cx, buf)
+    }
+    /// Does nothing and finishes immediately, as sockets cannot be flushed.
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+    /// Finishes immediately. See the `.shutdown()` method.
+    #[inline(always)]
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.shutdown(Shutdown::Both)?;
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncWrite for UdStream {
+    #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        self.pinproject().poll_write(cx, buf)
+    }
+    /// Does nothing and finishes immediately, as sockets cannot be flushed.
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+    /// Finishes immediately. See the `.shutdown()` method.
+    #[inline(always)]
+    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.shutdown(Shutdown::Both)?;
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncWriteAncillary for UdStream {
+    #[inline(always)]
+    fn poll_write_ancillary(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut &*self).poll_write_ancillary(cx, buf, abuf)
+    }
+    #[inline(always)]
+    fn poll_write_ancillary_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut &*self).poll_write_ancillary_vectored(cx, bufs, abuf)
     }
 }
 
 /// Error indicating that a read half and a write half were not from the same stream, and thus could not be reunited.
 #[derive(Debug)]
-pub struct ReuniteError(pub OwnedReadHalf, pub OwnedWriteHalf);
+pub struct ReuniteError(pub ReadHalf, pub WriteHalf);
 impl Error for ReuniteError {}
 impl fmt::Display for ReuniteError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -240,8 +432,8 @@ impl fmt::Display for ReuniteError {
 }
 impl From<TokioReuniteError> for ReuniteError {
     fn from(TokioReuniteError(read, write): TokioReuniteError) -> Self {
-        let read = OwnedReadHalf::from(read);
-        let write = OwnedWriteHalf::from(write);
+        let read = ReadHalf::from(read);
+        let write = WriteHalf::from(write);
         Self(read, write)
     }
 }

@@ -14,7 +14,7 @@ static CLIENT_BYTES: &[u8] = b"Bytes from client!\0";
 
 pub async fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
     async fn handle_conn(conn: LocalSocketStream) -> TestResult {
-        let (reader, mut writer) = conn.into_split();
+        let (reader, mut writer) = conn.split();
         let mut buffer = Vec::with_capacity(128);
         let mut reader = BufReader::new(reader);
 
@@ -87,7 +87,7 @@ pub async fn client(name: Arc<String>) -> TestResult {
     let (reader, mut writer) = LocalSocketStream::connect(name.as_str())
         .await
         .context("Connect failed")?
-        .into_split();
+        .split();
     let mut reader = BufReader::new(reader);
 
     let read = async {

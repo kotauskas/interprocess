@@ -9,24 +9,24 @@ use {
 };
 
 impmod! {local_socket::tokio,
-    OwnedWriteHalf as OwnedWriteHalfImpl
+    WriteHalf as WriteHalfImpl
 }
 
-/// An owned write half of a Tokio-based local socket stream, obtained by splitting a [`LocalSocketStream`].
+/// A write half of a Tokio-based local socket stream, obtained by splitting a [`LocalSocketStream`].
 ///
 /// # Examples
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 ///
 /// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
-pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
-impl OwnedWriteHalf {
+pub struct WriteHalf(pub(super) WriteHalfImpl);
+impl WriteHalf {
     #[inline]
-    fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
+    fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
         Pin::new(&mut self.0)
     }
 }
 
-impl AsyncWrite for OwnedWriteHalf {
+impl AsyncWrite for WriteHalf {
     #[inline]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
@@ -50,12 +50,12 @@ impl AsyncWrite for OwnedWriteHalf {
     }
 }
 
-impl Debug for OwnedWriteHalf {
+impl Debug for WriteHalf {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.0, f)
     }
 }
 
-forward_as_handle!(OwnedWriteHalf);
-derive_asraw!(OwnedWriteHalf);
+forward_as_handle!(WriteHalf);
+derive_asraw!(WriteHalf);

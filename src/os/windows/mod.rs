@@ -10,11 +10,7 @@ pub(crate) mod local_socket;
 mod file_handle;
 pub(crate) use file_handle::*;
 
-use std::{
-    io,
-    mem::{transmute, MaybeUninit},
-    task::Poll,
-};
+use std::{io, task::Poll};
 mod winprelude {
     pub use std::os::windows::prelude::*;
     pub use winapi::{

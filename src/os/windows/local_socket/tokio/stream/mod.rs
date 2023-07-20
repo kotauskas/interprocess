@@ -29,11 +29,11 @@ impl LocalSocketStream {
         Ok(Self(inner))
     }
     #[inline]
-    pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
+    pub fn split(self) -> (ReadHalf, WriteHalf) {
         let (r, w) = self.0.split();
-        (OwnedReadHalf(r), OwnedWriteHalf(w))
+        (ReadHalf(r), WriteHalf(w))
     }
-    pub fn reunite(rh: OwnedReadHalf, wh: OwnedWriteHalf) -> io::Result<Self> {
+    pub fn reunite(rh: ReadHalf, wh: WriteHalf) -> io::Result<Self> {
         match rh.0.reunite(wh.0) {
             Ok(inner) => Ok(Self(inner)),
             Err(_) => todo!(),
@@ -45,8 +45,8 @@ impl LocalSocketStream {
     }
 }
 
-/// Thunks broken pipe errors into EOFs because broken pipe to the writer is what EOF is to the
-/// reader, but Windows shoehorns both into the former.
+// TODO I/O by ref, including Tokio traits
+
 impl AsyncRead for LocalSocketStream {
     #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {

@@ -21,9 +21,9 @@ impl LocalSocketStream {
         let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
         UdStream::connect(path).await.map(Self::from)
     }
-    pub fn into_split(self) -> (OwnedReadHalf, OwnedWriteHalf) {
-        let (r, w) = self.0.into_split();
-        (OwnedReadHalf(r), OwnedWriteHalf(w))
+    pub fn split(self) -> (ReadHalf, WriteHalf) {
+        let (r, w) = self.0.split();
+        (ReadHalf(r), WriteHalf(w))
     }
     fn pinproj(&mut self) -> Pin<&mut UdStream> {
         Pin::new(&mut self.0)

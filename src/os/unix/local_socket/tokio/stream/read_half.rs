@@ -1,5 +1,5 @@
 use {
-    crate::os::unix::udsocket::tokio::OwnedReadHalf as OwnedReadHalfImpl,
+    crate::os::unix::udsocket::tokio::ReadHalf as ReadHalfImpl,
     futures_io::AsyncRead,
     std::{
         fmt::{self, Debug, Formatter},
@@ -9,14 +9,14 @@ use {
     },
 };
 
-pub struct OwnedReadHalf(pub(super) OwnedReadHalfImpl);
-impl OwnedReadHalf {
+pub struct ReadHalf(pub(super) ReadHalfImpl);
+impl ReadHalf {
     #[inline]
-    fn pinproj(&mut self) -> Pin<&mut OwnedReadHalfImpl> {
+    fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
         Pin::new(&mut self.0)
     }
 }
-impl AsyncRead for OwnedReadHalf {
+impl AsyncRead for ReadHalf {
     #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> std::task::Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
@@ -30,9 +30,9 @@ impl AsyncRead for OwnedReadHalf {
         self.pinproj().poll_read_vectored(cx, bufs)
     }
 }
-impl Debug for OwnedReadHalf {
+impl Debug for ReadHalf {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("local_socket::OwnedReadHalf").field(&self.0).finish()
+        f.debug_tuple("local_socket::ReadHalf").field(&self.0).finish()
     }
 }
-forward_as_handle!(OwnedReadHalf);
+forward_as_handle!(ReadHalf);

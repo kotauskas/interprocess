@@ -9,23 +9,22 @@ use {
 };
 
 impmod! {local_socket::tokio,
-    OwnedReadHalf as OwnedReadHalfImpl
+    ReadHalf as ReadHalfImpl
 }
 
-/// An owned read half of a Tokio-based local socket stream, obtained by splitting a [`LocalSocketStream`].
+/// A read half of a Tokio-based local socket stream, obtained by splitting a
+/// [`LocalSocketStream`](super::LocalSocketStream).
 ///
 /// # Examples
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
-///
-/// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
-pub struct OwnedReadHalf(pub(super) OwnedReadHalfImpl);
-impl OwnedReadHalf {
+pub struct ReadHalf(pub(super) ReadHalfImpl);
+impl ReadHalf {
     #[inline]
-    fn pinproj(&mut self) -> Pin<&mut OwnedReadHalfImpl> {
+    fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
         Pin::new(&mut self.0)
     }
 }
-impl AsyncRead for OwnedReadHalf {
+impl AsyncRead for ReadHalf {
     #[inline]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_read(cx, buf)
@@ -39,12 +38,12 @@ impl AsyncRead for OwnedReadHalf {
         self.pinproj().poll_read_vectored(cx, bufs)
     }
 }
-impl Debug for OwnedReadHalf {
+impl Debug for ReadHalf {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.0, f)
     }
 }
 
-forward_as_handle!(OwnedReadHalf);
-derive_asraw!(OwnedReadHalf);
+forward_as_handle!(ReadHalf);
+derive_asraw!(ReadHalf);

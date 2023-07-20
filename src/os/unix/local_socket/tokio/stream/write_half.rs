@@ -1,5 +1,5 @@
 use {
-    crate::os::unix::udsocket::tokio::OwnedWriteHalf as OwnedWriteHalfImpl,
+    crate::os::unix::udsocket::tokio::WriteHalf as WriteHalfImpl,
     futures_io::AsyncWrite,
     std::{
         fmt::{self, Debug, Formatter},
@@ -9,14 +9,14 @@ use {
     },
 };
 
-pub struct OwnedWriteHalf(pub(super) OwnedWriteHalfImpl);
-impl OwnedWriteHalf {
+pub struct WriteHalf(pub(super) WriteHalfImpl);
+impl WriteHalf {
     #[inline]
-    fn pinproj(&mut self) -> Pin<&mut OwnedWriteHalfImpl> {
+    fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
         Pin::new(&mut self.0)
     }
 }
-impl AsyncWrite for OwnedWriteHalf {
+impl AsyncWrite for WriteHalf {
     #[inline]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         self.pinproj().poll_write(cx, buf)
@@ -38,9 +38,9 @@ impl AsyncWrite for OwnedWriteHalf {
         self.pinproj().poll_close(cx)
     }
 }
-impl Debug for OwnedWriteHalf {
+impl Debug for WriteHalf {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("local_socket::OwnedWriteHalf").field(&self.0).finish()
+        f.debug_tuple("local_socket::WriteHalf").field(&self.0).finish()
     }
 }
-forward_as_handle!(OwnedWriteHalf);
+forward_as_handle!(WriteHalf);

@@ -7,7 +7,10 @@
 // TODO add examples
 
 use super::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
-use crate::unnamed_pipe::{weaken_buf_init_mut, UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter};
+use crate::{
+    unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter},
+    weaken_buf_init_mut,
+};
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
