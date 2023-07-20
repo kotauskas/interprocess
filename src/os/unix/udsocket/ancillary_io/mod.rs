@@ -2,7 +2,11 @@
 
 #[cfg(feature = "async")]
 pub(super) mod poll;
-pub(super) mod sync;
+pub(super) mod sync {
+    mod read;
+    mod write;
+    pub use {read::*, write::*};
+}
 
 #[cfg(feature = "async")]
 pub use poll::*;
