@@ -1,7 +1,18 @@
 // TODO async version
 
 #[cfg(feature = "async")]
-pub(super) mod poll;
+pub(super) mod poll {
+    #[inline(always)]
+    fn assert_future<F: core::future::Future>(fut: F) -> F {
+        fut
+    }
+
+    mod read;
+    mod write;
+    pub use {read::*, write::*};
+
+    pub mod futures;
+}
 pub(super) mod sync {
     mod read;
     mod write;
