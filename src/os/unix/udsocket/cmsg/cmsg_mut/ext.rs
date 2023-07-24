@@ -27,11 +27,13 @@ pub trait CmsgMutExt: CmsgMut {
     fn add_message(&mut self, msg: &impl ToCmsg) -> usize {
         self.add_raw_message(msg.to_cmsg())
     }
+
     /// Returns the capacity of the buffer, which is simply the length of the slice returned by `as_bytes()`.
     #[inline(always)]
     fn capacity(&self) -> usize {
         self.as_bytes().len()
     }
+
     /// Immutably borrows the part of the buffer which is already filled with valid ancillary data as a [`CmsgRef`].
     ///
     /// Use this method to deserialize the contents of a `CmsgMut` used for receiving control messages from a socket.
@@ -39,6 +41,7 @@ pub trait CmsgMutExt: CmsgMut {
     fn as_ref(&self) -> CmsgRef<'_, '_, Self::Context> {
         unsafe { CmsgRef::new_unchecked_with_context(self.valid_part(), self.context()) }
     }
+
     /// Immutably borrows the part of the buffer which is already filled with valid ancillary data as a raw slice.
     #[inline(always)]
     fn valid_part(&self) -> &[u8] {
@@ -57,6 +60,7 @@ pub trait CmsgMutExt: CmsgMut {
         debug_assert!(len >= 0);
         unsafe { slice::from_raw_parts_mut(start, len as usize) }
     }
+
     /// Splits the buffer into two parts: the left one which is valid and well-initialized and the right one which is
     /// uninitialized, according to `valid_len()`. Only the right part is given as a slice with mutable access; the left
     /// part is given as a [`CmsgRef`].
@@ -106,6 +110,16 @@ pub trait CmsgMutExt: CmsgMut {
             self.uninit_part(),
         )
     }
+
+    /// Clears the buffer via `.set_len(0)`. It becomes logically empty but retains all capacity, allowing for buffer
+    /// reuse.
+    #[inline(always)]
+    fn clear(&mut self) {
+        unsafe {
+            // SAFETY: why the hell wouldn't it be?
+            self.set_len(0);
+        }
+    }
     /// Alias for `set_len(valid_len() + incr)`.
     ///
     /// # Safety
@@ -117,6 +131,7 @@ pub trait CmsgMutExt: CmsgMut {
             self.set_len(self.valid_len() + incr)
         }
     }
+
     /// Allocates additional space in the buffer via `reserve()` such that its total capacity (counting both existing
     /// capacity and the amount by which the buffer will be grown) reaches or exceeds the given value, at the underlying
     /// data structure's discretion or due to the buffer already being large enough.
