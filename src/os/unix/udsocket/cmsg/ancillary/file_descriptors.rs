@@ -32,6 +32,7 @@ impl<'a> FileDescriptors<'a> {
     }
 }
 impl ToCmsg for FileDescriptors<'_> {
+    #[inline]
     fn to_cmsg(&self) -> Cmsg<'_> {
         unsafe {
             // SAFETY: a bunch of file descriptors is all you need for a SCM_RIGHTS control message

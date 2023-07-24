@@ -27,18 +27,25 @@ impl Collector for CredsOptContext {
 
 impl Credentials<'_> {
     pub const ANCTYPE: c_int = libc::SCM_CREDS;
+    fn len(&self) -> usize {
+        match self {
+            Self::Cmsgcred(..) => size_of::<cmsgcred>(),
+            #[cfg(uds_sockcred)]
+            Self::Sockcred(c) => unsafe { libc::SOCKCREDSIZE(c.sc_ngroups as _) },
+        }
+    }
 }
 
 impl<'a> ToCmsg for Credentials<'a> {
     fn to_cmsg(&self) -> Cmsg<'_> {
         let st_bytes = unsafe {
-            let (ptr, len) = match self {
-                Credentials::Cmsgcred(c) => (<*const _>::cast(c), size_of::<cmsgcred>()),
+            let ptr = match self {
+                Credentials::Cmsgcred(c) => <*const _>::cast(c),
                 #[cfg(uds_sockcred)]
-                Credentials::Sockcred(c) => (<*const _>::cast(c), libc::SOCKCREDSIZE(c.sc_ngroups as _)),
+                Credentials::Sockcred(c) => <*const _>::cast(c),
             };
             // SAFETY: well-initialized POD struct with #[repr(C)]
-            slice::from_raw_parts(ptr, len)
+            slice::from_raw_parts(ptr, self.len())
         };
         unsafe {
             // SAFETY: we've got checks to ensure that we're not using the wrong struct

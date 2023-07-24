@@ -174,6 +174,7 @@ impl Collector for Context {
     )))
 )]
 impl ToCmsg for Credentials<'_> {
+    #[inline(always)]
     fn to_cmsg(&self) -> Cmsg<'_> {
         self.0.to_cmsg()
     }

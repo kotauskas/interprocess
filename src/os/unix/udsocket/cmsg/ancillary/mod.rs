@@ -36,7 +36,7 @@ const LEVEL: c_int = libc::SOL_SOCKET;
 
 /// An ancillary data wrapper that can be converted to a control message.
 pub trait ToCmsg {
-    /// Invokes the conversion to an ancillary message.
+    /// Invokes the conversion to a control message.
     ///
     /// The resulting value may contain unmanaged ownership of resources – dropping it without sending may leak those
     /// resources.

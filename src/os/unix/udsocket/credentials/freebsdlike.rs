@@ -112,6 +112,7 @@ impl ExactSizeIterator for Groups<'_> {
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub(crate) struct cmsgcred_packed {
     pub cmcred_pid: pid_t,
     pub cmcred_uid: uid_t,
@@ -135,9 +136,10 @@ impl AsRef<cmsgcred_packed> for cmsgcred {
     }
 }
 
+#[cfg(uds_sockcred)]
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg(uds_sockcred)]
+#[allow(non_camel_case_types)]
 pub(crate) struct sockcred_packed {
     pub sc_uid: uid_t,
     pub sc_euid: uid_t,

@@ -77,6 +77,8 @@ pub(super) fn add_raw_message(buf: &mut (impl CmsgMut + ?Sized), cmsg: Cmsg<'_>)
     // This will be the return value.
     let mut ret = 0;
 
+    let _ = buf.reserve(cmsg.space_occupied());
+
     let Some(fwd_align) = align_first(buf.uninit_part()) else {
         return 0;
     };

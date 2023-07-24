@@ -24,6 +24,7 @@ impl<'a> Credentials<'a> {
 }
 
 impl ToCmsg for Credentials<'_> {
+    #[inline]
     fn to_cmsg(&self) -> Cmsg<'_> {
         let st_bytes = unsafe {
             // SAFETY: well-initialized POD struct with #[repr(C)]

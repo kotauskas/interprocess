@@ -39,6 +39,7 @@ impl AsRef<ucred_packed> for Credentials<'_> {
 #[cfg(uds_ucred)]
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub(crate) struct ucred_packed {
     pid: pid_t,
     uid: uid_t,
