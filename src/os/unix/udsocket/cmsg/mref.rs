@@ -9,6 +9,7 @@ use std::{
     cmp::min,
     io,
     iter::FusedIterator,
+    mem::size_of,
     slice::{self, SliceIndex},
 };
 
@@ -224,10 +225,14 @@ impl<'b, 'c, C: ?Sized> Iterator for Cmsgs<'b, 'c, C> {
             let max_len = one_past_end.offset_from(dptr);
             debug_assert!(max_len >= 0);
 
+            // cmsg_len includes the size of the cmsghdr
+            let hdrlen = cmsghdr.cmsg_len - size_of::<cmsghdr>();
+            debug_assert!(hdrlen <= isize::MAX as usize);
+
             // Buffer overflow check because some OSes (such as everyone's favorite putrid hellspawn macOS) don't
             // even fucking clip the fucking cmsg_len thing to the buffer end as specified by msg_controllen.
             // Source: https://gist.github.com/kentonv/bc7592af98c68ba2738f4436920868dc
-            let len = min(cmsghdr.cmsg_len as isize, max_len);
+            let len = min(hdrlen as isize, max_len);
 
             // SAFETY: we trust CMSG_DATA; the init guarantee comes from CmsgRef containing a slice of initialized data
             slice::from_raw_parts(dptr, len as usize)
