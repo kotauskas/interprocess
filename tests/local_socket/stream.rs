@@ -1,5 +1,5 @@
 use super::{util::*, NameGen};
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{bail, Context};
 use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
     io::{self, BufRead, BufReader, Write},
@@ -27,10 +27,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("Incoming connection failed: {e}"),
         };
 
         let expected = message(false, Some('\n'));

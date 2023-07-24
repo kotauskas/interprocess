@@ -1,5 +1,5 @@
 use super::util::*;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{bail, Context};
 use interprocess::os::unix::udsocket::{UdSocket, UdStream, UdStreamListener};
 use std::{
     io::{self, BufRead, BufReader, Read, Write},
@@ -35,10 +35,7 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("Incoming connection failed: {e}"),
         };
 
         if shutdown {
