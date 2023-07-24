@@ -147,9 +147,9 @@ impl<E: Display> Display for ParseErrorKind<E> {
             WrongLevel { expected, got } | WrongType { expected, got } => {
                 write!(f, "{msg_base} (")?;
                 if let Some(expected) = expected {
-                    write!(f, "expected {expected}, ")?;
+                    write!(f, "expected {expected:#08x}, ")?;
                 }
-                write!(f, "got {got}")
+                write!(f, "got {got:#08x})")
             }
             MalformedPayload(e) => write!(f, "{msg_base}: {e}"),
             _ => f.write_str(msg_base),
