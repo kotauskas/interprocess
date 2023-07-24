@@ -1,4 +1,5 @@
 use super::{ancillary::ToCmsg, *};
+use crate::weaken_buf_init;
 use std::{mem::MaybeUninit, slice};
 
 /// Methods derived from the interface of [`CmsgMut`].
@@ -39,7 +40,9 @@ pub trait CmsgMutExt: CmsgMut {
     /// Use this method to deserialize the contents of a `CmsgMut` used for receiving control messages from a socket.
     #[inline(always)]
     fn as_ref(&self) -> CmsgRef<'_, '_, Self::Context> {
-        unsafe { CmsgRef::new_unchecked_with_context(self.valid_part(), self.context()) }
+        let vp = self.valid_part();
+        let align = align_first(weaken_buf_init(vp)).unwrap_or(vp.len());
+        unsafe { CmsgRef::new_unchecked_with_context(&vp[align..], self.context()) }
     }
 
     /// Immutably borrows the part of the buffer which is already filled with valid ancillary data as a raw slice.

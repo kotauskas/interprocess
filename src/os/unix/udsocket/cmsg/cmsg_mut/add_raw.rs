@@ -1,59 +1,12 @@
 //! Insertion of ancillary messages into mutable buffers.
 
 use super::{super::Cmsg, *};
-use crate::{os::unix::udsocket::util::to_msghdr_controllen, weaken_buf_init};
-use libc::{cmsghdr, msghdr};
-use std::{
-    ffi::c_void,
-    mem::{align_of, size_of, zeroed},
-};
+use crate::weaken_buf_init;
+use libc::cmsghdr;
+use std::mem::{size_of, MaybeUninit};
 
 type MUu8 = MaybeUninit<u8>;
 const ZEROFILL: MUu8 = MUu8::new(0);
-
-fn dummy_msghdr(buf: &[MUu8]) -> msghdr {
-    let mut hdr = unsafe { zeroed::<msghdr>() };
-    hdr.msg_control = buf.as_ptr().cast::<c_void>().cast_mut();
-    hdr.msg_controllen = to_msghdr_controllen(buf.len()).expect("failed to create dummy msghdr");
-    hdr
-}
-
-/// Computes an index to the first byte in the buffer in which a `cmsghdr` would be well-aligned.
-///
-/// The returned location is guaranteed to be able to fit a `cmsghdr`.
-// Used in read.rs
-pub(super) fn align_first(buf: &[MUu8]) -> Option<usize> {
-    const ALIGN: usize = align_of::<cmsghdr>();
-    const MASK: usize = ALIGN - 1;
-
-    // The potentially misaligned address
-    let base = buf.as_ptr() as usize;
-    // Adding the mask pushes any misaligned address over the edge, but puts a well-aligned one
-    // just a single byte short of going forward by the alignment's worth of offset
-    let nudged = base + MASK;
-    // Masking the misalignment out puts us at an aligned location
-    let aligned = nudged & !MASK;
-    // The amount by which the start must be moved forward to become aligned
-    let fwd_align = aligned - base;
-
-    let mut hdr = dummy_msghdr(buf);
-    hdr.msg_control = hdr.msg_control.wrapping_add(fwd_align);
-    // The cast here is fine because no one in their right mind expects the alignment adjustment to
-    // exceed the sort of integer type used for controllen
-    hdr.msg_controllen = hdr.msg_controllen.saturating_sub(fwd_align as _);
-
-    let base = unsafe { libc::CMSG_FIRSTHDR(&hdr) }.cast::<MUu8>();
-    if base.is_null() {
-        return None;
-    }
-
-    let base_idx = unsafe {
-        // SAFETY: CMSG_FIRSTHDR never returns a pointer outside the buffer if the return value is non-null
-        base.offset_from(buf.as_ptr())
-    };
-    debug_assert!(base_idx >= 0);
-    Some(base_idx as usize)
-}
 
 /// Wraps `CMSG_NXTHDR` in offset-addressing form. The current `cmsghdr` from which the next one is to be found is
 /// assumed to be at the beginning of the buffer.
