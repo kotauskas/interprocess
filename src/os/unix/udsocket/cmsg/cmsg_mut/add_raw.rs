@@ -26,10 +26,15 @@ pub(super) fn align_first(buf: &[MUu8]) -> Option<usize> {
     const ALIGN: usize = align_of::<cmsghdr>();
     const MASK: usize = ALIGN - 1;
 
-    // The amount by which the start is misaligned
-    let misalign = (buf.as_ptr() as usize) & MASK;
+    // The potentially misaligned address
+    let base = buf.as_ptr() as usize;
+    // Adding the mask pushes any misaligned address over the edge, but puts a well-aligned one
+    // just a single byte short of going forward by the alignment's worth of offset
+    let nudged = base + MASK;
+    // Masking the misalignment out puts us at an aligned location
+    let aligned = nudged & !MASK;
     // The amount by which the start must be moved forward to become aligned
-    let fwd_align = ALIGN - misalign;
+    let fwd_align = aligned - base;
 
     let mut hdr = dummy_msghdr(buf);
     hdr.msg_control = hdr.msg_control.wrapping_add(fwd_align);
