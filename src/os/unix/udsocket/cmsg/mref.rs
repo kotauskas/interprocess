@@ -226,7 +226,7 @@ impl<'b, 'c, C: ?Sized> Iterator for Cmsgs<'b, 'c, C> {
             debug_assert!(max_len >= 0);
 
             // cmsg_len includes the size of the cmsghdr
-            let hdrlen = cmsghdr.cmsg_len - size_of::<cmsghdr>();
+            let hdrlen = cmsghdr.cmsg_len as usize - size_of::<cmsghdr>();
             debug_assert!(hdrlen <= isize::MAX as usize);
 
             // Buffer overflow check because some OSes (such as everyone's favorite putrid hellspawn macOS) don't
