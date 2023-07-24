@@ -1,4 +1,4 @@
-use crate::os::unix::udsocket::{cmsg::*, WithCmsgRef};
+use crate::os::unix::udsocket::{cmsg::*, WithCmsgMut, WithCmsgRef};
 use futures_core::ready;
 use futures_io::*;
 use std::{
@@ -231,5 +231,51 @@ impl<AWA: AsyncWriteAncillary + Unpin> AsyncWrite for WithCmsgRef<'_, '_, AWA> {
             ready!(writer.poll_write_vectored(cx, bufs))?
         };
         Poll::Ready(Ok(bytes_written))
+    }
+}
+
+/// Forwarding of `AsyncWrite` through an irrelevant adapter.
+impl<AW: AsyncWrite + Unpin, AB: ?Sized> AsyncWrite for WithCmsgMut<'_, AW, AB> {
+    #[inline(always)]
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
+        Pin::new(&mut self.reader).poll_write(cx, buf)
+    }
+    #[inline(always)]
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        Pin::new(&mut self.reader).poll_flush(cx)
+    }
+    #[inline(always)]
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        Pin::new(&mut self.reader).poll_close(cx)
+    }
+    #[inline(always)]
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<Result<usize>> {
+        Pin::new(&mut self.reader).poll_write_vectored(cx, bufs)
+    }
+}
+
+/// Forwarding of `AsyncWriteAncillary` through an irrelevant adapter.
+impl<AWA: AsyncWriteAncillary + Unpin, AB: ?Sized> AsyncWriteAncillary for WithCmsgMut<'_, AWA, AB> {
+    #[inline(always)]
+    fn poll_write_ancillary(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.reader).poll_write_ancillary(cx, buf, abuf)
+    }
+    #[inline(always)]
+    fn poll_write_ancillary_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+        abuf: CmsgRef<'_, '_>,
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.reader).poll_write_ancillary_vectored(cx, bufs, abuf)
     }
 }

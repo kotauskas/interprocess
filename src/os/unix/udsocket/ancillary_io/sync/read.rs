@@ -1,5 +1,5 @@
 use super::super::devector_mut;
-use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess, WithCmsgMut};
+use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess, WithCmsgMut, WithCmsgRef};
 use std::io::{self, prelude::*, IoSliceMut};
 
 /// An extension of [`Read`] that enables operations involving ancillary data.
@@ -180,4 +180,44 @@ impl<RA: ReadAncillary<AB>, AB: CmsgMut + ?Sized> Read for WithCmsgMut<'_, RA, A
     }
 
     // FUTURE is_read_vectored, read_buf
+}
+
+/// Forwarding of `Read` through an irrelevant adapter.
+impl<R: Read> Read for WithCmsgRef<'_, '_, R> {
+    #[inline(always)]
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.writer.read(buf)
+    }
+    #[inline(always)]
+    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+        self.writer.read_vectored(bufs)
+    }
+    #[inline(always)]
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
+        self.writer.read_to_end(buf)
+    }
+    #[inline(always)]
+    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
+        self.writer.read_to_string(buf)
+    }
+    #[inline(always)]
+    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+        self.writer.read_exact(buf)
+    }
+}
+
+/// Forwarding of `ReadAncillary` through an irrelevant adapter.
+impl<RA: ReadAncillary<AB>, AB: CmsgMut + ?Sized> ReadAncillary<AB> for WithCmsgRef<'_, '_, RA> {
+    #[inline(always)]
+    fn read_ancillary(&mut self, buf: &mut [u8], abuf: &mut AB) -> io::Result<ReadAncillarySuccess> {
+        self.writer.read_ancillary(buf, abuf)
+    }
+    #[inline(always)]
+    fn read_ancillary_vectored(
+        &mut self,
+        bufs: &mut [IoSliceMut<'_>],
+        abuf: &mut AB,
+    ) -> io::Result<ReadAncillarySuccess> {
+        self.writer.read_ancillary_vectored(bufs, abuf)
+    }
 }

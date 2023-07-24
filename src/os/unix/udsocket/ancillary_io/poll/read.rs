@@ -1,5 +1,5 @@
 use super::assert_future;
-use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess, WithCmsgMut};
+use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess, WithCmsgMut, WithCmsgRef};
 use futures_core::ready;
 use futures_io::*;
 use std::{
@@ -278,5 +278,43 @@ impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncRead for Wi
         let sc = ready!(Pin::new(&mut slf.reader).poll_read_ancillary_vectored(cx, bufs, slf.abuf))?;
         slf.accumulator += sc;
         Poll::Ready(Ok(sc.main))
+    }
+}
+
+/// Forwarding of `AsyncRead` through an irrelevant adapter.
+impl<AR: AsyncRead + Unpin> AsyncRead for WithCmsgRef<'_, '_, AR> {
+    #[inline(always)]
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+        Pin::new(&mut self.writer).poll_read(cx, buf)
+    }
+    #[inline(always)]
+    fn poll_read_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> Poll<Result<usize>> {
+        Pin::new(&mut self.writer).poll_read_vectored(cx, bufs)
+    }
+}
+
+/// Forwarding of `AsyncReadAncillary` through an irrelevant adapter.
+impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for WithCmsgRef<'_, '_, ARA> {
+    #[inline(always)]
+    fn poll_read_ancillary(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        Pin::new(&mut self.writer).poll_read_ancillary(cx, buf, abuf)
+    }
+    #[inline(always)]
+    fn poll_read_ancillary_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [IoSliceMut<'_>],
+        abuf: &mut AB,
+    ) -> Poll<io::Result<ReadAncillarySuccess>> {
+        Pin::new(&mut self.writer).poll_read_ancillary_vectored(cx, bufs, abuf)
     }
 }

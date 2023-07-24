@@ -1,5 +1,5 @@
 use super::super::devector;
-use crate::os::unix::udsocket::{cmsg::*, WithCmsgRef};
+use crate::os::unix::udsocket::{cmsg::*, WithCmsgMut, WithCmsgRef};
 use std::{
     fmt::Arguments,
     io::{self, prelude::*, IoSlice},
@@ -162,4 +162,40 @@ impl<WA: WriteAncillary> Write for WithCmsgRef<'_, '_, WA> {
     }
 
     // FUTURE is_vectored, write_all_vectored
+}
+
+/// Forwarding of `Write` through an irrelevant adapter.
+impl<W: Write, AB: ?Sized> Write for WithCmsgMut<'_, W, AB> {
+    #[inline(always)]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.reader.write(buf)
+    }
+    #[inline(always)]
+    fn flush(&mut self) -> io::Result<()> {
+        self.reader.flush()
+    }
+    #[inline(always)]
+    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.reader.write_vectored(bufs)
+    }
+    #[inline(always)]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.reader.write_all(buf)
+    }
+    #[inline(always)]
+    fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> io::Result<()> {
+        self.reader.write_fmt(fmt)
+    }
+}
+
+/// Forwarding of `WriteAncillary` through an irrelevant adapter.
+impl<WA: WriteAncillary, AB: ?Sized> WriteAncillary for WithCmsgMut<'_, WA, AB> {
+    #[inline(always)]
+    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+        self.reader.write_ancillary(buf, abuf)
+    }
+    #[inline(always)]
+    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+        self.reader.write_ancillary_vectored(bufs, abuf)
+    }
 }

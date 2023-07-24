@@ -1,5 +1,11 @@
 use super::ReadAncillarySuccess;
-use crate::os::unix::udsocket::cmsg::{CmsgMut, CmsgMutExt, CmsgRef};
+use crate::os::unix::{
+    udsocket::{
+        cmsg::{CmsgMut, CmsgMutExt, CmsgRef},
+        UdSocket,
+    },
+    unixprelude::*,
+};
 
 /// An adapter from [`WriteAncillary`] to [`Write`] that
 /// [partially applies](https://en.wikipedia.org/wiki/Partial_application) the former and allows the use of further
@@ -23,6 +29,13 @@ impl<WA> WithCmsgRef<'_, '_, WA> {
         self.writer
     }
 }
+impl<WA: AsFd> AsFd for WithCmsgRef<'_, '_, WA> {
+    #[inline(always)]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.writer.as_fd()
+    }
+}
+impl<WA: UdSocket> UdSocket for WithCmsgRef<'_, '_, WA> {}
 
 /// An adapter from [`ReadAncillary`] to [`Write`] that
 /// [partially applies](https://en.wikipedia.org/wiki/Partial_application) the former and allows the use of further
@@ -75,3 +88,10 @@ impl<'abuf, RA, AB: CmsgMut + ?Sized> WithCmsgMut<'abuf, RA, AB> {
         }
     }
 }
+impl<RA: AsFd, AB: ?Sized> AsFd for WithCmsgMut<'_, RA, AB> {
+    #[inline(always)]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.reader.as_fd()
+    }
+}
+impl<RA: UdSocket, AB: ?Sized> UdSocket for WithCmsgMut<'_, RA, AB> {}
