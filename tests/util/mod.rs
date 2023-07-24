@@ -33,7 +33,7 @@ use {
     to_method::*,
 };
 
-pub type TestResult = color_eyre::eyre::Result<()>;
+pub type TestResult<T = ()> = color_eyre::eyre::Result<T>;
 
 /// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
 pub fn drive_pair<T, Ld, Fl>(leader: Ld, leader_name: &str, follower: Fl, follower_name: &str)
