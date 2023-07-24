@@ -143,6 +143,17 @@ pub struct Context {
     fresh: Cell<bool>,
     platform: PlatformContext,
 }
+impl Context {
+    /// Creates an empty collector, ready to collect the value of `LOCAL_CREDS` (probably).
+    #[inline]
+    #[allow(clippy::default_constructed_unit_structs)]
+    pub fn new() -> Self {
+        Self {
+            fresh: Cell::new(false),
+            platform: PlatformContext::default(),
+        }
+    }
+}
 impl Collector for Context {
     fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
         self.platform.pre_op_collect(socket);
@@ -174,7 +185,7 @@ impl Collector for Context {
     )))
 )]
 impl ToCmsg for Credentials<'_> {
-    #[inline(always)]
+    #[inline]
     fn to_cmsg(&self) -> Cmsg<'_> {
         self.0.to_cmsg()
     }
