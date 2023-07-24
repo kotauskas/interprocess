@@ -7,11 +7,7 @@ use std::{collections::TryReserveError, mem::MaybeUninit, slice};
 /// A **c**ontrol **m**e**s**sa**g**e buffer, used to store the encoded form of ancillary data.
 pub struct CmsgVecBuf<C = DummyCollector> {
     buf: Vec<u8>,
-    /// The context collector stored alongside the buffer.
-    ///
-    /// `.as_ref()` and `.as_mut()` borrow this field (immutably and mutably, respectively) for decoding and context
-    /// collection respectively.
-    pub context_collector: C,
+    context_collector: C,
 }
 impl CmsgVecBuf {
     /// Creates a buffer with the specified capacity. Using a capacity of 0 makes for a useless buffer, but does not

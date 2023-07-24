@@ -1,4 +1,3 @@
-// TODO rewrite this garbage
 use super::{
     context::{Collector, DummyCollector},
     *,
@@ -6,16 +5,11 @@ use super::{
 use std::mem::MaybeUninit;
 
 /// A mutable reference to a control message buffer that allows for insertion of ancillary data messages.
-// TODO finish rename, separate entirely from VecBuf
 #[derive(Debug)]
 pub struct CmsgMutBuf<'b, C = DummyCollector> {
     buf: &'b mut [MaybeUninit<u8>],
     init_len: usize,
-    /// The context collector stored alongside the buffer reference. Usually this should be a mutable reference.
-    ///
-    /// Any I/O operation on a Ud-socket that takes a `CmsgMut` will allow this field to hook into the process and
-    /// collect context.
-    pub context_collector: C,
+    context_collector: C,
 }
 impl<'b> CmsgMutBuf<'b> {
     /// Creates a control message buffer from the given uninitialized slice.
