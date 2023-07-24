@@ -1,7 +1,13 @@
 //! [Futures](Future) returned by [`AsyncReadAncillaryExt`] and [`AsyncWriteAncillaryExt`].
 
-use super::super::{AsyncReadAncillary, AsyncWriteAncillary, ReadAncillarySuccess};
-use crate::os::unix::udsocket::cmsg::{CmsgMut, CmsgMutExt, CmsgRef};
+use super::{
+    super::{AsyncReadAncillary, AsyncWriteAncillary, ReadAncillarySuccess},
+    AsyncReadAncillaryExt, AsyncWriteAncillaryExt,
+};
+use crate::os::unix::udsocket::{
+    cmsg::{CmsgMut, CmsgRef},
+    WithCmsgMut, WithCmsgRef,
+};
 use futures_core::ready;
 use futures_io::{AsyncRead, AsyncWrite};
 use futures_util::io::AsyncReadExt;
@@ -15,17 +21,17 @@ use std::{
 };
 
 /// [Future] returned by [`read_ancillary()`](super::AsyncReadAncillaryExt::read_ancillary).
-pub struct ReadAncillary<'slf, 'b, 'ab, AB: ?Sized, T: ?Sized> {
-    slf: &'slf mut T,
-    buf: &'b mut [u8],
-    abuf: &'ab mut AB,
+pub struct ReadAncillary<'reader, 'buf, 'abuf, AB: ?Sized, ARA: ?Sized> {
+    slf: &'reader mut ARA,
+    buf: &'buf mut [u8],
+    abuf: &'abuf mut AB,
     _phantom: PhantomData<for<'a> fn(&'a mut AB)>,
 }
-impl<'slf, 'b, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized>
-    ReadAncillary<'slf, 'b, 'ab, AB, T>
+impl<'reader, 'buf, 'abuf, AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized>
+    ReadAncillary<'reader, 'buf, 'abuf, AB, ARA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, buf: &'b mut [u8], abuf: &'ab mut AB) -> Self {
+    pub(super) fn new(slf: &'reader mut ARA, buf: &'buf mut [u8], abuf: &'abuf mut AB) -> Self {
         Self {
             slf,
             buf,
@@ -34,7 +40,7 @@ impl<'slf, 'b, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?S
         }
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future for ReadAncillary<'_, '_, '_, AB, T> {
+impl<AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized> Future for ReadAncillary<'_, '_, '_, AB, ARA> {
     type Output = io::Result<ReadAncillarySuccess>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -44,17 +50,17 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future fo
 }
 
 /// [Future] returned by [`read_ancillary_vectored()`](super::AsyncReadAncillaryExt::read_ancillary_vectored).
-pub struct ReadAncillaryVectored<'slf, 'b, 'iov, 'ab, AB: ?Sized, T: ?Sized> {
-    slf: &'slf mut T,
-    bufs: &'b mut [IoSliceMut<'iov>],
-    abuf: &'ab mut AB,
+pub struct ReadAncillaryVectored<'reader, 'buf, 'iov, 'abuf, AB: ?Sized, ARA: ?Sized> {
+    slf: &'reader mut ARA,
+    bufs: &'buf mut [IoSliceMut<'iov>],
+    abuf: &'abuf mut AB,
     _phantom: PhantomData<for<'a> fn(&'a mut AB)>,
 }
-impl<'slf, 'b, 'iov, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized>
-    ReadAncillaryVectored<'slf, 'b, 'iov, 'ab, AB, T>
+impl<'reader, 'buf, 'iov, 'abuf, AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized>
+    ReadAncillaryVectored<'reader, 'buf, 'iov, 'abuf, AB, ARA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, bufs: &'b mut [IoSliceMut<'iov>], abuf: &'ab mut AB) -> Self {
+    pub(super) fn new(slf: &'reader mut ARA, bufs: &'buf mut [IoSliceMut<'iov>], abuf: &'abuf mut AB) -> Self {
         Self {
             slf,
             bufs,
@@ -63,8 +69,8 @@ impl<'slf, 'b, 'iov, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpi
         }
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
-    for ReadAncillaryVectored<'_, '_, '_, '_, AB, T>
+impl<AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
+    for ReadAncillaryVectored<'_, '_, '_, '_, AB, ARA>
 {
     type Output = io::Result<ReadAncillarySuccess>;
     #[inline(always)]
@@ -76,53 +82,29 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
 
 //--- Actual adapters ---
 
-// Same business as the sync version.
-struct ReadAncillaryPartAppl<'slf, 'ab, ARA: ?Sized, AB: ?Sized> {
-    slf: Pin<&'slf mut ARA>,
-    abuf: &'ab mut AB,
-    /// An accumulator for the return value.
-    ret: ReadAncillarySuccess,
-    /// Whether to reserve together with the main-band buffer.
-    reserve: bool,
-}
-impl<ARA: AsyncReadAncillary<AB> + ?Sized, AB: CmsgMut + ?Sized> AsyncRead for ReadAncillaryPartAppl<'_, '_, ARA, AB> {
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        if self.reserve {
-            let _ = self.abuf.reserve_up_to_exact(buf.len());
-        }
-        let Self { slf, abuf, ret, .. } = self.get_mut();
-        let sc = ready!(Pin::new(slf).poll_read_ancillary(cx, buf, abuf))?;
-        *ret += sc;
-        Poll::Ready(Ok(sc.main))
-    }
-}
-
 /// [Future] returned by [`read_ancillary_to_end()`](super::AsyncReadAncillaryExt::read_ancillary_to_end) and
 /// [`read_to_end_with_ancillary()`](super::AsyncReadAncillaryExt::read_to_end_with_ancillary).
-pub struct ReadToEndAncillary<'slf, 'b, 'ab, AB: ?Sized, T: ?Sized> {
-    partappl: ReadAncillaryPartAppl<'slf, 'ab, T, AB>,
-    buf: &'b mut Vec<u8>,
+pub struct ReadToEndAncillary<'reader, 'buf, 'abuf, AB: ?Sized, ARA: ?Sized> {
+    partappl: WithCmsgMut<'abuf, &'reader mut ARA, AB>,
+    buf: &'buf mut Vec<u8>,
     _phantom: PhantomData<for<'a> fn(&'a mut AB)>,
 }
-impl<'slf, 'b, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized>
-    ReadToEndAncillary<'slf, 'b, 'ab, AB, T>
+impl<'reader, 'buf, 'abuf, AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized>
+    ReadToEndAncillary<'reader, 'buf, 'abuf, AB, ARA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, buf: &'b mut Vec<u8>, abuf: &'ab mut AB, reserve: bool) -> Self {
-        Self {
-            partappl: ReadAncillaryPartAppl {
-                slf: Pin::new(slf),
-                abuf,
-                ret: Default::default(),
-                reserve,
-            },
+    pub(super) fn new(reader: &'reader mut ARA, buf: &'buf mut Vec<u8>, abuf: &'abuf mut AB, reserve: bool) -> Self {
+        let mut ret = Self {
+            partappl: reader.with_cmsg_mut(abuf),
             buf,
             _phantom: PhantomData,
-        }
+        };
+        ret.partappl.reserve = reserve;
+        ret
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
-    for ReadToEndAncillary<'_, '_, '_, AB, T>
+impl<AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
+    for ReadToEndAncillary<'_, '_, '_, AB, ARA>
 {
     type Output = io::Result<ReadAncillarySuccess>;
     #[inline(always)]
@@ -135,35 +117,32 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
         // counter.
         let mut rte = slf.partappl.read_to_end(slf.buf);
         ready!(Pin::new(&mut rte).poll(cx))?;
-        Poll::Ready(Ok(slf.partappl.ret))
+        Poll::Ready(Ok(slf.partappl.total_read()))
     }
 }
 
 /// [Future] returned by [`read_exact_with_ancillary()`](super::AsyncReadAncillaryExt::read_exact_with_ancillary).
-pub struct ReadExactWithAncillary<'slf, 'b, 'ab, AB: ?Sized, T: ?Sized> {
-    partappl: ReadAncillaryPartAppl<'slf, 'ab, T, AB>,
-    buf: &'b mut [u8],
+pub struct ReadExactWithAncillary<'reader, 'buf, 'abuf, AB: ?Sized, ARA: ?Sized> {
+    partappl: WithCmsgMut<'abuf, &'reader mut ARA, AB>,
+    buf: &'buf mut [u8],
     _phantom: PhantomData<for<'a> fn(&'a mut AB)>,
 }
-impl<'slf, 'b, 'ab, AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized>
-    ReadExactWithAncillary<'slf, 'b, 'ab, AB, T>
+impl<'reader, 'buf, 'abuf, AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized>
+    ReadExactWithAncillary<'reader, 'buf, 'abuf, AB, ARA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, buf: &'b mut [u8], abuf: &'ab mut AB) -> Self {
-        Self {
-            partappl: ReadAncillaryPartAppl {
-                slf: Pin::new(slf),
-                abuf,
-                ret: Default::default(),
-                reserve: false,
-            },
+    pub(super) fn new(reader: &'reader mut ARA, buf: &'buf mut [u8], abuf: &'abuf mut AB) -> Self {
+        let mut ret = Self {
+            partappl: reader.with_cmsg_mut(abuf),
             buf,
             _phantom: PhantomData,
-        }
+        };
+        ret.partappl.reserve = false;
+        ret
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
-    for ReadExactWithAncillary<'_, '_, '_, AB, T>
+impl<AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
+    for ReadExactWithAncillary<'_, '_, '_, AB, ARA>
 {
     type Output = io::Result<ReadAncillarySuccess>;
     #[inline(always)]
@@ -181,23 +160,25 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
                 return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));
             }
         }
-        Poll::Ready(Ok(slf.partappl.ret))
+        Poll::Ready(Ok(slf.partappl.total_read()))
     }
 }
 
 /// [Future] returned by [`write_ancillary()`](super::AsyncWriteAncillaryExt::write_ancillary).
-pub struct WriteAncillary<'slf, 'b, 'ab, 'ac, T: ?Sized> {
-    slf: &'slf mut T,
-    buf: &'b [u8],
-    abuf: CmsgRef<'ab, 'ac>,
+pub struct WriteAncillary<'writer, 'buf, 'abuf, 'acol, AWA: ?Sized> {
+    slf: &'writer mut AWA,
+    buf: &'buf [u8],
+    abuf: CmsgRef<'abuf, 'acol>,
 }
-impl<'slf, 'b, 'ab, 'ac, T: AsyncWriteAncillary + Unpin + ?Sized> WriteAncillary<'slf, 'b, 'ab, 'ac, T> {
+impl<'writer, 'buf, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
+    WriteAncillary<'writer, 'buf, 'abuf, 'acol, AWA>
+{
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, buf: &'b [u8], abuf: CmsgRef<'ab, 'ac>) -> Self {
+    pub(super) fn new(slf: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf, 'acol>) -> Self {
         Self { slf, buf, abuf }
     }
 }
-impl<T: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_, '_, '_, T> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_, '_, '_, AWA> {
     type Output = io::Result<usize>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -207,20 +188,20 @@ impl<T: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_, 
 }
 
 /// [Future] returned by [`write_ancillary_vectored()`](super::AsyncWriteAncillaryExt::write_ancillary_vectored).
-pub struct WriteAncillaryVectored<'slf, 'b, 'iov, 'ab, 'ac, T: ?Sized> {
-    slf: &'slf mut T,
-    bufs: &'b [IoSlice<'iov>],
-    abuf: CmsgRef<'ab, 'ac>,
+pub struct WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, 'acol, AWA: ?Sized> {
+    slf: &'writer mut AWA,
+    bufs: &'buf [IoSlice<'iov>],
+    abuf: CmsgRef<'abuf, 'acol>,
 }
-impl<'slf, 'b, 'iov, 'ab, 'ac, T: AsyncWriteAncillary + Unpin + ?Sized>
-    WriteAncillaryVectored<'slf, 'b, 'iov, 'ab, 'ac, T>
+impl<'writer, 'buf, 'iov, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
+    WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, 'acol, AWA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, bufs: &'b [IoSlice<'iov>], abuf: CmsgRef<'ab, 'ac>) -> Self {
+    pub(super) fn new(slf: &'writer mut AWA, bufs: &'buf [IoSlice<'iov>], abuf: CmsgRef<'abuf, 'acol>) -> Self {
         Self { slf, bufs, abuf }
     }
 }
-impl<T: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectored<'_, '_, '_, '_, '_, T> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectored<'_, '_, '_, '_, '_, AWA> {
     type Output = io::Result<usize>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -231,54 +212,23 @@ impl<T: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectored<
 
 //--- Actual adapters ---
 
-struct WriteAncillaryPartAppl<'slf, 'ab, 'ac, AWA: ?Sized> {
-    slf: Pin<&'slf mut AWA>,
-    abuf: CmsgRef<'ab, 'ac>,
-}
-// hi myrl
-impl<AWA: AsyncWriteAncillary + ?Sized> AsyncWrite for WriteAncillaryPartAppl<'_, '_, '_, AWA> {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        let Self { slf, abuf } = self.get_mut();
-        let pin = Pin::new(slf);
-        let bytes_written = if !abuf.inner().is_empty() {
-            let bw = ready!(pin.poll_write_ancillary(cx, buf, *abuf))?;
-            abuf.consume_bytes(abuf.inner().len());
-            bw
-        } else {
-            ready!(pin.poll_write(cx, buf))?
-        };
-        Poll::Ready(Ok(bytes_written))
-    }
-    #[inline(always)]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let Self { slf, .. } = self.get_mut();
-        Pin::new(slf).poll_flush(cx)
-    }
-    #[inline(always)]
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        let Self { slf, .. } = self.get_mut();
-        Pin::new(slf).poll_close(cx)
-    }
-}
-
 /// [Future] returned by [`write_all_ancillary()`](super::AsyncWriteAncillaryExt::write_all_ancillary).
-pub struct WriteAllAncillary<'slf, 'b, 'ab, 'ac, T: ?Sized> {
-    partappl: WriteAncillaryPartAppl<'slf, 'ab, 'ac, T>,
-    buf: &'b [u8],
+pub struct WriteAllAncillary<'writer, 'buf, 'abuf, 'acol, AWA: ?Sized> {
+    partappl: WithCmsgRef<'abuf, 'acol, &'writer mut AWA>,
+    buf: &'buf [u8],
 }
-impl<'slf, 'b, 'ab, 'ac, T: AsyncWriteAncillary + Unpin + ?Sized> WriteAllAncillary<'slf, 'b, 'ab, 'ac, T> {
+impl<'writer, 'buf, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
+    WriteAllAncillary<'writer, 'buf, 'abuf, 'acol, AWA>
+{
     #[inline(always)]
-    pub(super) fn new(slf: &'slf mut T, buf: &'b [u8], abuf: CmsgRef<'ab, 'ac>) -> Self {
+    pub(super) fn new(writer: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf, 'acol>) -> Self {
         Self {
-            partappl: WriteAncillaryPartAppl {
-                slf: Pin::new(slf),
-                abuf,
-            },
+            partappl: writer.with_cmsg_ref(abuf),
             buf,
         }
     }
 }
-impl<T: AsyncWriteAncillary + ?Sized> Future for WriteAllAncillary<'_, '_, '_, '_, T> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAllAncillary<'_, '_, '_, '_, AWA> {
     type Output = io::Result<()>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

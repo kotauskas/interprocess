@@ -1,5 +1,3 @@
-// TODO async version
-
 #[cfg(feature = "async")]
 pub(super) mod poll {
     #[inline(always)]
@@ -18,10 +16,11 @@ pub(super) mod sync {
     mod write;
     pub use {read::*, write::*};
 }
+mod partappl;
 
 #[cfg(feature = "async")]
 pub use poll::*;
-pub use sync::*;
+pub use {partappl::*, sync::*};
 
 use std::ops::{Add, AddAssign};
 

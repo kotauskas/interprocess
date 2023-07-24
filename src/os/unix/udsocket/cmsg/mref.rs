@@ -26,7 +26,7 @@ pub struct CmsgRef<'b, 'c, C: ?Sized = DummyCollector> {
     /// them into ancillary data structs.
     pub context_collector: &'c C,
 }
-impl<'b> CmsgRef<'b, 'static> {
+impl<'b, 'c> CmsgRef<'b, 'c> {
     /// Creates an empty `CmsgRef`.
     #[inline]
     pub const fn empty() -> Self {
@@ -165,6 +165,12 @@ impl<C: ?Sized> Clone for CmsgRef<'_, '_, C> {
     #[inline]
     fn clone(&self) -> Self {
         *self
+    }
+}
+impl Default for CmsgRef<'_, '_> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::empty()
     }
 }
 

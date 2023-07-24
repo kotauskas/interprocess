@@ -1,5 +1,6 @@
 use super::assert_future;
-use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess};
+use crate::os::unix::udsocket::{cmsg::*, ReadAncillarySuccess, WithCmsgMut};
+use futures_core::ready;
 use futures_io::*;
 use std::{
     io::{self, IoSliceMut},
@@ -51,13 +52,17 @@ pub(crate) fn read_in_terms_of_vectored<AB: CmsgMut + ?Sized>(
 }
 
 #[cfg(debug_assertions)]
-fn _assert_async_read_ancillary_object_safe<'j: 'm + 'c, 'm, 'c, T: AsyncReadAncillary<DynCmsgMut<'m, 'c>> + 'j>(
-    x: &mut T,
+fn _assert_ext<ARA: AsyncReadAncillaryExt<AB> + ?Sized, AB: CmsgMut + ?Sized>(x: &mut ARA) -> &mut ARA {
+    x
+}
+#[cfg(debug_assertions)]
+fn _assert_async_read_ancillary_object_safe<'j: 'm + 'c, 'm, 'c, ARA: AsyncReadAncillary<DynCmsgMut<'m, 'c>> + 'j>(
+    x: &mut ARA,
 ) -> &mut (dyn AsyncReadAncillary<DynCmsgMut<'m, 'c>> + 'j) {
-    x as _
+    _assert_ext(x as _)
 }
 
-impl<AB: CmsgMut + ?Sized, P: DerefMut + Unpin> AsyncReadAncillary<AB> for Pin<P>
+impl<P: DerefMut + Unpin, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for Pin<P>
 where
     P::Target: AsyncReadAncillary<AB>,
 {
@@ -79,7 +84,7 @@ where
     }
 }
 
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> AsyncReadAncillary<AB> for &mut T {
+impl<ARA: AsyncReadAncillary<AB> + Unpin + ?Sized, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for &mut ARA {
     fn poll_read_ancillary(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -97,7 +102,7 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> AsyncRead
         Pin::new(&mut **self.get_mut()).poll_read_ancillary_vectored(cx, bufs, abuf)
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> AsyncReadAncillary<AB> for Box<T> {
+impl<ARA: AsyncReadAncillary<AB> + Unpin + ?Sized, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for Box<ARA> {
     fn poll_read_ancillary(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -120,17 +125,47 @@ impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + Unpin + ?Sized> AsyncRead
 ///
 /// See the documentation on `AsyncReadAncillary` for notes on why a type parameter is present.
 pub trait AsyncReadAncillaryExt<AB: CmsgMut + ?Sized>: AsyncReadAncillary<AB> {
+    /// The asynchronous version of [`ReadAncillaryExt::with_cmsg_mut`](super::super::ReadAncillaryExt::with_cmsg_mut).
+    #[inline(always)]
+    fn with_cmsg_mut<'reader, 'abuf>(
+        &'reader mut self,
+        abuf: &'abuf mut AB,
+    ) -> WithCmsgMut<'abuf, &'reader mut Self, AB>
+    where
+        Self: Unpin,
+    {
+        AsyncReadAncillaryExt::with_cmsg_mut_by_val(self, abuf)
+    }
+    /// Like [`.with_cmsg_mut()`](AsyncReadAncillaryExt::with_cmsg_mut), but does not require that `Self: Unpin`,
+    /// instead requiring the caller to pass `self` by `Pin`.
+    #[inline(always)]
+    fn with_cmsg_mut_pin<'reader, 'abuf>(
+        self: Pin<&'reader mut Self>,
+        abuf: &'abuf mut AB,
+    ) -> WithCmsgMut<'abuf, Pin<&'reader mut Self>, AB> {
+        AsyncReadAncillaryExt::with_cmsg_mut_by_val(self, abuf)
+    }
+    /// Like [`.with_cmsg_mut()`](AsyncReadAncillaryExt::with_cmsg_mut), but does not borrow `self`, consuming ownership
+    /// instead.
+    #[inline(always)]
+    fn with_cmsg_mut_by_val(self, abuf: &mut AB) -> WithCmsgMut<'_, Self, AB>
+    where
+        Self: Unpin + Sized,
+    {
+        WithCmsgMut::new(self, abuf)
+    }
+
     /// Analogous to [`AsyncReadExt::read()`](futures_util::AsyncReadExt::read), but also reads control messages into
     /// the given ancillary buffer.
     ///
     /// The return value contains both the amount of main-band data read into the given regular buffer and the number of
     /// bytes read into the ancillary buffer.
     #[inline(always)]
-    fn read_ancillary<'slf, 'b, 'ab>(
-        &'slf mut self,
-        buf: &'b mut [u8],
-        abuf: &'ab mut AB,
-    ) -> super::futures::ReadAncillary<'slf, 'b, 'ab, AB, Self>
+    fn read_ancillary<'reader, 'buf, 'abuf>(
+        &'reader mut self,
+        buf: &'buf mut [u8],
+        abuf: &'abuf mut AB,
+    ) -> super::futures::ReadAncillary<'reader, 'buf, 'abuf, AB, Self>
     where
         Self: Unpin,
     {
@@ -141,11 +176,11 @@ pub trait AsyncReadAncillaryExt<AB: CmsgMut + ?Sized>: AsyncReadAncillary<AB> {
     ///
     /// The return value contains both the amount of main-band data read into the given regular buffers and the number
     /// of bytes read into the ancillary buffer.
-    fn read_ancillary_vectored<'slf, 'b, 'iov, 'ab>(
-        &'slf mut self,
-        bufs: &'b mut [IoSliceMut<'iov>],
-        abuf: &'ab mut AB,
-    ) -> super::futures::ReadAncillaryVectored<'slf, 'b, 'iov, 'ab, AB, Self>
+    fn read_ancillary_vectored<'reader, 'bufs, 'iovec, 'abuf>(
+        &'reader mut self,
+        bufs: &'bufs mut [IoSliceMut<'iovec>],
+        abuf: &'abuf mut AB,
+    ) -> super::futures::ReadAncillaryVectored<'reader, 'bufs, 'iovec, 'abuf, AB, Self>
     where
         Self: Unpin,
     {
@@ -163,11 +198,11 @@ pub trait AsyncReadAncillaryExt<AB: CmsgMut + ?Sized>: AsyncReadAncillary<AB> {
     ///
     /// [`read_to_end_with_ancillary()`]: AsyncReadAncillaryExt::read_to_end_with_ancillary
     #[inline(always)]
-    fn read_ancillary_to_end<'slf, 'b, 'ab>(
-        &'slf mut self,
-        buf: &'b mut Vec<u8>,
-        abuf: &'ab mut AB,
-    ) -> super::futures::ReadToEndAncillary<'slf, 'b, 'ab, AB, Self>
+    fn read_ancillary_to_end<'reader, 'buf, 'abuf>(
+        &'reader mut self,
+        buf: &'buf mut Vec<u8>,
+        abuf: &'abuf mut AB,
+    ) -> super::futures::ReadToEndAncillary<'reader, 'buf, 'abuf, AB, Self>
     where
         Self: Unpin,
     {
@@ -180,11 +215,11 @@ pub trait AsyncReadAncillaryExt<AB: CmsgMut + ?Sized>: AsyncReadAncillary<AB> {
     /// [`read_ancillary_to_end()`](AsyncReadAncillaryExt::read_ancillary_to_end), which grows both buffers adaptively
     /// and thus requires both of them to be passed with ownership.
     #[inline(always)]
-    fn read_to_end_with_ancillary<'slf, 'b, 'ab>(
-        &'slf mut self,
-        buf: &'b mut Vec<u8>,
-        abuf: &'ab mut AB,
-    ) -> super::futures::ReadToEndAncillary<'slf, 'b, 'ab, AB, Self>
+    fn read_to_end_with_ancillary<'reader, 'buf, 'abuf>(
+        &'reader mut self,
+        buf: &'buf mut Vec<u8>,
+        abuf: &'abuf mut AB,
+    ) -> super::futures::ReadToEndAncillary<'reader, 'buf, 'abuf, AB, Self>
     where
         Self: Unpin,
     {
@@ -193,15 +228,55 @@ pub trait AsyncReadAncillaryExt<AB: CmsgMut + ?Sized>: AsyncReadAncillary<AB> {
 
     /// Analogous to [`AsyncReadExt::read_exact()`](futures_util::AsyncReadExt::read_exact), but also reads ancillary
     /// data into the given buffer.
-    fn read_exact_with_ancillary<'slf, 'b, 'ab>(
-        &'slf mut self,
-        buf: &'b mut [u8],
-        abuf: &'ab mut AB,
-    ) -> super::futures::ReadExactWithAncillary<'slf, 'b, 'ab, AB, Self>
+    fn read_exact_with_ancillary<'reader, 'buf, 'abuf>(
+        &'reader mut self,
+        buf: &'buf mut [u8],
+        abuf: &'abuf mut AB,
+    ) -> super::futures::ReadExactWithAncillary<'reader, 'buf, 'abuf, AB, Self>
     where
         Self: Unpin,
     {
         assert_future(super::futures::ReadExactWithAncillary::new(self, buf, abuf))
     }
 }
-impl<AB: CmsgMut + ?Sized, T: AsyncReadAncillary<AB> + ?Sized> AsyncReadAncillaryExt<AB> for T {}
+impl<ARA: AsyncReadAncillary<AB> + ?Sized, AB: CmsgMut + ?Sized> AsyncReadAncillaryExt<AB> for ARA {}
+
+impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncRead for WithCmsgMut<'_, ARA, AB> {
+    /// Reads via [`.poll_read_ancillary()`](AsyncReadAncillary::poll_read_ancillary) on the inner reader with the
+    /// `abuf` argument being `self.abuf`.
+    ///
+    /// If `reserve` is enabled, it will be resized to match or exceed the size of `buf` (if
+    /// possible) via [`.reserve_up_to_exact()`](CmsgMutExt::reserve_up_to_exact).
+    ///
+    /// Only the amount of data read into `buf` is returned, with the amount of ancillary data read being stored in the
+    /// adapter to be later retrieved via [`.total_read()`](WithCmsgMut::total_read).
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+        let slf = self.get_mut();
+        slf.maybe_reserve(buf.len());
+        let sc = ready!(Pin::new(&mut slf.reader).poll_read_ancillary(cx, buf, slf.abuf))?;
+        slf.accumulator += sc;
+        Poll::Ready(Ok(sc.main))
+    }
+
+    /// Reads via [`.poll_read_ancillary_vectored()`](AsyncReadAncillary::poll_read_ancillary_vectored) on the inner
+    /// reader with the `abuf` argument being `self.abuf`.
+    ///
+    /// If `reserve` is enabled, it will be resized to match or exceed the size of the ***last*** buffer in `bufs` (if
+    /// possible) via [`.reserve_up_to_exact()`](CmsgMutExt::reserve_up_to_exact).
+    ///
+    /// Only the amount of data read into `bufs` is returned, with the amount of ancillary data read being stored in the
+    /// adapter to be later retrieved via [`.total_read()`](WithCmsgMut::total_read).
+    fn poll_read_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &mut [IoSliceMut<'_>],
+    ) -> Poll<Result<usize>> {
+        let slf = self.get_mut();
+        if let Some(s) = bufs.last() {
+            slf.maybe_reserve(s.len());
+        }
+        let sc = ready!(Pin::new(&mut slf.reader).poll_read_ancillary_vectored(cx, bufs, slf.abuf))?;
+        slf.accumulator += sc;
+        Poll::Ready(Ok(sc.main))
+    }
+}
