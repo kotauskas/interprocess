@@ -94,3 +94,15 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = {
     };
     LENGTH
 };
+
+const LEVEL: libc::c_int = {
+    // FIXME do through build.rs
+    #[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+    {
+        libc::SOL_LOCAL
+    }
+    #[cfg(not(any(target_os = "freebsd", target_os = "dragonfly")))]
+    {
+        libc::SOL_SOCKET
+    }
+};

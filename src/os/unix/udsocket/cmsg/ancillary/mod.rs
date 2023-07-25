@@ -25,14 +25,12 @@ pub mod file_descriptors;
 mod dispatcher;
 pub use dispatcher::*;
 
-use super::*;
+use super::{super::LEVEL, *};
 use std::{
     convert::Infallible,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
 };
-
-const LEVEL: c_int = libc::SOL_SOCKET;
 
 /// An ancillary data wrapper that can be converted to a control message.
 pub trait ToCmsg {
