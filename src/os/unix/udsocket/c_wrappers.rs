@@ -14,9 +14,12 @@ pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
     #[allow(unused_mut, clippy::let_and_return)]
     let ty = {
         let mut ty = ty;
-        #[cfg(target_os = "linux")]
+        #[cfg(uds_sock_cloexec)]
         {
             ty |= libc::SOCK_CLOEXEC;
+        }
+        #[cfg(uds_sock_nonblock)]
+        {
             if nonblocking {
                 ty |= libc::SOCK_NONBLOCK;
             }
@@ -24,9 +27,11 @@ pub(super) fn create_uds(ty: c_int, nonblocking: bool) -> io::Result<FdOps> {
         ty
     };
     let fd = create_uds_raw(ty)?;
-    if !cfg!(target_os = "linux") {
-        set_nonblocking(fd.0.as_fd(), nonblocking)?;
+    if !cfg!(uds_sock_cloexec) {
         set_cloexec(fd.0.as_fd())?;
+    }
+    if !cfg!(uds_sock_nonblock) && nonblocking {
+        set_nonblocking(fd.0.as_fd(), nonblocking)?;
     }
     Ok(fd)
 }

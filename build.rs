@@ -16,6 +16,8 @@ fn is_unix() -> bool {
 
 /// This can define the following:
 /// - `uds_sun_len` on platforms that have the stupid as fuck `sun_len` field (to correct max length calculation)
+/// - `uds_sock_cloexec` on platforms with SOCK_CLOEXEC
+/// - `uds_sock_nonblock` on platforms with SOCK_NONBLOCK
 /// - Credential ancillary message structure flavor:
 ///     - `uds_ucred`
 ///     - `uds_cmsgcred`
@@ -36,10 +38,16 @@ fn is_unix() -> bool {
 ///     - `uds_cmsghdr_len_size_t`
 #[rustfmt::skip]
 fn collect_uds_features(target: &TargetTriplet) {
-    let [mut size_t_madness, mut ucred, mut cmsgcred, mut sockcred] = [false; 4];
+    let [
+        mut size_t_madness,
+        mut ucred,
+        mut cmsgcred,
+        mut sockcred,
+        mut sock_cloexec,
+        mut sock_nonblock] = [false; 6];
     if target.os_any(&["linux", "android", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
-        ucred = true;
+        [ucred, sock_cloexec, sock_nonblock] = [true; 3];
         if (target.os("linux") && target.env("gnu"))
         || (target.os("linux") && target.env("uclibc") && target.arch_any(&["x86_64", "mips64"]))
         || target.os("android") {
@@ -57,7 +65,7 @@ fn collect_uds_features(target: &TargetTriplet) {
         ]);
 
         if target.os_any(&["freebsd", "dragonfly"]) {
-            cmsgcred = true;
+            [cmsgcred, sock_cloexec, sock_nonblock] = [true; 3];
             if target.os("freebsd") {
                 sockcred = true;
             }
@@ -100,6 +108,12 @@ fn collect_uds_features(target: &TargetTriplet) {
         if contcred {
             define("uds_cont_credentials");
         }
+    }
+    if sock_cloexec {
+        define("uds_sock_cloexec");
+    }
+    if sock_nonblock {
+        define("uds_sock_nonblock");
     }
 }
 
