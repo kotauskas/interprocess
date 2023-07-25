@@ -23,6 +23,18 @@ pub(super) fn run_with_namegen(namegen: NameGen) {
     drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, true), |nm| client(nm, true));
 }
 
+fn enable_passcred(sock: &UdStream) -> TestResult {
+    cfg_if::cfg_if! {
+        if #[cfg(uds_cont_credentials)] {
+            sock.set_continuous_ancillary_credentials(true)
+        } else if #[cfg(uds_sockcred)] {
+            sock.set_oneshot_ancillary_credentials(true)
+        } else {
+            Ok(())
+        }
+    }
+    .context("Failed to enable credential passing")
+}
 fn decreds<'b>(abuf: CmsgRef<'b, '_, CredentialsContext>) -> TestResult<Credentials<'b>> {
     match abuf.decode::<Credentials>().next() {
         Some(Ok(c)) => Ok(c),
@@ -60,13 +72,9 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     {
         abm.add_message(&Credentials::new_ucred(false, false));
     }
-    #[cfg(all(uds_cmsgcred, not(uds_sockcred)))]
+    #[cfg(uds_cmsgcred)]
     {
         abm.add_message(&Credentials::sendable_cmsgcred());
-    }
-    #[cfg(all(uds_sockcred, not(uds_cmsgcred)))]
-    {
-        abm.add_message(&Credentials::sendable_sockcred());
     }
     let ancself = abm.as_ref();
 
@@ -77,9 +85,7 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
             Ok(c) => BufReader::new(c.with_cmsg_mut_by_val(&mut abread)),
             Err(e) => bail!("Incoming connection failed: {e}"),
         };
-        conn.get_mut()
-            .set_continuous_ancillary_credentials(true)
-            .context("Failed to enable credential passing")?;
+        enable_passcred(&conn.get_mut().reader)?;
 
         if shutdown {
             conn.read_to_string(&mut buffer)
@@ -115,13 +121,9 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     {
         abm.add_message(&Credentials::new_ucred(false, false));
     }
-    #[cfg(all(uds_cmsgcred, not(uds_sockcred)))]
+    #[cfg(uds_cmsgcred)]
     {
         abm.add_message(&Credentials::sendable_cmsgcred());
-    }
-    #[cfg(all(uds_sockcred, not(uds_cmsgcred)))]
-    {
-        abm.add_message(&Credentials::sendable_sockcred());
     }
     let ancself = abm.as_ref();
 
@@ -131,9 +133,7 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
         .context("Connect failed")?
         .with_cmsg_ref_by_val(ancself);
 
-    conn.writer
-        .set_continuous_ancillary_credentials(true)
-        .context("Failed to enable credential passing")?;
+    enable_passcred(&conn.writer)?;
 
     conn.write_all(CLIENT_MSG.as_bytes()).context("Socket send failed")?;
 
