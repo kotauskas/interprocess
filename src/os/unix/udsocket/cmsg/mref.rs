@@ -203,6 +203,7 @@ impl<'b, 'c, C: ?Sized> Cmsgs<'b, 'c, C> {
 impl<'b, 'c, C: ?Sized> Iterator for Cmsgs<'b, 'c, C> {
     type Item = Cmsg<'b>;
 
+    #[allow(clippy::unnecessary_cast)]
     fn next(&mut self) -> Option<Self::Item> {
         let buf = self.buf.buf;
         let one_past_end = buf.as_ptr_range().end;
