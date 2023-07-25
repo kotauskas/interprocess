@@ -25,12 +25,15 @@ pub mod file_descriptors;
 mod dispatcher;
 pub use dispatcher::*;
 
-use super::{super::LEVEL, *};
+use super::*;
 use std::{
     convert::Infallible,
     error::Error,
     fmt::{self, Debug, Display, Formatter},
 };
+
+// FIXME is this right?
+const LEVEL: c_int = libc::SOL_SOCKET;
 
 /// An ancillary data wrapper that can be converted to a control message.
 pub trait ToCmsg {

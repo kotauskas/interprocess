@@ -95,7 +95,7 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = {
     LENGTH
 };
 
-const LEVEL: libc::c_int = {
+const OPTLEVEL: libc::c_int = {
     // FIXME do through build.rs
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "freebsd"))] {
