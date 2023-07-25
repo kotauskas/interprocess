@@ -7,20 +7,20 @@ use crate::os::unix::{
     unixprelude::*,
 };
 use libc::cmsgcred;
-use std::{mem::size_of, slice};
+use std::{cell::Cell, mem::size_of, slice};
 
 #[cfg(uds_sockcred)]
 use {crate::os::unix::udsocket::c_wrappers, libc::sockcred};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub(super) struct CredsOptContext {
-    local_creds: bool,
+    local_creds: Cell<bool>,
 }
 impl Collector for CredsOptContext {
     fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
         #[cfg(uds_sockcred)]
         if let Ok(val) = c_wrappers::get_local_creds(socket) {
-            self.local_creds = val;
+            *self.local_creds.get_mut() = val;
         }
     }
 }
@@ -60,8 +60,9 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
 
     fn try_parse(mut cmsg: Cmsg<'a>, ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
-        if ctx.platform.local_creds {
-            // LOCAL_CREDS is set
+        if ctx.platform.local_creds.get() {
+            // LOCAL_CREDS was set, but is now unset because it's one-shot
+            ctx.platform.local_creds.set(false);
             #[cfg(not(uds_sockcred))]
             {
                 unreachable!("corrupted context (LOCAL_CREDS reported set on a platform that doesn't support it)")
@@ -87,13 +88,10 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
                 };
 
                 let expected = unsafe { libc::SOCKCREDSIZE(creds.sc_ngroups as _) };
-                if len != expected {
+                // Be nice on the alignment here.
+                if len < expected {
                     // The rest of the size error reporting process happens here.
-                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
-                        expected: min_expected,
-                        got: len,
-                    })
-                    .wrap(cmsg));
+                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch { expected, got: len }).wrap(cmsg));
                 }
 
                 Ok(Self::Sockcred(creds.as_ref()))

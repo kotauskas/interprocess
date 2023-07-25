@@ -158,18 +158,10 @@ fn dummy_msghdr(buf: &[MaybeUninit<u8>]) -> msghdr {
 /// Computes an index to the first byte in the buffer in which a `cmsghdr` would be well-aligned.
 ///
 /// The returned location is guaranteed to be able to fit a `cmsghdr`.
-// Used in read.rs
 fn align_first(buf: &[MaybeUninit<u8>]) -> Option<usize> {
-    const ALIGN: usize = align_of::<cmsghdr>();
-    const MASK: usize = ALIGN - 1;
-
     // The potentially misaligned address
     let base = buf.as_ptr() as usize;
-    // Adding the mask pushes any misaligned address over the edge, but puts a well-aligned one
-    // just a single byte short of going forward by the alignment's worth of offset
-    let nudged = base + MASK;
-    // Masking the misalignment out puts us at an aligned location
-    let aligned = nudged & !MASK;
+    let aligned = align_up(base, align_of::<cmsghdr>());
     // The amount by which the start must be moved forward to become aligned
     let fwd_align = aligned - base;
 
@@ -190,4 +182,13 @@ fn align_first(buf: &[MaybeUninit<u8>]) -> Option<usize> {
     };
     debug_assert!(base_idx >= 0);
     Some(base_idx as usize)
+}
+
+fn align_up(base: usize, align: usize) -> usize {
+    let mask = align - 1;
+    // Adding the mask pushes any misaligned address over the edge, but puts a well-aligned one
+    // just a single byte short of going forward by the alignment's worth of offset
+    let nudged = base + mask;
+    // Masking the misalignment out puts us at an aligned location
+    nudged & !mask
 }

@@ -30,7 +30,7 @@ pub trait Collector {
     /// Called right before the call to `recvmsg` or `sendmsg`, providing a borrow of the file descriptor of the socket.
     fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {}
     /// Same as `pre_op_collect`, but called right after the system call with the contents of the `msghdr`'s `msg_flags`
-    /// field which it will be performed with..
+    /// field which it will be performed with.
     fn post_op_collect(&mut self, socket: BorrowedFd<'_>, msghdr_flags: c_int) {}
 }
 impl<T: Collector> Collector for &mut T {

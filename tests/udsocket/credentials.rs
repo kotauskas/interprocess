@@ -24,13 +24,15 @@ pub(super) fn run_with_namegen(namegen: NameGen) {
 }
 
 fn enable_passcred(sock: &UdStream) -> TestResult {
-    cfg_if::cfg_if! {
-        if #[cfg(uds_cont_credentials)] {
-            sock.set_continuous_ancillary_credentials(true)
-        } else if #[cfg(uds_sockcred)] {
-            sock.set_oneshot_ancillary_credentials(true)
-        } else {
-            Ok(())
+    {
+        cfg_if::cfg_if! {
+            if #[cfg(uds_sockcred)] {
+                sock.set_oneshot_ancillary_credentials(true)
+            } else if #[cfg(uds_cont_credentials)] {
+                sock.set_continuous_ancillary_credentials(true)
+            } else {
+                Ok(())
+            }
         }
     }
     .context("Failed to enable credential passing")

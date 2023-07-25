@@ -156,11 +156,14 @@ impl Context {
 }
 impl Collector for Context {
     fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
-        self.platform.pre_op_collect(socket);
-    }
-    fn post_op_collect(&mut self, socket: BorrowedFd<'_>, msghdr_flags: c_int) {
-        self.fresh.set(true);
-        self.platform.post_op_collect(socket, msghdr_flags);
+        // If the context wasn't yet used in parsing, the oneshot nature of LOCAL_CREDS will lead
+        // to previous control messages erroneously being interpreted as cmsgcred when they're
+        // really sockcred. In adapter situations, this overwriting behavior will consistently
+        // always happen due to two or more reads being used.
+        if !self.fresh.get() {
+            self.platform.pre_op_collect(socket);
+            self.fresh.set(true);
+        }
     }
 }
 
