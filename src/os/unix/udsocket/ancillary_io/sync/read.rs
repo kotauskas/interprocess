@@ -37,9 +37,9 @@ fn _assert_ext<T: ReadAncillaryExt<AB>, AB: CmsgMut + ?Sized>(x: T) -> T {
     x
 }
 #[cfg(debug_assertions)]
-fn _assert_read_ancillary_object_safe<'j: 'm + 'c, 'm, 'c, T: ReadAncillary<DynCmsgMut<'m, 'c>> + 'j>(
+fn _assert_read_ancillary_object_safe<'m, 'n, T: ReadAncillary<dyn CmsgMut + 'm> + 'n>(
     x: &mut T,
-) -> &mut (dyn ReadAncillary<DynCmsgMut<'m, 'c>> + 'j) {
+) -> &mut (dyn ReadAncillary<dyn CmsgMut + 'm> + 'n) {
     _assert_ext(x as _)
 }
 
@@ -183,7 +183,7 @@ impl<RA: ReadAncillary<AB>, AB: CmsgMut + ?Sized> Read for WithCmsgMut<'_, RA, A
 }
 
 /// Forwarding of `Read` through an irrelevant adapter.
-impl<R: Read> Read for WithCmsgRef<'_, '_, R> {
+impl<R: Read> Read for WithCmsgRef<'_, R> {
     #[inline(always)]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.writer.read(buf)
@@ -207,7 +207,7 @@ impl<R: Read> Read for WithCmsgRef<'_, '_, R> {
 }
 
 /// Forwarding of `ReadAncillary` through an irrelevant adapter.
-impl<RA: ReadAncillary<AB>, AB: CmsgMut + ?Sized> ReadAncillary<AB> for WithCmsgRef<'_, '_, RA> {
+impl<RA: ReadAncillary<AB>, AB: CmsgMut + ?Sized> ReadAncillary<AB> for WithCmsgRef<'_, RA> {
     #[inline(always)]
     fn read_ancillary(&mut self, buf: &mut [u8], abuf: &mut AB) -> io::Result<ReadAncillarySuccess> {
         self.writer.read_ancillary(buf, abuf)

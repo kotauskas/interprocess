@@ -11,45 +11,45 @@ pub trait WriteAncillary: Write {
     ///
     /// The return value only the amount of main-band data sent from the given regular buffer – the entirety of the
     /// given `abuf` is always sent in full.
-    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize>;
+    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize>;
 
     /// Same as [`.write_ancillary()`](WriteAncillary::write_ancillary), but performs a
     /// [gather write](https://en.wikipedia.org/wiki/Vectored_I%2FO) instead.
-    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.write_ancillary(devector(bufs), abuf)
     }
 }
 
 impl<T: WriteAncillary + ?Sized> WriteAncillary for &mut T {
     forward_trait_method!(
-        fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>)
+        fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>)
             -> io::Result<usize>
     );
     forward_trait_method!(
         fn write_ancillary_vectored(
             &mut self,
             bufs: &[IoSlice<'_>],
-            abuf: CmsgRef<'_, '_>,
+            abuf: CmsgRef<'_>,
         ) -> io::Result<usize>
     );
 }
 impl<T: WriteAncillary + ?Sized> WriteAncillary for Box<T> {
     forward_trait_method!(
-        fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>)
+        fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>)
             -> io::Result<usize>
     );
     forward_trait_method!(
         fn write_ancillary_vectored(
             &mut self,
             bufs: &[IoSlice<'_>],
-            abuf: CmsgRef<'_, '_>,
+            abuf: CmsgRef<'_>,
         ) -> io::Result<usize>
     );
 }
 pub(crate) fn write_in_terms_of_vectored(
     slf: &mut impl WriteAncillary,
     buf: &[u8],
-    abuf: CmsgRef<'_, '_>,
+    abuf: CmsgRef<'_>,
 ) -> io::Result<usize> {
     slf.write_ancillary_vectored(&[IoSlice::new(buf)], abuf)
 }
@@ -86,16 +86,13 @@ pub trait WriteAncillaryExt: WriteAncillary {
     /// implementation of `Write` is normally different from that of this type, as they would simply send no ancillary
     /// data since none is provided.
     #[inline(always)]
-    fn with_cmsg_ref<'writer, 'b, 'c>(
-        &'writer mut self,
-        abuf: CmsgRef<'b, 'c>,
-    ) -> WithCmsgRef<'b, 'c, &'writer mut Self> {
+    fn with_cmsg_ref<'writer, 'abuf>(&'writer mut self, abuf: CmsgRef<'abuf>) -> WithCmsgRef<'abuf, &'writer mut Self> {
         WriteAncillaryExt::with_cmsg_ref_by_val(self, abuf)
     }
     /// Like [`.with_cmsg_ref()`](WriteAncillaryExt::with_cmsg_ref), but does not borrow `self`, consuming ownership
     /// instead.
     #[inline(always)]
-    fn with_cmsg_ref_by_val<'b, 'c>(self, abuf: CmsgRef<'b, 'c>) -> WithCmsgRef<'b, 'c, Self>
+    fn with_cmsg_ref_by_val(self, abuf: CmsgRef<'_>) -> WithCmsgRef<'_, Self>
     where
         Self: Sized,
     {
@@ -104,19 +101,19 @@ pub trait WriteAncillaryExt: WriteAncillary {
 
     /// Analogous to [`.write_all()`](Write::write_all), but also writes ancillary data.
     #[inline]
-    fn write_all_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<()> {
+    fn write_all_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<()> {
         self.with_cmsg_ref(abuf).write_all(buf)
     }
 
     /// Analogous to [`.write_fmt()`](Write::write_fmt), but also writes ancillary data.
     #[inline]
-    fn write_fmt_ancillary(&mut self, fmt: Arguments<'_>, abuf: CmsgRef<'_, '_>) -> io::Result<()> {
+    fn write_fmt_ancillary(&mut self, fmt: Arguments<'_>, abuf: CmsgRef<'_>) -> io::Result<()> {
         self.with_cmsg_ref(abuf).write_fmt(fmt)
     }
 }
 impl<T: WriteAncillary + ?Sized> WriteAncillaryExt for T {}
 
-impl<WA: WriteAncillary> Write for WithCmsgRef<'_, '_, WA> {
+impl<WA: WriteAncillary> Write for WithCmsgRef<'_, WA> {
     /// Writes via [`.write_ancillary()`](WriteAncillary::write_ancillary) of the inner writer with the `abuf`
     /// argument being `self.abuf`; if `abuf` is empty, [`.write()`](Write::write) of the inner writer is simply used.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -191,11 +188,11 @@ impl<W: Write, AB: ?Sized> Write for WithCmsgMut<'_, W, AB> {
 /// Forwarding of `WriteAncillary` through an irrelevant adapter.
 impl<WA: WriteAncillary, AB: ?Sized> WriteAncillary for WithCmsgMut<'_, WA, AB> {
     #[inline(always)]
-    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.reader.write_ancillary(buf, abuf)
     }
     #[inline(always)]
-    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.reader.write_ancillary_vectored(bufs, abuf)
     }
 }

@@ -310,7 +310,7 @@ impl UdDatagram {
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    pub fn send_ancillary(&self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         self.send_ancillary_vectored(&[IoSlice::new(buf)], abuf)
     }
     /// Sends a datagram and ancillary data into the socket, making use of [gather output] for the main data.
@@ -320,7 +320,7 @@ impl UdDatagram {
     ///
     /// [gather output]: https://en.wikipedia.org/wiki/Vectored_I/O " "
     #[inline]
-    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    pub fn send_ancillary_vectored(&self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         ancwrap::sendmsg(self.as_fd(), bufs, abuf)
     }
 }

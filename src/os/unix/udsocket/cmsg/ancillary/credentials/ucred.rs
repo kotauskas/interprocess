@@ -1,4 +1,3 @@
-use super::Context;
 use crate::os::unix::{
     c_wrappers,
     udsocket::{
@@ -39,9 +38,8 @@ impl ToCmsg for Credentials<'_> {
 
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
-    type Context = Context;
 
-    fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
         unsafe { into_fixed_size_contents::<ucred_packed>(cmsg) }.map(Self::Borrowed)
     }

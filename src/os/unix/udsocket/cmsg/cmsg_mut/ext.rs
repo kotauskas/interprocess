@@ -39,10 +39,10 @@ pub trait CmsgMutExt: CmsgMut {
     ///
     /// Use this method to deserialize the contents of a `CmsgMut` used for receiving control messages from a socket.
     #[inline(always)]
-    fn as_ref(&self) -> CmsgRef<'_, '_, Self::Context> {
+    fn as_ref(&self) -> CmsgRef<'_> {
         let vp = self.valid_part();
         let align = align_first(weaken_buf_init(vp)).unwrap_or(vp.len());
-        unsafe { CmsgRef::new_unchecked_with_context(&vp[align..], self.context()) }
+        unsafe { CmsgRef::new_unchecked(&vp[align..]) }
     }
 
     /// Immutably borrows the part of the buffer which is already filled with valid ancillary data as a raw slice.
@@ -70,14 +70,12 @@ pub trait CmsgMutExt: CmsgMut {
     ///
     /// This method is useful for deserializing the valid part of the buffer while being able to modify the
     /// uninitialized part.
-    fn split_at_init(&mut self) -> (CmsgRef<'_, '_, Self::Context>, &mut [MaybeUninit<u8>]) {
-        let ctx: *const _ = self.context();
+    fn split_at_init(&mut self) -> (CmsgRef<'_>, &mut [MaybeUninit<u8>]) {
         let (left, right) = self.raw_split_at_init();
         (
             unsafe {
-                // SAFETY: the buffer is valid as per the omnipresent guarantees of `CmsgMut`; the `ctx` borrow is safe
-                // because it is contractually required to not overlap with the buffer.
-                CmsgRef::new_unchecked_with_context(left, &*ctx)
+                // SAFETY: the buffer is valid as per the omnipresent guarantees of `CmsgMut`.
+                CmsgRef::new_unchecked(left)
             },
             right,
         )

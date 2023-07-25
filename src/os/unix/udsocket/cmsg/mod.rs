@@ -43,7 +43,6 @@
 // TODO parser
 
 pub mod ancillary;
-pub mod context;
 
 pub(super) mod cmsg_mut;
 mod mref;

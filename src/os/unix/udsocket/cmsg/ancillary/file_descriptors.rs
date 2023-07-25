@@ -43,9 +43,8 @@ impl ToCmsg for FileDescriptors<'_> {
 /// Only errors with `MalformedPayload` if the length isn't aligned to the size of a file descriptor.
 impl<'a> FromCmsg<'a> for FileDescriptors<'a> {
     type MalformedPayloadError = SizeMismatch;
-    type Context = ();
 
-    fn try_parse(mut cmsg: Cmsg<'a>, _ctx: &()) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
         let unalign_mask = (1_usize << align_of::<c_int>()) - 1;
         let len = cmsg.data().len();

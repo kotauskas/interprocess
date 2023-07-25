@@ -1,12 +1,9 @@
-#![cfg(uds_credentials)]
+#![cfg(uds_cont_credentials)]
 
 use super::util::*;
 use color_eyre::eyre::{bail, Context};
 use interprocess::os::unix::udsocket::{
-    cmsg::{
-        ancillary::credentials::{Context as CredentialsContext, Credentials},
-        CmsgMutExt, CmsgRef, CmsgVecBuf,
-    },
+    cmsg::{ancillary::credentials::Credentials, CmsgMutExt, CmsgRef, CmsgVecBuf},
     ReadAncillaryExt, UdSocket, UdStream, UdStreamListener, WriteAncillaryExt,
 };
 use std::{
@@ -26,9 +23,7 @@ pub(super) fn run_with_namegen(namegen: NameGen) {
 fn enable_passcred(sock: &UdStream) -> TestResult {
     {
         cfg_if::cfg_if! {
-            if #[cfg(uds_sockcred)] {
-                sock.set_oneshot_ancillary_credentials(true)
-            } else if #[cfg(uds_cont_credentials)] {
+            if #[cfg(uds_cont_credentials)] {
                 sock.set_continuous_ancillary_credentials(true)
             } else {
                 Ok(())
@@ -37,7 +32,7 @@ fn enable_passcred(sock: &UdStream) -> TestResult {
     }
     .context("Failed to enable credential passing")
 }
-fn decreds<'b>(abuf: CmsgRef<'b, '_, CredentialsContext>) -> TestResult<Credentials<'b>> {
+fn decreds(abuf: CmsgRef<'_>) -> TestResult<Credentials<'_>> {
     match abuf.decode::<Credentials>().next() {
         Some(Ok(c)) => Ok(c),
         Some(Err(e)) => bail!("Parsing of credentials failed: {e}"),
@@ -80,7 +75,7 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     }
     let ancself = abm.as_ref();
 
-    let mut abread = CmsgVecBuf::new_with_collector(64, CredentialsContext::new());
+    let mut abread = CmsgVecBuf::new(64);
 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
@@ -129,7 +124,7 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     }
     let ancself = abm.as_ref();
 
-    let mut abread = CmsgVecBuf::new_with_collector(64, CredentialsContext::new());
+    let mut abread = CmsgVecBuf::new(64);
 
     let mut conn = UdStream::connect(name.as_str())
         .context("Connect failed")?

@@ -184,13 +184,13 @@ impl WriteAncillary for &UdStream {
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         write_in_terms_of_vectored(self, buf, abuf)
     }
     /// # System calls
     /// - `sendmsg`
     #[inline]
-    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         ancwrap::sendmsg(self.as_fd(), bufs, abuf)
     }
 }
@@ -201,13 +201,13 @@ impl WriteAncillary for UdStream {
     /// # System calls
     /// - `sendmsg`
     #[inline(always)]
-    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary(&mut self, buf: &[u8], abuf: CmsgRef<'_>) -> io::Result<usize> {
         (&*self).write_ancillary(buf, abuf)
     }
     /// # System calls
     /// - `sendmsg`
     #[inline(always)]
-    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+    fn write_ancillary_vectored(&mut self, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
         (&*self).write_ancillary_vectored(bufs, abuf)
     }
 }

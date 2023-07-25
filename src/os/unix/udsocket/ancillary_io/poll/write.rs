@@ -18,7 +18,7 @@ pub trait AsyncWriteAncillary: AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>>;
 
     /// Same as [`poll_write_ancillary`](AsyncWriteAncillary::poll_write_ancillary), but performs a
@@ -27,7 +27,7 @@ pub trait AsyncWriteAncillary: AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         let buf = bufs.iter().find(|b| !b.is_empty()).map_or(&[][..], |b| &**b);
         self.poll_write_ancillary(cx, buf, abuf)
@@ -38,7 +38,7 @@ pub(crate) fn write_in_terms_of_vectored(
     slf: Pin<&mut impl AsyncWriteAncillary>,
     cx: &mut Context<'_>,
     buf: &[u8],
-    abuf: CmsgRef<'_, '_>,
+    abuf: CmsgRef<'_>,
 ) -> Poll<io::Result<usize>> {
     slf.poll_write_ancillary_vectored(cx, &[IoSlice::new(buf)], abuf)
 }
@@ -62,7 +62,7 @@ where
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         self.get_mut().as_mut().poll_write_ancillary(cx, buf, abuf)
     }
@@ -70,7 +70,7 @@ where
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         self.get_mut().as_mut().poll_write_ancillary_vectored(cx, bufs, abuf)
     }
@@ -81,7 +81,7 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> AsyncWriteAncillary for &mut AWA
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut **self.get_mut()).poll_write_ancillary(cx, buf, abuf)
     }
@@ -89,7 +89,7 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> AsyncWriteAncillary for &mut AWA
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut **self.get_mut()).poll_write_ancillary_vectored(cx, bufs, abuf)
     }
@@ -99,7 +99,7 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> AsyncWriteAncillary for Box<AWA>
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut **self.get_mut()).poll_write_ancillary(cx, buf, abuf)
     }
@@ -107,7 +107,7 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> AsyncWriteAncillary for Box<AWA>
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut **self.get_mut()).poll_write_ancillary_vectored(cx, bufs, abuf)
     }
@@ -118,10 +118,7 @@ pub trait AsyncWriteAncillaryExt: AsyncWriteAncillary {
     /// The asynchronous version of
     /// [`WriteAncillaryExt::with_cmsg_ref`](super::super::WriteAncillaryExt::with_cmsg_ref).
     #[inline(always)]
-    fn with_cmsg_ref<'writer, 'abuf, 'acol>(
-        &'writer mut self,
-        abuf: CmsgRef<'abuf, 'acol>,
-    ) -> WithCmsgRef<'abuf, 'acol, &'writer mut Self>
+    fn with_cmsg_ref<'writer, 'abuf>(&'writer mut self, abuf: CmsgRef<'abuf>) -> WithCmsgRef<'abuf, &'writer mut Self>
     where
         Self: Unpin,
     {
@@ -130,16 +127,16 @@ pub trait AsyncWriteAncillaryExt: AsyncWriteAncillary {
     /// Like [`.with_cmsg_ref()`](AsyncWriteAncillaryExt::with_cmsg_ref), but does not require that `Self: Unpin`,
     /// instead requiring the caller to pass `self` by `Pin`.
     #[inline(always)]
-    fn with_cmsg_ref_pin<'writer, 'abuf, 'acol>(
+    fn with_cmsg_ref_pin<'writer, 'abuf>(
         self: Pin<&'writer mut Self>,
-        abuf: CmsgRef<'abuf, 'acol>,
-    ) -> WithCmsgRef<'abuf, 'acol, Pin<&'writer mut Self>> {
+        abuf: CmsgRef<'abuf>,
+    ) -> WithCmsgRef<'abuf, Pin<&'writer mut Self>> {
         AsyncWriteAncillaryExt::with_cmsg_ref_by_val(self, abuf)
     }
     /// Like [`.with_cmsg_ref()`](AsyncWriteAncillaryExt::with_cmsg_ref), but does not borrow `self`, consuming
     /// ownership instead.
     #[inline(always)]
-    fn with_cmsg_ref_by_val<'abuf, 'acol>(self, abuf: CmsgRef<'abuf, 'acol>) -> WithCmsgRef<'abuf, 'acol, Self>
+    fn with_cmsg_ref_by_val(self, abuf: CmsgRef<'_>) -> WithCmsgRef<'_, Self>
     where
         Self: Unpin + Sized,
     {
@@ -150,11 +147,11 @@ pub trait AsyncWriteAncillaryExt: AsyncWriteAncillary {
     ///
     /// The return value only the amount of main-band data sent from the given regular buffer – the entirety of the
     /// given `abuf` is always sent in full.
-    fn write_ancillary<'slf, 'b, 'ab, 'ac>(
-        &'slf mut self,
-        buf: &'b [u8],
-        abuf: CmsgRef<'ab, 'ac>,
-    ) -> super::futures::WriteAncillary<'slf, 'b, 'ab, 'ac, Self>
+    fn write_ancillary<'writer, 'buf, 'abuf>(
+        &'writer mut self,
+        buf: &'buf [u8],
+        abuf: CmsgRef<'abuf>,
+    ) -> super::futures::WriteAncillary<'writer, 'buf, 'abuf, Self>
     where
         Self: Unpin,
     {
@@ -162,22 +159,22 @@ pub trait AsyncWriteAncillaryExt: AsyncWriteAncillary {
     }
     /// Same as [`write_ancillary`](AsyncWriteAncillaryExt::write_ancillary), but performs a
     /// [gather write](https://en.wikipedia.org/wiki/Vectored_I%2FO) instead.
-    fn write_ancillary_vectored<'slf, 'bufs, 'iov, 'ab, 'ac>(
-        &'slf mut self,
+    fn write_ancillary_vectored<'writer, 'bufs, 'iov, 'abuf>(
+        &'writer mut self,
         bufs: &'bufs [IoSlice<'iov>],
-        abuf: CmsgRef<'ab, 'ac>,
-    ) -> super::futures::WriteAncillaryVectored<'slf, 'bufs, 'iov, 'ab, 'ac, Self>
+        abuf: CmsgRef<'abuf>,
+    ) -> super::futures::WriteAncillaryVectored<'writer, 'bufs, 'iov, 'abuf, Self>
     where
         Self: Unpin,
     {
         super::futures::WriteAncillaryVectored::new(self, bufs, abuf)
     }
     /// Analogous to [`write_all`](futures_util::AsyncWriteExt::write_all), but also writes ancillary data.
-    fn write_all_ancillary<'slf, 'b, 'ab, 'ac>(
-        &'slf mut self,
-        buf: &'b [u8],
-        abuf: CmsgRef<'ab, 'ac>,
-    ) -> super::futures::WriteAllAncillary<'slf, 'b, 'ab, 'ac, Self>
+    fn write_all_ancillary<'writer, 'buf, 'abuf>(
+        &'writer mut self,
+        buf: &'buf [u8],
+        abuf: CmsgRef<'abuf>,
+    ) -> super::futures::WriteAllAncillary<'writer, 'buf, 'abuf, Self>
     where
         Self: Unpin,
     {
@@ -187,7 +184,7 @@ pub trait AsyncWriteAncillaryExt: AsyncWriteAncillary {
 // hi myrl
 impl<AWA: AsyncWriteAncillary + ?Sized> AsyncWriteAncillaryExt for AWA {}
 
-impl<AWA: AsyncWriteAncillary + Unpin> AsyncWrite for WithCmsgRef<'_, '_, AWA> {
+impl<AWA: AsyncWriteAncillary + Unpin> AsyncWrite for WithCmsgRef<'_, AWA> {
     /// Writes via [`.poll_write_ancillary()`](AsyncWriteAncillary::poll_write_ancillary) of the inner writer with the
     /// `abuf` argument being `self.abuf`; if `abuf` is empty, [`.poll_write()`](AsyncWrite::poll_write) of the inner
     /// writer is simply used.
@@ -265,7 +262,7 @@ impl<AWA: AsyncWriteAncillary + Unpin, AB: ?Sized> AsyncWriteAncillary for WithC
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.reader).poll_write_ancillary(cx, buf, abuf)
     }
@@ -274,7 +271,7 @@ impl<AWA: AsyncWriteAncillary + Unpin, AB: ?Sized> AsyncWriteAncillary for WithC
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.reader).poll_write_ancillary_vectored(cx, bufs, abuf)
     }

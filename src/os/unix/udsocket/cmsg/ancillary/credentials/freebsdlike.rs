@@ -1,37 +1,18 @@
-use super::Context;
 use crate::os::unix::{
     udsocket::{
-        cmsg::{ancillary::*, context::Collector, Cmsg},
+        cmsg::{ancillary::*, Cmsg},
         credentials::freebsdlike::*,
     },
     unixprelude::*,
 };
 use libc::cmsgcred;
-use std::{cell::Cell, mem::size_of, slice};
-
-#[cfg(uds_sockcred)]
-use {crate::os::unix::udsocket::c_wrappers, libc::sockcred};
-
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub(super) struct CredsOptContext {
-    local_creds: Cell<bool>,
-}
-impl Collector for CredsOptContext {
-    fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
-        #[cfg(uds_sockcred)]
-        if let Ok(val) = c_wrappers::get_local_creds(socket) {
-            *self.local_creds.get_mut() = val;
-        }
-    }
-}
+use std::{mem::size_of, slice};
 
 impl Credentials<'_> {
     pub const ANCTYPE: c_int = libc::SCM_CREDS;
     fn len(&self) -> usize {
         match self {
             Self::Cmsgcred(..) => size_of::<cmsgcred>(),
-            #[cfg(uds_sockcred)]
-            Self::Sockcred(c) => unsafe { libc::SOCKCREDSIZE(c.sc_ngroups as _) },
         }
     }
 }
@@ -41,8 +22,6 @@ impl<'a> ToCmsg for Credentials<'a> {
         let st_bytes = unsafe {
             let ptr = match self {
                 Credentials::Cmsgcred(c) => <*const _>::cast(c),
-                #[cfg(uds_sockcred)]
-                Credentials::Sockcred(c) => <*const _>::cast(c),
             };
             // SAFETY: well-initialized POD struct with #[repr(C)]
             slice::from_raw_parts(ptr, self.len())
@@ -56,49 +35,10 @@ impl<'a> ToCmsg for Credentials<'a> {
 
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
-    type Context = Context;
 
-    fn try_parse(mut cmsg: Cmsg<'a>, ctx: &Context) -> ParseResult<'a, Self, SizeMismatch> {
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
-        if ctx.platform.local_creds.get() {
-            // LOCAL_CREDS was set, but is now unset because it's one-shot
-            ctx.platform.local_creds.set(false);
-            #[cfg(not(uds_sockcred))]
-            {
-                unreachable!("corrupted context (LOCAL_CREDS reported set on a platform that doesn't support it)")
-            }
-            #[cfg(uds_sockcred)]
-            {
-                let min_expected = size_of::<sockcred>();
-                let len = cmsg.data().len();
-                if len < min_expected {
-                    // If this is false, we can't even do the reinterpret and figure out the number
-                    // of supplementary groups; prioritize formal soundness over error reporting
-                    // precision in this niche case and claim to expect the base size of sockcred.
-                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
-                        expected: min_expected,
-                        got: len,
-                    })
-                    .wrap(cmsg));
-                }
-
-                let creds = unsafe {
-                    // SAFETY: POD
-                    &*cmsg.data().as_ptr().cast::<sockcred>()
-                };
-
-                let expected = unsafe { libc::SOCKCREDSIZE(creds.sc_ngroups as _) };
-                // Be nice on the alignment here.
-                if len < expected {
-                    // The rest of the size error reporting process happens here.
-                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch { expected, got: len }).wrap(cmsg));
-                }
-
-                Ok(Self::Sockcred(creds.as_ref()))
-            }
-        } else {
-            unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(Self::Cmsgcred)
-        }
+        unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(Self::Cmsgcred)
     }
 }
 
@@ -109,13 +49,4 @@ pub(super) static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
     cmcred_gid: 0,
     cmcred_ngroups: 0,
     cmcred_groups: [0; libc::CMGROUP_MAX],
-};
-#[cfg(uds_sockcred)]
-pub(super) static ZEROED_SOCKCRED: sockcred = sockcred {
-    sc_uid: 0,
-    sc_euid: 0,
-    sc_gid: 0,
-    sc_egid: 0,
-    sc_ngroups: 0,
-    sc_groups: [0],
 };

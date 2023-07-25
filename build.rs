@@ -19,9 +19,10 @@ fn is_unix() -> bool {
 /// - `uds_sock_cloexec` on platforms with SOCK_CLOEXEC
 /// - `uds_sock_nonblock` on platforms with SOCK_NONBLOCK
 /// - Credential ancillary message structure flavor:
-///     - `uds_ucred`
-///     - `uds_cmsgcred`
-///     - `uds_sockcred` TODO: distinguish FreeBSD and NetBSD flavors of this; the NetBSD thing is more like cmsgcred
+///     - `uds_ucred` from Linux
+///     - `uds_cmsgcred` from FreeBSD
+///     - `uds_sockcred2`, also from FreeBSD
+///     - `uds_sockcred` from NetBSD ( TODO )
 /// - Socket options for retrieving peer credentials:
 ///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to
 ///       Linux)
@@ -43,8 +44,9 @@ fn collect_uds_features(target: &TargetTriplet) {
         mut ucred,
         mut cmsgcred,
         mut sockcred,
+        mut sockcred2,
         mut sock_cloexec,
-        mut sock_nonblock] = [false; 6];
+        mut sock_nonblock] = [false; 7];
     if target.os_any(&["linux", "android", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
         [ucred, sock_cloexec, sock_nonblock] = [true; 3];
@@ -65,12 +67,14 @@ fn collect_uds_features(target: &TargetTriplet) {
         ]);
 
         if target.os_any(&["freebsd", "dragonfly"]) {
-            [cmsgcred, sock_cloexec, sock_nonblock] = [true; 3];
+            cmsgcred = true;
+            [sock_cloexec, sock_nonblock] = [true; 2];
             if target.os("freebsd") {
-                sockcred = true;
+                sockcred2 = true;
             }
         }
         if target.os("netbsd") {
+            sockcred = true;
             // TODO
             define("uds_unpcbid");
         } else {
@@ -91,19 +95,21 @@ fn collect_uds_features(target: &TargetTriplet) {
             "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
         ])
     }
-    if ucred || cmsgcred || sockcred {
-        let mut contcred = false;
+    if ucred || cmsgcred || sockcred || sockcred2 {
+        let mut contcred = false; // TODO is NetBSD sockcred a contcred?
         define("uds_credentials");
         if ucred {
             contcred = true;
             define("uds_ucred");
         }
         if cmsgcred {
-            define("uds_cmsgcred");
-            if sockcred {
-                contcred = true;
-                define("uds_sockcred");
-            }
+            // TODO CREDS2
+        }
+        if sockcred {
+            define("uds_sockcred");
+        }
+        if sockcred2 {
+            define("uds_sockcred2");
         }
         if contcred {
             define("uds_cont_credentials");

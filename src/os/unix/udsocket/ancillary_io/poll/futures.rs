@@ -165,20 +165,18 @@ impl<AB: CmsgMut + ?Sized, ARA: AsyncReadAncillary<AB> + Unpin + ?Sized> Future
 }
 
 /// [Future] returned by [`write_ancillary()`](super::AsyncWriteAncillaryExt::write_ancillary).
-pub struct WriteAncillary<'writer, 'buf, 'abuf, 'acol, AWA: ?Sized> {
+pub struct WriteAncillary<'writer, 'buf, 'abuf, AWA: ?Sized> {
     slf: &'writer mut AWA,
     buf: &'buf [u8],
-    abuf: CmsgRef<'abuf, 'acol>,
+    abuf: CmsgRef<'abuf>,
 }
-impl<'writer, 'buf, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
-    WriteAncillary<'writer, 'buf, 'abuf, 'acol, AWA>
-{
+impl<'writer, 'buf, 'abuf, AWA: AsyncWriteAncillary + Unpin + ?Sized> WriteAncillary<'writer, 'buf, 'abuf, AWA> {
     #[inline(always)]
-    pub(super) fn new(slf: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf, 'acol>) -> Self {
+    pub(super) fn new(slf: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf>) -> Self {
         Self { slf, buf, abuf }
     }
 }
-impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_, '_, '_, AWA> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_, '_, AWA> {
     type Output = io::Result<usize>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -188,20 +186,20 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillary<'_, '_
 }
 
 /// [Future] returned by [`write_ancillary_vectored()`](super::AsyncWriteAncillaryExt::write_ancillary_vectored).
-pub struct WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, 'acol, AWA: ?Sized> {
+pub struct WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, AWA: ?Sized> {
     slf: &'writer mut AWA,
     bufs: &'buf [IoSlice<'iov>],
-    abuf: CmsgRef<'abuf, 'acol>,
+    abuf: CmsgRef<'abuf>,
 }
-impl<'writer, 'buf, 'iov, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
-    WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, 'acol, AWA>
+impl<'writer, 'buf, 'iov, 'abuf, AWA: AsyncWriteAncillary + Unpin + ?Sized>
+    WriteAncillaryVectored<'writer, 'buf, 'iov, 'abuf, AWA>
 {
     #[inline(always)]
-    pub(super) fn new(slf: &'writer mut AWA, bufs: &'buf [IoSlice<'iov>], abuf: CmsgRef<'abuf, 'acol>) -> Self {
+    pub(super) fn new(slf: &'writer mut AWA, bufs: &'buf [IoSlice<'iov>], abuf: CmsgRef<'abuf>) -> Self {
         Self { slf, bufs, abuf }
     }
 }
-impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectored<'_, '_, '_, '_, '_, AWA> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectored<'_, '_, '_, '_, AWA> {
     type Output = io::Result<usize>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -213,22 +211,20 @@ impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAncillaryVectore
 //--- Actual adapters ---
 
 /// [Future] returned by [`write_all_ancillary()`](super::AsyncWriteAncillaryExt::write_all_ancillary).
-pub struct WriteAllAncillary<'writer, 'buf, 'abuf, 'acol, AWA: ?Sized> {
-    partappl: WithCmsgRef<'abuf, 'acol, &'writer mut AWA>,
+pub struct WriteAllAncillary<'writer, 'buf, 'abuf, AWA: ?Sized> {
+    partappl: WithCmsgRef<'abuf, &'writer mut AWA>,
     buf: &'buf [u8],
 }
-impl<'writer, 'buf, 'abuf, 'acol, AWA: AsyncWriteAncillary + Unpin + ?Sized>
-    WriteAllAncillary<'writer, 'buf, 'abuf, 'acol, AWA>
-{
+impl<'writer, 'buf, 'abuf, AWA: AsyncWriteAncillary + Unpin + ?Sized> WriteAllAncillary<'writer, 'buf, 'abuf, AWA> {
     #[inline(always)]
-    pub(super) fn new(writer: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf, 'acol>) -> Self {
+    pub(super) fn new(writer: &'writer mut AWA, buf: &'buf [u8], abuf: CmsgRef<'abuf>) -> Self {
         Self {
             partappl: writer.with_cmsg_ref(abuf),
             buf,
         }
     }
 }
-impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAllAncillary<'_, '_, '_, '_, AWA> {
+impl<AWA: AsyncWriteAncillary + Unpin + ?Sized> Future for WriteAllAncillary<'_, '_, '_, AWA> {
     type Output = io::Result<()>;
     #[inline(always)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

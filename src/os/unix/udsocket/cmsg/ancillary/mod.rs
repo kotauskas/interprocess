@@ -55,12 +55,10 @@ pub trait ToCmsg {
 pub trait FromCmsg<'a>: Sized {
     /// The error type produced for malformed payloads, typically [`Infallible`].
     type MalformedPayloadError;
-    /// The context required to decode the message.
-    type Context;
 
     /// Attempts to extract data from `cmsg` into a new instance of `Self`, returning `None` if the control message is
     /// of the wrong level, type or has malformed content.
-    fn try_parse(cmsg: Cmsg<'a>, ctx: &Self::Context) -> ParseResult<'a, Self, Self::MalformedPayloadError>;
+    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError>;
 }
 
 /// The result type for [`FromCmsg`].
@@ -110,8 +108,6 @@ pub enum ParseErrorKind<E = Infallible> {
         /// The `cmsg_type` that was received.
         got: c_int,
     },
-    /// Necessary context was not collected.
-    InsufficientContext,
     /// The control message data does not conform to the format of the ancillary data message type, with an explanatory
     /// error value.
     MalformedPayload(E),
@@ -130,7 +126,6 @@ impl<E> ParseErrorKind<E> {
             Self::MalformedPayload(e) => ParseErrorKind::MalformedPayload(f(e)),
             Self::WrongLevel { expected, got } => ParseErrorKind::WrongLevel { expected, got },
             Self::WrongType { expected, got } => ParseErrorKind::WrongType { expected, got },
-            Self::InsufficientContext => ParseErrorKind::InsufficientContext,
         }
     }
 }
@@ -140,7 +135,6 @@ impl<E: Display> Display for ParseErrorKind<E> {
         let msg_base = match self {
             WrongLevel { .. } => "wrong cmsg_level",
             WrongType { .. } => "wrong cmsg_type",
-            InsufficientContext => "insufficient context",
             MalformedPayload(..) => "malformed control message",
         };
 
@@ -153,7 +147,6 @@ impl<E: Display> Display for ParseErrorKind<E> {
                 write!(f, "got {got:#08x})")
             }
             MalformedPayload(e) => write!(f, "{msg_base}: {e}"),
-            _ => f.write_str(msg_base),
         }
     }
 }

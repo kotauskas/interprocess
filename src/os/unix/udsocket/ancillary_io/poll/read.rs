@@ -56,9 +56,9 @@ fn _assert_ext<ARA: AsyncReadAncillaryExt<AB> + ?Sized, AB: CmsgMut + ?Sized>(x:
     x
 }
 #[cfg(debug_assertions)]
-fn _assert_async_read_ancillary_object_safe<'j: 'm + 'c, 'm, 'c, ARA: AsyncReadAncillary<DynCmsgMut<'m, 'c>> + 'j>(
+fn _assert_async_read_ancillary_object_safe<'m, 'n, ARA: AsyncReadAncillary<dyn CmsgMut + 'm> + 'n>(
     x: &mut ARA,
-) -> &mut (dyn AsyncReadAncillary<DynCmsgMut<'m, 'c>> + 'j) {
+) -> &mut (dyn AsyncReadAncillary<dyn CmsgMut + 'm> + 'n) {
     _assert_ext(x as _)
 }
 
@@ -282,7 +282,7 @@ impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncRead for Wi
 }
 
 /// Forwarding of `AsyncRead` through an irrelevant adapter.
-impl<AR: AsyncRead + Unpin> AsyncRead for WithCmsgRef<'_, '_, AR> {
+impl<AR: AsyncRead + Unpin> AsyncRead for WithCmsgRef<'_, AR> {
     #[inline(always)]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
         Pin::new(&mut self.writer).poll_read(cx, buf)
@@ -298,7 +298,7 @@ impl<AR: AsyncRead + Unpin> AsyncRead for WithCmsgRef<'_, '_, AR> {
 }
 
 /// Forwarding of `AsyncReadAncillary` through an irrelevant adapter.
-impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for WithCmsgRef<'_, '_, ARA> {
+impl<ARA: AsyncReadAncillary<AB> + Unpin, AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for WithCmsgRef<'_, ARA> {
     #[inline(always)]
     fn poll_read_ancillary(
         mut self: Pin<&mut Self>,

@@ -8,17 +8,7 @@ mod freebsdlike;
 #[cfg(uds_ucred)]
 mod ucred;
 
-cfg_if::cfg_if! {
-    if #[cfg(uds_sockcred)] {
-        use freebsdlike::CredsOptContext as PlatformContext;
-    } else {
-        use crate::os::unix::udsocket::cmsg::context::DummyCollector as PlatformContext;
-    }
-}
-
 use super::*;
-use crate::os::unix::{udsocket::cmsg::context::Collector, unixprelude::*};
-use std::cell::Cell;
 
 pub use crate::os::unix::udsocket::credentials::*;
 
@@ -112,62 +102,9 @@ impl<'a> Credentials<'a> {
     pub fn sendable_cmsgcred() -> Self {
         Self(CredentialsImpl::Cmsgcred(freebsdlike::ZEROED_CMSGCRED.as_ref()))
     }
-    /// Creates a `Credentials` ancillary data struct of the `sockcred` variety to be sent as a control message. The
-    /// underlying value is zeroed out and automatically filled in by the kernel.
-    ///
-    /// The receiver will be able to read the sender's real and effective UID, real and effective GID and an unspecified
-    /// amount of supplemental groups. As per the [FreeBSD manual page for `unix(4)`][mp], the supplemental group list
-    /// is currently truncated to `CMGROUP_MAX` (16) entries.
-    ///
-    /// The `LOCAL_CREDS` option must be *enabled* for this ancillary data struct to be sent.
-    ///
-    /// [mp]: https://man.freebsd.org/cgi/man.cgi?query=unix&sektion=0&manpath=FreeBSD+13.2-RELEASE+and+Ports
-    #[cfg_attr( // uds_sockcred template
-        feature = "doc_cfg",
-        doc(cfg(any(target_os = "freebsd")))
-    )]
-    #[cfg(uds_sockcred)]
-    #[inline]
-    pub fn sendable_sockcred() -> Self {
-        Self(CredentialsImpl::Sockcred(freebsdlike::ZEROED_SOCKCRED.as_ref()))
-    }
 }
 
-/// A context [`Collector`] required for parsing of [`Credentials`].
-///
-/// Allowing this collector to collect the necessary context is mandatory on all platforms on which `Credentials`
-/// exists, but it only serves a purpose on FreeBSD: obtaining the value of the `LOCAL_CREDS` socket option to
-/// disambiguate `cmsgcred` and `sockcred`.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct Context {
-    fresh: Cell<bool>,
-    platform: PlatformContext,
-}
-impl Context {
-    /// Creates an empty collector, ready to collect the value of `LOCAL_CREDS` (probably).
-    #[inline]
-    #[allow(clippy::default_constructed_unit_structs)]
-    pub fn new() -> Self {
-        Self {
-            fresh: Cell::new(false),
-            platform: PlatformContext::default(),
-        }
-    }
-}
-impl Collector for Context {
-    fn pre_op_collect(&mut self, socket: BorrowedFd<'_>) {
-        // If the context wasn't yet used in parsing, the oneshot nature of LOCAL_CREDS will lead
-        // to previous control messages erroneously being interpreted as cmsgcred when they're
-        // really sockcred. In adapter situations, this overwriting behavior will consistently
-        // always happen due to two or more reads being used.
-        if !self.fresh.get() {
-            self.platform.pre_op_collect(socket);
-            self.fresh.set(true);
-        }
-    }
-}
-
-/// Sending will set the credentials that the receieving end will read with `SO_PASSCRED`.
+/// Sending will set the credentials that the receieving end will read if they have credentials passing enabled.
 ///
 /// The kernel checks the contents of those ancillary messages to make sure that unprivileged processes can't
 /// impersonate anyone, allowing for secure authentication. For this reason, not all values of `Credentials` created for
@@ -206,14 +143,8 @@ impl ToCmsg for Credentials<'_> {
 )]
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
-    type Context = Context;
     #[inline]
-    fn try_parse(cmsg: Cmsg<'a>, ctx: &Self::Context) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
-        if !ctx.fresh.get() {
-            // Give me downstream portability or give me death!
-            return Err(ParseErrorKind::InsufficientContext.wrap(cmsg));
-        }
-        ctx.fresh.set(false);
-        CredentialsImpl::try_parse(cmsg, ctx).map(Self)
+    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+        CredentialsImpl::try_parse(cmsg).map(Self)
     }
 }

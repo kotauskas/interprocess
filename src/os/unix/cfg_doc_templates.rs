@@ -45,6 +45,11 @@
 
 #[cfg_attr( // uds_sockcred template
     feature = "doc_cfg",
+    doc(cfg(target_os = "netbsd"))
+)]
+
+#[cfg_attr( // uds_sockcred2 template
+    feature = "doc_cfg",
     doc(cfg(target_os = "freebsd"))
 )]
 

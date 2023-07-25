@@ -75,7 +75,10 @@ pub trait UdSocket: AsFd {
     ///
     /// Note that this has absolutely no effect on explicit sending of credentials – that can be done regardless of
     /// whether this option is enabled.
-    #[cfg_attr(feature = "doc_cfg", doc(cfg(target_os = "freebsd")))]
+    #[cfg_attr( // uds_sockcred template
+        feature = "doc_cfg",
+        doc(cfg(target_os = "netbsd"))
+    )]
     #[cfg(uds_sockcred)]
     #[inline]
     fn set_oneshot_ancillary_credentials(&self, val: bool) -> io::Result<()> {

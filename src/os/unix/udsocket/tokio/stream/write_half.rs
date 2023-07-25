@@ -116,7 +116,7 @@ impl AsyncWriteAncillary for &WriteHalf {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         write_in_terms_of_vectored(self, cx, buf, abuf)
     }
@@ -125,7 +125,7 @@ impl AsyncWriteAncillary for &WriteHalf {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         poll_write_ancvec_ref(self.0.as_ref(), cx, bufs, abuf)
     }
@@ -194,7 +194,7 @@ impl AsyncWriteAncillary for WriteHalf {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         write_in_terms_of_vectored(self, cx, buf, abuf)
     }
@@ -203,7 +203,7 @@ impl AsyncWriteAncillary for WriteHalf {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
-        abuf: CmsgRef<'_, '_>,
+        abuf: CmsgRef<'_>,
     ) -> Poll<io::Result<usize>> {
         Pin::new(&mut &*self).poll_write_ancillary_vectored(cx, bufs, abuf)
     }

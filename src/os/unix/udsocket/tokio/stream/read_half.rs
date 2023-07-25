@@ -101,8 +101,6 @@ impl<AB: CmsgMut + ?Sized> AsyncReadAncillary<AB> for &ReadHalf {
     }
 }
 
-// TODO the rest of by-ref, same for write half
-
 impl TokioAsyncRead for ReadHalf {
     #[inline(always)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {

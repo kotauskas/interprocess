@@ -15,27 +15,27 @@ use crate::os::unix::{
 /// perfectly fine to construct it manually, as all its fields are public. See the documentation of the above method for
 /// more details on how this adapter works.
 #[derive(Copy, Clone, Debug, Default)]
-pub struct WithCmsgRef<'abuf, 'acol, WA> {
+pub struct WithCmsgRef<'abuf, WA> {
     /// The writer whose [`WriteAncillary`] implementation is to be the delegation target of this adapter's [`Write`].
     pub writer: WA,
     /// The ancillary data to be passed to `writer`. It will be completely consumed after the first call unless it is
     /// explicitly replenished later.
-    pub abuf: CmsgRef<'abuf, 'acol>,
+    pub abuf: CmsgRef<'abuf>,
 }
-impl<WA> WithCmsgRef<'_, '_, WA> {
+impl<WA> WithCmsgRef<'_, WA> {
     /// Unwraps the adapter, returning the original writer.
     #[inline(always)]
     pub fn into_inner(self) -> WA {
         self.writer
     }
 }
-impl<WA: AsFd> AsFd for WithCmsgRef<'_, '_, WA> {
+impl<WA: AsFd> AsFd for WithCmsgRef<'_, WA> {
     #[inline(always)]
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.writer.as_fd()
     }
 }
-impl<WA: UdSocket> UdSocket for WithCmsgRef<'_, '_, WA> {}
+impl<WA: UdSocket> UdSocket for WithCmsgRef<'_, WA> {}
 
 /// An adapter from [`ReadAncillary`] to [`Write`] that
 /// [partially applies](https://en.wikipedia.org/wiki/Partial_application) the former and allows the use of further

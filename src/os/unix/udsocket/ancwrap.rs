@@ -1,7 +1,7 @@
 use super::{
     super::unixprelude::*,
     c_wrappers,
-    cmsg::{context::Collector, read::buf_to_msghdr, CmsgMut, CmsgMutExt, CmsgRef},
+    cmsg::{read::buf_to_msghdr, CmsgMut, CmsgMutExt, CmsgRef},
     util::{make_msghdr, to_msghdr_iovlen},
     ReadAncillarySuccess, UdSocketPath,
 };
@@ -32,12 +32,10 @@ pub(super) fn recvmsg<AB: CmsgMut + ?Sized>(
         }
     }
 
-    ancbuf.context_mut().pre_op_collect(fd);
     let bytes_read = unsafe {
         // SAFETY: make_msghdr_r is good at its job
         c_wrappers::recvmsg(fd, &mut hdr, 0)?
     };
-    ancbuf.context_mut().post_op_collect(fd, hdr.msg_flags);
 
     let advanc = hdr.msg_controllen as _; // FIXME as casts are bad!!
     unsafe {
@@ -55,7 +53,7 @@ pub(super) fn recvmsg<AB: CmsgMut + ?Sized>(
     })
 }
 
-pub(super) fn sendmsg(fd: BorrowedFd<'_>, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_, '_>) -> io::Result<usize> {
+pub(super) fn sendmsg(fd: BorrowedFd<'_>, bufs: &[IoSlice<'_>], abuf: CmsgRef<'_>) -> io::Result<usize> {
     let iov = bufs.as_ptr().cast_mut().cast::<iovec>();
     let iovlen = to_msghdr_iovlen(bufs.len())?;
     let mut hdr = make_msghdr(iov, iovlen);
