@@ -97,12 +97,11 @@ pub const MAX_UDSOCKET_PATH_LEN: usize = {
 
 const LEVEL: libc::c_int = {
     // FIXME do through build.rs
-    #[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
-    {
-        libc::SOL_LOCAL
-    }
-    #[cfg(not(any(target_os = "freebsd", target_os = "dragonfly")))]
-    {
-        libc::SOL_SOCKET
+    cfg_if::cfg_if! {
+        if #[cfg(any(target_os = "freebsd"))] {
+            0 // Source: https://cgit.freebsd.org/src/tree/sys/sys/un.h#n65
+        } else {
+            libc::SOL_SOCKET
+        }
     }
 };
