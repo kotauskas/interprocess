@@ -19,6 +19,7 @@ fn udsocket_stream() {
     }
 }
 
+#[cfg(uds_credentials)]
 #[test]
 fn udsocket_credentials() {
     use credentials::*;

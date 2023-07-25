@@ -1,3 +1,5 @@
+#![cfg(uds_credentials)]
+
 use super::util::*;
 use color_eyre::eyre::{bail, Context};
 use interprocess::os::unix::udsocket::{
