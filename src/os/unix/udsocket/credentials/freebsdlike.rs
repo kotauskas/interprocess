@@ -3,29 +3,68 @@ use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
 use to_method::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Credentials<'a>(&'a cmsgcred_packed);
+pub(crate) enum Credentials<'a> {
+    Cmsgcred(&'a cmsgcred_packed),
+    #[cfg(uds_sockcred2)]
+    Sockcred2(&'a sockcred2_packed),
+}
 impl<'a> Credentials<'a> {
-    pub fn euid(self) -> Option<uid_t> {
-        Some(c.cmcred_euid)
+    pub fn euid(&self) -> Option<uid_t> {
+        match self {
+            Self::Cmsgcred(c) => Some(c.cmcred_euid),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => Some(c.sc_euid),
+        }
     }
-    pub fn ruid(self) -> Option<uid_t> {
-        Some(c.cmcred_uid)
+    pub fn ruid(&self) -> Option<uid_t> {
+        match self {
+            Self::Cmsgcred(c) => Some(c.cmcred_uid),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => Some(c.sc_uid),
+        }
     }
-    pub fn egid(self) -> Option<gid_t> {
-        None
+    pub fn egid(&self) -> Option<gid_t> {
+        match self {
+            Self::Cmsgcred(c) => None,
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => Some(c.sc_egid),
+        }
     }
-    pub fn rgid(self) -> Option<gid_t> {
-        Some(c.cmcred_gid)
+    pub fn rgid(&self) -> Option<gid_t> {
+        match self {
+            Self::Cmsgcred(c) => Some(c.cmcred_gid),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => Some(c.sc_gid),
+        }
     }
-    pub fn pid(self) -> Option<pid_t> {
-        c.cmcred_pid
+    pub fn pid(&self) -> Option<pid_t> {
+        match self {
+            Self::Cmsgcred(c) => Some(c.cmcred_pid),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => Some(c.sc_pid),
+        }
+    }
+    fn n_groups(&self) -> usize {
+        match self {
+            Self::Cmsgcred(c) => min(c.cmcred_ngroups, libc::CMGROUP_MAX as _).to::<c_int>(),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => c.sc_ngroups,
+        }
+        .try_to::<usize>()
+        .unwrap()
+    }
+    fn ptr_to_gids(&self) -> *const gid_packed {
+        match self {
+            Self::Cmsgcred(c) => addr_of!(c.cmcred_groups).cast::<*const gid_packed>(),
+            #[cfg(uds_sockcred2)]
+            Self::Sockcred2(c) => addr_of!(c.sc_groups).cast::<*const gid_packed>(),
+        }
     }
     pub fn groups(&self) -> Groups<'a> {
-        let n_groups = min(c.cmcred_ngroups, libc::CMGROUP_MAX as _).try_to::<usize>().unwrap();
-        let cur = <*const _>::cast::<gid_packed>(addr_of!(c.cmcred_groups));
+        let cur = self.ptr_to_gids();
         let end = unsafe {
             // SAFETY: this puts us one byte past the last one
-            cur.add(n_groups)
+            cur.add(self.n_groups())
         };
         Groups {
             cur,
@@ -80,14 +119,44 @@ pub(crate) struct cmsgcred_packed {
     pub cmcred_euid: uid_t,
     pub cmcred_gid: gid_t,
     pub cmcred_ngroups: c_short,
+    // Breaks on batshit insane platforms where c_short = c_int,
+    // but neither FreeBSD nor Dragonfly BSD belong to this category
     pub __pad0: c_short,
-    pub cmcred_groups: [gid_t; 16],
+    pub cmcred_groups: [gid_t; libc::CMGROUP_MAX],
 }
 impl AsRef<cmsgcred_packed> for cmsgcred {
     fn as_ref(&self) -> &cmsgcred_packed {
         const _: () = {
             if size_of::<cmsgcred_packed>() != size_of::<cmsgcred>() {
                 panic!("size of `cmsgcred_packed` did not match that of `cmsgcred`");
+            }
+        };
+        unsafe {
+            // SAFETY: the two types have the same layout, save for stricter padding of the input
+            &*<*const _>::cast(self)
+        }
+    }
+}
+
+#[cfg(uds_sockcred2)]
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
+pub(crate) struct sockcred2 {
+    pub sc_version: c_int,
+    pub sc_pid: pid_t,
+    pub sc_uid: uid_t,
+    pub sc_euid: uid_t,
+    pub sc_gid: gid_t,
+    pub sc_egid: gid_t,
+    pub sc_ngroups: c_int,
+    pub sc_groups: [gid_t; 1],
+}
+impl AsRef<sockcred2_packed> for sockcred2 {
+    fn as_ref(&self) -> &sockcred2_packed {
+        const _: () = {
+            if size_of::<sockcred2_packed>() != size_of::<sockcred2>() {
+                panic!("size of `sockcred2_packed` did not match that of `sockcred2`");
             }
         };
         unsafe {

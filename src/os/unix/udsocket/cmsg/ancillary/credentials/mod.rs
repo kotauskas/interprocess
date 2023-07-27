@@ -88,8 +88,6 @@ impl<'a> Credentials<'a> {
     ///
     /// The receiver will be able to read the sender's PID, real and effective UID, real GID and up to `CMGROUP_MAX`
     /// (16) supplemental groups.
-    ///
-    /// The `LOCAL_CREDS` option must be *disabled* for this ancillary data struct to be sent.
     #[cfg_attr( // uds_cmsgcred template
         feature = "doc_cfg",
         doc(cfg(any(

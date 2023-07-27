@@ -194,7 +194,7 @@ impl<'buf> Iterator for Cmsgs<'buf> {
         };
 
         self.cur = unsafe {
-            // SAFETY: the cursor is being continously fed into CMSG_* pseudomacros from their own output. A null
+            // SAFETY: the cursor is being continuously fed into CMSG_* pseudomacros from their own output. A null
             // pointer cursor value is handled earlier in the function.
             CMSG_NXTHDR(&self.dummy, self.cur)
         };
