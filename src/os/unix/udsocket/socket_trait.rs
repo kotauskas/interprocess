@@ -45,7 +45,7 @@ pub trait UdSocket: AsFd {
     fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
         c_wrappers::get_peer_ucred(self.as_fd())
     }
-    /// Enables or disables continous reception of credentials via ancillary data.
+    /// Enables or disables continuous reception of credentials via ancillary data.
     ///
     /// After this option is set to `true`, every ancillary-enabled receive call will return a table of credentials of
     /// the process on the other side, directly associated with the data being received.
