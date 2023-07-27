@@ -74,6 +74,7 @@ fn collect_uds_features(target: &TargetTriplet) {
             }
         }
         if target.os("netbsd") {
+            // TODO does it have sock_cloexec and sock_nonblock?
             sockcred = true;
             // TODO
             define("uds_unpcbid");
@@ -102,18 +103,13 @@ fn collect_uds_features(target: &TargetTriplet) {
             contcred = true;
             define("uds_ucred");
         }
-        if cmsgcred {
-            // TODO CREDS2
-        }
-        if sockcred {
-            define("uds_sockcred");
-        }
         if sockcred2 {
+            contcred = true;
             define("uds_sockcred2");
         }
-        if contcred {
-            define("uds_cont_credentials");
-        }
+        cdefine(cmsgcred, "uds_cmsgcred");
+        cdefine(sockcred, "uds_sockcred");
+        cdefine(contcred, "uds_cont_credentials");
     }
     if sock_cloexec {
         define("uds_sock_cloexec");
@@ -131,6 +127,11 @@ fn ldefine(cfgs: &[&str]) {
     let mut stdout = stdout_.lock();
     for &i in cfgs {
         writeln!(stdout, "cargo:rustc-cfg={i}").unwrap();
+    }
+}
+fn cdefine(br: bool, cfg: &str) {
+    if br {
+        define(cfg);
     }
 }
 
