@@ -78,8 +78,8 @@
 //! [MIT license]: https://choosealicense.com/licenses/mit/
 //! [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
 //! [blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
+// TODO support iOS, TVOS and watchOS by association
 // TODO mailslots
-// TODO use standard library raw+owned FDs and handles
 // TODO the Intra Doc Link Sweep
 // - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across the network
 // - **Shared memory** – exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions

@@ -36,3 +36,7 @@ pub use name_type_support::*;
 
 mod to_name;
 pub use to_name::*;
+
+// TODO sync split
+// TODO I/O by ref
+// TODO extension traits in crate::os for exposing some OS-specific functionality here

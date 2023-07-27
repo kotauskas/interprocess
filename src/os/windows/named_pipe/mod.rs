@@ -13,6 +13,8 @@
 // TODO improve docs
 // TODO add examples
 // TODO document limbo
+// TODO sync split
+// TODO client impersonation
 
 mod enums;
 mod listener;

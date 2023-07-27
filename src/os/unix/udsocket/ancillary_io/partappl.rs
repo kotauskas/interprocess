@@ -7,6 +7,8 @@ use crate::os::unix::{
     unixprelude::*,
 };
 
+// TODO document pin behavior
+
 /// An adapter from [`WriteAncillary`] to [`Write`] that
 /// [partially applies](https://en.wikipedia.org/wiki/Partial_application) the former and allows the use of further
 /// adapters described in terms of the latter.

@@ -16,6 +16,8 @@
 //! The [`UdStreamListener`] and [`UdDatagram`] types are two starting points, depending on whether you intend to use
 //! UDP-like datagrams or TCP-like byte streams.
 
+// TODO sync split
+
 pub mod cmsg;
 
 #[cfg_attr( // uds_credentials template
