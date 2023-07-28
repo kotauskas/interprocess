@@ -92,7 +92,23 @@ impl<'a> Cmsg<'a> {
             data,
         }
     }
-    /// Returns the `cmsg_len` of the control message.
+    /// Returns the `cmsg_len` of a control message with a payload of the given size.
+    ///
+    /// The type of the return value is platform-independent, but values will never overflow the actual type used in
+    /// `cmsghdr` to store `cmsg_len`. The function simply panics if an offending size is encountered.
+    ///
+    /// # Panics
+    /// If the computed size exceeds the maximum for the `cmsg_len` field on `cmsghdr`.
+    pub const fn cmsg_len_for_payload_size(payload_size: c_uint) -> usize {
+        // FIXME potential portability concern, Linux says that it's only planned for inclusion into POSIX
+        let len = unsafe { libc::CMSG_LEN(payload_size) };
+        if len > CmsghdrLen::MAX as _ {
+            panic!("cmsg_len overflowed the storage type in cmsghdr");
+        }
+        len as usize
+    }
+    /// Returns the `cmsg_len` of the control message – an alias for
+    /// `Self::cmsg_len_for_payload_size(self.data.len())`.
     ///
     /// The type of the return value is platform-independent, but values will never overflow the actual type used in
     /// `cmsghdr` to store `cmsg_len`. The function simply panics if an offending size is encountered.
@@ -101,12 +117,7 @@ impl<'a> Cmsg<'a> {
     /// If the computed size exceeds the maximum for the `cmsg_len` field on `cmsghdr`.
     #[inline(always)]
     pub const fn cmsg_len(&self) -> usize {
-        // FIXME potential portability concern, Linux says that it's only planned for inclusion into POSIX
-        let len = unsafe { libc::CMSG_LEN(self.data.len() as c_uint) };
-        if len > CmsghdrLen::MAX as _ {
-            panic!("cmsg_len overflowed the storage type in cmsghdr");
-        }
-        len as usize
+        Self::cmsg_len_for_payload_size(self.data.len() as c_uint)
     }
     /// Returns the `cmsg_level` of the control message.
     #[inline(always)]

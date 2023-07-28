@@ -1,3 +1,5 @@
+#[cfg(uds_sockcred2)]
+use libc::sockcred2;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
 use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
 use to_method::*;
@@ -25,7 +27,7 @@ impl<'a> Credentials<'a> {
     }
     pub fn egid(&self) -> Option<gid_t> {
         match self {
-            Self::Cmsgcred(c) => None,
+            Self::Cmsgcred(..) => None,
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_egid),
         }
@@ -55,9 +57,9 @@ impl<'a> Credentials<'a> {
     }
     fn ptr_to_gids(&self) -> *const gid_packed {
         match self {
-            Self::Cmsgcred(c) => addr_of!(c.cmcred_groups).cast::<*const gid_packed>(),
+            Self::Cmsgcred(c) => addr_of!(c.cmcred_groups).cast::<gid_packed>(),
             #[cfg(uds_sockcred2)]
-            Self::Sockcred2(c) => addr_of!(c.sc_groups).cast::<*const gid_packed>(),
+            Self::Sockcred2(c) => addr_of!(c.sc_groups).cast::<gid_packed>(),
         }
     }
     pub fn groups(&self) -> Groups<'a> {
@@ -142,7 +144,7 @@ impl AsRef<cmsgcred_packed> for cmsgcred {
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
-pub(crate) struct sockcred2 {
+pub(crate) struct sockcred2_packed {
     pub sc_version: c_int,
     pub sc_pid: pid_t,
     pub sc_uid: uid_t,

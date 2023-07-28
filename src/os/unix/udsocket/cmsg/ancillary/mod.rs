@@ -4,7 +4,6 @@
 //! serialization without the use of unsafe code. It also includes parsers for those types of control messages and a
 //! catch-all parser that can parse all control message types that are known to this module.
 
-// TODO SCM_CREDS2 from FreeBSD
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
 
 #[cfg_attr( // uds_credentials template
@@ -36,6 +35,8 @@ use std::{
 const LEVEL: c_int = libc::SOL_SOCKET;
 
 /// An ancillary data wrapper that can be converted to a control message.
+///
+/// Ususally comes together with a [`FromCmsg`] implementation.
 pub trait ToCmsg {
     /// Invokes the conversion to a control message.
     ///
@@ -46,12 +47,15 @@ pub trait ToCmsg {
 
 /// An ancillary data wrapper than can be parsed from a control message.
 ///
+/// Ususally comes together with a [`ToCmsg`] implementation.
+///
 /// As a trait bound, this will typically require the use of an explicit generic lifetime. For example, for some `'a`,
 /// `FileDescriptors<'a>` only implements `FromCmsg<'a>`.
 ///
 /// Implementations of this trait are expected to return correct error information in good faith. Returning the wrong
 /// expected ancillary message type/level in
-/// [`WrongType`](ParseErrorKind::WrongType)/[`WrongLevel`](ParseErrorKind::WrongLevel) can lead to an infinite loop.
+/// [`WrongType`](ParseErrorKind::WrongType)/[`WrongLevel`](ParseErrorKind::WrongLevel) can lead to an infinite loop or
+/// any other similar non-UB logic error.
 pub trait FromCmsg<'a>: Sized {
     /// The error type produced for malformed payloads, typically [`Infallible`].
     type MalformedPayloadError;

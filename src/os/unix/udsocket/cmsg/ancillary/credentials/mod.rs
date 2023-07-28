@@ -14,7 +14,15 @@ pub use crate::os::unix::udsocket::credentials::*;
 
 /// Functions for creating tables of credentials to be sent as ancillary messages.
 impl<'a> Credentials<'a> {
-    pub(super) const ANCTYPE: c_int = CredentialsImpl::ANCTYPE;
+    pub(super) const ANCTYPE1: c_int = CredentialsImpl::ANCTYPE1;
+    #[cfg(uds_sockcred2)]
+    pub(super) const ANCTYPE2: c_int = CredentialsImpl::ANCTYPE2;
+    /// The smallest possible ancillary *payload size* of the largest supported credentials structure on the current
+    /// platform, as a [`c_uint`].
+    ///
+    /// You can use [`Cmsg::cmsg_len_for_payload_size()`](crate::os::unix::udsocket::cmsg::Cmsg) to calculate the
+    /// smallest compatible buffer size.
+    pub const MIN_ANCILLARY_SIZE: c_uint = CredentialsImpl::MIN_ANCILLARY_SIZE as c_uint;
     /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
     /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
     /// necessary for the other end to receive this type of ancillary data.
@@ -22,9 +30,9 @@ impl<'a> Credentials<'a> {
     /// # Validity
     /// If the given `ucred` structure is filled out incorrectly, sending this message will fail with an error. The
     /// requirements are as follows:
-    /// - ***`pid`*** must be the PID of the sending process, unless the it has the `CAP_SYS_ADMIN` capability, in which case
-    /// any valid PID can be specified. Note that not even privileged processes may specify PIDs of nonexistent
-    /// processes.
+    /// - ***`pid`*** must be the PID of the sending process, unless the it has the `CAP_SYS_ADMIN` capability, in
+    /// which case any valid PID can be specified. Note that not even privileged processes may specify PIDs of
+    /// nonexistent processes.
     /// - ***`uid`*** must be the sender's real UID, effective UID or saved set-user-ID, unless it has the `CAP_SETUID`
     /// capability, in which case any valid user ID may be specified.
     /// - ***`gid`*** must be the sender's real GID, effective GID or saved set-user-ID, unless it has the `CAP_SETGID`

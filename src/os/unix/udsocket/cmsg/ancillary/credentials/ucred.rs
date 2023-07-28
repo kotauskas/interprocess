@@ -9,7 +9,8 @@ use libc::ucred;
 use std::{mem::size_of, slice};
 
 impl<'a> Credentials<'a> {
-    pub const ANCTYPE: c_int = libc::SCM_CREDENTIALS;
+    pub const ANCTYPE1: c_int = libc::SCM_CREDENTIALS;
+    pub const MIN_ANCILLARY_SIZE: usize = size_of::<ucred>();
     pub fn new_auto(ruid: bool, rgid: bool) -> Self {
         Self::Owned(ucred {
             pid: c_wrappers::get_pid(),
@@ -31,7 +32,7 @@ impl ToCmsg for Credentials<'_> {
         };
         unsafe {
             // SAFETY: we've got checks to ensure that we're not using the wrong struct
-            Cmsg::new(LEVEL, Self::ANCTYPE, st_bytes)
+            Cmsg::new(LEVEL, Self::ANCTYPE1, st_bytes)
         }
     }
 }
@@ -40,7 +41,7 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
 
     fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
-        cmsg = check_level_and_type(cmsg, Self::ANCTYPE)?;
+        cmsg = check_level_and_type(cmsg, Self::ANCTYPE1)?;
         unsafe { into_fixed_size_contents::<ucred_packed>(cmsg) }.map(Self::Borrowed)
     }
 }

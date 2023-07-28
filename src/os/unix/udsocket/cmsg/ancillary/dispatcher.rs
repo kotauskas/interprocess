@@ -58,7 +58,9 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
         match cmsg.cmsg_type() {
             FileDescriptors::ANCTYPE => Self::parse_fd(cmsg),
             #[cfg(uds_credentials)]
-            Credentials::ANCTYPE => Self::parse_credentials(cmsg),
+            Credentials::ANCTYPE1 => Self::parse_credentials(cmsg),
+            #[cfg(uds_sockcred2)]
+            Credentials::ANCTYPE2 => Self::parse_credentials(cmsg),
             _ => Err(ParseError {
                 cmsg,
                 kind: ParseErrorKind::WrongType {

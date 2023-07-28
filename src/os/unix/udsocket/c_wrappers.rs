@@ -126,7 +126,7 @@ pub(super) unsafe fn set_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, opti
     ok_or_ret_errno!(success => ())
 }
 
-#[cfg(uds_cont_credentials)]
+#[allow(dead_code)]
 pub(super) fn get_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, option: c_int, buf: &mut T) -> io::Result<usize> {
     let ptr = <*mut _>::cast::<c_void>(buf);
     let mut len = socklen_t::try_from(size_of_val(buf)).unwrap();
@@ -134,14 +134,6 @@ pub(super) fn get_socket_option<T>(fd: BorrowedFd<'_>, level: c_int, option: c_i
     ok_or_ret_errno!(success => len.try_into().unwrap())
 }
 
-#[cfg(uds_sockcred)]
-fn set_local_creds(fd: BorrowedFd<'_>, creds: bool) -> io::Result<()> {
-    unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS, &c_int::from(creds)) }
-}
-#[cfg(uds_sockcred2)]
-fn set_local_creds_persistent(fd: BorrowedFd<'_>, creds: bool) -> io::Result<()> {
-    unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS_PERSISTENT, &c_int::from(creds)) }
-}
 #[cfg(uds_cont_credentials)]
 pub(super) fn set_continuous_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
     #[cfg(uds_ucred)]
@@ -150,12 +142,12 @@ pub(super) fn set_continuous_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io
     }
     #[cfg(uds_sockcred2)]
     {
-        set_local_creds_persistent(fd, val)
+        unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS_PERSISTENT, &c_int::from(val)) }
     }
 }
 #[cfg(uds_sockcred)]
 pub(super) fn set_oneshot_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
-    set_local_creds(fd, val)
+    unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS, &c_int::from(val)) }
 }
 #[cfg(uds_ucred)]
 pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {

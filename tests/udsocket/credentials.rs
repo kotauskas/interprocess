@@ -3,7 +3,7 @@
 use super::util::*;
 use color_eyre::eyre::{bail, Context};
 use interprocess::os::unix::udsocket::{
-    cmsg::{ancillary::credentials::Credentials, CmsgMutExt, CmsgRef, CmsgVecBuf},
+    cmsg::{ancillary::credentials::Credentials, Cmsg, CmsgMutExt, CmsgRef, CmsgVecBuf},
     ReadAncillaryExt, UdSocket, UdStream, UdStreamListener, WriteAncillaryExt,
 };
 use std::{
@@ -21,16 +21,8 @@ pub(super) fn run_with_namegen(namegen: NameGen) {
 }
 
 fn enable_passcred(sock: &UdStream) -> TestResult {
-    {
-        cfg_if::cfg_if! {
-            if #[cfg(uds_cont_credentials)] {
-                sock.set_continuous_ancillary_credentials(true)
-            } else {
-                Ok(())
-            }
-        }
-    }
-    .context("Failed to enable credential passing")
+    sock.set_continuous_ancillary_credentials(true)
+        .context("Failed to enable credential passing")
 }
 fn decreds(abuf: CmsgRef<'_>) -> TestResult<Credentials<'_>> {
     match abuf.decode::<Credentials>().next() {
@@ -75,14 +67,14 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     }
     let ancself = abm.as_ref();
 
-    let mut abread = CmsgVecBuf::new(64);
+    let mut abread = CmsgVecBuf::new(Cmsg::cmsg_len_for_payload_size(Credentials::MIN_ANCILLARY_SIZE) * 8);
 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c.with_cmsg_mut_by_val(&mut abread)),
             Err(e) => bail!("Incoming connection failed: {e}"),
         };
-        enable_passcred(&conn.get_mut().reader)?;
+        enable_passcred(&conn.get_mut().reader).context("Passcred enable failed")?;
 
         if shutdown {
             conn.read_to_string(&mut buffer)
@@ -124,13 +116,12 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     }
     let ancself = abm.as_ref();
 
-    let mut abread = CmsgVecBuf::new(64);
+    let mut abread = CmsgVecBuf::new(Cmsg::cmsg_len_for_payload_size(Credentials::MIN_ANCILLARY_SIZE) * 8);
 
     let mut conn = UdStream::connect(name.as_str())
         .context("Connect failed")?
         .with_cmsg_ref_by_val(ancself);
-
-    enable_passcred(&conn.writer)?;
+    enable_passcred(&conn.writer).context("Passcred enable failed")?;
 
     conn.write_all(CLIENT_MSG.as_bytes()).context("Socket send failed")?;
 
@@ -139,7 +130,7 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
             .context("Shutdown of writing end failed")?;
     }
 
-    let mut conn = BufReader::new(conn.with_cmsg_mut_by_val(&mut abread));
+    let mut conn = BufReader::new(conn.into_inner().with_cmsg_mut_by_val(&mut abread));
 
     if shutdown {
         conn.read_to_string(&mut buffer)

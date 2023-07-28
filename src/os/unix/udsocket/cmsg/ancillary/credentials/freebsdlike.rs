@@ -1,9 +1,6 @@
-use crate::os::unix::{
-    udsocket::{
-        cmsg::{ancillary::*, Cmsg},
-        credentials::freebsdlike::*,
-    },
-    unixprelude::*,
+use crate::os::unix::udsocket::{
+    cmsg::{ancillary::*, Cmsg},
+    credentials::freebsdlike::*,
 };
 use libc::{cmsgcred, SCM_CREDS};
 #[cfg(uds_sockcred2)]
@@ -11,6 +8,10 @@ use libc::{sockcred2, SCM_CREDS2};
 use std::{mem::size_of, slice};
 
 impl Credentials<'_> {
+    pub(super) const ANCTYPE1: c_int = SCM_CREDS;
+    #[cfg(uds_sockcred2)]
+    pub(super) const ANCTYPE2: c_int = SCM_CREDS2;
+    pub(super) const MIN_ANCILLARY_SIZE: usize = size_of::<cmsgcred>();
     fn len(&self) -> usize {
         match self {
             Self::Cmsgcred(..) => size_of::<cmsgcred>(),

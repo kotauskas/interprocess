@@ -3,13 +3,12 @@ use super::{
     ancillary::{FromCmsg, ParseError},
     *,
 };
-use libc::{c_void, cmsghdr, CMSG_DATA, CMSG_FIRSTHDR, CMSG_NXTHDR};
+use libc::{c_void, cmsghdr};
 use std::{
     cmp::min,
     io,
     iter::FusedIterator,
     marker::PhantomData,
-    mem::size_of,
     slice::{self, SliceIndex},
 };
 
@@ -144,7 +143,7 @@ impl<'buf> Cmsgs<'buf> {
             buf,
             cur: unsafe {
                 // SAFETY: we just constructed the msghdr from a slice
-                CMSG_FIRSTHDR(&dummy)
+                libc::CMSG_FIRSTHDR(&dummy)
             },
             dummy,
         }
@@ -167,7 +166,7 @@ impl<'buf> Iterator for Cmsgs<'buf> {
             &*self.cur
         };
         let data = unsafe {
-            let dptr = CMSG_DATA(cmsghdr);
+            let dptr = libc::CMSG_DATA(cmsghdr);
             if dptr.is_null() {
                 return None;
             }
@@ -176,8 +175,8 @@ impl<'buf> Iterator for Cmsgs<'buf> {
             let max_len = one_past_end.offset_from(dptr);
             debug_assert!(max_len >= 0);
 
-            // cmsg_len includes the size of the cmsghdr
-            let hdrlen = cmsghdr.cmsg_len as usize - size_of::<cmsghdr>();
+            // cmsg_len includes the size of the cmsghdr and the padding
+            let hdrlen = (cmsghdr.cmsg_len - libc::CMSG_LEN(0) as CmsghdrLen) as usize;
             debug_assert!(hdrlen <= isize::MAX as usize);
 
             // Buffer overflow check because some OSes (such as everyone's favorite putrid hellspawn macOS) don't
@@ -196,7 +195,7 @@ impl<'buf> Iterator for Cmsgs<'buf> {
         self.cur = unsafe {
             // SAFETY: the cursor is being continuously fed into CMSG_* pseudomacros from their own output. A null
             // pointer cursor value is handled earlier in the function.
-            CMSG_NXTHDR(&self.dummy, self.cur)
+            libc::CMSG_NXTHDR(&self.dummy, self.cur)
         };
 
         Some(cmsg)
