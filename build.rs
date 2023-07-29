@@ -28,7 +28,7 @@ fn is_unix() -> bool {
 ///       Linux)
 ///     - `uds_unpcbid`, as seen on NetBSD
 ///     - `uds_sockpeercred`, as seen on OpenBSD
-///     - `uds_xucred`, as seen on DragonFly BSD and FreeBSD
+///     - `uds_xucred`, as seen on DragonFly BSD, FreeBSD and Apple platforms
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
 ///     - `uds_msghdr_iovlen_size_t`
@@ -60,7 +60,7 @@ fn collect_uds_features(target: &TargetTriplet) {
             // Only actual Linux has that... I think? lmao
             define("uds_linux_namespace");
         }
-    } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios"]) {
+    } else if target.os_any(&["freebsd", "openbsd", "netbsd", "dragonfly", "macos", "ios", "tvos", "watchos"]) {
         // The BSD OS family
         ldefine(&[
             "uds_peereid",

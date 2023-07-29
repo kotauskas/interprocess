@@ -55,7 +55,7 @@
 //! - Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 //!
 //! ## Support by association
-//! *OSes at this level: **Redox**, **Android**, **Fuchsia***
+//! *OSes at this level: **Redox**, **Android**, **Fuchsia**, **iOS**, **tvOS**, **watchOS***
 //!
 //! - Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
 //! - No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
@@ -78,11 +78,9 @@
 //! [MIT license]: https://choosealicense.com/licenses/mit/
 //! [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
 //! [blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
-// TODO support iOS, TVOS and watchOS by association
 // TODO mailslots
 // TODO the Intra Doc Link Sweep
 // - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across the network
-// - **Shared memory** – exposes a nice safe interface for shared memory based on mapping identifiers, with some additional platform-specific extensions
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 #![deny(rust_2018_idioms)]
