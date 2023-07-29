@@ -69,7 +69,6 @@ pub struct Cmsg<'a> {
     cmsg_level: c_int,
     cmsg_type: c_int,
     data: &'a [u8],
-    // TODO truncation flag
 }
 impl<'a> Cmsg<'a> {
     /// Constructs a control message with the given level, type and payload.

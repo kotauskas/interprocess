@@ -36,6 +36,7 @@ pub(super) fn recvmsg<AB: CmsgMut + ?Sized>(
         // SAFETY: make_msghdr_r is good at its job
         c_wrappers::recvmsg(fd, &mut hdr, 0)?
     };
+    ancbuf.set_truncation_flag(hdr.msg_flags & libc::MSG_CTRUNC != 0);
 
     let advanc = hdr.msg_controllen as _; // FIXME as casts are bad!!
     unsafe {

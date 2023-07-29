@@ -6,6 +6,7 @@ use std::mem::MaybeUninit;
 pub struct CmsgMutBuf<'buf> {
     buf: &'buf mut [MaybeUninit<u8>],
     init_len: usize,
+    trunc: bool,
 }
 impl<'buf> CmsgMutBuf<'buf> {
     /// Creates a control message buffer from the given uninitialized slice.
@@ -14,7 +15,11 @@ impl<'buf> CmsgMutBuf<'buf> {
     /// The buffer's length must not overflow `isize`.
     #[inline]
     pub fn new(buf: &'buf mut [MaybeUninit<u8>]) -> Self {
-        Self { buf, init_len: 0 }
+        Self {
+            buf,
+            init_len: 0,
+            trunc: false,
+        }
     }
 }
 impl<'buf> From<&'buf mut [MaybeUninit<u8>]> for CmsgMutBuf<'buf> {
@@ -40,5 +45,13 @@ unsafe impl CmsgMut for CmsgMutBuf<'_> {
     #[inline(always)]
     unsafe fn set_len(&mut self, new_len: usize) {
         self.init_len = new_len
+    }
+    #[inline(always)]
+    fn is_truncated(&self) -> bool {
+        self.trunc
+    }
+    #[inline(always)]
+    fn set_truncation_flag(&mut self, flag: bool) {
+        self.trunc = flag;
     }
 }

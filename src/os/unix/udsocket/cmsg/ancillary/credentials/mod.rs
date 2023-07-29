@@ -22,6 +22,10 @@ impl<'a> Credentials<'a> {
     ///
     /// You can use [`Cmsg::cmsg_len_for_payload_size()`](crate::os::unix::udsocket::cmsg::Cmsg) to calculate the
     /// smallest compatible buffer size.
+    ///
+    /// Note that this does not actually guarantee reception of certain types ancillary messages, with `sockcred2` on
+    /// FreeBSD being the worst offender, since their dynamically-sized nature is often ignored by the code in the OS
+    /// that handles truncation. You must always check the truncation flag be sure.
     pub const MIN_ANCILLARY_SIZE: c_uint = CredentialsImpl::MIN_ANCILLARY_SIZE as c_uint;
     /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
     /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
