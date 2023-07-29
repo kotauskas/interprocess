@@ -54,16 +54,16 @@ pub trait UdSocket: AsFd {
     #[cfg(any(uds_ucred, uds_xucred))]
     #[inline]
     fn get_peer_credentials(&self) -> io::Result<credentials::Credentials<'static>> {
-        use credentials::{Credentials, CredentialsImpl};
+        use credentials::{Credentials, CredentialsInner};
         #[cfg(uds_ucred)]
         let cred = {
             let ucred = c_wrappers::get_peer_ucred(self.as_fd())?;
-            CredentialsImpl::Owned(ucred)
+            CredentialsInner::Ucred(ucred)
         };
         #[cfg(uds_xucred)]
         let cred = {
             let xucred = c_wrappers::get_peer_xucred(self.as_fd())?;
-            CredentialsImpl::Xucred(xucred)
+            CredentialsInner::Xucred(xucred)
         };
         Ok(Credentials(cred))
     }

@@ -3,20 +3,31 @@
 //! In addition to what's re-exported from [`udsocket::credentials`](crate::os::unix::udsocket::credentials), this
 //! module contains the context type required to deserialize ancillary messages of the [`Credentials`] variety.
 
-#[cfg(any(uds_cmsgcred, uds_sockcred2, uds_xucred))]
-mod bsd;
-#[cfg(uds_ucred)]
-mod ucred;
+pub use crate::os::unix::udsocket::credentials::*;
 
 use super::*;
-
-pub use crate::os::unix::udsocket::credentials::*;
+#[cfg(uds_cmsgcred)]
+use libc::cmsgcred;
+#[cfg(uds_sockcred2)]
+use libc::sockcred2;
+#[cfg(uds_ucred)]
+use libc::ucred;
+use std::{mem::size_of, slice};
 
 /// Functions for creating tables of credentials to be sent as ancillary messages.
 impl<'a> Credentials<'a> {
-    pub(super) const ANCTYPE1: c_int = CredentialsImpl::ANCTYPE1;
+    pub(super) const ANCTYPE1: c_int = {
+        #[cfg(uds_ucred)]
+        {
+            libc::SCM_CREDENTIALS
+        }
+        #[cfg(uds_cmsgcred)]
+        {
+            libc::SCM_CREDS
+        }
+    };
     #[cfg(uds_sockcred2)]
-    pub(super) const ANCTYPE2: c_int = CredentialsImpl::ANCTYPE2;
+    pub(super) const ANCTYPE2: c_int = libc::SCM_CREDS2;
     /// The smallest possible ancillary *payload size* of the largest supported credentials structure on the current
     /// platform, as a [`c_uint`].
     ///
@@ -26,7 +37,16 @@ impl<'a> Credentials<'a> {
     /// Note that this does not actually guarantee reception of certain types ancillary messages, with `sockcred2` on
     /// FreeBSD being the worst offender, since their dynamically-sized nature is often ignored by the code in the OS
     /// that handles truncation. You must always check the truncation flag be sure.
-    pub const MIN_ANCILLARY_SIZE: c_uint = CredentialsImpl::MIN_ANCILLARY_SIZE as c_uint;
+    pub const MIN_ANCILLARY_SIZE: c_uint = {
+        #[cfg(uds_ucred)]
+        {
+            size_of::<ucred>()
+        }
+        #[cfg(uds_cmsgcred)]
+        {
+            size_of::<cmsgcred>()
+        }
+    } as c_uint;
     /// Creates a `Credentials` ancillary data struct to be sent as a control message, storing it by value. This allows
     /// for impersonation of other processes, users and groups given sufficient privileges, and is not strictly
     /// necessary for the other end to receive this type of ancillary data.
@@ -52,8 +72,8 @@ impl<'a> Credentials<'a> {
     )]
     #[cfg(uds_ucred)]
     #[inline]
-    pub fn from_ucred(creds: libc::ucred) -> Self {
-        Self(CredentialsImpl::Owned(creds))
+    pub fn from_ucred(creds: ucred) -> Self {
+        Self(CredentialsInner::Ucred(creds))
     }
     /// Creates a `Credentials` ancillary data struct to be sent as a control message from a borrow. This allows for
     /// impersonation of other processes, users and groups given sufficient privileges, and is not strictly necessary
@@ -72,8 +92,8 @@ impl<'a> Credentials<'a> {
     )]
     #[cfg(uds_ucred)]
     #[inline]
-    pub fn from_ucred_ref(creds: &'a libc::ucred) -> Self {
-        Self(CredentialsImpl::new_borrowed(creds))
+    pub fn from_ucred_ref(creds: &'a ucred) -> Self {
+        Self(CredentialsInner::AncUcred(creds.as_ref()))
     }
     /// Creates a `Credentials` ancillary data struct to be sent as a control message by automatically filling in the
     /// underlying `ucred` structure with the PID, effective UID and effective GID of the calling process. The two
@@ -93,7 +113,12 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_ucred)]
     #[inline]
     pub fn new_ucred(ruid: bool, rgid: bool) -> Self {
-        Self(CredentialsImpl::new_auto(ruid, rgid))
+        use super::super::super::c_wrappers;
+        Self(CredentialsInner::Ucred(ucred {
+            pid: c_wrappers::get_pid(),
+            uid: c_wrappers::get_uid(ruid),
+            gid: c_wrappers::get_gid(rgid),
+        }))
     }
     /// Creates a `Credentials` ancillary data struct of the `cmsgcred` variety to be sent as a control message. The
     /// underlying value is zeroed out and automatically filled in by the kernel.
@@ -110,7 +135,33 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_cmsgcred)]
     #[inline]
     pub fn sendable_cmsgcred() -> Self {
-        Self(CredentialsImpl::Cmsgcred(bsd::ZEROED_CMSGCRED.as_ref()))
+        Self(CredentialsImpl::Cmsgcred(ZEROED_CMSGCRED.as_ref()))
+    }
+
+    fn tocmslice(&self) -> &[u8] {
+        #[cfg(uds_ucred)]
+        {
+            let ucp = match self.0 {
+                CredentialsInner::AncUcred(c) => c,
+                CredentialsInner::Ucred(ref c) => c.as_ref(),
+            };
+            unsafe {
+                // SAFETY: well-initialized POD struct with #[repr(C)]
+                slice::from_raw_parts(<*const _>::cast(ucp), size_of::<ucred>())
+            }
+        }
+        #[cfg(uds_cmsgcred)]
+        #[allow(unreachable_patterns)]
+        {
+            unsafe {
+                let ptr = match self.0 {
+                    CredentialsInner::Cmsgcred(c) => <*const _>::cast(c),
+                    els => panic!("not a sendable credentials structure"),
+                };
+                // SAFETY: well-initialized POD struct with #[repr(C)]
+                slice::from_raw_parts(ptr, size_of::<cmsgcred>())
+            }
+        }
     }
 }
 
@@ -142,7 +193,10 @@ impl<'a> Credentials<'a> {
 impl ToCmsg for Credentials<'_> {
     #[inline]
     fn to_cmsg(&self) -> Cmsg<'_> {
-        self.0.to_cmsg()
+        unsafe {
+            // SAFETY: we've got checks to ensure that we're not using the wrong struct
+            Cmsg::new(LEVEL, Self::ANCTYPE1, self.tocmslice())
+        }
     }
 }
 #[cfg_attr( // uds_credentials template
@@ -158,8 +212,60 @@ impl ToCmsg for Credentials<'_> {
 )]
 impl<'a> FromCmsg<'a> for Credentials<'a> {
     type MalformedPayloadError = SizeMismatch;
+    #[cfg(uds_ucred)]
     #[inline]
-    fn try_parse(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
-        CredentialsImpl::try_parse(cmsg).map(Self)
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, Self::MalformedPayloadError> {
+        cmsg = check_level_and_type(cmsg, Self::ANCTYPE1)?;
+        unsafe { into_fixed_size_contents::<ucred_packed>(cmsg) }
+            .map(CredentialsInner::AncUcred)
+            .map(Self)
+    }
+    #[cfg(uds_cmsgcred)]
+    fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
+        cmsg = check_level(cmsg)?;
+        let expected = if !cfg!(uds_sockcred2) { Some(SCM_CREDS) } else { None };
+        match cmsg.cmsg_type() {
+            SCM_CREDS => unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(Self::Cmsgcred),
+            #[cfg(uds_sockcred2)]
+            SCM_CREDS2 => {
+                let min_expected = size_of::<sockcred2>();
+                let len = cmsg.data().len();
+                if len < min_expected {
+                    // If this is false, we can't even do the reinterpret and figure out the number
+                    // of supplementary groups; prioritize formal soundness over error reporting
+                    // precision in this niche case and claim to expect the base size of sockcred.
+                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch {
+                        expected: min_expected,
+                        got: len,
+                    })
+                    .wrap(cmsg));
+                }
+
+                let creds = unsafe {
+                    // SAFETY: POD
+                    &*cmsg.data().as_ptr().cast::<sockcred2>()
+                };
+
+                let expected = unsafe { libc::SOCKCRED2SIZE(creds.sc_ngroups as _) };
+                // Be nice on the alignment here.
+                if len < expected {
+                    // The rest of the size error reporting process happens here.
+                    return Err(ParseErrorKind::MalformedPayload(SizeMismatch { expected, got: len }).wrap(cmsg));
+                }
+
+                Ok(Self::Sockcred2(creds.as_ref()))
+            }
+            els => Err(ParseErrorKind::WrongType { expected, got: els }.wrap(cmsg)),
+        }
     }
 }
+
+#[cfg(uds_cmsgcred)]
+pub(super) static ZEROED_CMSGCRED: cmsgcred = cmsgcred {
+    cmcred_pid: 0,
+    cmcred_uid: 0,
+    cmcred_euid: 0,
+    cmcred_gid: 0,
+    cmcred_ngroups: 0,
+    cmcred_groups: [0; libc::CMGROUP_MAX],
+};
