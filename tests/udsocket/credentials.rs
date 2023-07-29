@@ -1,4 +1,4 @@
-#![cfg(uds_cont_credentials)]
+#![cfg(uds_credentials)]
 
 use super::util::*;
 use color_eyre::eyre::{bail, Context};
@@ -15,14 +15,28 @@ use std::{
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
-pub(super) fn run_with_namegen(namegen: NameGen) {
-    drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, false), |nm| client(nm, false));
-    drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, true), |nm| client(nm, true));
+pub(super) fn run(namegen: NameGen, contcred: bool) {
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, false, contcred),
+        move |nm| client(nm, false, contcred),
+    );
+    drive_server_and_multiple_clients(
+        move |snd, nc| server(snd, nc, namegen, true, contcred),
+        move |nm| client(nm, true, contcred),
+    );
 }
 
 fn enable_passcred(sock: &UdStream) -> TestResult {
-    sock.set_continuous_ancillary_credentials(true)
-        .context("Failed to enable credential passing")
+    #[cfg(uds_cont_credentials)]
+    {
+        sock.set_continuous_ancillary_credentials(true)
+            .context("Failed to enable credential passing")
+    }
+
+    #[cfg(not(uds_cont_credentials))]
+    {
+        bail!("Attempted to enable credential passing on a platform that doesn't support it (misconfigured test)")
+    }
 }
 fn decreds(abuf: CmsgRef<'_>) -> TestResult<Credentials<'_>> {
     match abuf.decode::<Credentials>().next() {
@@ -39,7 +53,13 @@ fn ckcreds(creds: &Credentials) {
     assert_eq!(creds.best_effort_rgid(), unsafe { libc::getgid() });
 }
 
-fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, shutdown: bool) -> TestResult {
+fn server(
+    name_sender: Sender<String>,
+    num_clients: u32,
+    mut namegen: NameGen,
+    shutdown: bool,
+    contcred: bool,
+) -> TestResult {
     let (name, listener) = namegen
         .find_map(|nm| {
             let l = match UdStreamListener::bind(&*nm) {
@@ -57,13 +77,12 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     let mut buffer = String::with_capacity(128);
 
     let mut abm = CmsgVecBuf::new(0);
-    #[cfg(uds_ucred)]
-    {
-        abm.add_message(&Credentials::new_ucred(false, false));
-    }
-    #[cfg(uds_cmsgcred)]
-    {
-        abm.add_message(&Credentials::sendable_cmsgcred());
+    if !contcred {
+        let _ = &mut abm;
+        #[cfg(uds_cmsgcred)]
+        {
+            abm.add_message(&Credentials::sendable_cmsgcred());
+        }
     }
     let ancself = abm.as_ref();
 
@@ -74,7 +93,9 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
             Ok(c) => BufReader::new(c.with_cmsg_mut_by_val(&mut abread)),
             Err(e) => bail!("Incoming connection failed: {e}"),
         };
-        enable_passcred(&conn.get_mut().reader).context("Passcred enable failed")?;
+        if contcred {
+            enable_passcred(&conn.get_mut().reader).context("Passcred enable failed")?;
+        }
 
         if shutdown {
             conn.read_to_string(&mut buffer)
@@ -102,17 +123,16 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     Ok(())
 }
 
-fn client(name: Arc<String>, shutdown: bool) -> TestResult {
+fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
     let mut abm = CmsgVecBuf::new(0);
-    #[cfg(uds_ucred)]
-    {
-        abm.add_message(&Credentials::new_ucred(false, false));
-    }
-    #[cfg(uds_cmsgcred)]
-    {
-        abm.add_message(&Credentials::sendable_cmsgcred());
+    if !contcred {
+        let _ = &mut abm;
+        #[cfg(uds_cmsgcred)]
+        {
+            abm.add_message(&Credentials::sendable_cmsgcred());
+        }
     }
     let ancself = abm.as_ref();
 
@@ -121,7 +141,9 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     let mut conn = UdStream::connect(name.as_str())
         .context("Connect failed")?
         .with_cmsg_ref_by_val(ancself);
-    enable_passcred(&conn.writer).context("Passcred enable failed")?;
+    if contcred {
+        enable_passcred(&conn.writer).context("Passcred enable failed")?;
+    }
 
     conn.write_all(CLIENT_MSG.as_bytes()).context("Socket send failed")?;
 
