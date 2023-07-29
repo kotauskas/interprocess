@@ -29,21 +29,43 @@ pub trait UdSocket: AsFd {
     fn is_nonblocking(&self) -> io::Result<bool> {
         c_wrappers::get_nonblocking(self.as_fd())
     }
-    /// Fetches the credentials of the other end of the connection without using ancillary data. The returned structure
-    /// contains the process identifier, user identifier and group identifier of the peer.
-    #[cfg_attr( // uds_ucred template
+    /// Fetches the credentials of the other end of the connection without using ancillary data. The set of credentials
+    /// returned depends on the platform.
+    ///
+    /// # Implementation
+    /// The credential tables used are as follows:
+    /// - **Linux:** `ucred` (PID, UID, GID)
+    /// - **FreeBSD, DragonFly BSD, Apple:** `xucred` (effective UID, up to 16 supplementary groups)
+    #[cfg_attr(
         feature = "doc_cfg",
         doc(cfg(any(
             target_os = "linux",
             target_os = "redox",
             target_os = "android",
             target_os = "fuchsia",
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
         )))
     )]
-    #[cfg(uds_ucred)]
+    #[cfg(any(uds_ucred, uds_xucred))]
     #[inline]
-    fn get_peer_credentials(&self) -> io::Result<libc::ucred> {
-        c_wrappers::get_peer_ucred(self.as_fd())
+    fn get_peer_credentials(&self) -> io::Result<credentials::Credentials<'static>> {
+        use credentials::{Credentials, CredentialsImpl};
+        #[cfg(uds_ucred)]
+        let cred = {
+            let ucred = c_wrappers::get_peer_ucred(self.as_fd())?;
+            CredentialsImpl::Owned(ucred)
+        };
+        #[cfg(uds_xucred)]
+        let cred = {
+            let xucred = c_wrappers::get_peer_xucred(self.as_fd())?;
+            CredentialsImpl::Xucred(xucred)
+        };
+        Ok(Credentials(cred))
     }
     /// Enables or disables continuous reception of credentials via ancillary data.
     ///

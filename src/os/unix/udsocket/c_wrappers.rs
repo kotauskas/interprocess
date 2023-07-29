@@ -145,17 +145,26 @@ pub(super) fn set_continuous_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io
         unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS_PERSISTENT, &c_int::from(val)) }
     }
 }
+
 #[cfg(uds_sockcred)]
 pub(super) fn set_oneshot_ancillary_cred(fd: BorrowedFd<'_>, val: bool) -> io::Result<()> {
     unsafe { set_socket_option(fd, super::OPTLEVEL, libc::LOCAL_CREDS, &c_int::from(val)) }
 }
+
 #[cfg(uds_ucred)]
 pub(super) fn get_peer_ucred(fd: BorrowedFd<'_>) -> io::Result<libc::ucred> {
-    use libc::ucred;
-    let mut cred = ucred { pid: 0, uid: 0, gid: 0 };
+    let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
     get_socket_option(fd, super::OPTLEVEL, libc::SO_PEERCRED, &mut cred)?;
     Ok(cred)
 }
+
+#[cfg(uds_xucred)]
+pub(super) fn get_peer_xucred(fd: BorrowedFd<'_>) -> io::Result<libc::xucred> {
+    let mut cred = unsafe { std::mem::zeroed::<libc::xucred>() };
+    get_socket_option(fd, super::OPTLEVEL, libc::LOCAL_PEERCRED, &mut cred)?;
+    Ok(cred)
+}
+
 fn get_status_flags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
     unsafe { fcntl_noarg(fd, libc::F_GETFL) }
 }
