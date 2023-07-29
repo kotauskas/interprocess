@@ -3,15 +3,15 @@
 //! [`Credentials`] is the table type itself – see its own documentation for more on where and how it is used.
 //! [`Groups`] is an iterator produced by `Credentials` that enumerates supplementary groups stored in the table.
 
-#[cfg(uds_cmsgcred)]
-pub(super) mod freebsdlike;
+#[cfg(any(uds_cmsgcred, uds_sockcred2, uds_xucred))]
+pub(super) mod bsd;
 #[cfg(uds_ucred)]
 pub(super) mod ucred;
 cfg_if::cfg_if! {
     if #[cfg(uds_ucred)] {
         pub(super) use ucred::{Credentials as CredentialsImpl, Groups as GroupsImpl};
-    } else if #[cfg(uds_cmsgcred)] {
-        pub(super) use freebsdlike::{Credentials as CredentialsImpl, Groups as GroupsImpl};
+    } else if #[cfg(any(uds_cmsgcred, uds_sockcred2, uds_xucred))] {
+        pub(super) use bsd::{Credentials as CredentialsImpl, Groups as GroupsImpl};
     }
 }
 
@@ -33,7 +33,6 @@ use std::iter::FusedIterator;
 /// The latter option is primarily useful with datagram sockets, which are connectionless.
 /// After one of those those types of options is enabled, either every receive operation that provides an ancillary data
 /// buffer, or just the next one, will receive an instance of this message.
-// TODO finish writing this
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Credentials<'a>(pub(super) CredentialsImpl<'a>);
 /// Methods that read the received/stored credentials.

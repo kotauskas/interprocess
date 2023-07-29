@@ -1,5 +1,7 @@
 #[cfg(uds_sockcred2)]
 use libc::sockcred2;
+#[cfg(uds_xucred)]
+use libc::xucred;
 use libc::{c_int, c_short, cmsgcred, gid_t, pid_t, uid_t};
 use std::{cmp::min, marker::PhantomData, mem::size_of, ptr::addr_of};
 use to_method::*;
@@ -9,6 +11,8 @@ pub(crate) enum Credentials<'a> {
     Cmsgcred(&'a cmsgcred_packed),
     #[cfg(uds_sockcred2)]
     Sockcred2(&'a sockcred2_packed),
+    #[cfg(uds_xucred)]
+    Xucred(xucred),
 }
 impl<'a> Credentials<'a> {
     pub fn euid(&self) -> Option<uid_t> {
@@ -16,6 +20,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => Some(c.cmcred_euid),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_euid),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => Some(c.cr_uid),
         }
     }
     pub fn ruid(&self) -> Option<uid_t> {
@@ -23,6 +29,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => Some(c.cmcred_uid),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_uid),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => None,
         }
     }
     pub fn egid(&self) -> Option<gid_t> {
@@ -30,6 +38,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(..) => None,
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_egid),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => None,
         }
     }
     pub fn rgid(&self) -> Option<gid_t> {
@@ -37,6 +47,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => Some(c.cmcred_gid),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_gid),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => None,
         }
     }
     pub fn pid(&self) -> Option<pid_t> {
@@ -44,6 +56,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => Some(c.cmcred_pid),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => Some(c.sc_pid),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => None, // TODO available on FreeBSD, but extremely scuffed
         }
     }
     fn n_groups(&self) -> usize {
@@ -51,6 +65,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => min(c.cmcred_ngroups, libc::CMGROUP_MAX as _).to::<c_int>(),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => c.sc_ngroups,
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => c.cr_ngroups,
         }
         .try_to::<usize>()
         .unwrap()
@@ -60,6 +76,8 @@ impl<'a> Credentials<'a> {
             Self::Cmsgcred(c) => addr_of!(c.cmcred_groups).cast::<gid_packed>(),
             #[cfg(uds_sockcred2)]
             Self::Sockcred2(c) => addr_of!(c.sc_groups).cast::<gid_packed>(),
+            #[cfg(uds_xucred)]
+            Self::Xucred(c) => addr_of!(c.cr_groups).cast::<gid_packed>(),
         }
     }
     pub fn groups(&self) -> Groups<'a> {

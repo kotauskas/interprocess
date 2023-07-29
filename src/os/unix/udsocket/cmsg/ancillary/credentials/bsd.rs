@@ -1,6 +1,6 @@
 use crate::os::unix::udsocket::{
     cmsg::{ancillary::*, Cmsg},
-    credentials::freebsdlike::*,
+    credentials::bsd::*,
 };
 use libc::{cmsgcred, SCM_CREDS};
 #[cfg(uds_sockcred2)]
@@ -15,8 +15,7 @@ impl Credentials<'_> {
     fn len(&self) -> usize {
         match self {
             Self::Cmsgcred(..) => size_of::<cmsgcred>(),
-            #[cfg(uds_sockcred2)]
-            Self::Sockcred2(c) => unsafe { libc::SOCKCRED2SIZE(c.sc_ngroups as _) },
+            els => panic!("not a sendable credentials structure"),
         }
     }
 }
@@ -26,8 +25,7 @@ impl<'a> ToCmsg for Credentials<'a> {
         let (st_bytes, anctype) = unsafe {
             let (ptr, anctype) = match self {
                 Credentials::Cmsgcred(c) => (<*const _>::cast(c), SCM_CREDS),
-                #[cfg(uds_sockcred2)]
-                Self::Sockcred2(c) => (<*const _>::cast(c), SCM_CREDS2),
+                els => panic!("not a sendable credentials structure"),
             };
             // SAFETY: well-initialized POD struct with #[repr(C)]
             (slice::from_raw_parts(ptr, self.len()), anctype)

@@ -3,8 +3,8 @@
 //! In addition to what's re-exported from [`udsocket::credentials`](crate::os::unix::udsocket::credentials), this
 //! module contains the context type required to deserialize ancillary messages of the [`Credentials`] variety.
 
-#[cfg(uds_cmsgcred)]
-mod freebsdlike;
+#[cfg(any(uds_cmsgcred, uds_sockcred2, uds_xucred))]
+mod bsd;
 #[cfg(uds_ucred)]
 mod ucred;
 
@@ -110,11 +110,11 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_cmsgcred)]
     #[inline]
     pub fn sendable_cmsgcred() -> Self {
-        Self(CredentialsImpl::Cmsgcred(freebsdlike::ZEROED_CMSGCRED.as_ref()))
+        Self(CredentialsImpl::Cmsgcred(bsd::ZEROED_CMSGCRED.as_ref()))
     }
 }
 
-/// Sending will set the credentials that the receieving end will read if they have credentials passing enabled.
+/// Sending will set the credentials that the receieving end will read.
 ///
 /// The kernel checks the contents of those ancillary messages to make sure that unprivileged processes can't
 /// impersonate anyone, allowing for secure authentication. For this reason, not all values of `Credentials` created for
@@ -123,6 +123,11 @@ impl<'a> Credentials<'a> {
 ///
 /// It's impossible to cause undefined behavior in sound code by sending wrong values, and the send operation will
 /// simply return an error.
+///
+/// # Panics
+/// Only `ucred` (Linux) and `cmsgcred` (FreeBSD, DragonFly BSD) support this functionality. Attempting to serialize
+/// other types of structures (possible on FreeBSD in the case of `xucred` and `sockcred2`) will cause a panic in
+/// `.to_cmsg()`.
 #[cfg_attr( // uds_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
