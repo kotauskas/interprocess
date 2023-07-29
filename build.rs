@@ -27,7 +27,8 @@ fn is_unix() -> bool {
 ///     - `uds_getpeerucred` as seen on Solaris (the `ucred` in its case is a completely different beast compared to
 ///       Linux)
 ///     - `uds_unpcbid`, as seen on NetBSD
-///     - `uds_xucred`, as seen on all BSDs except for NetBSD
+///     - `uds_sockpeercred`, as seen on OpenBSD
+///     - `uds_xucred`, as seen on DragonFly BSD and FreeBSD
 /// - `msghdr`'s `msg_iovlen` type:
 ///     - `uds_msghdr_iovlen_c_int`
 ///     - `uds_msghdr_iovlen_size_t`
@@ -78,6 +79,9 @@ fn collect_uds_features(target: &TargetTriplet) {
             sockcred = true;
             // TODO
             define("uds_unpcbid");
+        } else if target.os("openbsd") {
+            // TODO
+            define("uds_sockpeercred");
         } else {
             // TODO
             define("uds_xucred");
