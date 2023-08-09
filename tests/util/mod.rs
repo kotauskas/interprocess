@@ -19,6 +19,8 @@ pub use namegen::*;
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
+use std::sync::Mutex;
+
 const NUM_CLIENTS: u32 = 80;
 const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
@@ -111,12 +113,10 @@ pub fn message(server: bool, terminator: Option<char>) -> String {
     msg
 }
 
-static COLOR_EYRE_INSTALLED: AtomicBool = AtomicBool::new(false);
+static COLOR_EYRE_INSTALLED: Mutex<bool> = Mutex::new(false);
 pub fn install_color_eyre() {
-    if COLOR_EYRE_INSTALLED
-        .compare_exchange(false, true, AcqRel, Acquire)
-        .is_ok()
-    {
+    let lock = COLOR_EYRE_INSTALLED.lock().unwrap();
+    if !*lock {
         let _ = color_eyre::install();
     }
 }
