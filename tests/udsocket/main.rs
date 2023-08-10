@@ -42,11 +42,12 @@ fn udsocket_explicitly_sent_credentials() {
 }
 
 #[test]
-fn udsocket_datagram() {
+fn udsocket_datagram() -> TestResult {
     use datagram::*;
     install_color_eyre();
-    run_with_namegen(NameGen::new(make_id!(), false));
+    run(NameGen::new(make_id!(), false))?;
     if cfg!(target_os = "linux") {
-        run_with_namegen(NameGen::new(make_id!(), true));
+        run(NameGen::new(make_id!(), true))?;
     }
+    Ok(())
 }

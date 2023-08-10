@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    color_eyre::eyre::Context,
+    color_eyre::eyre::{bail, Context},
     futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     interprocess::os::windows::named_pipe::{
         pipe_mode,
@@ -10,6 +10,7 @@ use {
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task, try_join},
 };
+// TODO untangle imports, use listen_and_pick_name
 
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
@@ -20,12 +21,12 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         let mut buffer = String::with_capacity(128);
         let mut reader = BufReader::new(reader);
 
-        let recv = async { reader.read_line(&mut buffer).await.context("Pipe receive failed") };
+        let recv = async { reader.read_line(&mut buffer).await.context("pipe receive failed") };
         let send = async {
             writer
                 .write_all(SERVER_MSG.as_bytes())
                 .await
-                .context("Pipe send failed")
+                .context("pipe send failed")
         };
         try_join!(recv, send)?;
 
@@ -48,7 +49,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             Some(Ok((nm, l)))
         })
         .unwrap()
-        .context("Listener bind failed")?;
+        .context("listener bind failed")?;
 
     let _ = name_sender.send(name);
 
@@ -57,18 +58,15 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
     for _ in 0..num_clients {
         let conn = match listener.accept().await {
             Ok(c) => c,
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
         let task = task::spawn(handle_conn(conn));
         tasks.push(task);
     }
     for task in tasks {
         task.await
-            .context("Server task panicked")?
-            .context("Server task returned early with error")?;
+            .context("server task panicked")?
+            .context("server task returned early with error")?;
     }
 
     Ok(())
@@ -78,17 +76,17 @@ pub async fn client(name: Arc<String>) -> TestResult {
 
     let (reader, mut writer) = DuplexPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
         .await
-        .context("Connect failed")?
+        .context("connect failed")?
         .split();
 
     let mut reader = BufReader::new(reader);
 
-    let read = async { reader.read_line(&mut buffer).await.context("Pipe receive failed") };
+    let read = async { reader.read_line(&mut buffer).await.context("pipe receive failed") };
     let write = async {
         writer
             .write_all(CLIENT_MSG.as_bytes())
             .await
-            .context("Pipe send failed")
+            .context("pipe send failed")
     };
     try_join!(read, write)?;
 

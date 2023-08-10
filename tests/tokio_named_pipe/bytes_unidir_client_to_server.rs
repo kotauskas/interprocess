@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    color_eyre::eyre::Context,
+    color_eyre::eyre::{bail, Context},
     futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     interprocess::os::windows::named_pipe::{
         pipe_mode,
@@ -10,6 +10,7 @@ use {
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task},
 };
+// TODO untangle imports, use listen_and_pick_name
 
 static MSG: &str = "Hello from client!\n";
 
@@ -18,7 +19,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
         let mut buffer = String::with_capacity(128);
         let mut conn = BufReader::new(conn);
 
-        conn.read_line(&mut buffer).await.context("Pipe receive failed")?;
+        conn.read_line(&mut buffer).await.context("pipe receive failed")?;
 
         assert_eq!(buffer, MSG);
 
@@ -39,7 +40,7 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
             Some(Ok((nm, l)))
         })
         .unwrap()
-        .context("Listener bind failed")?;
+        .context("listener bind failed")?;
 
     let _ = name_sender.send(name);
 
@@ -48,18 +49,15 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
     for _ in 0..num_clients {
         let conn = match listener.accept().await {
             Ok(c) => c,
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
         let task = task::spawn(handle_conn(conn));
         tasks.push(task);
     }
     for task in tasks {
         task.await
-            .context("Server task panicked")?
-            .context("Server task returned early with error")?;
+            .context("server task panicked")?
+            .context("server task returned early with error")?;
     }
 
     Ok(())
@@ -67,9 +65,9 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult
 pub async fn client(name: Arc<String>) -> TestResult {
     let mut conn = SendPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
         .await
-        .context("Connect failed")?;
+        .context("connect failed")?;
 
-    conn.write_all(MSG.as_bytes()).await.context("Pipe send failed")?;
+    conn.write_all(MSG.as_bytes()).await.context("pipe send failed")?;
 
     Ok(())
 }

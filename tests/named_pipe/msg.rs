@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    color_eyre::eyre::Context,
+    color_eyre::eyre::{bail, Context},
     interprocess::{
         os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions, PipeMode},
         reliable_recv_msg::*,
@@ -11,6 +11,7 @@ use {
         sync::{mpsc::Sender, Arc},
     },
 };
+// TODO untangle imports, use listen_and_pick_name
 
 const SERVER_MSG_1: &[u8] = b"First server message";
 const SERVER_MSG_2: &[u8] = b"Second server message";
@@ -34,36 +35,33 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             Some(Ok((nm, l)))
         })
         .unwrap()
-        .context("Listener bind failed")?;
+        .context("listener bind failed")?;
 
     let _ = name_sender.send(name);
 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => c,
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
 
         let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
-        let rslt = conn.recv(&mut buf1).context("First pipe receive failed")?;
+        let rslt = conn.recv(&mut buf1).context("first pipe receive failed")?;
         assert_eq!(rslt.size(), CLIENT_MSG_1.len());
         assert_eq!(rslt.borrow_to_size(&buf1), CLIENT_MSG_1);
 
-        let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
+        let rslt = conn.recv(&mut buf2).context("second pipe receive failed")?;
         assert_eq!(rslt.size(), CLIENT_MSG_2.len());
         assert_eq!(rslt.borrow_to_size(&buf2), CLIENT_MSG_2);
 
-        let written = conn.send(SERVER_MSG_1).context("First pipe send failed")?;
+        let written = conn.send(SERVER_MSG_1).context("first pipe send failed")?;
         assert_eq!(written, SERVER_MSG_1.len());
 
-        let written = conn.send(SERVER_MSG_2).context("Second pipe send failed")?;
+        let written = conn.send(SERVER_MSG_2).context("second pipe send failed")?;
         assert_eq!(written, SERVER_MSG_2.len());
 
-        conn.flush().context("Flush failed")?;
+        conn.flush().context("flush failed")?;
     }
 
     Ok(())
@@ -71,23 +69,23 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 pub fn client(name: Arc<String>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; CLIENT_MSG_1.len()], [0; CLIENT_MSG_2.len()]);
 
-    let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect(name.as_str()).context("Connect failed")?;
+    let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect(name.as_str()).context("connect failed")?;
 
-    let written = conn.send(CLIENT_MSG_1).context("First pipe send failed")?;
+    let written = conn.send(CLIENT_MSG_1).context("first pipe send failed")?;
     assert_eq!(written, CLIENT_MSG_1.len());
 
-    let written = conn.send(CLIENT_MSG_2).context("Second pipe send failed")?;
+    let written = conn.send(CLIENT_MSG_2).context("second pipe send failed")?;
     assert_eq!(written, CLIENT_MSG_2.len());
 
-    let rslt = conn.recv(&mut buf1).context("First pipe receive failed")?;
+    let rslt = conn.recv(&mut buf1).context("first pipe receive failed")?;
     assert_eq!(rslt.size(), SERVER_MSG_1.len());
     assert_eq!(rslt.borrow_to_size(&buf1), SERVER_MSG_1);
 
-    let rslt = conn.recv(&mut buf2).context("Second pipe receive failed")?;
+    let rslt = conn.recv(&mut buf2).context("second pipe receive failed")?;
     assert_eq!(rslt.size(), SERVER_MSG_2.len());
     assert_eq!(rslt.borrow_to_size(&buf2), SERVER_MSG_2);
 
-    conn.flush().context("Flush failed")?;
+    conn.flush().context("flush failed")?;
 
     Ok(())
 }

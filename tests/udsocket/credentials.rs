@@ -7,7 +7,7 @@ use interprocess::os::unix::udsocket::{
     ReadAncillaryExt, UdSocket, UdStream, UdStreamListener, WriteAncillaryExt,
 };
 use std::{
-    io::{self, BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::Shutdown,
     sync::{mpsc::Sender, Arc},
 };
@@ -30,7 +30,7 @@ fn enable_passcred(sock: &UdStream) -> TestResult {
     #[cfg(uds_cont_credentials)]
     {
         sock.set_continuous_ancillary_credentials(true)
-            .context("Failed to enable credential passing")
+            .context("failed to enable credential passing")
     }
 
     #[cfg(not(uds_cont_credentials))]
@@ -60,17 +60,7 @@ fn server(
     shutdown: bool,
     contcred: bool,
 ) -> TestResult {
-    let (name, listener) = namegen
-        .find_map(|nm| {
-            let l = match UdStreamListener::bind(&*nm) {
-                Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(Ok((nm, l)))
-        })
-        .unwrap()
-        .context("Listener bind failed")?;
+    let (name, listener) = listen_and_pick_name(&mut namegen, |nm| UdStreamListener::bind(nm))?;
 
     let _ = name_sender.send(name);
 
@@ -91,10 +81,10 @@ fn server(
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c.with_cmsg_mut_by_val(&mut abread)),
-            Err(e) => bail!("Incoming connection failed: {e}"),
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
         if contcred {
-            enable_passcred(&conn.get_mut().reader).context("Passcred enable failed")?;
+            enable_passcred(&conn.get_mut().reader).context("passcred enable failed")?;
         }
 
         if shutdown {
@@ -102,14 +92,14 @@ fn server(
         } else {
             conn.read_line(&mut buffer)
         }
-        .context("Socket receive failed")?;
+        .context("socket receive failed")?;
 
         let mut conn = conn.into_inner().into_inner().with_cmsg_ref_by_val(ancself);
 
-        conn.write_all(SERVER_MSG.as_bytes()).context("Socket send failed")?;
+        conn.write_all(SERVER_MSG.as_bytes()).context("socket send failed")?;
         if shutdown {
             conn.shutdown(Shutdown::Write)
-                .context("Shutdown of writing end failed")?;
+                .context("shutdown of writing end failed")?;
         }
 
         assert_eq!(buffer, CLIENT_MSG);
@@ -139,17 +129,17 @@ fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
     let mut abread = CmsgVecBuf::new(Cmsg::cmsg_len_for_payload_size(Credentials::MIN_ANCILLARY_SIZE) * 8);
 
     let mut conn = UdStream::connect(name.as_str())
-        .context("Connect failed")?
+        .context("connect failed")?
         .with_cmsg_ref_by_val(ancself);
     if contcred {
-        enable_passcred(&conn.writer).context("Passcred enable failed")?;
+        enable_passcred(&conn.writer).context("passcred enable failed")?;
     }
 
-    conn.write_all(CLIENT_MSG.as_bytes()).context("Socket send failed")?;
+    conn.write_all(CLIENT_MSG.as_bytes()).context("socket send failed")?;
 
     if shutdown {
         conn.shutdown(Shutdown::Write)
-            .context("Shutdown of writing end failed")?;
+            .context("shutdown of writing end failed")?;
     }
 
     let mut conn = BufReader::new(conn.into_inner().with_cmsg_mut_by_val(&mut abread));
@@ -159,7 +149,7 @@ fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
     } else {
         conn.read_line(&mut buffer)
     }
-    .context("Socket receive failed")?;
+    .context("socket receive failed")?;
 
     assert_eq!(buffer, SERVER_MSG);
 

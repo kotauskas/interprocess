@@ -23,6 +23,6 @@ async fn client(prefer_namespaced: bool) -> TestResult {
 
     LocalSocketStream::connect(name.as_str())
         .await
-        .context("Connect failed")?;
+        .context("connect failed")?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use {
     super::util::{NameGen, TestResult},
-    color_eyre::eyre::Context,
+    color_eyre::eyre::{bail, Context},
     interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, RecvPipeStream},
     std::{
         ffi::OsStr,
@@ -8,6 +8,7 @@ use {
         sync::{mpsc::Sender, Arc},
     },
 };
+// TODO untangle imports, use listen_and_pick_name
 
 static MSG: &str = "Hello from server!\n";
 
@@ -26,20 +27,17 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
             Some(Ok((nm, l)))
         })
         .unwrap()
-        .context("Listener bind failed")?;
+        .context("listener bind failed")?;
 
     let _ = name_sender.send(name);
 
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => c,
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
 
-        conn.write_all(MSG.as_bytes()).context("Pipe send failed")?;
+        conn.write_all(MSG.as_bytes()).context("pipe send failed")?;
         conn.flush()?;
     }
 
@@ -49,10 +47,10 @@ pub fn client(name: Arc<String>) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
     let mut conn = RecvPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
-        .context("Connect failed")
+        .context("connect failed")
         .map(BufReader::new)?;
 
-    conn.read_line(&mut buffer).context("Pipe receive failed")?;
+    conn.read_line(&mut buffer).context("pipe receive failed")?;
     assert_eq!(buffer, MSG);
 
     Ok(())

@@ -2,7 +2,7 @@ use super::util::*;
 use color_eyre::eyre::{bail, Context};
 use interprocess::os::unix::udsocket::{UdSocket, UdStream, UdStreamListener};
 use std::{
-    io::{self, BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::Shutdown,
     sync::{mpsc::Sender, Arc},
 };
@@ -16,17 +16,7 @@ pub(super) fn run_with_namegen(namegen: NameGen) {
 }
 
 fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, shutdown: bool) -> TestResult {
-    let (name, listener) = namegen
-        .find_map(|nm| {
-            let l = match UdStreamListener::bind(&*nm) {
-                Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(Ok((nm, l)))
-        })
-        .unwrap()
-        .context("Listener bind failed")?;
+    let (name, listener) = listen_and_pick_name(&mut namegen, |nm| UdStreamListener::bind(nm))?;
 
     let _ = name_sender.send(name);
 
@@ -35,7 +25,7 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
     for _ in 0..num_clients {
         let mut conn = match listener.accept() {
             Ok(c) => BufReader::new(c),
-            Err(e) => bail!("Incoming connection failed: {e}"),
+            Err(e) => bail!("incoming connection failed: {e}"),
         };
 
         if shutdown {
@@ -43,15 +33,15 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
         } else {
             conn.read_line(&mut buffer)
         }
-        .context("Socket receive failed")?;
+        .context("socket receive failed")?;
 
         conn.get_mut()
             .write_all(SERVER_MSG.as_bytes())
-            .context("Socket send failed")?;
+            .context("socket send failed")?;
         if shutdown {
             conn.get_mut()
                 .shutdown(Shutdown::Write)
-                .context("Shutdown of writing end failed")?;
+                .context("shutdown of writing end failed")?;
         }
 
         assert_eq!(buffer, CLIENT_MSG);
@@ -63,16 +53,16 @@ fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, s
 fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
-    let conn = UdStream::connect(name.as_str()).context("Connect failed")?;
+    let conn = UdStream::connect(name.as_str()).context("connect failed")?;
     let mut conn = BufReader::new(conn);
 
     conn.get_mut()
         .write_all(CLIENT_MSG.as_bytes())
-        .context("Socket send failed")?;
+        .context("socket send failed")?;
     if shutdown {
         conn.get_mut()
             .shutdown(Shutdown::Write)
-            .context("Shutdown of writing end failed")?;
+            .context("shutdown of writing end failed")?;
     }
 
     if shutdown {
@@ -80,7 +70,7 @@ fn client(name: Arc<String>, shutdown: bool) -> TestResult {
     } else {
         conn.read_line(&mut buffer)
     }
-    .context("Socket receive failed")?;
+    .context("socket receive failed")?;
 
     assert_eq!(buffer, SERVER_MSG);
 
