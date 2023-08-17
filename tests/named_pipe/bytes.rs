@@ -4,9 +4,9 @@ use interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeLis
 use std::{
     ffi::OsStr,
     io::{self, prelude::*, BufReader},
-    sync::{mpsc::Sender, Arc},
+    sync::mpsc::Sender,
 };
-// TODO use listen_and_pick_name
+// TODO context instead of bail, ensure_eq, use listen_and_pick_name
 
 pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
     let (name, listener) = NameGen::new(make_id!(), true)
@@ -44,10 +44,10 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
+pub fn client(name: &str) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
-    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
+    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect(name)
         .context("connect failed")
         .map(BufReader::new)?;
 

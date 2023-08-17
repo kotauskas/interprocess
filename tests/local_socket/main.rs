@@ -9,16 +9,17 @@ mod stream;
 use interprocess::local_socket::NameTypeSupport;
 
 #[test]
-fn local_socket_stream() {
+fn local_socket_stream() -> TestResult {
     use stream::*;
     install_color_eyre();
     // If only one name type is supported, this one will choose the supported one. If both are
     // supported, this will try paths first.
-    util::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);
+    util::drive_server_and_multiple_clients(|s, n| server(s, n, false), client)?;
     if NameTypeSupport::query() == NameTypeSupport::Both {
         // Try the namespace now.
-        util::drive_server_and_multiple_clients(|s, n| server(s, n, true), client);
+        util::drive_server_and_multiple_clients(|s, n| server(s, n, true), client)?;
     }
+    Ok(())
 }
 #[test]
 fn local_socket_no_server() -> TestResult {

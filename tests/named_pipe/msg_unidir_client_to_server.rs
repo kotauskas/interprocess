@@ -1,17 +1,12 @@
+use interprocess::reliable_recv_msg::ReliableRecvMsg;
+
 use {
     super::util::{NameGen, TestResult},
     color_eyre::eyre::{bail, Context},
-    interprocess::{
-        os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode, SendPipeStream},
-        reliable_recv_msg::*,
-    },
-    std::{
-        ffi::OsStr,
-        io,
-        sync::{mpsc::Sender, Arc},
-    },
+    interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode, SendPipeStream},
+    std::{ffi::OsStr, io, sync::mpsc::Sender},
 };
-// TODO untangle imports, use listen_and_pick_name
+// TODO context instead of bail, ensure_eq, untangle imports, use listen_and_pick_name
 
 const MSG_1: &[u8] = b"First client message";
 const MSG_2: &[u8] = b"Second client message";
@@ -55,8 +50,8 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
-    let conn = SendPipeStream::<pipe_mode::Messages>::connect(name.as_str()).context("connect failed")?;
+pub fn client(name: &str) -> TestResult {
+    let conn = SendPipeStream::<pipe_mode::Messages>::connect(name).context("connect failed")?;
 
     let sent = conn.send(MSG_1).context("first pipe send failed")?;
     assert_eq!(sent, MSG_1.len());

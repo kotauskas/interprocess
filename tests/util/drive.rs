@@ -1,48 +1,47 @@
+use std::borrow::Borrow;
+
 use super::{choke::*, TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
+use color_eyre::eyre::{bail, Context};
 use {
     std::{
         io,
-        sync::{
-            mpsc::{channel, /*Receiver,*/ Sender},
-            Arc,
-        },
+        sync::mpsc::{channel, /*Receiver,*/ Sender},
         thread,
     },
     to_method::*,
 };
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
-pub fn drive_pair<T, Ld, Fl>(leader: Ld, leader_name: &str, follower: Fl, follower_name: &str)
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the
+/// follower. Captures Eyre errors on both sides and bubbles them up if they occur, reporting which side produced the
+/// error.
+pub fn drive_pair<T, Ld, Fl>(leader: Ld, leader_name: &str, follower: Fl, follower_name: &str) -> TestResult
 where
-    T: Send + 'static,
-    Ld: FnOnce(Sender<T>) -> TestResult + Send + 'static,
+    T: Send,
+    Ld: FnOnce(Sender<T>) -> TestResult + Send,
     Fl: FnOnce(T) -> TestResult,
 {
-    let (sender, receiver) = channel();
+    thread::scope(|scope| {
+        let (sender, receiver) = channel();
 
-    let ltname = leader_name.to_lowercase();
-    let leading_thread = thread::Builder::new()
-        .name(ltname)
-        .spawn(move || leader(sender))
-        // Lazy .expect()
-        .unwrap_or_else(|e| panic!("{leader_name} thread launch failed: {e}"));
+        let ltname = leader_name.to_lowercase();
+        let leading_thread = thread::Builder::new()
+            .name(ltname)
+            .spawn_scoped(scope, move || leader(sender))
+            .with_context(|| format!("{leader_name} thread launch failed"))?;
 
-    if let Ok(msg) = receiver.recv() {
-        // If the leader reached the send point, proceed with the follower code
-        let fres = follower(msg);
-        if let Err(e) = exclude_deadconn(fres) {
-            panic!("{follower_name} exited early with error: {e:#}");
+        if let Ok(msg) = receiver.recv() {
+            // If the leader reached the send point, proceed with the follower code
+            let rslt = follower(msg);
+            exclude_deadconn(rslt).with_context(|| format!("{follower_name} exited early with error"))?;
         }
-    }
-    let Ok(rslt) = leading_thread.join() else {
-        panic!("{leader_name} panicked");
-    };
-    if let Err(e) = exclude_deadconn(rslt) {
-        panic!("{leader_name} exited early with error: {e:#}");
-    }
+        let Ok(rslt) = leading_thread.join() else {
+            bail!("{leader_name} panicked");
+        };
+        exclude_deadconn(rslt).with_context(|| format!("{leader_name} exited early with error"))
+    })
 }
 
-/// Filters errors that have to do with the other side returning an error and not making it to the panic in time.
+/// Filters errors that have to do with the other side returning an error and not bubbling it up in time.
 #[rustfmt::skip] // oh FUCK OFF
 fn exclude_deadconn(r: TestResult) -> TestResult {
     use io::ErrorKind::*;
@@ -64,40 +63,43 @@ fn exclude_deadconn(r: TestResult) -> TestResult {
     }
 }
 
-pub fn drive_server_and_multiple_clients<T, Srv, Clt>(server: Srv, client: Clt)
+pub fn drive_server_and_multiple_clients<T, B, Srv, Clt>(server: Srv, client: Clt) -> TestResult
 where
-    T: Send + Sync + 'static,
-    Srv: FnOnce(Sender<T>, u32) -> TestResult + Send + 'static,
-    Clt: Fn(Arc<T>) -> TestResult + Send + Sync + 'static,
+    T: Send + Borrow<B>,
+    B: Send + Sync + ?Sized,
+    Srv: FnOnce(Sender<T>, u32) -> TestResult + Send,
+    Clt: Fn(&B) -> TestResult + Send + Sync,
 {
     let choke = Choke::new(NUM_CONCURRENT_CLIENTS);
 
-    let client = Arc::new(client);
-    let client_wrapper = move |msg| {
-        let msg = Arc::new(msg);
-        let mut client_threads = Vec::with_capacity(NUM_CLIENTS.try_to().unwrap());
-        for n in 1..=NUM_CLIENTS {
-            let tname = format!("client {n}");
-            let clientc = Arc::clone(&client);
-            let msgc = Arc::clone(&msg);
+    let client_wrapper = |msg: T| {
+        thread::scope(|scope| {
+            let mut client_threads = Vec::with_capacity(NUM_CLIENTS.try_to().unwrap());
+            for n in 1..=NUM_CLIENTS {
+                let tname = format!("client {n}");
 
-            let choke_guard = choke.take();
+                let choke_guard = choke.take();
+                let (bclient, bmsg) = (&client, msg.borrow());
 
-            let jhndl = thread::Builder::new()
-                .name(tname.clone())
-                .spawn(move || {
-                    let _cg = choke_guard; // Send to other thread to drop when client finishes
-                    clientc(msgc)
-                })
-                .unwrap_or_else(|e| panic!("{tname} thread launch failed: {e}"));
-            client_threads.push(jhndl);
-        }
-        for client in client_threads {
-            client.join().expect("Client panicked")?; // Early-return the first error
-        }
-        Ok::<(), color_eyre::eyre::Error>(())
+                let jhndl = thread::Builder::new()
+                    .name(tname.clone())
+                    .spawn_scoped(scope, move || {
+                        let _cg = choke_guard; // Has to use move to send to other thread to drop when client finishes
+                        bclient(bmsg)
+                    })
+                    .with_context(|| format!("{tname} thread launch failed"))?;
+                client_threads.push(jhndl);
+            }
+            for client in client_threads {
+                let Ok(rslt) = client.join() else {
+                    bail!("client thread panicked");
+                };
+                rslt?; // Early-return the first error; context not necessary as drive_pair does it
+            }
+            Ok(())
+        })
     };
     let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
 
-    drive_pair(server_wrapper, "Server", client_wrapper, "Client");
+    drive_pair(server_wrapper, "server", client_wrapper, "client")
 }

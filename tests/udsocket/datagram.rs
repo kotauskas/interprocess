@@ -10,8 +10,7 @@ pub(super) fn run(mut namegen: NameGen) -> TestResult {
 
     let side_a = move |s| side(a_socket, Some(s), b_name);
     let side_b = move |_| side(b_socket, None, a_name);
-    drive_pair(side_a, "side A", side_b, "side B");
-    Ok(())
+    drive_pair(side_a, "side A", side_b, "side B")
 }
 
 fn make_message(side_name: char, second: bool) -> Vec<u8> {
@@ -36,18 +35,18 @@ fn side(sock: UdDatagram, notifier: Option<Sender<()>>, other_name: String) -> T
     sock.set_destination(other_name).context("set destination failed")?;
 
     let written = sock.send(&own_msg_1).context("first socket send failed")?;
-    assert_eq!(written, own_msg_1.len());
+    ensure_eq!(written, own_msg_1.len());
 
     let written = sock.send(&own_msg_2).context("second socket send failed")?;
-    assert_eq!(written, own_msg_2.len());
+    ensure_eq!(written, own_msg_2.len());
 
     let read = sock.recv(&mut buf1).context("first socket receive failed")?;
-    assert_eq!(read, other_msg_1.len());
-    assert_eq!(&buf1[0..read], other_msg_1);
+    ensure_eq!(read, other_msg_1.len());
+    ensure_eq!(&buf1[0..read], other_msg_1);
 
     let read = sock.recv(&mut buf2).context("second socket receive failed")?;
-    assert_eq!(read, other_msg_2.len());
-    assert_eq!(&buf2[0..read], other_msg_2);
+    ensure_eq!(read, other_msg_2.len());
+    ensure_eq!(&buf2[0..read], other_msg_2);
 
     Ok(())
 }

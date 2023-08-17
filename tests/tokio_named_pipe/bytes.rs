@@ -10,7 +10,7 @@ use {
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task, try_join},
 };
-// TODO untangle imports, use listen_and_pick_name
+// TODO context instead of bail, ensure_eq, untangle imports, use listen_and_pick_name
 
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";

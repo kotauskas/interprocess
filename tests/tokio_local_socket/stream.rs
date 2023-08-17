@@ -23,14 +23,14 @@ pub async fn server(name_sender: Sender<String>, num_clients: u32, prefer_namesp
                 .read_until(b'\n', &mut buffer)
                 .await
                 .context("first socket receive failed")?;
-            assert_eq!(buffer, CLIENT_LINE);
+            ensure_eq!(buffer, CLIENT_LINE);
             buffer.clear();
 
             reader
                 .read_until(b'\0', &mut buffer)
                 .await
                 .context("second socket receive failed")?;
-            assert_eq!(buffer, CLIENT_BYTES);
+            ensure_eq!(buffer, CLIENT_BYTES);
             TestResult::Ok(())
         };
         let write = async {
@@ -84,14 +84,14 @@ pub async fn client(name: Arc<String>) -> TestResult {
             .read_until(b'\n', &mut buffer)
             .await
             .context("first socket receive failed")?;
-        assert_eq!(buffer, SERVER_LINE);
+        ensure_eq!(buffer, SERVER_LINE);
         buffer.clear();
 
         reader
             .read_until(b'\0', &mut buffer)
             .await
             .context("second socket receive failed")?;
-        assert_eq!(buffer, SERVER_BYTES);
+        ensure_eq!(buffer, SERVER_BYTES);
         TestResult::Ok(())
     };
     let write = async {

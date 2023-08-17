@@ -4,7 +4,7 @@ use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
     io::{BufRead, BufReader, Write},
     str,
-    sync::{mpsc::Sender, Arc},
+    sync::mpsc::Sender,
 };
 
 pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
@@ -25,7 +25,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
         let expected = message(false, Some('\n'));
         conn.read_until(b'\n', &mut buffer)
             .context("first socket receive failed")?;
-        assert_eq!(
+        ensure_eq!(
             str::from_utf8(&buffer).context("first socket receive wasn't valid UTF-8")?,
             expected
         );
@@ -39,7 +39,7 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
         let expected = message(false, Some('\0'));
         conn.read_until(b'\0', &mut buffer)
             .context("second socket receive failed")?;
-        assert_eq!(
+        ensure_eq!(
             str::from_utf8(&buffer).context("second socket receive wasn't valid UTF-8")?,
             expected
         );
@@ -52,10 +52,10 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: 
     }
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
+pub fn client(name: &str) -> TestResult {
     let mut buffer = Vec::with_capacity(128);
 
-    let mut conn = LocalSocketStream::connect(name.as_str())
+    let mut conn = LocalSocketStream::connect(name)
         .context("connect failed")
         .map(BufReader::new)?;
 
@@ -67,7 +67,7 @@ pub fn client(name: Arc<String>) -> TestResult {
     let expected = message(true, Some('\n'));
     conn.read_until(b'\n', &mut buffer)
         .context("first socket receive failed")?;
-    assert_eq!(
+    ensure_eq!(
         str::from_utf8(&buffer).context("first socket receive wasn't valid UTF-8")?,
         expected
     );
@@ -81,7 +81,7 @@ pub fn client(name: Arc<String>) -> TestResult {
     let expected = message(true, Some('\0'));
     conn.read_until(b'\0', &mut buffer)
         .context("second socket receive failed")?;
-    assert_eq!(
+    ensure_eq!(
         str::from_utf8(&buffer).context("second socket receive wasn't valid UTF-8")?,
         expected
     );

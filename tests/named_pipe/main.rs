@@ -12,41 +12,41 @@ mod msg_unidir_client_to_server;
 mod msg_unidir_server_to_client;
 
 #[test]
-fn named_pipe_bytes() {
+fn named_pipe_bytes() -> TestResult {
+    use bytes::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(bytes::server, bytes::client)
+    drive_server_and_multiple_clients(server, client)
 }
 
 #[test]
-fn named_pipe_bytes_unidir_client_to_server() {
+fn named_pipe_bytes_unidir_client_to_server() -> TestResult {
+    use bytes_unidir_client_to_server::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(
-        bytes_unidir_client_to_server::server,
-        bytes_unidir_client_to_server::client,
-    )
+    drive_server_and_multiple_clients(server, client)
 }
 #[test]
-fn named_pipe_bytes_unidir_server_to_client() {
+fn named_pipe_bytes_unidir_server_to_client() -> TestResult {
+    use bytes_unidir_server_to_client::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(
-        bytes_unidir_server_to_client::server,
-        bytes_unidir_server_to_client::client,
-    )
+    drive_server_and_multiple_clients(server, client)
 }
 
 #[test]
-fn named_pipe_msg() {
+fn named_pipe_msg() -> TestResult {
+    use msg::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(msg::server, msg::client)
+    drive_server_and_multiple_clients(server, client)
 }
 
 #[test]
-fn named_pipe_msg_unidir_client_to_server() {
+fn named_pipe_msg_unidir_client_to_server() -> TestResult {
+    use msg_unidir_client_to_server::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(msg_unidir_client_to_server::server, msg_unidir_client_to_server::client)
+    drive_server_and_multiple_clients(server, client)
 }
 #[test]
-fn named_pipe_msg_unidir_server_to_client() {
+fn named_pipe_msg_unidir_server_to_client() -> TestResult {
+    use msg_unidir_server_to_client::*;
     install_color_eyre();
-    util::drive_server_and_multiple_clients(msg_unidir_server_to_client::server, msg_unidir_server_to_client::client)
+    drive_server_and_multiple_clients(server, client)
 }

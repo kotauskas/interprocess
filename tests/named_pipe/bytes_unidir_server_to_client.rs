@@ -5,10 +5,10 @@ use {
     std::{
         ffi::OsStr,
         io::{self, prelude::*, BufReader},
-        sync::{mpsc::Sender, Arc},
+        sync::mpsc::Sender,
     },
 };
-// TODO untangle imports, use listen_and_pick_name
+// TODO context instead of bail, ensure_eq, untangle imports, use listen_and_pick_name
 
 static MSG: &str = "Hello from server!\n";
 
@@ -43,10 +43,10 @@ pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
 
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
+pub fn client(name: &str) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
-    let mut conn = RecvPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
+    let mut conn = RecvPipeStream::<pipe_mode::Bytes>::connect(name)
         .context("connect failed")
         .map(BufReader::new)?;
 

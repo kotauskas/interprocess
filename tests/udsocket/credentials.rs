@@ -9,21 +9,21 @@ use interprocess::os::unix::udsocket::{
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::Shutdown,
-    sync::{mpsc::Sender, Arc},
+    sync::mpsc::Sender,
 };
 
 static SERVER_MSG: &str = "Hello from server!\n";
 static CLIENT_MSG: &str = "Hello from client!\n";
 
-pub(super) fn run(namegen: NameGen, contcred: bool) {
+pub(super) fn run(namegen: NameGen, contcred: bool) -> TestResult {
     drive_server_and_multiple_clients(
         move |snd, nc| server(snd, nc, namegen, false, contcred),
         move |nm| client(nm, false, contcred),
-    );
+    )?;
     drive_server_and_multiple_clients(
         move |snd, nc| server(snd, nc, namegen, true, contcred),
         move |nm| client(nm, true, contcred),
-    );
+    )
 }
 
 fn enable_passcred(sock: &UdStream) -> TestResult {
@@ -45,12 +45,13 @@ fn decreds(abuf: CmsgRef<'_>) -> TestResult<Credentials<'_>> {
         None => bail!("No credentials received"),
     }
 }
-fn ckcreds(creds: &Credentials) {
+fn ckcreds(creds: &Credentials) -> TestResult {
     if let Some(pid) = creds.pid() {
-        assert_eq!(pid, unsafe { libc::getpid() });
+        ensure_eq!(pid, unsafe { libc::getpid() });
     }
-    assert_eq!(creds.best_effort_ruid(), unsafe { libc::getuid() });
-    assert_eq!(creds.best_effort_rgid(), unsafe { libc::getgid() });
+    ensure_eq!(creds.best_effort_ruid(), unsafe { libc::getuid() });
+    ensure_eq!(creds.best_effort_rgid(), unsafe { libc::getgid() });
+    Ok(())
 }
 
 fn server(
@@ -102,10 +103,10 @@ fn server(
                 .context("shutdown of writing end failed")?;
         }
 
-        assert_eq!(buffer, CLIENT_MSG);
+        ensure_eq!(buffer, CLIENT_MSG);
 
         let client_creds = decreds(abread.as_ref())?;
-        ckcreds(&client_creds);
+        ckcreds(&client_creds)?;
 
         buffer.clear();
         abread.clear();
@@ -113,7 +114,7 @@ fn server(
     Ok(())
 }
 
-fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
+fn client(name: &str, shutdown: bool, contcred: bool) -> TestResult {
     let mut buffer = String::with_capacity(128);
 
     let mut abm = CmsgVecBuf::new(0);
@@ -128,7 +129,7 @@ fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
 
     let mut abread = CmsgVecBuf::new(Cmsg::cmsg_len_for_payload_size(Credentials::MIN_ANCILLARY_SIZE) * 8);
 
-    let mut conn = UdStream::connect(name.as_str())
+    let mut conn = UdStream::connect(name)
         .context("connect failed")?
         .with_cmsg_ref_by_val(ancself);
     if contcred {
@@ -151,10 +152,10 @@ fn client(name: Arc<String>, shutdown: bool, contcred: bool) -> TestResult {
     }
     .context("socket receive failed")?;
 
-    assert_eq!(buffer, SERVER_MSG);
+    ensure_eq!(buffer, SERVER_MSG);
 
     let server_creds = decreds(abread.as_ref())?;
-    ckcreds(&server_creds);
+    ckcreds(&server_creds)?;
 
     Ok(())
 }

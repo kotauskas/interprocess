@@ -21,8 +21,6 @@ pub async fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
 async fn client(prefer_namespaced: bool) -> TestResult {
     let name = NameGen::new_auto(make_id!(), prefer_namespaced).next().unwrap();
 
-    LocalSocketStream::connect(name.as_str())
-        .await
-        .context("connect failed")?;
+    LocalSocketStream::connect(name).await.context("connect failed")?;
     Ok(())
 }

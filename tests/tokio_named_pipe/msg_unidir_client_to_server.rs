@@ -12,7 +12,7 @@ use {
     std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
     tokio::{sync::oneshot::Sender, task},
 };
-// TODO untangle imports, use listen_and_pick_name
+// TODO context instead of bail, ensure_eq, untangle imports, use listen_and_pick_name
 const MSG_1: &[u8] = b"First client message";
 const MSG_2: &[u8] = b"Second client message";
 

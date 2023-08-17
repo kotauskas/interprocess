@@ -1,5 +1,5 @@
 use super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{bail, Context};
 use std::{convert::TryInto, future::Future, sync::Arc};
 use tokio::{
     sync::{
@@ -64,11 +64,14 @@ where
             client_tasks.push(jhndl);
         }
         for client in client_tasks {
-            client.await.expect("Client panicked")?; // Early-return the first error
+            let Ok(rslt) = client.await else {
+                bail!("client task panicked");
+            };
+            rslt?; // Early-return the first error; context not necessary as drive_pair does it
         }
         Ok::<(), color_eyre::eyre::Error>(())
     };
     let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
 
-    drive_pair(server_wrapper, "Server", client_wrapper, "Client").await
+    drive_pair(server_wrapper, "server", client_wrapper, "client").await
 }

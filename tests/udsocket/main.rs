@@ -10,35 +10,38 @@ mod datagram;
 mod stream;
 
 #[test]
-fn udsocket_stream() {
+fn udsocket_stream() -> TestResult {
     use stream::*;
     install_color_eyre();
-    run_with_namegen(NameGen::new(make_id!(), false));
+    run(NameGen::new(make_id!(), false))?;
     if cfg!(target_os = "linux") {
-        run_with_namegen(NameGen::new(make_id!(), true));
+        run(NameGen::new(make_id!(), true))?;
     }
+    Ok(())
 }
 
 #[cfg(uds_cont_credentials)]
 #[test]
-fn udsocket_continuous_credentials() {
+fn udsocket_continuous_credentials() -> TestResult {
     use credentials::*;
     install_color_eyre();
-    run(NameGen::new(make_id!(), false), true);
+    run(NameGen::new(make_id!(), false), true)?;
     if cfg!(target_os = "linux") {
-        run(NameGen::new(make_id!(), true), true);
+        run(NameGen::new(make_id!(), true), true)?;
     }
+    Ok(())
 }
 
 #[cfg(uds_cmsgcred)]
 #[test]
-fn udsocket_explicitly_sent_credentials() {
+fn udsocket_explicitly_sent_credentials() -> TestResult {
     use credentials::*;
     install_color_eyre();
-    run(NameGen::new(make_id!(), false), false);
+    run(NameGen::new(make_id!(), false), false)?;
     if cfg!(target_os = "linux") {
-        run(NameGen::new(make_id!(), true), false);
+        run(NameGen::new(make_id!(), true), false)?;
     }
+    Ok(())
 }
 
 #[test]
