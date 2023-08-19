@@ -42,6 +42,6 @@ pub fn listen_and_pick_name<T>(
             };
             Some(Ok((nm, l)))
         })
-        .unwrap()
+        .unwrap() // Infinite iterator
         .context("listener bind failed")
 }
