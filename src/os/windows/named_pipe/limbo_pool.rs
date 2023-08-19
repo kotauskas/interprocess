@@ -1,10 +1,13 @@
 //! The limbo which dropped streams are sent to if send buffer preservation is enabled.
 //!
-//! Because dropping a named pipe file handle, be it a client or a server, discards its send buffer, the portability-conscious local socket interface requires this additional feature to allow for the common use case of dropping right after sending a graceful shutdown message.
+//! Because dropping a named pipe file handle, be it a client or a server, discards its send buffer, the
+//! portability-conscious local socket interface requires this additional feature to allow for the common use case of
+//! dropping right after sending a graceful shutdown message.
 
 const LIMBO_SLOTS: usize = 16;
 
-/// Common result type for operations that complete with no output but may reject their input, requiring some form of retry.
+/// Common result type for operations that complete with no output but may reject their input, requiring some form of
+/// retry.
 pub(crate) type MaybeReject<T> = Result<(), T>;
 
 pub(crate) struct LimboPool<S> {
@@ -35,7 +38,8 @@ impl<S> LimboPool<S> {
         }
         Err(acc.unwrap())
     }
-    /// Performs `linear_try` with `acc` and `tryf`, and if that fails, calls `createf` and consumes its output with `add_sender` if the pool has vacant space, resorting to `fullf` otherwise.
+    /// Performs `linear_try` with `acc` and `tryf`, and if that fails, calls `createf` and consumes its output with
+    /// `add_sender` if the pool has vacant space, resorting to `fullf` otherwise.
     pub fn linear_try_or_create<T>(
         &mut self,
         acc: T,

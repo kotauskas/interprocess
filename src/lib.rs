@@ -80,7 +80,8 @@
 //! [blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
 // TODO mailslots
 // TODO the Intra Doc Link Sweep
-// - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across the network
+// - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across
+// the network
 
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 #![deny(rust_2018_idioms)]

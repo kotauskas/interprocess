@@ -31,7 +31,7 @@ impmod! {local_socket,
 ///         }
 ///     }
 /// }
-//// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
+/// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.
 /// let name = {
 ///     // This scoping trick allows us to nicely contain the import inside the `match`, so that if
@@ -119,18 +119,22 @@ impl LocalSocketListener {
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         self.0.accept().map(LocalSocketStream)
     }
-    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to
+    /// conveniently create a main loop for a socket server.
     #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
     /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
     ///
-    /// In nonblocking mode, calling [`accept`] and iterating through [`incoming`] will immediately return a [`WouldBlock`] error if there is no client attempting to connect at the moment instead of blocking until one arrives.
+    /// In nonblocking mode, calling [`accept`] and iterating through [`incoming`] will immediately return a
+    /// [`WouldBlock`] error if there is no client attempting to connect at the moment instead of blocking until one
+    /// arrives.
     ///
     /// # Platform-specific behavior
     /// ## Windows
-    /// The nonblocking mode will be also be set for the streams produced by [`accept`] and [`incoming`], both existing and new ones.
+    /// The nonblocking mode will be also be set for the streams produced by [`accept`] and [`incoming`], both existing
+    /// and new ones.
     ///
     /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     /// [`accept`]: #method.accept " "

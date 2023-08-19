@@ -27,7 +27,8 @@ mod write_half;
 use connect_future::*;
 pub use {read_half::*, write_half::*};
 
-/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by connecting to an existing server.
+/// A Unix domain socket byte stream, obtained either from [`UdStreamListener`](super::UdStreamListener) or by
+/// connecting to an existing server.
 ///
 /// # Examples
 ///

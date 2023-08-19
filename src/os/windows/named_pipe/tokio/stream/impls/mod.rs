@@ -316,7 +316,8 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
 }
 */
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
-    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
+    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
+    /// what was requested to be sent).
     #[inline]
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.write(buf).await
@@ -330,12 +331,14 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), waiting until a server instance is dispatched.
+    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), waiting until a server
+    /// instance is dispatched.
     pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some()).await?;
         Ok(Self::new(raw))
     }
-    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
+    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added
+    /// automatically), blocking until a server instance is dispatched.
     pub async fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(
             pipename.as_ref(),
@@ -346,7 +349,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         .await?;
         Ok(Self::new(raw))
     }
-    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
+    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
+    /// dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
     pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
         let raw_a = Arc::new(self.raw);
         let raw_ac = Arc::clone(&raw_a);
@@ -382,18 +386,21 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to
+    /// a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         matches!(self.raw.inner(), &InnerTokio::Server(..))
     }
-    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a
+    /// listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.is_server()
     }
 
-    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
+    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong
+    /// kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
             raw,
@@ -444,14 +451,17 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
         }
         rslt
     }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
+    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
+    /// limbo.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     #[inline]
     pub fn assume_flushed(&self) {
         self.raw.assume_flushed()
     }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
+    /// dropping it.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     pub fn evade_limbo(self) {
@@ -571,9 +581,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
         self.raw.as_handle()
     }
 }
-/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
+/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or
+/// trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is
+/// returned.
 ///
-/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause
+/// "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has
+/// message boundaries.
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
     type Error = FromHandleError;
 

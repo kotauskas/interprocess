@@ -79,13 +79,16 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 
         Ok(PipeStream::new(raw))
     }
-    /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one connects.
+    /// Creates an iterator which accepts connections from clients, blocking each time `next()` is called until one
+    /// connects.
     pub fn incoming(&self) -> Incoming<'_, Rm, Sm> {
         Incoming { listener: self }
     }
-    /// Enables or disables the nonblocking mode for all existing instances of the listener and future ones. By default, it is disabled.
+    /// Enables or disables the nonblocking mode for all existing instances of the listener and future ones. By default,
+    /// it is disabled.
     ///
-    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation options, unless there's a good reason not to. This allows making one less system call during creation.
+    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation options, unless
+    /// there's a good reason not to. This allows making one less system call during creation.
     ///
     /// See the documentation of the aforementioned field for the exact effects of enabling this mode.
     ///
@@ -123,34 +126,51 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
-    /// Specifies the name for the named pipe. Since the name typically, but not always, is a string literal, an owned string does not need to be provided.
+    /// Specifies the name for the named pipe. Since the name typically, but not always, is a string literal, an owned
+    /// string does not need to be provided.
     // TODO turn to Path
     pub name: Cow<'a, OsStr>,
-    /// Specifies how data is written into the data stream. This is required in all cases, regardless of whether the pipe is inbound, outbound or duplex, since this affects all data being written into the pipe, not just the data written by the server.
+    /// Specifies how data is written into the data stream. This is required in all cases, regardless of whether the
+    /// pipe is inbound, outbound or duplex, since this affects all data being written into the pipe, not just the data
+    /// written by the server.
     pub mode: PipeMode,
-    /// Specifies whether nonblocking mode will be enabled for all stream instances upon creation. By default, it is disabled.
+    /// Specifies whether nonblocking mode will be enabled for all stream instances upon creation. By default, it is
+    /// disabled.
     ///
     /// There are two ways in which the listener is affected by nonblocking mode:
-    /// - Whenever [`accept`] is called or [`incoming`] is being iterated through, if there is no client currently attempting to connect to the named pipe server, the method will return immediately with the [`WouldBlock`] error instead of blocking until one arrives.
-    /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an explanation of the exact effects.
+    /// - Whenever [`accept`] is called or [`incoming`] is being iterated through, if there is no client currently
+    ///   attempting to connect to the named pipe server, the method will return immediately with the [`WouldBlock`]
+    ///   error instead of blocking until one arrives.
+    /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side streams behave in
+    ///   nonblocking mode. See the documentation for `set_nonblocking` for an explanation of the exact effects.
     ///
     /// [`accept`]: struct.PipeListener.html#method.accept
     /// [`incoming`]: struct.PipeListener.html#method.incoming
     /// [`WouldBlock`]: io::ErrorKind::WouldBlock
     pub nonblocking: bool,
-    /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many clients can be communicated with at once. If set to 1, trying to create multiple instances at the same time will return an error. If set to `None`, no limit is applied. The value 255 is not allowed because of Windows limitations.
+    /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many clients can be
+    /// communicated with at once. If set to 1, trying to create multiple instances at the same time will return an
+    /// error. If set to `None`, no limit is applied. The value 255 is not allowed because of Windows limitations.
     pub instance_limit: Option<NonZeroU8>,
-    /// Enables write-through mode, which applies only to network connections to the pipe. If enabled, writing to the pipe would always block until all data is delivered to the other end instead of piling up in the kernel's network buffer until a certain amount of data accamulates or a certain period of time passes, which is when the system actually sends the contents of the buffer over the network.
+    /// Enables write-through mode, which applies only to network connections to the pipe. If enabled, writing to the
+    /// pipe would always block until all data is delivered to the other end instead of piling up in the kernel's
+    /// network buffer until a certain amount of data accamulates or a certain period of time passes, which is when the
+    /// system actually sends the contents of the buffer over the network.
     ///
-    /// Not required for pipes which are restricted to local connections only. If debug assertions are enabled, setting this parameter on a local-only pipe will cause a panic when the pipe is created; in release builds, creation will successfully complete without any errors and the flag will be completely ignored.
+    /// Not required for pipes which are restricted to local connections only. If debug assertions are enabled, setting
+    /// this parameter on a local-only pipe will cause a panic when the pipe is created; in release builds, creation
+    /// will successfully complete without any errors and the flag will be completely ignored.
     pub write_through: bool,
     /// Enables remote machines to connect to the named pipe over the network.
     pub accept_remote: bool,
-    /// Specifies how big the input buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
+    /// Specifies how big the input buffer should be. The system will automatically adjust this size to align it as
+    /// required or clip it by the minimum or maximum buffer size.
     pub input_buffer_size_hint: DWORD,
-    /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as required or clip it by the minimum or maximum buffer size.
+    /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as
+    /// required or clip it by the minimum or maximum buffer size.
     pub output_buffer_size_hint: DWORD,
-    /// The default timeout clients use when connecting. Used unless another timeout is specified when waiting by a client.
+    /// The default timeout clients use when connecting. Used unless another timeout is specified when waiting by a
+    /// client.
     // TODO use WaitTimeout struct
     pub wait_timeout: NonZeroU32,
 }
@@ -187,7 +207,8 @@ impl<'a> PipeListenerOptions<'a> {
             wait_timeout: NonZeroU32::new(50).unwrap(),
         }
     }
-    /// Clones configuration options which are not owned by value and returns a copy of the original option table which is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
+    /// Clones configuration options which are not owned by value and returns a copy of the original option table which
+    /// is guaranteed not to borrow anything and thus ascribes to the `'static` lifetime.
     pub fn to_owned(&self) -> PipeListenerOptions<'static> {
         // We need this ugliness because the compiler does not understand that
         // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
@@ -217,7 +238,8 @@ impl<'a> PipeListenerOptions<'a> {
         output_buffer_size_hint: DWORD,
         wait_timeout: NonZeroU32,
     );
-    /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set to the specified value.
+    /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set
+    /// to the specified value.
     pub(super) fn create_instance(
         &self,
         first: bool,
@@ -272,10 +294,12 @@ cannot create pipe server that has byte type but reads messages – have you for
             OwnedHandle::from_raw_handle(handle)
         })
     }
-    /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the type of pipe stream that the listener will create, thus determining the direction of the pipe and its mode.
+    /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the type of pipe stream
+    /// that the listener will create, thus determining the direction of the pipe and its mode.
     ///
     /// # Errors
-    /// In addition to regular OS errors, an error will be returned if the given `Rm` is [`pipe_mode::Messages`], but the `mode` field isn't also [`pipe_mode::Messages`].
+    /// In addition to regular OS errors, an error will be returned if the given `Rm` is [`pipe_mode::Messages`], but
+    /// the `mode` field isn't also [`pipe_mode::Messages`].
     pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
         let (owned_config, instance) = self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         let nonblocking = owned_config.nonblocking.into();

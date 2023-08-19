@@ -34,7 +34,11 @@ fn static_runtime_handle() -> &'static RuntimeHandle {
                 .thread_name("Tokio limbo dispatcher")
                 .thread_stack_size(1024 * 1024)
                 .build()
-                .expect("failed to build Tokio limbo helper (only necessary if the first named pipe to be dropped happens to go out of scope outside of another Tokio runtime)")
+                .expect(
+                    "\
+failed to build Tokio limbo helper (only necessary if the first named pipe to be dropped happens to go out of scope \
+outside of another Tokio runtime)",
+                )
         })
         .handle()
 }

@@ -139,7 +139,8 @@ impl<'a> Cmsg<'a> {
     pub const fn space_occupied(&self) -> usize {
         unsafe { libc::CMSG_SPACE(self.data.len() as c_uint) as usize }
     }
-    /// Clones the control message. No special treatment of the contained data is performed, and the struct is simply copied bitwise, with the data slice pointing to the same memory.
+    /// Clones the control message. No special treatment of the contained data is performed, and the struct is simply
+    /// copied bitwise, with the data slice pointing to the same memory.
     ///
     /// # Safety
     /// As outlined in the [struct-level documentation](Cmsg), control messages can potentially and unknowingly have

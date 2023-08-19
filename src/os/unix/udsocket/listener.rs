@@ -14,7 +14,8 @@ use to_method::To;
 
 /// A Unix domain byte stream socket server, listening for connections.
 ///
-/// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP server.
+/// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP
+/// server.
 ///
 /// # Examples
 ///
@@ -57,9 +58,13 @@ pub struct UdStreamListener {
 impl UdStreamListener {
     /// Creates a new listener socket at the specified address.
     ///
-    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the
+    /// [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should
+    /// always be handled regardless of whether the path is known to be short enough or not.
     ///
-    /// After the socket is dropped, the socket file will be left over. Use [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics (if unwinding is enabled).
+    /// After the socket is dropped, the socket file will be left over. Use
+    /// [`bind_with_drop_guard()`](Self::bind_with_drop_guard) to mitigate this automatically, even during panics (if
+    /// unwinding is enabled).
     ///
     /// # Example
     /// See [`ToUdSocketPath`].
@@ -74,7 +79,8 @@ impl UdStreamListener {
     pub fn bind<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
         Self::_bind(path.to_socket_path()?, false, false)
     }
-    /// Creates a new listener socket at the specified address, remembers the address, and installs a drop guard that will delete the socket file once the socket is dropped.
+    /// Creates a new listener socket at the specified address, remembers the address, and installs a drop guard that
+    /// will delete the socket file once the socket is dropped.
     ///
     /// See the documentation of [`bind()`](Self::bind).
     pub fn bind_with_drop_guard<'a>(path: impl ToUdSocketPath<'a>) -> io::Result<Self> {
@@ -153,7 +159,8 @@ impl UdStreamListener {
         }
     }
 
-    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to
+    /// conveniently create a main loop for a socket server.
     ///
     /// # Example
     /// ```no_run
@@ -176,11 +183,13 @@ impl UdStreamListener {
 
     /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
     ///
-    /// In nonblocking mode, calls to [`accept`], and, by extension, iteration through [`incoming`] will never wait for a client to become available to connect and will instead return a [`WouldBlock`] error immediately, allowing the thread to perform other useful operations while there are no new client connections to accept.
+    /// In nonblocking mode, calls to [`accept`], and, by extension, iteration through [`incoming`] will never wait for
+    /// a client to become available to connect and will instead return a [`WouldBlock`](io::ErrorKind::WouldBlock)
+    /// error immediately, allowing the thread to perform other useful operations while there are no new client
+    /// connections to accept.
     ///
     /// [`accept`]: #method.accept " "
     /// [`incoming`]: #method.incoming " "
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         c_wrappers::set_nonblocking(self.fd.0.as_fd(), nonblocking)
     }
@@ -233,7 +242,6 @@ derive_raw!(unix: UdStreamListener);
 ///
 /// This iterator is created by the [`incoming`] method on [`UdStreamListener`] – see its documentation for more.
 ///
-/// [`UdStreamListener`]: struct.UdStreamListener.html " "
 /// [`incoming`]: struct.UdStreamListener.html#method.incoming " "
 pub struct Incoming<'a> {
     listener: &'a UdStreamListener,

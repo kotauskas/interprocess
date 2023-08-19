@@ -6,7 +6,8 @@ use tokio::net::UnixListener as TokioUdStreamListener;
 
 /// A Tokio-based Unix domain byte stream socket server, listening for connections.
 ///
-/// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP server.
+/// All such sockets have the `SOCK_STREAM` socket type; in other words, this is the Unix domain version of a TCP
+/// server.
 ///
 /// Can be freely converted to and from its Tokio counterpart.
 ///
@@ -97,7 +98,9 @@ pub struct UdStreamListener(TokioUdStreamListener);
 impl UdStreamListener {
     /// Creates a new listener socket at the specified address.
     ///
-    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should always be handled regardless of whether the path is known to be short enough or not.
+    /// If the socket path exceeds the [maximum socket path length] (which includes the first 0 byte when using the
+    /// [socket namespace]), an error is returned. Errors can also be produced for different reasons, i.e. errors should
+    /// always be handled regardless of whether the path is known to be short enough or not.
     ///
     /// # Example
     /// See [`ToUdSocketPath`].

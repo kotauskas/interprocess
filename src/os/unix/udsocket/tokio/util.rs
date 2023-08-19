@@ -46,7 +46,8 @@ macro_rules! tokio_wrapper_trait_impls {
     (for $slf:ty, @tokio $tok:ty) => {
         tokio_wrapper_trait_impls!(for $slf, @tokio_onlyasfd $tok);
 
-        /// Releases ownership of the raw file descriptor, detaches the object from the Tokio runtime and returns the file descriptor as an [`OwnedFd`](::std::os::unix::io::OwnedFd).
+        /// Releases ownership of the raw file descriptor, detaches the object from the Tokio runtime and returns the
+        /// file descriptor as an [`OwnedFd`](::std::os::unix::io::OwnedFd).
         ///
         /// # Errors
         /// Returns an error if called outside of a Tokio runtime.
@@ -59,7 +60,8 @@ macro_rules! tokio_wrapper_trait_impls {
                 Ok(fd)
             }
         }
-        /// Creates a Tokio-based async object from a given owned file descriptor. This will also attach the object to the Tokio runtime this function is called in, so calling it outside a runtime will result in an error.
+        /// Creates a Tokio-based async object from a given owned file descriptor. This will also attach the object to
+        /// the Tokio runtime this function is called in, so calling it outside a runtime will result in an error.
         ///
         /// # Errors
         /// Returns an error if called outside of a Tokio runtime.
@@ -100,7 +102,8 @@ macro_rules! tokio_wrapper_trait_impls {
         }
     };
     (for $slf:ty, @std $std:ty) => {
-        /// Detaches the async object from the Tokio runtime and converts it to a blocking one from the standard library.
+        /// Detaches the async object from the Tokio runtime and converts it to a blocking one from the standard
+        /// library.
         ///
         /// # Errors
         /// Returns an error if called outside of a Tokio runtime.

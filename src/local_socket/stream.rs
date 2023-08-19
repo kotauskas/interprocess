@@ -10,7 +10,8 @@ impmod! {local_socket,
     LocalSocketStream as LocalSocketStreamImpl
 }
 
-/// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
+/// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting
+/// to an existing local socket.
 ///
 /// # Examples
 ///

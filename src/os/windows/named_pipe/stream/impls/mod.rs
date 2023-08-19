@@ -218,7 +218,8 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     }
 }
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
-    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
+    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
+    /// what was requested to be sent).
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.write(buf)
@@ -232,12 +233,14 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
+    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server
+    /// instance is dispatched.
     pub fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some())?;
         Ok(Self::new(raw))
     }
-    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added automatically), blocking until a server instance is dispatched.
+    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added
+    /// automatically), blocking until a server instance is dispatched.
     pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
         let raw = RawPipeStream::connect(
             pipename.as_ref(),
@@ -247,7 +250,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         )?;
         Ok(Self::new(raw))
     }
-    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
+    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
+    /// dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
     pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
         let raw_a = Arc::new(self.raw);
         let raw_ac = Arc::clone(&raw_a);
@@ -282,21 +286,28 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to
+    /// a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         self.raw.is_server
     }
-    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a
+    /// listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.raw.is_server
     }
     /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
     ///
-    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to perform useful actions in the meantime.
+    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer
+    /// has filled up because the receiving side did not read enough bytes in time will never block like they normally
+    /// do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to
+    /// perform useful actions in the meantime.
     ///
-    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
+    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option,
+    /// [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk
+    /// for all current instances and future ones.
     ///
     /// [`nonblocking`]: super::super::PipeListenerOptions::nonblocking
     /// [`set_nonblocking`]: super::super::PipeListenerOptions::set_nonblocking
@@ -305,7 +316,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         self.raw.set_nonblocking(Rm::MODE, nonblocking)
     }
 
-    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
+    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong
+    /// kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
             raw,
@@ -314,19 +326,23 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
-    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its entirety).
+    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its
+    /// entirety).
     ///
     /// Only available on streams that have a send mode.
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
         self.raw.flush()
     }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
+    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
+    /// limbo.
     #[inline]
     pub fn assume_flushed(&self) {
         self.raw.assume_flushed()
     }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
+    /// dropping it.
     pub fn evade_limbo(self) {
         self.assume_flushed();
     }
@@ -398,9 +414,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeStream<Rm, Sm>> for OwnedHandle 
         x.raw.into()
     }
 }
-/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is returned.
+/// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or
+/// trying to figure out whether it's wrong or not caused a system call error, the corresponding error condition is
+/// returned.
 ///
-/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has message boundaries.
+/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only pipes will cause
+/// "access denied" errors because they lack permissions to check whether it's a server-side pipe and whether it has
+/// message boundaries.
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
     type Error = FromHandleError;
 

@@ -19,7 +19,8 @@ impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl
 }
 
-/// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local socket.
+/// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or
+/// by connecting to an existing local socket.
 ///
 /// # Examples
 ///

@@ -16,7 +16,8 @@ fn reunite<Rm: PipeModeTag, Sm: PipeModeTag>(
 }
 
 impl<Rm: PipeModeTag> RecvHalf<Rm> {
-    /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both halves as an error if they belong to different streams.
+    /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both
+    /// halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Sm: PipeModeTag>(self, other: SendHalf<Sm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(self, other)
@@ -41,12 +42,14 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.raw.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by
+    /// connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         matches!(self.raw.inner(), InnerTokio::Server(..))
     }
-    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was
+    /// created by a listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.is_server()
@@ -143,20 +146,24 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
         *slf_flush = None;
         rslt
     }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
+    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
+    /// limbo.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     #[inline]
     pub fn assume_flushed(&self) {
         self.raw.assume_flushed()
     }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
+    /// dropping it.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     pub fn evade_limbo(self) {
         self.assume_flushed();
     }
-    /// Attempts to reunite this send half with the given receive half to yield the original stream back, returning both halves as an error if they belong to different streams.
+    /// Attempts to reunite this send half with the given receive half to yield the original stream back, returning both
+    /// halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(other, self)
@@ -181,19 +188,22 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.raw.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by
+    /// connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         matches!(self.raw.inner(), InnerTokio::Server(..))
     }
-    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was
+    /// created by a listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.is_server()
     }
 }
 impl SendHalf<pipe_mode::Messages> {
-    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
+    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
+    /// what was requested to be sent).
     #[inline]
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.write(buf).await

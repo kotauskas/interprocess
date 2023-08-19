@@ -1,11 +1,22 @@
 //! Traits for receiving from IPC channels with message boundaries reliably, without truncation.
 //!
 //! ## The problem
-//! Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why no such interface is exposed by any OS – instead, all messages received from message IPC channels are full messages rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of implementing datagram support.
+//! Unlike a byte stream interface, message-mode named pipes preserve boundaries between different write calls, which is
+//! what "message boundary" essentially means. Extracting messages by partial reads is an error-prone task, which is why
+//! no such interface is exposed by any OS – instead, all messages received from message IPC channels are full messages
+//! rather than chunks of messages, which simplifies things to a great degree and is arguably the only proper way of
+//! implementing datagram support.
 //!
-//! There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully receive a message. With byte streams, that always works – there either is some data which can be written into that buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits into the buffer without discarding it and then actually receiving it into a suitably large buffer. In such a case, the message needs an alternate channel besides the buffer to somehow get returned.
+//! There is one pecularity related to this design: you can't just use a buffer with arbitrary length to successfully
+//! receive a message. With byte streams, that always works – there either is some data which can be written into that
+//! buffer or end of file has been reached, aside from the implied error case which is always a possibility for any kind
+//! of I/O. With message streams, however, **there might not always be enough space in a buffer to fetch a whole
+//! message**. If the buffer is too small to fetch a message, it won't be written into the buffer, but simply will be
+//! ***discarded*** instead. The only way to protect from it being discarded is first checking whether the message fits
+//! into the buffer without discarding it and then actually receiving it into a suitably large buffer. In such a case,
+//! the message needs an alternate channel besides the buffer to somehow get returned.
 //!
-//! This brings the discussion specifically to the signature of the `recv` method:
+//! This brings us to the signature of the `recv` method:
 //! ```no_run
 //! # use std::io;
 //! # type RecvResult = ();
@@ -13,9 +24,15 @@
 //! fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult>;
 //! # }
 //! ```
-//! Notice the nested result that's going on here. Setting aside from the `io::Result` part, the "true return value" is [`RecvResult`]. The `Fit(...)` variant here means that the message has been successfully received into the buffer and contains the actual size of the message which has been received. The `Alloc(...)` variant means that the buffer was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message. The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv` function, see if it fits inside the buffer, and if it does not, replace the stored buffer with the new one.
+//! Notice the nested result that's going on here. Setting aside from the `io::Result` part, the "true return value" is
+//! [`RecvResult`]. The `Fit(...)` variant here means that the message has been successfully received into the buffer
+//! and contains the actual size of the message which has been received. The `Alloc(...)` variant means that the buffer
+//! was too small for the message, containing a freshly allocated buffer which is just big enough to fit the message.
+//! The usage strategy is to store a buffer, mutably borrow it and pass it to the `recv` function, see if it fits inside
+//! the buffer, and if it does not, replace the stored buffer with the new one.
 //!
-//! The `try_recv` method is used mainly by implementations of `recv`, but can also be called directly. It has the following signature:
+//! The `try_recv` method is used mainly by implementations of `recv`, but can also be called directly. It has the
+//! following signature:
 //! ```no_run
 //! # use std::io;
 //! # type TryRecvResult = ();
@@ -23,13 +40,15 @@
 //! fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
 //! # }
 //! ```
-//! The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it didn't fit, the buffer is unaffected (unlike with `RecvResult`).
+//! The inner [`TryRecvResult`] reports both the size of the message and whether it fit into the buffer or not. If it
+//! didn't fit, the buffer is unaffected (unlike with `RecvResult`).
 //!
 //! ## Platform support
 //! The traits are implemented for:
 //! - Named pipes on Windows (module `interprocess::os::windows::named_pipe`)
 //! - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
-//!     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message regardless of the provided buffer size when peeking.
+//!     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message
+//!       regardless of the provided buffer size when peeking.
 
 use std::{
     error::Error,
@@ -44,10 +63,15 @@ use std::{
 ///
 /// See the [module-level documentation](self) for more.
 pub trait ReliableRecvMsg {
-    /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
+    /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message,
+    /// which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided
+    /// buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost
+    /// `Result` is returned.
     fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
 
-    /// Receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    /// Receives one message from the stream into the specified buffer, returning either the size of the message
+    /// written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the
+    /// operation could not be completed for OS reasons.
     fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
         let TryRecvResult { size, fit } = self.try_recv(buf)?;
         if fit {
@@ -69,10 +93,15 @@ pub trait ReliableRecvMsg {
 ///
 /// See the [module-level documentation](self) for more.
 pub trait AsyncReliableRecvMsg {
-    /// Polls a future that attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
+    /// Polls a future that attempts to receive one message from the stream into the specified buffer, returning the
+    /// size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not
+    /// fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error
+    /// from the outermost `Result` is returned.
     fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>>;
 
-    /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of
+    /// the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if
+    /// the operation could not be completed for OS reasons.
     fn poll_recv(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
         let TryRecvResult { size, fit } = match self.as_mut().poll_try_recv(cx, buf) {
             Poll::Ready(r) => r?,
@@ -101,7 +130,9 @@ pub trait AsyncReliableRecvMsg {
 ///
 /// See the [module-level documentation](self) for more.
 pub trait AsyncReliableRecvMsgExt: AsyncReliableRecvMsg {
-    /// Asynchronously receives one message from the stream into the specified buffer, returning either the size of the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the operation could not be completed for OS reasons.
+    /// Asynchronously receives one message from the stream into the specified buffer, returning either the size of the
+    /// message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the
+    /// operation could not be completed for OS reasons.
     fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b, Self>
     where
         Self: Unpin,
@@ -109,7 +140,10 @@ pub trait AsyncReliableRecvMsgExt: AsyncReliableRecvMsg {
         Recv(self, buf)
     }
 
-    /// Asynchronously attempts to receive one message from the stream into the specified buffer, returning the size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost `Result` is returned.
+    /// Asynchronously attempts to receive one message from the stream into the specified buffer, returning the size of
+    /// the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into
+    /// the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the
+    /// outermost `Result` is returned.
     fn try_recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> TryRecv<'a, 'b, Self>
     where
         Self: Unpin,
@@ -140,7 +174,9 @@ impl<T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for TryRecv<'_, '_, T> {
     }
 }
 
-/// Marker error indicating that a datagram write operation failed because the amount of bytes which were actually written as reported by the operating system was smaller than the size of the message which was requested to be written.
+/// Marker error indicating that a datagram write operation failed because the amount of bytes which were actually
+/// written as reported by the operating system was smaller than the size of the message which was requested to be
+/// written.
 ///
 /// Always emitted with the `ErrorKind::Other` error type.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -157,7 +193,8 @@ impl Error for PartialMsgWriteError {}
 pub enum RecvResult {
     /// Indicates that the message successfully fit into the provided buffer.
     Fit(usize),
-    /// Indicates that it didn't fit into the provided buffer and contains a new, bigger buffer which it was written to instead.
+    /// Indicates that it didn't fit into the provided buffer and contains a new, bigger buffer which it was written to
+    /// instead.
     Alloc(Vec<u8>),
 }
 impl RecvResult {
@@ -221,7 +258,8 @@ impl From<RecvResult> for Result<usize, Vec<u8>> {
 
 /// Result type for `.try_recv()` methods.
 ///
-/// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it doesn't and hence wasn't written into the buffer. Both variants' payload is the total size of the message.
+/// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it
+/// doesn't and hence wasn't written into the buffer. Both variants' payload is the total size of the message.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TryRecvResult {
     /// The size of the message.

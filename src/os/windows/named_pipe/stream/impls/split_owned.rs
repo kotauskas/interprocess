@@ -22,7 +22,8 @@ fn reunite<Rm: PipeModeTag, Sm: PipeModeTag>(
 }
 
 impl<Rm: PipeModeTag> RecvHalf<Rm> {
-    /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both halves as an error if they belong to different streams.
+    /// Attempts to reunite this receive half with the given send half to yield the original stream back, returning both
+    /// halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Sm: PipeModeTag>(self, other: SendHalf<Sm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(self, other)
@@ -47,21 +48,29 @@ impl<Rm: PipeModeTag> RecvHalf<Rm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by
+    /// connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         self.raw.is_server
     }
-    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was
+    /// created by a listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.raw.is_server
     }
-    /// Sets whether the nonblocking mode for the whole pipe stream is enabled. **Note that this also affects the associated send half.** By default, it is disabled.
+    /// Sets whether the nonblocking mode for the whole pipe stream is enabled. **Note that this also affects the
+    /// associated send half.** By default, it is disabled.
     ///
-    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to perform useful actions in the meantime.
+    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer
+    /// has filled up because the receiving side did not read enough bytes in time will never block like they normally
+    /// do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to
+    /// perform useful actions in the meantime.
     ///
-    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
+    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option,
+    /// [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk
+    /// for all current instances and future ones.
     ///
     /// [`nonblocking`]: crate::os::windows::named_pipe::PipeListenerOptions::nonblocking
     /// [`set_nonblocking`]: crate::os::windows::named_pipe::PipeListenerOptions::set_nonblocking
@@ -131,23 +140,28 @@ impl<Rm: PipeModeTag> AsHandle for RecvHalf<Rm> {
 derive_asraw!(windows: {Rm: PipeModeTag} RecvHalf<Rm>);
 
 impl<Sm: PipeModeTag> SendHalf<Sm> {
-    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its entirety).
+    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its
+    /// entirety).
     ///
     /// Only available on streams that have a send mode.
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
         self.raw.flush()
     }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to limbo.
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
+    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
+    /// limbo.
     #[inline]
     pub fn assume_flushed(&self) {
         self.raw.assume_flushed()
     }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before dropping it.
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
+    /// dropping it.
     pub fn evade_limbo(self) {
         self.assume_flushed();
     }
-    /// Attempts to reunite this send half with the given receive half to yield the original stream back, returning both halves as an error if they belong to different streams.
+    /// Attempts to reunite this send half with the given receive half to yield the original stream back, returning both
+    /// halves as an error if they belong to different streams.
     #[inline]
     pub fn reunite<Rm: PipeModeTag>(self, other: RecvHalf<Rm>) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
         reunite(other, self)
@@ -172,21 +186,29 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.as_handle(), GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by connecting to a server (server-side).
+    /// Returns `true` if the underlying stream was created by a listener (server-side), `false` if it was created by
+    /// connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         self.raw.is_server
     }
-    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was created by a listener (server-side).
+    /// Returns `true` if the underlying stream was created by connecting to a server (client-side), `false` if it was
+    /// created by a listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.raw.is_server
     }
-    /// Sets whether the nonblocking mode for the whole pipe stream is enabled. **Note that this also affects the associated receive half.** By default, it is disabled.
+    /// Sets whether the nonblocking mode for the whole pipe stream is enabled. **Note that this also affects the
+    /// associated receive half.** By default, it is disabled.
     ///
-    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer has filled up because the receiving side did not read enough bytes in time will never block like they normally do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to perform useful actions in the meantime.
+    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to write when the buffer
+    /// has filled up because the receiving side did not read enough bytes in time will never block like they normally
+    /// do. Instead, a [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread to
+    /// perform useful actions in the meantime.
     ///
-    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option, [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk for all current instances and future ones.
+    /// *If called on the server side, the flag will be set only for one stream instance.* A listener creation option,
+    /// [`nonblocking`], and a similar method on the listener, [`set_nonblocking`], can be used to set the mode in bulk
+    /// for all current instances and future ones.
     ///
     /// [`nonblocking`]: crate::os::windows::named_pipe::PipeListenerOptions::nonblocking
     /// [`set_nonblocking`]: crate::os::windows::named_pipe::PipeListenerOptions::set_nonblocking
@@ -195,7 +217,8 @@ impl<Sm: PipeModeTag> SendHalf<Sm> {
     }
 }
 impl SendHalf<pipe_mode::Messages> {
-    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of what was requested to be sent).
+    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
+    /// what was requested to be sent).
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.write(buf)

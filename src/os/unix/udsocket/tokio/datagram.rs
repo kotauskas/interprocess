@@ -78,7 +78,8 @@ impl UdDatagram {
         let socket = TokioUdDatagram::bind(path.as_osstr())?;
         Ok(Self(socket))
     }
-    /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead, but supplying the address to the kernel once is more efficient.
+    /// Selects the Unix domain socket to send packets to. You can also just use [`.send_to()`](Self::send_to) instead,
+    /// but supplying the address to the kernel once is more efficient.
     ///
     /// See [`ToUdSocketPath`] for an example of using various string types to specify socket paths.
     pub fn set_destination<'a>(&self, path: impl ToUdSocketPath<'a>) -> io::Result<()> {
@@ -104,13 +105,15 @@ impl UdDatagram {
     }
     /// Receives a single datagram from the socket, returning the amount of bytes received.
     ///
-    /// Uses an `std`-like `&mut [u8]` interface. See `.recv()` for a version which uses Tokio's [`ReadBuf`](TokioReadBuf) instead.
+    /// Uses an `std`-like `&mut [u8]` interface. See `.recv()` for a version which uses Tokio's
+    /// [`ReadBuf`](TokioReadBuf) instead.
     pub async fn recv_stdbuf(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.recv(buf).await
     }
     /// Asynchronously waits until readable data arrives to the socket.
     ///
-    /// May finish spuriously – *do not* perform a blocking read when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
+    /// May finish spuriously – *do not* perform a blocking read when this future finishes and *do* handle a
+    /// [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
     pub async fn recv_ready(&self) -> io::Result<()> {
         self.0.readable().await
     }
@@ -126,9 +129,11 @@ impl UdDatagram {
     async fn _send_to(&self, buf: &[u8], path: &UdSocketPath<'_>) -> io::Result<usize> {
         self.0.send_to(buf, path.as_osstr()).await
     }
-    /// Asynchronously waits until the socket becomes writable due to the other side freeing up space in its OS receive buffer.
+    /// Asynchronously waits until the socket becomes writable due to the other side freeing up space in its OS receive
+    /// buffer.
     ///
-    /// May finish spuriously – *do not* perform a blocking write when this future finishes and *do* handle a [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
+    /// May finish spuriously – *do not* perform a blocking write when this future finishes and *do* handle a
+    /// [`WouldBlock`](io::ErrorKind::WouldBlock) or [`Poll::Pending`].
     pub async fn send_ready(&self) -> io::Result<()> {
         self.0.writable().await
     }
@@ -136,7 +141,8 @@ impl UdDatagram {
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.0.poll_recv(cx, buf)
     }
-    /// Raw polling interface for receiving datagrams with an `std`-like receive buffer. You probably want `.recv_stdbuf()` instead.
+    /// Raw polling interface for receiving datagrams with an `std`-like receive buffer. You probably want
+    /// `.recv_stdbuf()` instead.
     pub fn poll_recv_stdbuf(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<()>> {
         let mut readbuf = TokioReadBuf::new(buf);
         self.0.poll_recv(cx, &mut readbuf)
