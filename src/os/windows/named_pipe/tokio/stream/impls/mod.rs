@@ -366,6 +366,21 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             },
         )
     }
+    /// Converts into a `RecvHalf` – same as `split()`, but the send half is not constructed, saving an `Arc` clone.
+    pub fn into_recv_half(self) -> RecvHalf<Rm> {
+        RecvHalf {
+            raw: Arc::new(self.raw),
+            _phantom: PhantomData,
+        }
+    }
+    /// Converts into a `SendHalf` – same as `split()`, but the receive half is not constructed, saving an `Arc` clone.
+    pub fn into_send_half(self) -> SendHalf<Sm> {
+        SendHalf {
+            raw: Arc::new(self.raw),
+            flush: self.flush,
+            _phantom: PhantomData,
+        }
+    }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
     pub fn client_process_id(&self) -> io::Result<u32> {
