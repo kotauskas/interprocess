@@ -361,7 +361,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
             },
             SendHalf {
                 raw: raw_ac,
-                flush: TokioMutex::new(None),
+                flush: self.flush,
                 _phantom: PhantomData,
             },
         )
