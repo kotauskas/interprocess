@@ -41,17 +41,16 @@ where
 
 pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(server: Srv, client: Clt) -> TestResult
 where
-    T: Send + Sync + 'static,
-    Srv: FnOnce(Sender<T>, u32) -> Srvf + Send + 'static,
+    T: Send + Sync + ?Sized + 'static,
+    Srv: FnOnce(Sender<Arc<T>>, u32) -> Srvf + Send + 'static,
     Srvf: Future<Output = TestResult>,
     Clt: Fn(Arc<T>) -> Cltf + Send + Sync + 'static,
     Cltf: Future<Output = TestResult> + Send,
 {
-    let client_wrapper = move |msg| async {
+    let client_wrapper = |msg| async move {
         let client = Arc::new(client);
         let choke = Arc::new(Semaphore::new(NUM_CONCURRENT_CLIENTS.try_into().unwrap()));
 
-        let msg = Arc::new(msg);
         let mut client_tasks = Vec::with_capacity(NUM_CLIENTS.try_into().unwrap());
         for _ in 0..NUM_CLIENTS {
             let permit = Arc::clone(&choke).acquire_owned().await.unwrap();
@@ -71,7 +70,7 @@ where
         }
         Ok::<(), color_eyre::eyre::Error>(())
     };
-    let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
+    let server_wrapper = move |sender: Sender<Arc<T>>| server(sender, NUM_CLIENTS);
 
     drive_pair(server_wrapper, "server", client_wrapper, "client").await
 }

@@ -115,6 +115,8 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 /// Type alias for a pipe stream with a write mode but no read mode.
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
+// TODO replace halves with the main stream type after all
+
 /// The receiving half of a [`PipeStream`] as produced via `.split()`.
 pub struct RecvHalf<Rm: PipeModeTag> {
     raw: Arc<RawPipeStream>,

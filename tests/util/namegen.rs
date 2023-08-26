@@ -1,4 +1,7 @@
-use {super::Xorshift32, interprocess::local_socket::NameTypeSupport};
+use super::Xorshift32;
+use interprocess::local_socket::NameTypeSupport;
+use std::sync::Arc;
+
 #[derive(Copy, Clone, Debug)]
 pub struct NameGen {
     rng: Xorshift32,
@@ -23,15 +26,15 @@ impl NameGen {
         };
         Self::new(id, namespaced)
     }
-    fn next_path(&mut self) -> String {
-        format!("/tmp/interprocess-test-{:08x}.sock", self.rng.next())
+    fn next_path(&mut self) -> Arc<str> {
+        format!("/tmp/interprocess-test-{:08x}.sock", self.rng.next()).into()
     }
-    fn next_namespaced(&mut self) -> String {
-        format!("@interprocess-test-{:08x}.sock", self.rng.next())
+    fn next_namespaced(&mut self) -> Arc<str> {
+        format!("@interprocess-test-{:08x}.sock", self.rng.next()).into()
     }
 }
 impl Iterator for NameGen {
-    type Item = String;
+    type Item = Arc<str>;
     fn next(&mut self) -> Option<Self::Item> {
         let name = match self.namespaced {
             false => self.next_path(),

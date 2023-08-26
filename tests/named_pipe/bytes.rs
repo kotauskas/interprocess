@@ -4,10 +4,16 @@ use interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeLis
 use std::{
     ffi::OsStr,
     io::{prelude::*, BufReader},
-    sync::mpsc::Sender,
+    sync::{mpsc::Sender, Arc},
 };
 
-pub fn server(name_sender: Sender<String>, num_clients: u32, recv: bool, send: bool) -> TestResult {
+// TODO use correct stream type
+
+fn msg(server: bool) -> Box<str> {
+    message(None, server, None)
+}
+
+pub fn server(name_sender: Sender<Arc<str>>, num_clients: u32, recv: bool, send: bool) -> TestResult {
     let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), true), |nm| {
         PipeListenerOptions::new()
             .name(nm.as_ref() as &OsStr)
@@ -22,15 +28,15 @@ pub fn server(name_sender: Sender<String>, num_clients: u32, recv: bool, send: b
         let mut conn = listener.accept().context("accept failed").map(BufReader::new)?;
 
         if recv {
-            let expected = message(false, Some('\n'));
+            let expected = msg(false);
             conn.read_line(&mut buffer).context("pipe receive failed")?;
-            ensure_eq!(buffer, expected);
+            ensure_eq!(buffer, &*expected);
             buffer.clear();
         }
 
         if send {
-            let msg = message(true, Some('\n'));
-            conn.get_mut().write_all(msg.as_bytes()).context("pipe send failed")?;
+            let m = msg(true);
+            conn.get_mut().write_all(m.as_bytes()).context("pipe send failed")?;
             conn.get_mut().flush().context("pipe flush failed")?;
         }
     }
@@ -45,14 +51,14 @@ pub fn client(name: &str, recv: bool, send: bool) -> TestResult {
         .map(BufReader::new)?;
 
     if send {
-        let msg = message(false, Some('\n'));
-        conn.get_mut().write_all(msg.as_bytes()).context("pipe send failed")?;
+        let m = msg(false);
+        conn.get_mut().write_all(m.as_bytes()).context("pipe send failed")?;
     }
 
     if recv {
-        let expected = message(true, Some('\n'));
+        let expected = msg(true);
         conn.read_line(&mut buffer).context("pipe receive failed")?;
-        ensure_eq!(buffer, expected);
+        ensure_eq!(buffer, &*expected);
     }
 
     if send {

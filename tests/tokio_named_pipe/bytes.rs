@@ -1,96 +1,94 @@
-use {
-    super::util::{NameGen, TestResult},
-    color_eyre::eyre::{bail, Context},
-    futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    interprocess::os::windows::named_pipe::{
-        pipe_mode,
-        tokio::{DuplexPipeStream, PipeListenerOptionsExt},
-        PipeListenerOptions,
-    },
-    std::{convert::TryInto, ffi::OsStr, io, sync::Arc},
-    tokio::{sync::oneshot::Sender, task, try_join},
+use super::{
+    drive_server,
+    util::{message, TestResult},
 };
-// TODO context instead of bail, ensure_eq, untangle imports, use listen_and_pick_name
+use color_eyre::eyre::Context;
+use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use interprocess::os::windows::named_pipe::{
+    pipe_mode,
+    tokio::{self as np, DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+};
+use std::sync::Arc;
+use tokio::{sync::oneshot::Sender, try_join};
 
-static SERVER_MSG: &str = "Hello from server!\n";
-static CLIENT_MSG: &str = "Hello from client!\n";
-
-pub async fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> TestResult {
-        let (reader, mut writer) = conn.split();
-        let mut buffer = String::with_capacity(128);
-        let mut reader = BufReader::new(reader);
-
-        let recv = async { reader.read_line(&mut buffer).await.context("pipe receive failed") };
-        let send = async {
-            writer
-                .write_all(SERVER_MSG.as_bytes())
-                .await
-                .context("pipe send failed")
-        };
-        try_join!(recv, send)?;
-
-        assert_eq!(buffer, CLIENT_MSG);
-
-        Ok(())
-    }
-
-    let (name, listener) = NameGen::new(make_id!(), true)
-        .find_map(|nm| {
-            let rnm: &OsStr = nm.as_ref();
-            let l = match PipeListenerOptions::new()
-                .name(rnm)
-                .create_tokio_duplex::<pipe_mode::Bytes>()
-            {
-                Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(Ok((nm, l)))
-        })
-        .unwrap()
-        .context("listener bind failed")?;
-
-    let _ = name_sender.send(name);
-
-    let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
-
-    for _ in 0..num_clients {
-        let conn = match listener.accept().await {
-            Ok(c) => c,
-            Err(e) => bail!("incoming connection failed: {e}"),
-        };
-        let task = task::spawn(handle_conn(conn));
-        tasks.push(task);
-    }
-    for task in tasks {
-        task.await
-            .context("server task panicked")?
-            .context("server task returned early with error")?;
-    }
-
-    Ok(())
+fn msg(server: bool) -> Box<str> {
+    message(None, server, Some('\n'))
 }
-pub async fn client(name: Arc<String>) -> TestResult {
-    let mut buffer = String::with_capacity(128);
 
-    let (reader, mut writer) = DuplexPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
+pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        name_sender,
+        num_clients,
+        |plo| plo.create_tokio_duplex::<pipe_mode::Bytes>(),
+        handle_conn_duplex,
+    )
+    .await
+}
+pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        name_sender,
+        num_clients,
+        |plo| plo.create_tokio_recv_only::<pipe_mode::Bytes>(),
+        handle_conn_cts,
+    )
+    .await
+}
+pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        name_sender,
+        num_clients,
+        |plo| plo.create_tokio_send_only::<pipe_mode::Bytes>(),
+        handle_conn_stc,
+    )
+    .await
+}
+
+async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>>) -> TestResult {
+    let conn = listener.accept().await.context("accept failed")?;
+    let (reader, writer) = conn.split();
+    try_join!(read(reader, msg(false)), write(writer, msg(true))).map(|((), ())| ())
+}
+async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::None>>) -> TestResult {
+    let conn = listener.accept().await.context("accept failed")?;
+    read(conn.into_recv_half(), msg(false)).await
+}
+async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Bytes>>) -> TestResult {
+    let conn = listener.accept().await.context("accept failed")?;
+    write(conn.into_send_half(), msg(true)).await
+}
+
+pub async fn client_duplex(name: Arc<str>) -> TestResult {
+    let (reader, writer) = DuplexPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
         .context("connect failed")?
         .split();
+    try_join!(read(reader, msg(true)), write(writer, msg(false))).map(|((), ())| ())
+}
+pub async fn client_cts(name: Arc<str>) -> TestResult {
+    let writer = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
+        .await
+        .context("connect failed")?
+        .into_send_half();
+    write(writer, msg(false)).await
+}
+pub async fn client_stc(name: Arc<str>) -> TestResult {
+    let reader = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
+        .await
+        .context("connect failed")?
+        .into_recv_half();
+    read(reader, msg(true)).await
+}
 
+async fn read(reader: np::RecvHalf<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
+    let mut buffer = String::with_capacity(128);
     let mut reader = BufReader::new(reader);
-
-    let read = async { reader.read_line(&mut buffer).await.context("pipe receive failed") };
-    let write = async {
-        writer
-            .write_all(CLIENT_MSG.as_bytes())
-            .await
-            .context("pipe send failed")
-    };
-    try_join!(read, write)?;
-
-    assert_eq!(buffer, SERVER_MSG);
-
+    reader.read_line(&mut buffer).await.context("pipe receive failed")?;
+    ensure_eq!(buffer, exp.as_ref());
     Ok(())
+}
+async fn write(mut writer: np::SendHalf<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
+    writer
+        .write_all(snd.as_ref().as_bytes())
+        .await
+        .context("pipe send failed")
 }

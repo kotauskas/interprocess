@@ -18,21 +18,22 @@ const NUM_CLIENTS: u32 = 80;
 const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
 use color_eyre::eyre::Context;
-use std::io;
+use std::{fmt::Arguments, io, sync::Arc};
 
-pub fn message(server: bool, terminator: Option<char>) -> String {
+pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char>) -> Box<str> {
+    let msg = msg.unwrap_or_else(|| format_args!("Message"));
     let sc = if server { "server" } else { "client" };
-    let mut msg = format!("Message from {sc}!");
+    let mut msg = format!("{msg} from {sc}!");
     if let Some(t) = terminator {
         msg.push(t);
     }
-    msg
+    msg.into()
 }
 
 pub fn listen_and_pick_name<T>(
     namegen: &mut NameGen,
     mut bindfn: impl FnMut(&str) -> io::Result<T>,
-) -> TestResult<(String, T)> {
+) -> TestResult<(Arc<str>, T)> {
     namegen
         .find_map(|nm| {
             let l = match bindfn(&nm) {

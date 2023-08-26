@@ -7,12 +7,12 @@ use util::*;
 mod bytes;
 mod msg;
 
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Arc};
 fn mk_server(
-    f: impl (FnOnce(Sender<String>, u32, bool, bool) -> TestResult),
+    f: impl (FnOnce(Sender<Arc<str>>, u32, bool, bool) -> TestResult),
     recv: bool,
     send: bool,
-) -> impl (FnOnce(Sender<String>, u32) -> TestResult) {
+) -> impl (FnOnce(Sender<Arc<str>>, u32) -> TestResult) {
     move |snd, numc| (f)(snd, numc, recv, send)
 }
 fn mk_client(f: impl (Fn(&str, bool, bool) -> TestResult), recv: bool, send: bool) -> impl (Fn(&str) -> TestResult) {
