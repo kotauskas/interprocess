@@ -6,7 +6,7 @@ use color_eyre::eyre::Context;
 use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::os::windows::named_pipe::{
     pipe_mode,
-    tokio::{self as np, DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+    tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
 };
 use std::sync::Arc;
 use tokio::{sync::oneshot::Sender, try_join};
@@ -50,11 +50,11 @@ async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mo
 }
 async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::None>>) -> TestResult {
     let conn = listener.accept().await.context("accept failed")?;
-    read(conn.into_recv_half(), msg(false)).await
+    read(conn, msg(false)).await
 }
 async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Bytes>>) -> TestResult {
     let conn = listener.accept().await.context("accept failed")?;
-    write(conn.into_send_half(), msg(true)).await
+    write(conn, msg(true)).await
 }
 
 pub async fn client_duplex(name: Arc<str>) -> TestResult {
@@ -67,26 +67,24 @@ pub async fn client_duplex(name: Arc<str>) -> TestResult {
 pub async fn client_cts(name: Arc<str>) -> TestResult {
     let writer = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
-        .context("connect failed")?
-        .into_send_half();
+        .context("connect failed")?;
     write(writer, msg(false)).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
     let reader = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
-        .context("connect failed")?
-        .into_recv_half();
+        .context("connect failed")?;
     read(reader, msg(true)).await
 }
 
-async fn read(reader: np::RecvHalf<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
+async fn read(reader: RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
     let mut buffer = String::with_capacity(128);
     let mut reader = BufReader::new(reader);
     reader.read_line(&mut buffer).await.context("pipe receive failed")?;
     ensure_eq!(buffer, exp.as_ref());
     Ok(())
 }
-async fn write(mut writer: np::SendHalf<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
+async fn write(mut writer: SendPipeStream<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
     writer
         .write_all(snd.as_ref().as_bytes())
         .await

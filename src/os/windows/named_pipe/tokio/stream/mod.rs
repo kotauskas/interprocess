@@ -6,7 +6,10 @@ pub(crate) use wrapper_fns::*;
 use crate::{
     error::ConversionError,
     os::windows::{
-        named_pipe::stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
+        named_pipe::{
+            maybe_arc::MaybeArc,
+            stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
+        },
         winprelude::*,
     },
 };
@@ -16,7 +19,7 @@ use std::{
     fmt::{self, Display, Formatter},
     io,
     marker::PhantomData,
-    sync::{atomic::AtomicBool, Arc},
+    sync::atomic::AtomicBool,
 };
 use tokio::{
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
@@ -79,7 +82,7 @@ use tokio::{
 /// # Ok(()) }
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
-    raw: RawPipeStream,
+    raw: MaybeArc<RawPipeStream>,
     flush: TokioMutex<Option<FlushJH>>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
@@ -89,22 +92,13 @@ type FlushJH = tokio::task::JoinHandle<io::Result<()>>;
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
 
 /// Type alias for a pipe stream with a read mode but no write mode.
+///
+/// This can be produced by the listener, by connecting, or by splitting.
 pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 /// Type alias for a pipe stream with a write mode but no read mode.
+///
+/// This can be produced by the listener, by connecting, or by splitting.
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
-
-/// The receiving half of a [`PipeStream`] as produced via `.split()`.
-pub struct RecvHalf<Rm: PipeModeTag> {
-    raw: Arc<RawPipeStream>,
-    _phantom: PhantomData<Rm>,
-}
-
-/// The sending half of a [`PipeStream`] as produced via `.split()`.
-pub struct SendHalf<Sm: PipeModeTag> {
-    raw: Arc<RawPipeStream>,
-    flush: TokioMutex<Option<FlushJH>>,
-    _phantom: PhantomData<Sm>,
-}
 
 pub(crate) struct RawPipeStream {
     inner: Option<InnerTokio>,
@@ -167,9 +161,9 @@ pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
 #[derive(Debug)]
 pub struct ReuniteError<Rm: PipeModeTag, Sm: PipeModeTag> {
     /// The receive half that didn't go anywhere, in case you still need it.
-    pub recv_half: RecvHalf<Rm>,
+    pub recv_half: RecvPipeStream<Rm>,
     /// The send half that didn't go anywhere, in case you still need it.
-    pub send_half: SendHalf<Sm>,
+    pub send_half: SendPipeStream<Sm>,
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Display for ReuniteError<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

@@ -1,5 +1,5 @@
 use {
-    crate::os::windows::named_pipe::{pipe_mode, tokio::RecvHalf},
+    crate::os::windows::named_pipe::{pipe_mode, tokio::RecvPipeStream},
     futures_io::AsyncRead,
     std::{
         fmt::{self, Debug, Formatter},
@@ -9,7 +9,7 @@ use {
     },
 };
 
-type ReadHalfImpl = RecvHalf<pipe_mode::Bytes>;
+type ReadHalfImpl = RecvPipeStream<pipe_mode::Bytes>;
 
 pub struct ReadHalf(pub(super) ReadHalfImpl);
 impl ReadHalf {

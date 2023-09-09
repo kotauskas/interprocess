@@ -1,5 +1,5 @@
 use {
-    crate::os::windows::named_pipe::{pipe_mode, tokio::SendHalf},
+    crate::os::windows::named_pipe::{pipe_mode, tokio::SendPipeStream},
     futures_io::AsyncWrite,
     std::{
         fmt::{self, Debug, Formatter},
@@ -9,7 +9,7 @@ use {
     },
 };
 
-type WriteHalfImpl = SendHalf<pipe_mode::Bytes>;
+type WriteHalfImpl = SendPipeStream<pipe_mode::Bytes>;
 
 pub struct WriteHalf(pub(super) WriteHalfImpl);
 impl WriteHalf {

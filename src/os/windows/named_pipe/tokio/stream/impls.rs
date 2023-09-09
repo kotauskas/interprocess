@@ -1,8 +1,5 @@
 //! Methods and trait implementations for `PipeStream`.
 
-// TODO rename into just split
-mod split_owned;
-
 use super::{
     limbo::{send_off, Corpse},
     *,
@@ -11,12 +8,12 @@ use crate::{
     os::windows::{
         downgrade_eof, downgrade_poll_eof,
         named_pipe::{
+            maybe_arc::MaybeArc,
             path_conversion,
             stream::{
                 block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
-                UNWRAP_FAIL_MSG,
             },
-            PipeMode, PmtNotNone,
+            PipeMode, PmtNotNone, LIMBO_ERR, REBURY_ERR,
         },
         winprelude::*,
         FileHandle,
@@ -62,7 +59,6 @@ struct AssertHandleSyncSend(HANDLE);
 unsafe impl Sync for AssertHandleSyncSend {}
 unsafe impl Send for AssertHandleSyncSend {}
 
-static LIMBO_ERR: &str = "attempt to perform operation on pipe stream which has been sent off to limbo";
 impl RawPipeStream {
     fn new(inner: InnerTokio) -> Self {
         Self {
@@ -80,15 +76,9 @@ impl RawPipeStream {
     fn inner(&self) -> &InnerTokio {
         self.inner.as_ref().expect(LIMBO_ERR)
     }
-    fn inner_mut(&mut self) -> &mut InnerTokio {
-        self.inner.as_mut().expect(LIMBO_ERR)
-    }
 
     fn reap(&mut self) -> Corpse {
-        self.inner
-            .take()
-            .map(Corpse)
-            .expect("attempt to bury same pipe stream twice")
+        self.inner.take().map(Corpse).expect(REBURY_ERR)
     }
 
     async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
@@ -118,20 +108,24 @@ impl RawPipeStream {
         Ok(Self::new_client(client))
     }
 
-    fn poll_read_readbuf(&mut self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        downgrade_poll_eof(same_clsrv!(x in self.inner_mut() => Pin::new(x).poll_read(cx, buf)))
+    fn poll_read_readbuf(&self, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+        loop {
+            match same_clsrv!(x in self.inner() => x.try_read_buf(buf)) {
+                Ok(..) => return Poll::Ready(Ok(())),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(e) => return Poll::Ready(Err(e)),
+            }
+            ready!(same_clsrv!(x in self.inner() => x.poll_read_ready(cx)))?;
+        }
     }
 
-    // FIXME: silly Tokio doesn't support polling a named pipe through a shared reference, so this
-    // has to be `&mut self`.
-    // TODO hack &self into existence via split()
-    fn poll_read_uninit(&mut self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
+    fn poll_read_uninit(&self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
         let mut readbuf = TokioReadBuf::uninit(buf);
         ready!(downgrade_poll_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
         Poll::Ready(Ok(readbuf.filled().len()))
     }
     #[inline]
-    fn read_uninit<'a, 'b>(&'a mut self, buf: &'b mut [MaybeUninit<u8>]) -> ReadUninit<'a, 'b> {
+    fn read_uninit<'a, 'b>(&'a self, buf: &'b mut [MaybeUninit<u8>]) -> ReadUninit<'a, 'b> {
         ReadUninit(self, buf)
     }
 
@@ -287,7 +281,7 @@ impl Future for Write<'_> {
     }
 }
 
-struct ReadUninit<'a, 'b>(&'a mut RawPipeStream, &'b mut [MaybeUninit<u8>]);
+struct ReadUninit<'a, 'b>(&'a RawPipeStream, &'b mut [MaybeUninit<u8>]);
 impl Future for ReadUninit<'_, '_> {
     type Output = io::Result<usize>;
     #[inline]
@@ -297,8 +291,7 @@ impl Future for ReadUninit<'_, '_> {
     }
 }
 
-// FIXME: currently impossible due to Tokio limitations.
-/*
+/* TODO
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
     #[inline]
@@ -307,10 +300,7 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     }
     /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
     #[inline]
-    pub async fn try_recv_to_uninit(
-        &self,
-        buf: &mut [MaybeUninit<u8>],
-    ) -> io::Result<TryRecvResult> {
+    pub async fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
         self.raw.try_recv_msg(buf).await
     }
 }
@@ -323,13 +313,15 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
         self.raw.write(buf).await
     }
 }
+
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
     #[inline]
-    pub async fn read_to_uninit(&mut self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+    pub async fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         self.raw.read_uninit(buf).await
     }
 }
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), waiting until a server
     /// instance is dispatched.
@@ -350,36 +342,43 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         Ok(Self::new(raw))
     }
     /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
-    /// dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
-    pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
-        let raw_a = Arc::new(self.raw);
-        let raw_ac = Arc::clone(&raw_a);
+    /// dropped, kind of like an `Arc` (which is how it's implemented under the hood).
+    pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
+        let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
         (
-            RecvHalf {
+            RecvPipeStream {
                 raw: raw_a,
+                flush: None.into(), // PERF the mutex is unnecessary for readers
                 _phantom: PhantomData,
             },
-            SendHalf {
+            SendPipeStream {
                 raw: raw_ac,
                 flush: self.flush,
                 _phantom: PhantomData,
             },
         )
     }
-    /// Converts into a `RecvHalf` – same as `split()`, but the send half is not constructed, saving an `Arc` clone.
-    pub fn into_recv_half(self) -> RecvHalf<Rm> {
-        RecvHalf {
-            raw: Arc::new(self.raw),
-            _phantom: PhantomData,
+    /// Attempts to reunite a receive half with a send half to yield the original stream back,
+    /// returning both halves as an error if they belong to different streams (or when using
+    /// this method on streams that were never split to begin with).
+    pub fn reunite(
+        recver: RecvPipeStream<Rm>,
+        sender: SendPipeStream<Sm>,
+    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+        if !MaybeArc::ptr_eq(&recver.raw, &sender.raw) {
+            return Err(ReuniteError {
+                recv_half: recver,
+                send_half: sender,
+            });
         }
-    }
-    /// Converts into a `SendHalf` – same as `split()`, but the receive half is not constructed, saving an `Arc` clone.
-    pub fn into_send_half(self) -> SendHalf<Sm> {
-        SendHalf {
-            raw: Arc::new(self.raw),
-            flush: self.flush,
+        let PipeStream { mut raw, flush, .. } = sender;
+        drop(recver);
+        raw.try_make_owned();
+        Ok(PipeStream {
+            raw,
+            flush,
             _phantom: PhantomData,
-        }
+        })
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
@@ -418,12 +417,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
-            raw,
+            raw: MaybeArc::Inline(raw),
             flush: TokioMutex::new(None),
             _phantom: PhantomData,
         }
     }
 }
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     fn ensure_flush_start(&self, slf_flush: &mut TokioMutexGuard<'_, Option<FlushJH>>) {
         if slf_flush.is_some() {
@@ -496,6 +496,7 @@ impl<Sm: PipeModeTag> AsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
         Pin::new(&mut self.deref()).poll_read(cx, buf)
     }
 }
+// TODO TokioAsyncRead on ref
 impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {

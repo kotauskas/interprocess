@@ -35,6 +35,7 @@ mod stream;
 pub use {enums::*, listener::*, stream::*};
 
 mod limbo_pool;
+mod maybe_arc;
 mod path_conversion;
 
 #[cfg(feature = "tokio")]

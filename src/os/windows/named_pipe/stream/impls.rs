@@ -1,8 +1,5 @@
 //! Methods and trait implementations for `PipeStream`.
 
-mod split_owned;
-pub(crate) use split_owned::UNWRAP_FAIL_MSG;
-
 use super::{
     limbo::{send_off, Corpse},
     *,
@@ -40,6 +37,9 @@ pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
     unsafe { slice::from_raw_parts_mut(vec.as_mut_ptr() as *mut MaybeUninit<u8>, cap) }
 }
 
+pub(crate) static LIMBO_ERR: &str = "attempt to perform operation on pipe stream which has been sent off to limbo";
+pub(crate) static REBURY_ERR: &str = "attempt to bury same pipe stream twice";
+
 impl RawPipeStream {
     pub(crate) fn new(handle: FileHandle, is_server: bool) -> Self {
         Self {
@@ -56,14 +56,12 @@ impl RawPipeStream {
     }
 
     fn file_handle(&self) -> &FileHandle {
-        self.handle
-            .as_ref()
-            .expect("attempt to perform operation on pipe stream which has been sent off to limbo")
+        self.handle.as_ref().expect(LIMBO_ERR)
     }
 
     fn reap(&mut self) -> Corpse {
         Corpse {
-            handle: self.handle.take().expect("attempt to bury same pipe stream twice"),
+            handle: self.handle.take().expect(REBURY_ERR),
             is_server: self.is_server,
         }
     }
@@ -251,34 +249,40 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         Ok(Self::new(raw))
     }
     /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
-    /// dropped, kind of like an `Arc` (I wonder how it's implemented under the hood...).
-    pub fn split(self) -> (RecvHalf<Rm>, SendHalf<Sm>) {
-        let raw_a = Arc::new(self.raw);
-        let raw_ac = Arc::clone(&raw_a);
+    /// dropped, kind of like an `Arc` (which is how it's implemented under the hood).
+    pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
+        let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
         (
-            RecvHalf {
+            RecvPipeStream {
                 raw: raw_a,
                 _phantom: PhantomData,
             },
-            SendHalf {
+            SendPipeStream {
                 raw: raw_ac,
                 _phantom: PhantomData,
             },
         )
     }
-    /// Converts into a `RecvHalf` – same as `split()`, but the send half is not constructed, saving an `Arc` clone.
-    pub fn into_recv_half(self) -> RecvHalf<Rm> {
-        RecvHalf {
-            raw: Arc::new(self.raw),
-            _phantom: PhantomData,
+    /// Attempts to reunite a receive half with a send half to yield the original stream back,
+    /// returning both halves as an error if they belong to different streams (or when using
+    /// this method on streams that were never split to begin with).
+    pub fn reunite(
+        recver: RecvPipeStream<Rm>,
+        sender: SendPipeStream<Sm>,
+    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
+        if !MaybeArc::ptr_eq(&recver.raw, &sender.raw) {
+            return Err(ReuniteError {
+                recv_half: recver,
+                send_half: sender,
+            });
         }
-    }
-    /// Converts into a `SendHalf` – same as `split()`, but the receive half is not constructed, saving an `Arc` clone.
-    pub fn into_send_half(self) -> SendHalf<Sm> {
-        SendHalf {
-            raw: Arc::new(self.raw),
+        let mut raw = sender.raw;
+        drop(recver);
+        raw.try_make_owned();
+        Ok(PipeStream {
+            raw,
             _phantom: PhantomData,
-        }
+        })
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
@@ -334,11 +338,12 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
-            raw,
+            raw: raw.into(),
             _phantom: PhantomData,
         }
     }
 }
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its
     /// entirety).
@@ -422,10 +427,16 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
         self.raw.as_handle()
     }
 }
-impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeStream<Rm, Sm>> for OwnedHandle {
+/// Attempts to unwrap the given stream into the raw owned handle type, returning itself back if no
+/// ownership over it is available, as is the case when the stream is split.
+impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<PipeStream<Rm, Sm>> for OwnedHandle {
+    type Error = PipeStream<Rm, Sm>;
     #[inline]
-    fn from(x: PipeStream<Rm, Sm>) -> Self {
-        x.raw.into()
+    fn try_from(s: PipeStream<Rm, Sm>) -> Result<Self, Self::Error> {
+        match s.raw {
+            MaybeArc::Inline(x) => Ok(x.into()),
+            MaybeArc::Shared(..) => Err(s),
+        }
     }
 }
 /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe type is wrong or
@@ -437,7 +448,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeStream<Rm, Sm>> for OwnedHandle 
 /// message boundaries.
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
     type Error = FromHandleError;
-
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
         let raw = RawPipeStream::try_from(handle)?;
         // If the wrapper type tries to read incoming data as messages, that might break if
@@ -465,4 +475,4 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
     }
 }
 
-derive_asintoraw!(windows: {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>);
+derive_asraw!(windows: {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>);

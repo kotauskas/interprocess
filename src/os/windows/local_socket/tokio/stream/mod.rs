@@ -34,7 +34,7 @@ impl LocalSocketStream {
         (ReadHalf(r), WriteHalf(w))
     }
     pub fn reunite(rh: ReadHalf, wh: WriteHalf) -> io::Result<Self> {
-        match rh.0.reunite(wh.0) {
+        match DuplexPipeStream::reunite(rh.0, wh.0) {
             Ok(inner) => Ok(Self(inner)),
             Err(_) => todo!(),
         }

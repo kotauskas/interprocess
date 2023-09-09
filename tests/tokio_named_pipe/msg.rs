@@ -3,7 +3,7 @@ use color_eyre::eyre::Context;
 use interprocess::{
     os::windows::named_pipe::{
         pipe_mode,
-        tokio::{self as np, DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+        tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
     },
     reliable_recv_msg::AsyncReliableRecvMsgExt,
 };
@@ -53,11 +53,11 @@ async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Messages, pipe
     .map(|((), ())| ())
 }
 async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Messages, pipe_mode::None>>) -> TestResult {
-    let recver = listener.accept().await.context("accept failed")?.into_recv_half();
+    let recver = listener.accept().await.context("accept failed")?;
     recv(recver, CLIENT_MSG_1, CLIENT_MSG_2).await
 }
 async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Messages>>) -> TestResult {
-    let sender = listener.accept().await.context("accept failed")?.into_send_half();
+    let sender = listener.accept().await.context("accept failed")?;
     send(sender, SERVER_MSG_1, SERVER_MSG_2).await
 }
 
@@ -76,21 +76,19 @@ pub async fn client_duplex(nm: Arc<str>) -> TestResult {
 pub async fn client_cts(name: Arc<str>) -> TestResult {
     let sender = SendPipeStream::<pipe_mode::Messages>::connect(&*name)
         .await
-        .context("connect failed")?
-        .into_send_half();
+        .context("connect failed")?;
 
     send(sender, CLIENT_MSG_1, CLIENT_MSG_2).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
     let recver = RecvPipeStream::<pipe_mode::Messages>::connect(&*name)
         .await
-        .context("connect failed")?
-        .into_recv_half();
+        .context("connect failed")?;
 
     recv(recver, SERVER_MSG_1, SERVER_MSG_2).await
 }
 
-async fn recv(recver: np::RecvHalf<pipe_mode::Messages>, exp1: &[u8], exp2: &[u8]) -> TestResult {
+async fn recv(recver: RecvPipeStream<pipe_mode::Messages>, exp1: &[u8], exp2: &[u8]) -> TestResult {
     let mut buf = Vec::with_capacity(exp1.len());
 
     let rslt = (&recver).recv(&mut buf).await.context("first receive failed")?;
@@ -105,7 +103,7 @@ async fn recv(recver: np::RecvHalf<pipe_mode::Messages>, exp1: &[u8], exp2: &[u8
 
     Ok(())
 }
-async fn send(sender: np::SendHalf<pipe_mode::Messages>, snd1: &[u8], snd2: &[u8]) -> TestResult {
+async fn send(sender: SendPipeStream<pipe_mode::Messages>, snd1: &[u8], snd2: &[u8]) -> TestResult {
     let sent = sender.send(snd1).await.context("first send failed")?;
     ensure_eq!(sent, snd1.len());
 

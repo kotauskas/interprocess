@@ -4,8 +4,10 @@ pub use enums::*;
 mod impls;
 mod limbo;
 mod wrapper_fns;
-pub(crate) use {impls::*, wrapper_fns::*};
+pub(super) use impls::{LIMBO_ERR, REBURY_ERR};
+pub(crate) use wrapper_fns::*;
 
+use super::maybe_arc::MaybeArc;
 use crate::{error::ConversionError, os::windows::FileHandle};
 use std::{
     error::Error,
@@ -13,7 +15,7 @@ use std::{
     io,
     marker::PhantomData,
     os::windows::prelude::*,
-    sync::{atomic::AtomicBool, Arc},
+    sync::atomic::AtomicBool,
 };
 
 pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong to different pipe stream objects";
@@ -26,7 +28,7 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 /// Pipe streams can be split by reference and by value for concurrent receive and send operations. Splitting by
 /// reference is ephemeral and can be achieved by simply borrowing the stream, since both `PipeStream` and `&PipeStream`
 /// implement I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a
-/// [`RecvHalf`] and a [`SendHalf`], and can be reverted via the `.reunite()` method defined on the halves.
+/// receive half and a send half, and can be reverted via [`.reunite()`](PipeStream::reunite).
 ///
 /// # Examples
 ///
@@ -103,7 +105,7 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
-    raw: RawPipeStream,
+    raw: MaybeArc<RawPipeStream>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
 
@@ -111,23 +113,13 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
 
 /// Type alias for a pipe stream with a read mode but no write mode.
+///
+/// This can be produced by the listener, by connecting, or by splitting.
 pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 /// Type alias for a pipe stream with a write mode but no read mode.
+///
+/// This can be produced by the listener, by connecting, or by splitting.
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
-
-// TODO replace halves with the main stream type after all
-
-/// The receiving half of a [`PipeStream`] as produced via `.split()`.
-pub struct RecvHalf<Rm: PipeModeTag> {
-    raw: Arc<RawPipeStream>,
-    _phantom: PhantomData<Rm>,
-}
-
-/// The sending half of a [`PipeStream`] as produced via `.split()`.
-pub struct SendHalf<Sm: PipeModeTag> {
-    raw: Arc<RawPipeStream>,
-    _phantom: PhantomData<Sm>,
-}
 
 pub(crate) struct RawPipeStream {
     handle: Option<FileHandle>,
@@ -180,9 +172,9 @@ pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
 #[derive(Debug)]
 pub struct ReuniteError<Rm: PipeModeTag, Sm: PipeModeTag> {
     /// The receive half that didn't go anywhere, in case you still need it.
-    pub recv_half: RecvHalf<Rm>,
+    pub recv_half: RecvPipeStream<Rm>,
     /// The send half that didn't go anywhere, in case you still need it.
-    pub send_half: SendHalf<Sm>,
+    pub send_half: SendPipeStream<Sm>,
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Display for ReuniteError<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
