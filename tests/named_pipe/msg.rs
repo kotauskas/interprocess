@@ -70,7 +70,7 @@ pub fn client(name: &str, recv: bool, send: bool) -> TestResult {
         let [msg1, msg2] = msgs(false);
 
         let written = conn.send(msg1.as_bytes()).context("first pipe send failed")?;
-        ensure_eq!(written, msg2.len());
+        ensure_eq!(written, msg1.len());
 
         let written = conn.send(msg2.as_bytes()).context("second pipe send failed")?;
         ensure_eq!(written, msg2.len());
