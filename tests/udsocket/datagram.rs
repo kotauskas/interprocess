@@ -1,7 +1,7 @@
 use super::util::*;
 use color_eyre::eyre::Context;
 use interprocess::os::unix::udsocket::UdDatagram;
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Arc};
 
 pub(super) fn run(mut namegen: NameGen) -> TestResult {
     let mks = |nm: &str| UdDatagram::bound(nm);
@@ -18,7 +18,7 @@ fn make_message(side_name: char, second: bool) -> Vec<u8> {
     format!("{fs} message from side {side_name}").into_bytes()
 }
 
-fn side(sock: UdDatagram, notifier: Option<Sender<()>>, other_name: String) -> TestResult {
+fn side(sock: UdDatagram, notifier: Option<Sender<()>>, other_name: Arc<str>) -> TestResult {
     let (mut buf1, mut buf2) = ([0; 64], [0; 64]);
 
     let (side_name, other_side_name) = if let Some(n) = notifier {
@@ -32,7 +32,7 @@ fn side(sock: UdDatagram, notifier: Option<Sender<()>>, other_name: String) -> T
     let other_msg_1 = make_message(other_side_name, false);
     let other_msg_2 = make_message(other_side_name, true);
 
-    sock.set_destination(other_name).context("set destination failed")?;
+    sock.set_destination(&*other_name).context("set destination failed")?;
 
     let written = sock.send(&own_msg_1).context("first socket send failed")?;
     ensure_eq!(written, own_msg_1.len());
