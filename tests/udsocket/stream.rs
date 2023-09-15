@@ -4,7 +4,7 @@ use interprocess::os::unix::udsocket::{UdSocket, UdStream, UdStreamListener};
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::Shutdown,
-    sync::mpsc::Sender,
+    sync::{mpsc::Sender, Arc},
 };
 
 static SERVER_MSG: &str = "Hello from server!\n";
@@ -15,7 +15,7 @@ pub(super) fn run(namegen: NameGen) -> TestResult {
     drive_server_and_multiple_clients(move |snd, nc| server(snd, nc, namegen, true), |nm| client(nm, true))
 }
 
-fn server(name_sender: Sender<String>, num_clients: u32, mut namegen: NameGen, shutdown: bool) -> TestResult {
+fn server(name_sender: Sender<Arc<str>>, num_clients: u32, mut namegen: NameGen, shutdown: bool) -> TestResult {
     let (name, listener) = listen_and_pick_name(&mut namegen, |nm| UdStreamListener::bind(nm))?;
 
     let _ = name_sender.send(name);

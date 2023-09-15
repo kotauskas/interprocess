@@ -9,7 +9,7 @@ use interprocess::os::unix::udsocket::{
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::Shutdown,
-    sync::mpsc::Sender,
+    sync::{mpsc::Sender, Arc},
 };
 
 static SERVER_MSG: &str = "Hello from server!\n";
@@ -55,7 +55,7 @@ fn ckcreds(creds: &Credentials) -> TestResult {
 }
 
 fn server(
-    name_sender: Sender<String>,
+    name_sender: Sender<Arc<str>>,
     num_clients: u32,
     mut namegen: NameGen,
     shutdown: bool,
