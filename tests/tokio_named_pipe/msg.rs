@@ -1,4 +1,7 @@
-use super::{drive_server, util::TestResult};
+use super::{
+    drive_server,
+    util::{message, TestResult},
+};
 use color_eyre::eyre::Context;
 use interprocess::{
     os::windows::named_pipe::{
@@ -7,15 +10,18 @@ use interprocess::{
     },
     reliable_recv_msg::AsyncReliableRecvMsgExt,
 };
-use std::sync::Arc;
+use std::{str, sync::Arc};
 use tokio::{sync::oneshot::Sender, try_join};
 
-// TODO msg()
-const SERVER_MSG_1: &[u8] = b"First server message";
-const SERVER_MSG_2: &[u8] = b"Second server message";
-
-const CLIENT_MSG_1: &[u8] = b"First client message";
-const CLIENT_MSG_2: &[u8] = b"Second client message";
+fn msgs(server: bool) -> [Box<str>; 2] {
+    [
+        message(Some(format_args!("First")), server, None),
+        message(Some(format_args!("Second")), server, None),
+    ]
+}
+fn futf8(m: &[u8]) -> TestResult<&str> {
+    str::from_utf8(m).context("received message was not valid UTF-8")
+}
 
 pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
@@ -46,72 +52,71 @@ pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> Test
 }
 
 async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Messages, pipe_mode::Messages>>) -> TestResult {
-    let (recver, sender) = listener.accept().await.context("accept failed")?.split();
-    try_join!(
-        recv(recver, CLIENT_MSG_1, CLIENT_MSG_2),
-        send(sender, SERVER_MSG_1, SERVER_MSG_2),
-    )
-    .map(|((), ())| ())
+    let (mut recver, mut sender) = listener.accept().await.context("accept failed")?.split();
+    let [rmsg1, rmsg2] = msgs(false);
+    let [smsg1, smsg2] = msgs(true);
+    try_join!(recv(&mut recver, &rmsg1, &rmsg2), send(&mut sender, &smsg1, &smsg2))?;
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    Ok(())
 }
 async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Messages, pipe_mode::None>>) -> TestResult {
-    let recver = listener.accept().await.context("accept failed")?;
-    recv(recver, CLIENT_MSG_1, CLIENT_MSG_2).await
+    let mut recver = listener.accept().await.context("accept failed")?;
+    let [rmsg1, rmsg2] = msgs(false);
+    recv(&mut recver, &rmsg1, &rmsg2).await
 }
 async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Messages>>) -> TestResult {
-    let sender = listener.accept().await.context("accept failed")?;
-    send(sender, SERVER_MSG_1, SERVER_MSG_2).await
+    let mut sender = listener.accept().await.context("accept failed")?;
+    let [smsg1, smsg2] = msgs(true);
+    send(&mut sender, &smsg1, &smsg2).await
 }
 
 pub async fn client_duplex(nm: Arc<str>) -> TestResult {
-    let (recver, sender) = DuplexPipeStream::<pipe_mode::Messages>::connect(&*nm)
+    let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Messages>::connect(&*nm)
         .await
         .context("connect failed")?
         .split();
-
-    try_join!(
-        recv(recver, SERVER_MSG_1, SERVER_MSG_2),
-        send(sender, CLIENT_MSG_1, CLIENT_MSG_2),
-    )
-    .map(|((), ())| ())
+    let [rmsg1, rmsg2] = msgs(true);
+    let [smsg1, smsg2] = msgs(false);
+    try_join!(recv(&mut recver, &rmsg1, &rmsg2), send(&mut sender, &smsg1, &smsg2))?;
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    Ok(())
 }
 pub async fn client_cts(name: Arc<str>) -> TestResult {
-    let sender = SendPipeStream::<pipe_mode::Messages>::connect(&*name)
+    let mut sender = SendPipeStream::<pipe_mode::Messages>::connect(&*name)
         .await
         .context("connect failed")?;
-
-    send(sender, CLIENT_MSG_1, CLIENT_MSG_2).await
+    let [smsg1, smsg2] = msgs(false);
+    send(&mut sender, &smsg1, &smsg2).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
-    let recver = RecvPipeStream::<pipe_mode::Messages>::connect(&*name)
+    let mut recver = RecvPipeStream::<pipe_mode::Messages>::connect(&*name)
         .await
         .context("connect failed")?;
-
-    recv(recver, SERVER_MSG_1, SERVER_MSG_2).await
+    let [rmsg1, rmsg2] = msgs(true);
+    recv(&mut recver, &rmsg1, &rmsg2).await
 }
 
-async fn recv(recver: RecvPipeStream<pipe_mode::Messages>, exp1: &[u8], exp2: &[u8]) -> TestResult {
+async fn recv(recver: &mut RecvPipeStream<pipe_mode::Messages>, exp1: &str, exp2: &str) -> TestResult {
     let mut buf = Vec::with_capacity(exp1.len());
 
-    let rslt = (&recver).recv(&mut buf).await.context("first receive failed")?;
+    let rslt = (&*recver).recv(&mut buf).await.context("first receive failed")?;
     ensure_eq!(rslt.size(), exp1.len());
-    ensure_eq!(rslt.borrow_to_size(&buf), exp1);
+    ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp1);
 
     buf.clear();
     buf.reserve(exp2.len().saturating_sub(exp1.len()));
-    let rslt = (&recver).recv(&mut buf).await.context("second receive failed")?;
+    let rslt = (&*recver).recv(&mut buf).await.context("second receive failed")?;
     ensure_eq!(rslt.size(), exp2.len());
-    ensure_eq!(rslt.borrow_to_size(&buf), exp2);
+    ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp2);
 
     Ok(())
 }
-async fn send(sender: SendPipeStream<pipe_mode::Messages>, snd1: &[u8], snd2: &[u8]) -> TestResult {
-    let sent = sender.send(snd1).await.context("first send failed")?;
+async fn send(sender: &mut SendPipeStream<pipe_mode::Messages>, snd1: &str, snd2: &str) -> TestResult {
+    let sent = sender.send(snd1.as_bytes()).await.context("first send failed")?;
     ensure_eq!(sent, snd1.len());
 
-    let sent = sender.send(snd2).await.context("second send failed")?;
+    let sent = sender.send(snd2.as_bytes()).await.context("second send failed")?;
     ensure_eq!(sent, snd2.len());
 
-    sender.flush().await.context("flush failed")?;
-
-    Ok(())
+    sender.flush().await.context("flush failed")
 }

@@ -28,7 +28,10 @@ fn handle_conn_duplex(listener: &mut PipeListener<pipe_mode::Messages, pipe_mode
 
     let [msg1, msg2] = msgs(true);
     send(&mut sender, msg1, 0)?;
-    send(&mut sender, msg2, 1)
+    send(&mut sender, msg2, 1)?;
+
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    Ok(())
 }
 fn handle_conn_cts(listener: &mut PipeListener<pipe_mode::Messages, pipe_mode::None>) -> TestResult {
     let mut recver = listener.accept().context("accept failed")?;
@@ -79,7 +82,10 @@ pub fn client_duplex(name: &str) -> TestResult {
 
     let [msg1, msg2] = msgs(true);
     recv(&mut recver, msg1, 0)?;
-    recv(&mut recver, msg2, 1)
+    recv(&mut recver, msg2, 1)?;
+
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    Ok(())
 }
 pub fn client_cts(name: &str) -> TestResult {
     let mut sender = SendPipeStream::<pipe_mode::Messages>::connect(name).context("connect failed")?;
