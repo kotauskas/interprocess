@@ -44,49 +44,45 @@ pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> Test
 }
 
 async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>>) -> TestResult {
-    let conn = listener.accept().await.context("accept failed")?;
-    let (reader, writer) = conn.split();
-    try_join!(read(reader, msg(false)), write(writer, msg(true))).map(|((), ())| ())
+    let (recver, sender) = listener.accept().await.context("accept failed")?.split();
+    try_join!(recv(recver, msg(false)), send(sender, msg(true))).map(|((), ())| ())
 }
 async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::None>>) -> TestResult {
     let conn = listener.accept().await.context("accept failed")?;
-    read(conn, msg(false)).await
+    recv(conn, msg(false)).await
 }
 async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Bytes>>) -> TestResult {
     let conn = listener.accept().await.context("accept failed")?;
-    write(conn, msg(true)).await
+    send(conn, msg(true)).await
 }
 
 pub async fn client_duplex(name: Arc<str>) -> TestResult {
-    let (reader, writer) = DuplexPipeStream::<pipe_mode::Bytes>::connect(&*name)
+    let (recver, sender) = DuplexPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
         .context("connect failed")?
         .split();
-    try_join!(read(reader, msg(true)), write(writer, msg(false))).map(|((), ())| ())
+    try_join!(recv(recver, msg(true)), send(sender, msg(false))).map(|((), ())| ())
 }
 pub async fn client_cts(name: Arc<str>) -> TestResult {
-    let writer = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
+    let sender = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
         .context("connect failed")?;
-    write(writer, msg(false)).await
+    send(sender, msg(false)).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
-    let reader = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
+    let recver = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
         .await
         .context("connect failed")?;
-    read(reader, msg(true)).await
+    recv(recver, msg(true)).await
 }
 
-async fn read(reader: RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
+async fn recv(recver: RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
     let mut buffer = String::with_capacity(128);
-    let mut reader = BufReader::new(reader);
-    reader.read_line(&mut buffer).await.context("pipe receive failed")?;
+    let mut recver = BufReader::new(recver);
+    recver.read_line(&mut buffer).await.context("receive failed")?;
     ensure_eq!(buffer, exp.as_ref());
     Ok(())
 }
-async fn write(mut writer: SendPipeStream<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
-    writer
-        .write_all(snd.as_ref().as_bytes())
-        .await
-        .context("pipe send failed")
+async fn send(mut sender: SendPipeStream<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
+    sender.write_all(snd.as_ref().as_bytes()).await.context("send failed")
 }

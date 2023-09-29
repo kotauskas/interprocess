@@ -10,6 +10,7 @@ use interprocess::{
 use std::sync::Arc;
 use tokio::{sync::oneshot::Sender, try_join};
 
+// TODO msg()
 const SERVER_MSG_1: &[u8] = b"First server message";
 const SERVER_MSG_2: &[u8] = b"Second server message";
 
