@@ -1,16 +1,5 @@
 #![allow(unused_macros)]
 
-#[macro_use]
-mod ok_or_ret_errno;
-#[macro_use]
-mod derive_raw;
-#[macro_use]
-mod forward_handle_and_fd;
-#[macro_use]
-mod forward_try_clone;
-#[macro_use]
-mod forward_trait_method;
-
 macro_rules! impmod {
     ($($osmod:ident)::+, $($orig:ident $(as $into:ident)?),* $(,)?) => {
         #[cfg(unix)]
@@ -18,4 +7,21 @@ macro_rules! impmod {
         #[cfg(windows)]
         use $crate::os::windows::$($osmod)::+::{$($orig $(as $into)?,)*};
     };
+}
+
+macro_rules! multimacro {
+    ($tok:tt, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
+        $macro!($tok $(, $($arg)+)?);
+    )+};
+}
+
+macro_rules! make_macro_modules {
+    ($($modname:ident),+ $(,)?) => {$(
+        #[macro_use] mod $modname;
+    )+};
+}
+
+make_macro_modules! {
+    ok_or_ret_errno, derive_raw,
+    forward_handle_and_fd, forward_try_clone, forward_trait_method, forward_iorw, forward_fmt,
 }

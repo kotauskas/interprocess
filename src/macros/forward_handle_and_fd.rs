@@ -67,15 +67,28 @@ macro_rules! forward_from_handle {
     };
 }
 
-macro_rules! forward_handle {
+macro_rules! forward_asinto_handle {
     (windows: $ty:ident) => {
         forward_as_handle!(windows: $ty);
         forward_into_handle!(windows: $ty);
-        forward_from_handle!(windows: $ty);
     };
     (unix: $ty:ident) => {
         forward_as_handle!(unix: $ty);
         forward_into_handle!(unix: $ty);
+    };
+    ($ty:ident) => {
+        forward_asinto_handle!(windows: $ty);
+        forward_asinto_handle!(unix: $ty);
+    };
+}
+
+macro_rules! forward_handle {
+    (windows: $ty:ident) => {
+        forward_asinto_handle!(windows: $ty);
+        forward_from_handle!(windows: $ty);
+    };
+    (unix: $ty:ident) => {
+        forward_asinto_handle!(unix: $ty);
         forward_from_handle!(unix: $ty);
     };
     ($ty:ident) => {
