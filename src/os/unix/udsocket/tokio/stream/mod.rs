@@ -119,7 +119,7 @@ tokio_wrapper_trait_impls!(
     sync SyncUdStream,
     std StdUdStream,
     tokio TokioUdStream);
-derive_asraw!(unix: UdStream);
+derive_asraw!(UdStream, unix);
 
 fn poll_read_ref(slf: &TokioUdStream, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
     loop {

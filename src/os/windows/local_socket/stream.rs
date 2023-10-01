@@ -3,10 +3,7 @@ use crate::{
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{pipe_mode, DuplexPipeStream},
 };
-use std::{
-    io::{self, prelude::*, IoSlice, IoSliceMut},
-    os::windows::prelude::*,
-};
+use std::{io, os::windows::prelude::*};
 
 type PipeStream = DuplexPipeStream<pipe_mode::Bytes>;
 #[derive(Debug)]
@@ -23,32 +20,6 @@ impl LocalSocketStream {
     }
 }
 
-// The thunking already happens inside.
-impl Read for LocalSocketStream {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
-    }
-    #[inline]
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.0.read_vectored(bufs)
-    }
-}
-impl Write for LocalSocketStream {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
-    }
-    #[inline]
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.write_vectored(bufs)
-    }
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-}
-forward_as_handle!(LocalSocketStream);
 impl From<LocalSocketStream> for OwnedHandle {
     fn from(s: LocalSocketStream) -> Self {
         // The outer local socket interface has read and write halves and is always duplex in the
@@ -70,4 +41,10 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
             }),
         }
     }
+}
+
+multimacro! {
+    LocalSocketStream,
+    forward_sync_rw, // The thunking already happens inside.
+    forward_as_handle,
 }

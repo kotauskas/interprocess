@@ -369,4 +369,4 @@ impl From<OwnedFd> for UdDatagram {
         }
     }
 }
-derive_raw!(unix: UdDatagram);
+derive_raw!(UdDatagram, unix);

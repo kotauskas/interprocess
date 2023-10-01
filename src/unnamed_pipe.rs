@@ -14,10 +14,7 @@ impmod! {unnamed_pipe,
     UnnamedPipeWriter as UnnamedPipeWriterImpl,
     pipe as pipe_impl,
 }
-use std::{
-    fmt::{self, Formatter},
-    io::{self, Read, Write},
-};
+use std::io;
 
 /// Creates a new pipe with the default creation settings and returns the handles to its writing end and reading end.
 ///
@@ -42,19 +39,14 @@ pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
 /// [FRF]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 // field is pub(crate) to allow the platform specific builders to create the public-facing pipe types
 pub struct UnnamedPipeReader(pub(crate) UnnamedPipeReaderImpl);
-impl Read for UnnamedPipeReader {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
-    }
+multimacro! {
+    UnnamedPipeReader,
+    forward_sync_read,
+    forward_handle,
+    forward_try_clone,
+    forward_debug,
+    derive_raw,
 }
-impl fmt::Debug for UnnamedPipeReader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-forward_handle!(UnnamedPipeReader);
-forward_try_clone!(UnnamedPipeReader);
-derive_raw!(UnnamedPipeReader);
 
 /// A handle to the writing end of an unnamed pipe, created by the [`pipe()`] function together with the
 /// [reading end](UnnamedPipeReader).
@@ -63,7 +55,6 @@ derive_raw!(UnnamedPipeReader);
 /// [`ShareHandle`](crate::os::windows::ShareHandle) and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`][FRH] traits are
 /// also implemented, along with [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`][FRF] on Unix.
 ///
-/// [`ShareHandle`]: ../os/windows/trait.ShareHandle.html " "
 /// [AsRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
 /// [IntoRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
 /// [FromRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
@@ -71,19 +62,11 @@ derive_raw!(UnnamedPipeReader);
 /// [IntoRawFd]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [FromRawFd]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 pub struct UnnamedPipeWriter(pub(crate) UnnamedPipeWriterImpl);
-impl Write for UnnamedPipeWriter {
-    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        self.0.write(data)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
+multimacro! {
+    UnnamedPipeWriter,
+    forward_sync_write,
+    forward_handle,
+    forward_try_clone,
+    forward_debug,
+    derive_raw,
 }
-impl fmt::Debug for UnnamedPipeWriter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-forward_handle!(UnnamedPipeWriter);
-forward_try_clone!(UnnamedPipeWriter);
-derive_raw!(UnnamedPipeWriter);

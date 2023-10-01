@@ -30,4 +30,4 @@ impl Debug for LocalSocketListener {
             .finish()
     }
 }
-forward_handle!(unix: LocalSocketListener);
+forward_handle!(LocalSocketListener, unix);

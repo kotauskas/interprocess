@@ -1,9 +1,6 @@
 use {
     super::{super::ToLocalSocketName, LocalSocketStream},
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-    },
+    std::io,
 };
 
 impmod! {local_socket::tokio,
@@ -120,13 +117,11 @@ impl From<LocalSocketListenerImpl> for LocalSocketListener {
         Self(inner)
     }
 }
-impl Debug for LocalSocketListener {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+multimacro! {
+    LocalSocketListener,
+    forward_as_handle(unix),
+    forward_try_handle(LocalSocketListenerImpl, unix),
+    forward_debug,
+    derive_asraw(unix),
 }
-forward_as_handle!(unix: LocalSocketListener);
-derive_asraw!(unix: LocalSocketListener);
-forward_try_handle!(unix: LocalSocketListener, LocalSocketListenerImpl);
 // TODO: incoming

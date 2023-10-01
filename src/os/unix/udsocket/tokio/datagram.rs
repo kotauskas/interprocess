@@ -171,4 +171,4 @@ tokio_wrapper_trait_impls!(
     sync SyncUdDatagram,
     std StdUdDatagram,
     tokio TokioUdDatagram);
-derive_asraw!(unix: UdDatagram);
+derive_asraw!(UdDatagram, unix);

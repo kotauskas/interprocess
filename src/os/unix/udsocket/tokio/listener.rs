@@ -128,4 +128,4 @@ tokio_wrapper_trait_impls!(
     sync SyncUdStreamListener,
     std StdUdStreamListener,
     tokio TokioUdStreamListener);
-derive_asraw!(unix: UdStreamListener);
+derive_asraw!(UdStreamListener, unix);

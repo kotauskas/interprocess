@@ -80,5 +80,5 @@ impl Debug for LocalSocketStream {
     }
 }
 
-forward_as_handle!(unix: LocalSocketStream);
-forward_try_handle!(unix: LocalSocketStream, UdStream);
+forward_as_handle!(LocalSocketStream, unix);
+forward_try_handle!(LocalSocketStream, UdStream, unix);

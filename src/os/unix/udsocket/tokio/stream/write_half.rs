@@ -218,4 +218,4 @@ impl AsFd for WriteHalf {
 
 tokio_wrapper_trait_impls!(
     for WriteHalf, tokio_nofd TokioUdStreamWriteHalf);
-derive_asraw!(unix: WriteHalf);
+derive_asraw!(WriteHalf, unix);

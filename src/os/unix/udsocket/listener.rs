@@ -236,7 +236,7 @@ impl TryClone for UdStreamListener {
         Ok(s)
     }
 }
-derive_raw!(unix: UdStreamListener);
+derive_raw!(UdStreamListener, unix);
 
 /// An infinite iterator over incoming client connections of a [`UdStreamListener`].
 ///

@@ -1,7 +1,6 @@
 use {
     futures_io::AsyncWrite,
     std::{
-        fmt::{self, Debug, Formatter},
         io::{self, IoSlice},
         pin::Pin,
         task::{Context, Poll},
@@ -18,6 +17,7 @@ impmod! {local_socket::tokio,
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 ///
 /// [`LocalSocketStream`]: struct.LocalSocketStream.html " "
+// TODO remove this GitHub link and others like it
 pub struct WriteHalf(pub(super) WriteHalfImpl);
 impl WriteHalf {
     #[inline]
@@ -26,6 +26,7 @@ impl WriteHalf {
     }
 }
 
+// TODO forward
 impl AsyncWrite for WriteHalf {
     #[inline]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
@@ -50,12 +51,9 @@ impl AsyncWrite for WriteHalf {
     }
 }
 
-impl Debug for WriteHalf {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+multimacro! {
+    WriteHalf,
+    forward_as_handle,
+    forward_debug,
+    derive_asraw,
 }
-
-forward_as_handle!(WriteHalf);
-derive_asraw!(WriteHalf);

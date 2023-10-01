@@ -11,15 +11,15 @@ macro_rules! forward_as_handle {
             }
         }
     };
-    (windows: $ty:ident) => {
+    ($ty:ident, windows) => {
         forward_as_handle!(@impl $ty, BorrowedHandle, AsHandle, as_handle, windows);
     };
-    (unix: $ty:ident) => {
+    ($ty:ident, unix) => {
         forward_as_handle!(@impl $ty, BorrowedFd, AsFd, as_fd, unix);
     };
     ($ty:ident) => {
-        forward_as_handle!(windows: $ty);
-        forward_as_handle!(unix: $ty);
+        forward_as_handle!($ty, windows);
+        forward_as_handle!($ty, unix);
     };
 }
 
@@ -33,15 +33,15 @@ macro_rules! forward_into_handle {
             }
         }
     };
-    (windows: $ty:ident) => {
+    ($ty:ident, windows) => {
         forward_into_handle!(@impl $ty, OwnedHandle, windows);
     };
-    (unix: $ty:ident) => {
+    ($ty:ident, unix) => {
         forward_into_handle!(@impl $ty, OwnedFd, unix);
     };
     ($ty:ident) => {
-        forward_into_handle!(windows: $ty);
-        forward_into_handle!(unix: $ty);
+        forward_into_handle!($ty, windows);
+        forward_into_handle!($ty, unix);
     };
 }
 
@@ -55,45 +55,45 @@ macro_rules! forward_from_handle {
             }
         }
     };
-    (windows: $ty:ident) => {
+    ($ty:ident, windows) => {
         forward_from_handle!(@impl $ty, OwnedHandle, windows);
     };
-    (unix: $ty:ident) => {
+    ($ty:ident, unix) => {
         forward_from_handle!(@impl $ty, OwnedFd, unix);
     };
     ($ty:ident) => {
-        forward_from_handle!(windows: $ty);
-        forward_from_handle!(unix: $ty);
+        forward_from_handle!($ty, windows);
+        forward_from_handle!($ty, unix);
     };
 }
 
 macro_rules! forward_asinto_handle {
-    (windows: $ty:ident) => {
-        forward_as_handle!(windows: $ty);
-        forward_into_handle!(windows: $ty);
+    ($ty:ident, windows) => {
+        forward_as_handle!($ty, windows);
+        forward_into_handle!($ty, windows);
     };
-    (unix: $ty:ident) => {
-        forward_as_handle!(unix: $ty);
-        forward_into_handle!(unix: $ty);
+    ($ty:ident, unix) => {
+        forward_as_handle!($ty, unix);
+        forward_into_handle!($ty, unix);
     };
     ($ty:ident) => {
-        forward_asinto_handle!(windows: $ty);
-        forward_asinto_handle!(unix: $ty);
+        forward_asinto_handle!($ty, windows);
+        forward_asinto_handle!($ty, unix);
     };
 }
 
 macro_rules! forward_handle {
-    (windows: $ty:ident) => {
-        forward_asinto_handle!(windows: $ty);
-        forward_from_handle!(windows: $ty);
+    ($ty:ident, windows) => {
+        forward_asinto_handle!($ty, windows);
+        forward_from_handle!($ty, windows);
     };
-    (unix: $ty:ident) => {
-        forward_asinto_handle!(unix: $ty);
-        forward_from_handle!(unix: $ty);
+    ($ty:ident, unix) => {
+        forward_asinto_handle!($ty, unix);
+        forward_from_handle!($ty, unix);
     };
     ($ty:ident) => {
-        forward_handle!(windows: $ty);
-        forward_handle!(unix: $ty);
+        forward_handle!($ty, windows);
+        forward_handle!($ty, unix);
     };
 }
 
@@ -113,15 +113,15 @@ macro_rules! forward_try_into_handle {
             }
         }
     };
-    (windows: $ty:ident, $fldt:path) => {
+    ($ty:ident, $fldt:path, windows) => {
         forward_try_into_handle!(@impl $ty, $fldt, OwnedHandle, windows);
     };
-    (unix: $ty:ident, $fldt:path) => {
+    ($ty:ident, $fldt:path, unix) => {
         forward_try_into_handle!(@impl $ty, $fldt, OwnedFd, unix);
     };
     ($ty:ident, $fldt:path) => {
-        forward_try_into_handle!(windows: $ty);
-        forward_try_into_handle!(unix: $ty);
+        forward_try_into_handle!($ty, windows);
+        forward_try_into_handle!($ty, unix);
     };
 }
 
@@ -141,29 +141,29 @@ macro_rules! forward_try_from_handle {
             }
         }
     };
-    (windows: $ty:ident, $fldt:path) => {
+    ($ty:ident, $fldt:path, windows) => {
         forward_try_from_handle!(@impl $ty, $fldt, OwnedHandle, windows);
     };
-    (unix: $ty:ident, $fldt:path) => {
+    ($ty:ident, $fldt:path, unix) => {
         forward_try_from_handle!(@impl $ty, $fldt, OwnedFd, unix);
     };
     ($ty:ident, $fldt:path) => {
-        forward_try_from_handle!(windows: $ty, $fldt);
-        forward_try_from_handle!(unix: $ty, $fldt);
+        forward_try_from_handle!($ty, $fldt, windows);
+        forward_try_from_handle!($ty, $fldt, unix);
     };
 }
 
 macro_rules! forward_try_handle {
-    (windows: $ty:ident, $fldt:path) => {
-        forward_try_into_handle!(windows: $ty, $fldt);
-        forward_try_from_handle!(windows: $ty, $fldt);
+    ($ty:ident, $fldt:path, windows) => {
+        forward_try_into_handle!($ty, $fldt, windows);
+        forward_try_from_handle!($ty, $fldt, windows);
     };
-    (unix: $ty:ident, $fldt:path) => {
-        forward_try_into_handle!(unix: $ty, $fldt);
-        forward_try_from_handle!(unix: $ty, $fldt);
+    ($ty:ident, $fldt:path, unix) => {
+        forward_try_into_handle!($ty, $fldt, unix);
+        forward_try_from_handle!($ty, $fldt, unix);
     };
     ($ty:ident, $fldt:path) => {
-        forward_try_handle!(windows: $ty, $fldt);
-        forward_try_handle!(unix: $ty, $fldt);
+        forward_try_handle!($ty, $fldt, windows);
+        forward_try_handle!($ty, $fldt, unix);
     };
 }

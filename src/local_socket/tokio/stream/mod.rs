@@ -8,7 +8,6 @@ use {
     super::super::ToLocalSocketName,
     futures_io::{AsyncRead, AsyncWrite},
     std::{
-        fmt::{self, Debug, Formatter},
         io::{self, IoSlice, IoSliceMut},
         pin::Pin,
         task::{Context, Poll},
@@ -140,12 +139,11 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_close(cx)
     }
 }
-impl Debug for LocalSocketStream {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+
+multimacro! {
+    LocalSocketStream,
+    forward_as_handle,
+    forward_try_from_handle(LocalSocketStreamImpl),
+    forward_debug,
+    derive_asraw,
 }
-forward_as_handle!(LocalSocketStream);
-derive_asraw!(LocalSocketStream);
-forward_try_from_handle!(LocalSocketStream, LocalSocketStreamImpl);

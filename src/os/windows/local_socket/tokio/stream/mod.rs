@@ -67,7 +67,6 @@ impl AsyncWrite for LocalSocketStream {
         self.pinproj().poll_close(cx)
     }
 }
-forward_as_handle!(LocalSocketStream);
 impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
@@ -81,4 +80,10 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
             }),
         }
     }
+}
+
+// TODO forward I/O here
+multimacro! {
+    LocalSocketStream,
+    forward_as_handle,
 }

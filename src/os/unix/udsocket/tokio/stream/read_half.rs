@@ -156,4 +156,4 @@ impl AsFd for ReadHalf {
 
 tokio_wrapper_trait_impls!(
     for ReadHalf, tokio_nofd TokioUdStreamReadHalf);
-derive_asraw!(unix: ReadHalf);
+derive_asraw!(ReadHalf, unix);

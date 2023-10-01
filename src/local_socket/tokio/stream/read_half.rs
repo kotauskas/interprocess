@@ -1,7 +1,6 @@
 use {
     futures_io::AsyncRead,
     std::{
-        fmt::{self, Debug, Formatter},
         io::{self, IoSliceMut},
         pin::Pin,
         task::{Context, Poll},
@@ -38,12 +37,10 @@ impl AsyncRead for ReadHalf {
         self.pinproj().poll_read_vectored(cx, bufs)
     }
 }
-impl Debug for ReadHalf {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
-}
 
-forward_as_handle!(ReadHalf);
-derive_asraw!(ReadHalf);
+multimacro! {
+    ReadHalf,
+    forward_as_handle,
+    forward_debug,
+    derive_asraw,
+}

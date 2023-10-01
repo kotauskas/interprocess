@@ -1,10 +1,6 @@
 use {
     super::{LocalSocketStream, ToLocalSocketName},
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-        iter::FusedIterator,
-    },
+    std::{io, iter::FusedIterator},
 };
 
 impmod! {local_socket,
@@ -144,13 +140,12 @@ impl LocalSocketListener {
         self.0.set_nonblocking(nonblocking)
     }
 }
-impl Debug for LocalSocketListener {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+multimacro! {
+    LocalSocketListener,
+    forward_debug,
+    forward_handle(unix),
+    derive_raw(unix),
 }
-forward_handle!(unix: LocalSocketListener);
-derive_raw!(unix: LocalSocketListener);
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
 ///

@@ -48,4 +48,4 @@ impl Debug for LocalSocketStream {
             .finish()
     }
 }
-forward_handle!(unix: LocalSocketStream);
+forward_handle!(LocalSocketStream, unix);

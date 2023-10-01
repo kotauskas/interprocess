@@ -1,10 +1,4 @@
-use {
-    super::ToLocalSocketName,
-    std::{
-        fmt::{self, Debug, Formatter},
-        io::{self, prelude::*, IoSlice, IoSliceMut},
-    },
-};
+use {super::ToLocalSocketName, std::io};
 
 impmod! {local_socket,
     LocalSocketStream as LocalSocketStreamImpl
@@ -77,36 +71,12 @@ impl LocalSocketStream {
         self.0.set_nonblocking(nonblocking)
     }
 }
-impl Read for LocalSocketStream {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
-    }
-    #[inline]
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.0.read_vectored(bufs)
-    }
+// TODO I/O by ref
+multimacro! {
+    LocalSocketStream,
+    forward_sync_rw,
+    forward_debug,
+    forward_asinto_handle,
+    forward_try_from_handle(LocalSocketStreamImpl),
+    derive_asintoraw,
 }
-impl Write for LocalSocketStream {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
-    }
-    #[inline]
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.write_vectored(bufs)
-    }
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-}
-impl Debug for LocalSocketStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
-}
-forward_as_handle!(LocalSocketStream);
-forward_into_handle!(LocalSocketStream);
-forward_try_from_handle!(LocalSocketStream, LocalSocketStreamImpl);
-derive_asintoraw!(LocalSocketStream);

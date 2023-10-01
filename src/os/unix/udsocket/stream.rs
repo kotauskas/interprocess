@@ -237,4 +237,4 @@ impl From<OwnedFd> for UdStream {
     }
 }
 
-derive_raw!(unix: UdStream);
+derive_raw!(UdStream, unix);

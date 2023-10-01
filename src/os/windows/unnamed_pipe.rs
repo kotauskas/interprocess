@@ -171,8 +171,11 @@ impl Debug for UnnamedPipeReader {
             .finish()
     }
 }
-forward_handle!(UnnamedPipeReader);
-forward_try_clone!(UnnamedPipeReader);
+multimacro! {
+    UnnamedPipeReader,
+    forward_handle,
+    forward_try_clone,
+}
 
 pub(crate) struct UnnamedPipeWriter(FileHandle);
 impl Write for UnnamedPipeWriter {
@@ -190,5 +193,8 @@ impl Debug for UnnamedPipeWriter {
             .finish()
     }
 }
-forward_handle!(UnnamedPipeWriter);
-forward_try_clone!(UnnamedPipeWriter);
+multimacro! {
+    UnnamedPipeWriter,
+    forward_handle,
+    forward_try_clone,
+}

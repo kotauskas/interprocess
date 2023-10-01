@@ -33,5 +33,8 @@ impl Debug for LocalSocketListener {
             .finish()
     }
 }
-forward_as_handle!(unix: LocalSocketListener);
-forward_try_handle!(unix: LocalSocketListener, UdStreamListener);
+multimacro! {
+    LocalSocketListener,
+    forward_as_handle(unix),
+    forward_try_handle(UdStreamListener, unix),
+}

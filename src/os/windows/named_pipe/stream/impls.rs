@@ -475,4 +475,4 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
     }
 }
 
-derive_asraw!(windows: {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>);
+derive_asraw!({Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>, windows);
