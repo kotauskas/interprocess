@@ -9,6 +9,16 @@ macro_rules! impmod {
     };
 }
 
+macro_rules! ok_or_ret_errno {
+    ($success:expr => $($scb:tt)+) => {
+        if $success {
+            Ok($($scb)+)
+        } else {
+            Err(::std::io::Error::last_os_error())
+        }
+    };
+}
+
 macro_rules! multimacro {
     ($tok:tt, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
         $macro!($tok $(, $($arg)+)?);
@@ -22,6 +32,6 @@ macro_rules! make_macro_modules {
 }
 
 make_macro_modules! {
-    ok_or_ret_errno, derive_raw,
+    derive_raw,
     forward_handle_and_fd, forward_try_clone, forward_trait_method, forward_iorw, forward_fmt,
 }
