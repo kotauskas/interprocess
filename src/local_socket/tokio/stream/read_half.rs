@@ -1,11 +1,4 @@
-use {
-    futures_io::AsyncRead,
-    std::{
-        io::{self, IoSliceMut},
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use std::pin::Pin;
 
 impmod! {local_socket::tokio,
     ReadHalf as ReadHalfImpl
@@ -23,23 +16,10 @@ impl ReadHalf {
         Pin::new(&mut self.0)
     }
 }
-impl AsyncRead for ReadHalf {
-    #[inline]
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_read(cx, buf)
-    }
-    #[inline]
-    fn poll_read_vectored(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &mut [IoSliceMut<'_>],
-    ) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_read_vectored(cx, bufs)
-    }
-}
 
 multimacro! {
     ReadHalf,
+    forward_futures_read,
     forward_as_handle,
     forward_debug,
     derive_asraw,

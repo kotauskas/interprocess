@@ -10,13 +10,7 @@ use crate::{
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream},
 };
-use futures_io::{AsyncRead, AsyncWrite};
-use std::{
-    io,
-    os::windows::prelude::*,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::{io, os::windows::prelude::*, pin::Pin};
 
 type StreamImpl = DuplexPipeStream<pipe_mode::Bytes>;
 
@@ -45,28 +39,6 @@ impl LocalSocketStream {
     }
 }
 
-// TODO I/O by ref, including Tokio traits
-
-impl AsyncRead for LocalSocketStream {
-    #[inline]
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_read(cx, buf)
-    }
-}
-impl AsyncWrite for LocalSocketStream {
-    #[inline]
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_write(cx, buf)
-    }
-    #[inline]
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproj().poll_flush(cx)
-    }
-    #[inline]
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproj().poll_close(cx)
-    }
-}
 impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
@@ -82,8 +54,9 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     }
 }
 
-// TODO forward I/O here
+// TODO I/O by ref, including Tokio traits
 multimacro! {
     LocalSocketStream,
+    forward_futures_rw,
     forward_as_handle,
 }

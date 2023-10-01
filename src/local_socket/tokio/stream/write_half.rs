@@ -1,11 +1,4 @@
-use {
-    futures_io::AsyncWrite,
-    std::{
-        io::{self, IoSlice},
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use std::pin::Pin;
 
 impmod! {local_socket::tokio,
     WriteHalf as WriteHalfImpl
@@ -26,33 +19,9 @@ impl WriteHalf {
     }
 }
 
-// TODO forward
-impl AsyncWrite for WriteHalf {
-    #[inline]
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_write(cx, buf)
-    }
-    #[inline]
-    fn poll_write_vectored(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        bufs: &[IoSlice<'_>],
-    ) -> Poll<io::Result<usize>> {
-        self.pinproj().poll_write_vectored(cx, bufs)
-    }
-    // Those don't do anything
-    #[inline]
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproj().poll_flush(cx)
-    }
-    #[inline]
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.pinproj().poll_close(cx)
-    }
-}
-
 multimacro! {
     WriteHalf,
+    forward_futures_write,
     forward_as_handle,
     forward_debug,
     derive_asraw,
