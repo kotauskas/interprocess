@@ -71,12 +71,12 @@ impl LocalSocketStream {
         self.0.set_nonblocking(nonblocking)
     }
 }
-// TODO I/O by ref
 multimacro! {
     LocalSocketStream,
-    forward_sync_rw,
+    forward_sync_ref_rw,
     forward_debug,
     forward_asinto_handle,
     forward_try_from_handle(LocalSocketStreamImpl),
+    derive_sync_mut_rw,
     derive_asintoraw,
 }
