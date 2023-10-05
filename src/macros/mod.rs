@@ -32,6 +32,6 @@ macro_rules! make_macro_modules {
 }
 
 make_macro_modules! {
-    derive_raw,
+    derive_raw, derive_mut_iorw,
     forward_handle_and_fd, forward_try_clone, forward_trait_method, forward_iorw, forward_fmt,
 }

@@ -45,6 +45,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 
 multimacro! {
     LocalSocketStream,
-    forward_sync_rw, // The thunking already happens inside.
+    forward_sync_ref_rw, // The thunking already happens inside.
     forward_as_handle,
+    derive_sync_mut_rw,
 }

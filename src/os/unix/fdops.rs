@@ -63,6 +63,7 @@ impl Debug for FdOps {
 }
 
 // No As/Into because those can be easily done with basic method forwarding.
+// TODO implement the above to facilitate macro forwarding
 impl FromRawFd for FdOps {
     #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Self {

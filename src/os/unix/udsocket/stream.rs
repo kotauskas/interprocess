@@ -4,10 +4,7 @@ use super::{
     cmsg::{CmsgMut, CmsgRef},
     ReadAncillary, ReadAncillarySuccess, ToUdSocketPath, UdSocketPath, WriteAncillary,
 };
-use crate::{
-    os::unix::{unixprelude::*, FdOps},
-    TryClone,
-};
+use crate::os::unix::{unixprelude::*, FdOps};
 use libc::{sockaddr_un, SOCK_STREAM};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use to_method::To;
@@ -212,12 +209,6 @@ impl WriteAncillary for UdStream {
     }
 }
 
-impl TryClone for UdStream {
-    fn try_clone(&self) -> io::Result<Self> {
-        self.0.try_clone().map(Self)
-    }
-}
-
 impl AsFd for UdStream {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
@@ -237,4 +228,9 @@ impl From<OwnedFd> for UdStream {
     }
 }
 
-derive_raw!(UdStream, unix);
+// TODO use the forwarding macros
+multimacro! {
+    UdStream,
+    forward_try_clone,
+    derive_raw(unix),
+}

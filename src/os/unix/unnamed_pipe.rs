@@ -36,18 +36,6 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
 }
 
 pub(crate) struct UnnamedPipeReader(FdOps);
-impl Read for &UnnamedPipeReader {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.0).read(buf)
-    }
-}
-impl Read for UnnamedPipeReader {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (self as &Self).read(buf)
-    }
-}
 impl Sealed for UnnamedPipeReader {}
 impl AsFd for UnnamedPipeReader {
     #[inline]
@@ -74,29 +62,14 @@ impl Debug for UnnamedPipeReader {
             .finish()
     }
 }
-forward_try_clone!(UnnamedPipeReader);
+multimacro! {
+    UnnamedPipeReader,
+    forward_sync_ref_read,
+    forward_try_clone,
+    derive_sync_mut_read,
+}
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
-impl Write for &UnnamedPipeWriter {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&self.0).write(buf)
-    }
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.0).flush()
-    }
-}
-impl Write for UnnamedPipeWriter {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (self as &Self).write(buf)
-    }
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        (self as &Self).flush()
-    }
-}
 impl Sealed for UnnamedPipeWriter {}
 impl AsFd for UnnamedPipeWriter {
     #[inline]
@@ -123,4 +96,10 @@ impl Debug for UnnamedPipeWriter {
             .finish()
     }
 }
-forward_try_clone!(UnnamedPipeWriter);
+
+multimacro! {
+    UnnamedPipeWriter,
+    forward_sync_ref_write,
+    forward_try_clone,
+    derive_sync_mut_write,
+}
