@@ -1,7 +1,10 @@
-use {super::ToLocalSocketName, std::io};
+use super::ToLocalSocketName;
+use std::io;
 
 impmod! {local_socket,
-    LocalSocketStream as LocalSocketStreamImpl
+    LocalSocketStream as LocalSocketStreamImpl,
+    ReadHalf as ReadHalfImpl,
+    WriteHalf as WriteHalfImpl,
 }
 
 /// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting
@@ -70,13 +73,46 @@ impl LocalSocketStream {
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
+    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently
+    /// from independently spawned tasks, entailing a memory allocation.
+    #[inline]
+    pub fn split(self) -> (ReadHalf, WriteHalf) {
+        let (r, w) = self.0.split();
+        (ReadHalf(r), WriteHalf(w))
+    }
+    // TODO reunite
 }
 multimacro! {
     LocalSocketStream,
     forward_sync_ref_rw,
-    forward_debug,
     forward_asinto_handle,
+    forward_debug,
     forward_try_from_handle(LocalSocketStreamImpl),
     derive_sync_mut_rw,
     derive_asintoraw,
+}
+
+/// A read half of a local socket stream, obtained by splitting a [`LocalSocketStream`](super::LocalSocketStream).
+// TODO example
+pub struct ReadHalf(pub(super) ReadHalfImpl);
+
+multimacro! {
+    ReadHalf,
+    forward_sync_ref_read,
+    forward_as_handle,
+    forward_debug,
+    derive_sync_mut_read,
+    derive_asraw,
+}
+
+/// A write half of a local socket stream, obtained by splitting a [`LocalSocketStream`](super::LocalSocketStream).
+pub struct WriteHalf(pub(super) WriteHalfImpl);
+
+multimacro! {
+    WriteHalf,
+    forward_sync_ref_write,
+    forward_as_handle,
+    forward_debug,
+    derive_sync_mut_write,
+    derive_asraw,
 }
