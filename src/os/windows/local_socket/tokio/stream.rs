@@ -1,21 +1,17 @@
-mod read_half;
-pub use read_half::*;
-
-mod write_half;
-pub use write_half::*;
 // TODO reunite
 
 use crate::{
     error::FromHandleError,
     local_socket::ToLocalSocketName,
-    os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream},
+    os::windows::named_pipe::{
+        pipe_mode::Bytes,
+        tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
+    },
 };
 use std::{io, os::windows::prelude::*, pin::Pin};
 
-type StreamImpl = DuplexPipeStream<pipe_mode::Bytes>;
-
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) StreamImpl);
+pub struct LocalSocketStream(pub(super) DuplexPipeStream<Bytes>);
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
@@ -34,7 +30,7 @@ impl LocalSocketStream {
         }
     }
     #[inline]
-    fn pinproj(&mut self) -> Pin<&mut StreamImpl> {
+    fn pinproj(&mut self) -> Pin<&mut DuplexPipeStream<Bytes>> {
         Pin::new(&mut self.0)
     }
 }
@@ -43,7 +39,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        match StreamImpl::try_from(handle) {
+        match DuplexPipeStream::try_from(handle) {
             Ok(s) => Ok(Self(s)),
             Err(e) => Err(FromHandleError {
                 details: Default::default(),
@@ -59,4 +55,30 @@ multimacro! {
     LocalSocketStream,
     forward_futures_rw,
     forward_as_handle,
+}
+
+pub struct ReadHalf(pub(super) RecvPipeStream<Bytes>);
+impl ReadHalf {
+    fn pinproj(&mut self) -> Pin<&mut RecvPipeStream<Bytes>> {
+        Pin::new(&mut self.0)
+    }
+}
+multimacro! {
+    ReadHalf,
+    forward_futures_read,
+    forward_as_handle,
+    forward_debug("local_socket::ReadHalf"),
+}
+
+pub struct WriteHalf(pub(super) SendPipeStream<Bytes>);
+impl WriteHalf {
+    fn pinproj(&mut self) -> Pin<&mut SendPipeStream<Bytes>> {
+        Pin::new(&mut self.0)
+    }
+}
+multimacro! {
+    WriteHalf,
+    forward_futures_write,
+    forward_as_handle,
+    forward_debug("local_socket::WriteHalf"),
 }

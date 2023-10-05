@@ -1,16 +1,10 @@
-mod read_half;
-pub use read_half::*;
-
-mod write_half;
-pub use write_half::*;
-
-use {
-    super::super::ToLocalSocketName,
-    std::{io, pin::Pin},
-};
+use super::super::ToLocalSocketName;
+use std::io;
 
 impmod! {local_socket::tokio,
-    LocalSocketStream as LocalSocketStreamImpl
+    LocalSocketStream as LocalSocketStreamImpl,
+    ReadHalf as ReadHalfImpl,
+    WriteHalf as WriteHalfImpl,
 }
 
 /// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or
@@ -82,10 +76,6 @@ impl LocalSocketStream {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
-    #[inline]
-    fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
-        Pin::new(&mut self.0)
-    }
 }
 #[doc(hidden)]
 impl From<LocalSocketStreamImpl> for LocalSocketStream {
@@ -98,9 +88,40 @@ impl From<LocalSocketStreamImpl> for LocalSocketStream {
 // TODO I/O by ref
 multimacro! {
     LocalSocketStream,
+    pinproj_for_unpin(LocalSocketStreamImpl),
     forward_futures_rw,
     forward_as_handle,
     forward_try_from_handle(LocalSocketStreamImpl),
+    forward_debug,
+    derive_asraw,
+}
+
+/// A read half of a Tokio-based local socket stream, obtained by splitting a
+/// [`LocalSocketStream`](super::LocalSocketStream).
+///
+/// # Examples
+/// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
+pub struct ReadHalf(pub(super) ReadHalfImpl);
+multimacro! {
+    ReadHalf,
+    pinproj_for_unpin(ReadHalfImpl),
+    forward_futures_read,
+    forward_as_handle,
+    forward_debug,
+    derive_asraw,
+}
+/// A write half of a Tokio-based local socket stream, obtained by splitting a
+/// [`LocalSocketStream`](super::LocalSocketStream).
+///
+/// # Examples
+/// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
+// TODO remove this GitHub link and others like it
+pub struct WriteHalf(pub(super) WriteHalfImpl);
+multimacro! {
+    WriteHalf,
+    pinproj_for_unpin(WriteHalfImpl),
+    forward_futures_write,
+    forward_as_handle,
     forward_debug,
     derive_asraw,
 }

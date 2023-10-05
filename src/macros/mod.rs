@@ -19,6 +19,17 @@ macro_rules! ok_or_ret_errno {
     };
 }
 
+macro_rules! pinproj_for_unpin {
+    ($src:ident, $dst:ident) => {
+        impl $src {
+            #[inline(always)]
+            fn pinproj(&mut self) -> ::std::pin::Pin<&mut $dst> {
+                ::std::pin::Pin::new(&mut self.0)
+            }
+        }
+    };
+}
+
 macro_rules! multimacro {
     ($tok:tt, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
         $macro!($tok $(, $($arg)+)?);
@@ -28,6 +39,8 @@ macro_rules! multimacro {
 macro_rules! make_macro_modules {
     ($($modname:ident),+ $(,)?) => {$(
         #[macro_use] mod $modname;
+        #[allow(unused_imports)]
+        pub(crate) use $modname::*;
     )+};
 }
 
