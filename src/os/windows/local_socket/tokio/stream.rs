@@ -8,7 +8,7 @@ use crate::{
         tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
     },
 };
-use std::{io, os::windows::prelude::*, pin::Pin};
+use std::{io, os::windows::prelude::*};
 
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) DuplexPipeStream<Bytes>);
@@ -28,10 +28,6 @@ impl LocalSocketStream {
             Ok(inner) => Ok(Self(inner)),
             Err(_) => todo!(),
         }
-    }
-    #[inline]
-    fn pinproj(&mut self) -> Pin<&mut DuplexPipeStream<Bytes>> {
-        Pin::new(&mut self.0)
     }
 }
 
@@ -53,31 +49,24 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 // TODO I/O by ref, including Tokio traits
 multimacro! {
     LocalSocketStream,
+    pinproj_for_unpin(DuplexPipeStream<Bytes>),
     forward_futures_rw,
     forward_as_handle,
 }
 
 pub struct ReadHalf(pub(super) RecvPipeStream<Bytes>);
-impl ReadHalf {
-    fn pinproj(&mut self) -> Pin<&mut RecvPipeStream<Bytes>> {
-        Pin::new(&mut self.0)
-    }
-}
 multimacro! {
     ReadHalf,
+    pinproj_for_unpin(RecvPipeStream<Bytes>),
     forward_futures_read,
     forward_as_handle,
     forward_debug("local_socket::ReadHalf"),
 }
 
 pub struct WriteHalf(pub(super) SendPipeStream<Bytes>);
-impl WriteHalf {
-    fn pinproj(&mut self) -> Pin<&mut SendPipeStream<Bytes>> {
-        Pin::new(&mut self.0)
-    }
-}
 multimacro! {
     WriteHalf,
+    pinproj_for_unpin(SendPipeStream<Bytes>),
     forward_futures_write,
     forward_as_handle,
     forward_debug("local_socket::WriteHalf"),

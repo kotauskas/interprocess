@@ -20,7 +20,7 @@ macro_rules! ok_or_ret_errno {
 }
 
 macro_rules! pinproj_for_unpin {
-    ($src:ident, $dst:ident) => {
+    ($src:ident, $dst:ty) => {
         impl $src {
             #[inline(always)]
             fn pinproj(&mut self) -> ::std::pin::Pin<&mut $dst> {

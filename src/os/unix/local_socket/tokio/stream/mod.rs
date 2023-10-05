@@ -18,9 +18,6 @@ impl LocalSocketStream {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
-    fn pinproj(&mut self) -> Pin<&mut UdStream> {
-        Pin::new(&mut self.0)
-    }
 }
 impl From<UdStream> for LocalSocketStream {
     #[inline]
@@ -38,6 +35,7 @@ impl Debug for LocalSocketStream {
 
 multimacro! {
     LocalSocketStream,
+    pinproj_for_unpin(UdStream),
     forward_futures_rw,
     forward_as_handle(unix),
     forward_try_handle(UdStream, unix),
