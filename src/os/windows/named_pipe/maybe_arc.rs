@@ -8,23 +8,33 @@ pub enum MaybeArc<T> {
 }
 impl<T> MaybeArc<T> {
     /// `Arc::clone` in place.
+    // TODO this whole function is dodgy, Miri correction needed
     pub fn refclone(&mut self) -> Self {
         let arc = match self {
             Self::Inline(mx) => {
                 let x = unsafe {
                     // SAFETY: generally a no-op from a safety perspective; the ManuallyDrop ensures
-                    // that it stays that way in the event of a panic
+                    // that it stays that way in the event of a panic in Arc::new
                     ptr::read((mx as *mut T).cast::<ManuallyDrop<T>>())
                 };
-                // Nothing can panic past the following line
                 let arc = Arc::new(x);
+
+                // BEGIN no-panic zone
                 let arc = unsafe {
                     // SAFETY: ManuallyDrop is layout-transparent
                     Arc::from_raw(Arc::into_raw(arc).cast::<T>())
                 };
-                let clone = Arc::clone(&arc);
-                *self = Self::Shared(arc);
-                clone
+                unsafe {
+                    // SAFETY: self, being a mutable reference, is valid for writes
+                    ptr::write(self, Self::Shared(arc));
+                }
+                // END no-panic zone, the danger has passed
+
+                let ref_for_clone = match self {
+                    Self::Shared(s) => &*s,
+                    Self::Inline(..) => unreachable!(),
+                };
+                Arc::clone(ref_for_clone)
             }
             Self::Shared(arc) => Arc::clone(arc),
         };
