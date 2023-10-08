@@ -9,7 +9,7 @@ use std::{
 };
 
 fn msg(server: bool) -> Box<str> {
-    message(None, server, None)
+    message(None, server, Some('\n'))
 }
 
 fn handle_conn_duplex(listener: &mut PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>) -> TestResult {
@@ -30,6 +30,7 @@ fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Bytes
 
 pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_duplex::<pipe_mode::Bytes>(),
@@ -38,6 +39,7 @@ pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestRes
 }
 pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_recv_only::<pipe_mode::Bytes>(),
@@ -46,6 +48,7 @@ pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
 }
 pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_send_only::<pipe_mode::Bytes>(),

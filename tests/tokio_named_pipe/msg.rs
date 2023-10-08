@@ -7,6 +7,7 @@ use interprocess::{
     os::windows::named_pipe::{
         pipe_mode,
         tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+        PipeMode,
     },
     reliable_recv_msg::AsyncReliableRecvMsgExt,
 };
@@ -25,27 +26,39 @@ fn futf8(m: &[u8]) -> TestResult<&str> {
 
 pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_tokio_duplex::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_tokio_duplex::<pipe_mode::Messages>()
+        },
         handle_conn_duplex,
     )
     .await
 }
 pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_tokio_recv_only::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_tokio_recv_only::<pipe_mode::Messages>()
+        },
         handle_conn_cts,
     )
     .await
 }
 pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_tokio_send_only::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_tokio_send_only::<pipe_mode::Messages>()
+        },
         handle_conn_stc,
     )
     .await
@@ -97,14 +110,14 @@ pub async fn client_stc(name: Arc<str>) -> TestResult {
 }
 
 async fn recv(recver: &mut RecvPipeStream<pipe_mode::Messages>, exp1: &str, exp2: &str) -> TestResult {
-    let mut buf = Vec::with_capacity(exp1.len());
+    let mut buf = vec![0; exp1.len()];
 
     let rslt = (&*recver).recv(&mut buf).await.context("first receive failed")?;
     ensure_eq!(rslt.size(), exp1.len());
     ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp1);
 
     buf.clear();
-    buf.reserve(exp2.len().saturating_sub(exp1.len()));
+    buf.resize(exp2.len(), 0);
     let rslt = (&*recver).recv(&mut buf).await.context("second receive failed")?;
     ensure_eq!(rslt.size(), exp2.len());
     ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp2);

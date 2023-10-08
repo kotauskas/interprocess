@@ -55,12 +55,13 @@ fn named_pipe_msg_unidir_server_to_client() -> TestResult {
 }
 
 fn drive_server<L>(
+    id: &'static str,
     name_sender: Sender<Arc<str>>,
     num_clients: u32,
     mut createfn: impl (FnMut(PipeListenerOptions) -> io::Result<L>),
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
 ) -> TestResult {
-    let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), true), |nm| {
+    let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(id, true), |nm| {
         createfn(PipeListenerOptions::new().name(nm.as_ref() as &OsStr))
     })?;
 

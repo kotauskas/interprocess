@@ -1,7 +1,7 @@
 use super::{drive_server, util::*};
 use color_eyre::eyre::Context;
 use interprocess::{
-    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream},
+    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream},
     reliable_recv_msg::*,
 };
 use std::{
@@ -48,25 +48,28 @@ fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Messa
 
 pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_duplex::<pipe_mode::Messages>(),
+        |plo| plo.mode(PipeMode::Messages).create_duplex::<pipe_mode::Messages>(),
         handle_conn_duplex,
     )
 }
 pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_recv_only::<pipe_mode::Messages>(),
+        |plo| plo.mode(PipeMode::Messages).create_recv_only::<pipe_mode::Messages>(),
         handle_conn_cts,
     )
 }
 pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.create_send_only::<pipe_mode::Messages>(),
+        |plo| plo.mode(PipeMode::Messages).create_send_only::<pipe_mode::Messages>(),
         handle_conn_stc,
     )
 }

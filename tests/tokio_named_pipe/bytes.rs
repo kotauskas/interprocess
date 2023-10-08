@@ -17,6 +17,7 @@ fn msg(server: bool) -> Box<str> {
 
 pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_tokio_duplex::<pipe_mode::Bytes>(),
@@ -26,6 +27,7 @@ pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> T
 }
 pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_tokio_recv_only::<pipe_mode::Bytes>(),
@@ -35,6 +37,7 @@ pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> Test
 }
 pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
+        make_id!(),
         name_sender,
         num_clients,
         |plo| plo.create_tokio_send_only::<pipe_mode::Bytes>(),
