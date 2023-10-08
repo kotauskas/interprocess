@@ -123,6 +123,8 @@ trait DebugExpectExt: Sized {
     fn debug_expect(self, msg: &str);
 }
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
+    #[inline]
+    #[track_caller]
     fn debug_expect(self, msg: &str) {
         if cfg!(debug_assertions) {
             self.expect(msg);
@@ -130,6 +132,8 @@ impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
     }
 }
 impl<T> DebugExpectExt for Option<T> {
+    #[inline]
+    #[track_caller]
     fn debug_expect(self, msg: &str) {
         if cfg!(debug_assertions) {
             self.expect(msg);
