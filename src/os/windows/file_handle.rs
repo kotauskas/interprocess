@@ -5,7 +5,6 @@ use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
 
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
 #[repr(transparent)]
-#[derive(Debug)]
 pub(crate) struct FileHandle(pub(crate) OwnedHandle);
 impl FileHandle {
     pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
@@ -65,4 +64,8 @@ impl TryClone for FileHandle {
         c_wrappers::duplicate_handle(self.0.as_handle()).map(Self)
     }
 }
-forward_handle!(FileHandle);
+multimacro! {
+    FileHandle,
+    forward_handle,
+    forward_debug,
+}

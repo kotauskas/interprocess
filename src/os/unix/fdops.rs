@@ -28,7 +28,7 @@ impl Read for &FdOps {
         };
         ok_or_ret_errno!(success => bytes_read)
     }
-    // TODO can_vector
+    // FUTURE can_vector
 }
 impl Write for &FdOps {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -49,12 +49,13 @@ impl Write for &FdOps {
         };
         ok_or_ret_errno!(success => bytes_written)
     }
-    // TODO can_vector
+    // FUTURE can_vector
     fn flush(&mut self) -> io::Result<()> {
         let success = unsafe { libc::fsync(self.0.as_raw_fd()) >= 0 };
         ok_or_ret_errno!(success => ())
     }
 }
+// TODO format as number
 impl Debug for FdOps {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
