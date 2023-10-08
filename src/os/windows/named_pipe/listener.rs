@@ -121,6 +121,11 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
             .finish()
     }
 }
+impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandle {
+    fn from(p: PipeListener<Rm, Sm>) -> Self {
+        p.stored_instance.into_inner().expect("unexpected lock poison").0
+    }
+}
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

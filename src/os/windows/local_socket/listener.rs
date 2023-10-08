@@ -1,11 +1,11 @@
 use super::LocalSocketStream;
 use crate::{
     local_socket::ToLocalSocketName,
-    os::windows::named_pipe::{pipe_mode, PipeListener as GenericPipeListener, PipeListenerOptions, PipeMode},
+    os::windows::named_pipe::{pipe_mode::Bytes, PipeListener as GenericPipeListener, PipeListenerOptions, PipeMode},
 };
 use std::io;
 
-type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
+type PipeListener = GenericPipeListener<Bytes, Bytes>;
 
 #[derive(Debug)]
 pub struct LocalSocketListener(PipeListener);
@@ -26,3 +26,4 @@ impl LocalSocketListener {
         self.0.set_nonblocking(nonblocking)
     }
 }
+forward_into_handle!(LocalSocketListener);

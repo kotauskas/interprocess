@@ -143,7 +143,9 @@ impl LocalSocketListener {
 multimacro! {
     LocalSocketListener,
     forward_debug,
-    forward_handle(unix),
+    forward_into_handle,
+    forward_as_handle(unix),
+    forward_from_handle(unix),
     derive_raw(unix),
 }
 
