@@ -1,7 +1,6 @@
 use super::{c_wrappers, unixprelude::*};
 use crate::TryClone;
 use std::{
-    fmt::{self, Debug, Formatter},
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::fd::OwnedFd,
 };
@@ -55,26 +54,17 @@ impl Write for &FdOps {
         ok_or_ret_errno!(success => ())
     }
 }
-// TODO format as number
-impl Debug for FdOps {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
-}
-
-// No As/Into because those can be easily done with basic method forwarding.
-// TODO implement the above to facilitate macro forwarding
-impl FromRawFd for FdOps {
-    #[inline]
-    unsafe fn from_raw_fd(fd: RawFd) -> Self {
-        Self(unsafe { OwnedFd::from_raw_fd(fd) })
-    }
-}
 
 impl TryClone for FdOps {
     fn try_clone(&self) -> std::io::Result<Self> {
         let fd = c_wrappers::duplicate_fd(self.0.as_fd())?;
         Ok(Self(fd))
     }
+}
+
+multimacro! {
+    FdOps,
+    forward_handle,
+    forward_debug,
+    derive_raw,
 }

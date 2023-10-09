@@ -5,12 +5,16 @@ use crate::{
 };
 use std::{io, os::windows::prelude::*};
 
+type StreamImpl = DuplexPipeStream<Bytes>;
+type ReadHalfImpl = RecvPipeStream<Bytes>;
+type WriteHalfImpl = SendPipeStream<Bytes>;
+
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) DuplexPipeStream<Bytes>);
+pub struct LocalSocketStream(pub(super) StreamImpl);
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = DuplexPipeStream::connect(name.inner())?;
+        let inner = StreamImpl::connect(name.inner())?;
         Ok(Self(inner))
     }
     #[inline]
@@ -36,7 +40,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        match DuplexPipeStream::try_from(handle) {
+        match StreamImpl::try_from(handle) {
             Ok(s) => Ok(Self(s)),
             Err(e) => Err(FromHandleError {
                 details: Default::default(),
@@ -49,24 +53,27 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 
 multimacro! {
     LocalSocketStream,
+    forward_rbv(StreamImpl, &),
     forward_sync_ref_rw, // The thunking already happens inside.
     forward_as_handle,
     derive_sync_mut_rw,
 }
 
 #[derive(Debug)]
-pub struct ReadHalf(pub(super) RecvPipeStream<Bytes>);
+pub struct ReadHalf(pub(super) ReadHalfImpl);
 multimacro! {
     ReadHalf,
+    forward_rbv(ReadHalfImpl, &),
     forward_sync_ref_read,
     forward_as_handle,
     derive_sync_mut_read,
 }
 
 #[derive(Debug)]
-pub struct WriteHalf(pub(super) SendPipeStream<Bytes>);
+pub struct WriteHalf(pub(super) WriteHalfImpl);
 multimacro! {
     WriteHalf,
+    forward_rbv(WriteHalfImpl, &),
     forward_sync_ref_write,
     forward_as_handle,
     derive_sync_mut_write,

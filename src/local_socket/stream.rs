@@ -84,6 +84,7 @@ impl LocalSocketStream {
 }
 multimacro! {
     LocalSocketStream,
+    forward_rbv(LocalSocketStreamImpl, &),
     forward_sync_ref_rw,
     forward_asinto_handle,
     forward_debug,
@@ -98,6 +99,7 @@ pub struct ReadHalf(pub(super) ReadHalfImpl);
 
 multimacro! {
     ReadHalf,
+    forward_rbv(ReadHalfImpl, &),
     forward_sync_ref_read,
     forward_as_handle,
     forward_debug,
@@ -110,6 +112,7 @@ pub struct WriteHalf(pub(super) WriteHalfImpl);
 
 multimacro! {
     WriteHalf,
+    forward_rbv(WriteHalfImpl, &),
     forward_sync_ref_write,
     forward_as_handle,
     forward_debug,

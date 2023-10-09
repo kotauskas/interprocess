@@ -6,9 +6,9 @@ use crate::{
 use libc::c_int;
 use std::{
     fmt::{self, Debug, Formatter},
-    io::{self, Read, Write},
+    io,
     os::{
-        fd::{AsFd, BorrowedFd, OwnedFd},
+        fd::OwnedFd,
         unix::io::{AsRawFd, FromRawFd},
     },
 };
@@ -37,24 +37,6 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
 
 pub(crate) struct UnnamedPipeReader(FdOps);
 impl Sealed for UnnamedPipeReader {}
-impl AsFd for UnnamedPipeReader {
-    #[inline]
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.0 .0.as_fd()
-    }
-}
-impl From<UnnamedPipeReader> for OwnedFd {
-    #[inline]
-    fn from(x: UnnamedPipeReader) -> Self {
-        x.0 .0
-    }
-}
-impl From<OwnedFd> for UnnamedPipeReader {
-    #[inline]
-    fn from(fd: OwnedFd) -> Self {
-        Self(FdOps(fd))
-    }
-}
 impl Debug for UnnamedPipeReader {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeReader")
@@ -64,31 +46,15 @@ impl Debug for UnnamedPipeReader {
 }
 multimacro! {
     UnnamedPipeReader,
+    forward_rbv(FdOps, &),
     forward_sync_ref_read,
     forward_try_clone,
+    forward_handle,
     derive_sync_mut_read,
 }
 
 pub(crate) struct UnnamedPipeWriter(FdOps);
 impl Sealed for UnnamedPipeWriter {}
-impl AsFd for UnnamedPipeWriter {
-    #[inline]
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.0 .0.as_fd()
-    }
-}
-impl From<UnnamedPipeWriter> for OwnedFd {
-    #[inline]
-    fn from(x: UnnamedPipeWriter) -> Self {
-        x.0 .0
-    }
-}
-impl From<OwnedFd> for UnnamedPipeWriter {
-    #[inline]
-    fn from(fd: OwnedFd) -> Self {
-        Self(FdOps(fd))
-    }
-}
 impl Debug for UnnamedPipeWriter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("UnnamedPipeWriter")
@@ -99,7 +65,9 @@ impl Debug for UnnamedPipeWriter {
 
 multimacro! {
     UnnamedPipeWriter,
+    forward_rbv(FdOps, &),
     forward_sync_ref_write,
     forward_try_clone,
+    forward_handle,
     derive_sync_mut_write,
 }
