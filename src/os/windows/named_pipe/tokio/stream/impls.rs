@@ -425,6 +425,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
         }
 
         let handle = AssertHandleSyncSend(self.as_raw_handle());
+        #[allow(clippy::redundant_locals)]
         let task = tokio::task::spawn_blocking(move || {
             let handle = handle;
             FileHandle::flush_hndl(handle.0)
