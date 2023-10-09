@@ -44,6 +44,23 @@ macro_rules! make_macro_modules {
     )+};
 }
 
+macro_rules! forward_rbv {
+    (@$slf:ident &) => {
+        &$slf.0
+    };
+    (@$slf:ident *) => {
+        &&*$slf.0
+    };
+    ($ty:ident, $int:ident, $kind:tt) => {
+        impl $ty {
+            #[inline(always)]
+            fn refwd(&self) -> &$int {
+                forward_rbv!(@self $kind)
+            }
+        }
+    };
+}
+
 make_macro_modules! {
     derive_raw, derive_mut_iorw,
     forward_handle_and_fd, forward_try_clone, forward_trait_method, forward_iorw, forward_fmt,
