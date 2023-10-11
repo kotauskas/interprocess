@@ -14,6 +14,24 @@ fn is_unix() -> bool {
     env_var_os("CARGO_CFG_UNIX").is_some()
 }
 
+fn define(cfg: &str) {
+    ldefine(&[cfg]);
+}
+fn ldefine(cfgs: &[&str]) {
+    let stdout_ = io::stdout();
+    let mut stdout = stdout_.lock();
+    for &i in cfgs {
+        writeln!(stdout, "cargo:rustc-cfg={i}").unwrap();
+    }
+}
+macro_rules! uds_cdefine {
+    ($($nm:ident),+ $(,)?) => {$(
+        if $nm {
+            define(concat!("uds_", stringify!($nm)))
+        }
+    )+};
+}
+
 /// This can define the following:
 /// - `uds_sun_len` on platforms that have the stupid as fuck `sun_len` field (to correct max length calculation)
 /// - `uds_sock_cloexec` on platforms with SOCK_CLOEXEC
@@ -46,8 +64,9 @@ fn collect_uds_features(target: &TargetTriplet) {
         mut cmsgcred,
         mut sockcred,
         mut sockcred2,
+        mut xucred,
         mut sock_cloexec,
-        mut sock_nonblock] = [false; 7];
+        mut sock_nonblock] = [false; 8];
     if target.os_any(&["linux", "android", "fuchsia", "redox"]) {
         // "Linux-like" in libc terminology, plus Fuchsia and Redox
         [ucred, sock_cloexec, sock_nonblock] = [true; 3];
@@ -84,7 +103,7 @@ fn collect_uds_features(target: &TargetTriplet) {
             define("uds_sockpeercred");
         } else {
             // TODO
-            define("uds_xucred");
+            xucred = true;
         }
     } else if target.os_any(&["solaris", "illumos"]) {
         // TODO
@@ -100,43 +119,13 @@ fn collect_uds_features(target: &TargetTriplet) {
             "uds_msghdr_iovlen_c_int", "uds_msghdr_controllen_socklen_t", "uds_cmsghdr_len_socklen_t"
         ])
     }
-    if ucred || cmsgcred || sockcred || sockcred2 {
+    if ucred || cmsgcred || sockcred || sockcred2 || xucred {
         let mut contcred = false; // TODO is NetBSD sockcred a contcred?
         define("uds_credentials");
-        if ucred {
-            contcred = true;
-            define("uds_ucred");
-        }
-        if sockcred2 {
-            contcred = true;
-            define("uds_sockcred2");
-        }
-        cdefine(cmsgcred, "uds_cmsgcred");
-        cdefine(sockcred, "uds_sockcred");
-        cdefine(contcred, "uds_cont_credentials");
+        contcred |= ucred | sockcred2;
+        uds_cdefine!(ucred, cmsgcred, sockcred, sockcred2, contcred, xucred);
     }
-    if sock_cloexec {
-        define("uds_sock_cloexec");
-    }
-    if sock_nonblock {
-        define("uds_sock_nonblock");
-    }
-}
-
-fn define(cfg: &str) {
-    ldefine(&[cfg]);
-}
-fn ldefine(cfgs: &[&str]) {
-    let stdout_ = io::stdout();
-    let mut stdout = stdout_.lock();
-    for &i in cfgs {
-        writeln!(stdout, "cargo:rustc-cfg={i}").unwrap();
-    }
-}
-fn cdefine(br: bool, cfg: &str) {
-    if br {
-        define(cfg);
-    }
+    uds_cdefine!(sock_cloexec, sock_nonblock);
 }
 
 struct TargetTriplet {
