@@ -178,7 +178,7 @@ impl<'a> Credentials<'a> {
 /// Only `ucred` (Linux) and `cmsgcred` (FreeBSD, DragonFly BSD) support this functionality. Attempting to serialize
 /// other types of structures (possible on FreeBSD in the case of `xucred` and `sockcred2`) will cause a panic in
 /// `.to_cmsg()`.
-#[cfg_attr( // uds_credentials template
+#[cfg_attr( // uds_ancillary_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
@@ -207,6 +207,14 @@ impl ToCmsg for Credentials<'_> {
         target_os = "fuchsia",
         target_os = "freebsd",
         target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
     )))
 )]
 impl<'a> FromCmsg<'a> for Credentials<'a> {

@@ -19,8 +19,26 @@
     )))
 )]
 
-// FIXME should be uds_ancillary_credentials
 #[cfg_attr( // uds_credentials template
+    feature = "doc_cfg",
+    doc(cfg(any(
+        target_os = "linux",
+        target_os = "redox",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+    )))
+)]
+#[cfg_attr( // uds_ancillary_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",

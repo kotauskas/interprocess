@@ -120,9 +120,12 @@ fn collect_uds_features(target: &TargetTriplet) {
         ])
     }
     if ucred || cmsgcred || sockcred || sockcred2 || xucred {
-        let mut contcred = false; // TODO is NetBSD sockcred a contcred?
         define("uds_credentials");
+        let mut contcred = false; // TODO is NetBSD sockcred a contcred?
         contcred |= ucred | sockcred2;
+        if ucred || cmsgcred || sockcred || sockcred2 {
+            define("uds_ancillary_credentials");
+        }
         uds_cdefine!(ucred, cmsgcred, sockcred, sockcred2, contcred, xucred);
     }
     uds_cdefine!(sock_cloexec, sock_nonblock);

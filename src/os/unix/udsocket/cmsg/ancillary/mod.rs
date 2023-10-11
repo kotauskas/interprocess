@@ -6,7 +6,7 @@
 
 // TODO SCM_TIMESTAMP, also the one with nanosecond precision
 
-#[cfg_attr( // uds_credentials template
+#[cfg_attr( // uds_ancillary_credentials template
     feature = "doc_cfg",
     doc(cfg(any(
         target_os = "linux",
@@ -17,7 +17,7 @@
         target_os = "dragonfly",
     )))
 )]
-#[cfg(uds_credentials)]
+#[cfg(uds_ancillary_credentials)]
 pub mod credentials;
 pub mod file_descriptors;
 
@@ -201,7 +201,7 @@ fn check_level_and_type<E>(mut cmsg: Cmsg<'_>, expected: c_int) -> ParseResult<'
     check_type(cmsg, expected)
 }
 
-#[cfg(uds_credentials)]
+#[cfg(uds_ancillary_credentials)]
 fn check_size<E: From<SizeMismatch>>(cmsg: Cmsg<'_>, expected: usize) -> ParseResult<'_, Cmsg<'_>, E> {
     let got = cmsg.data().len();
     if got != expected {
@@ -216,7 +216,7 @@ fn check_size<E: From<SizeMismatch>>(cmsg: Cmsg<'_>, expected: usize) -> ParseRe
 /// # Safety
 /// The control message must really contain a sufficiently initialized struct with that size and alignment. No level or
 /// type check is performed.
-#[cfg(uds_credentials)]
+#[cfg(uds_ancillary_credentials)]
 unsafe fn into_fixed_size_contents<T>(mut cmsg: Cmsg<'_>) -> ParseResult<'_, &T, SizeMismatch> {
     cmsg = check_size(cmsg, std::mem::size_of::<T>())?;
 

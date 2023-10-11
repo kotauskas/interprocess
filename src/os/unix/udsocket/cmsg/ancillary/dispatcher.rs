@@ -1,4 +1,4 @@
-#[cfg(uds_credentials)]
+#[cfg(uds_ancillary_credentials)]
 use super::credentials::Credentials;
 use super::{
     file_descriptors::FileDescriptors, Cmsg, FromCmsg, ParseError, ParseErrorKind, ParseResult, SizeMismatch, LEVEL,
@@ -24,7 +24,7 @@ pub enum Ancillary<'a> {
             target_os = "fuchsia",
         )))
     )]
-    #[cfg(uds_credentials)]
+    #[cfg(uds_ancillary_credentials)]
     Credentials(Credentials<'a>),
 }
 impl<'a> Ancillary<'a> {
@@ -33,7 +33,7 @@ impl<'a> Ancillary<'a> {
             .map(Self::FileDescriptors)
             .map_err(|e| e.map_payload_err(MalformedPayload::FileDescriptors))
     }
-    #[cfg(uds_credentials)]
+    #[cfg(uds_ancillary_credentials)]
     fn parse_credentials(cmsg: Cmsg<'a>) -> ParseResult<'a, Self, MalformedPayload> {
         Credentials::try_parse(cmsg)
             .map(Self::Credentials)
@@ -57,7 +57,7 @@ impl<'a> FromCmsg<'a> for Ancillary<'a> {
         // let's get down to jump tables
         match cmsg.cmsg_type() {
             FileDescriptors::ANCTYPE => Self::parse_fd(cmsg),
-            #[cfg(uds_credentials)]
+            #[cfg(uds_ancillary_credentials)]
             Credentials::ANCTYPE1 => Self::parse_credentials(cmsg),
             #[cfg(uds_sockcred2)]
             Credentials::ANCTYPE2 => Self::parse_credentials(cmsg),
@@ -87,14 +87,14 @@ pub enum MalformedPayload {
             target_os = "fuchsia",
         )))
     )]
-    #[cfg(uds_credentials)]
+    #[cfg(uds_ancillary_credentials)]
     Credentials(SizeMismatch),
 }
 impl Display for MalformedPayload {
     fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
             Self::FileDescriptors(e) => Display::fmt(&e, _f),
-            #[cfg(uds_credentials)]
+            #[cfg(uds_ancillary_credentials)]
             Self::Credentials(e) => Display::fmt(&e, _f),
         }
     }
