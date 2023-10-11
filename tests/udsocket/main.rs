@@ -5,6 +5,7 @@
 mod util;
 use util::*;
 
+#[cfg(any(uds_cont_credentials, uds_cmsgcred))]
 mod credentials;
 mod datagram;
 mod stream;
