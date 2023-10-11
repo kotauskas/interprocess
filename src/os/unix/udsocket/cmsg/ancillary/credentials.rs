@@ -135,7 +135,7 @@ impl<'a> Credentials<'a> {
     #[cfg(uds_cmsgcred)]
     #[inline]
     pub fn sendable_cmsgcred() -> Self {
-        Self(CredentialsImpl::Cmsgcred(ZEROED_CMSGCRED.as_ref()))
+        Self(CredentialsInner::Cmsgcred(ZEROED_CMSGCRED.as_ref()))
     }
 
     fn tocmslice(&self) -> &[u8] {
@@ -153,13 +153,12 @@ impl<'a> Credentials<'a> {
         #[cfg(uds_cmsgcred)]
         #[allow(unreachable_patterns)]
         {
+            let CredentialsInner::Cmsgcred(cm) = self.0 else {
+                panic!("not a sendable credentials structure");
+            };
             unsafe {
-                let ptr = match self.0 {
-                    CredentialsInner::Cmsgcred(c) => <*const _>::cast(c),
-                    els => panic!("not a sendable credentials structure"),
-                };
                 // SAFETY: well-initialized POD struct with #[repr(C)]
-                slice::from_raw_parts(ptr, size_of::<cmsgcred>())
+                slice::from_raw_parts(<*const _>::cast(cm), size_of::<cmsgcred>())
             }
         }
     }
@@ -223,11 +222,17 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
     #[cfg(uds_cmsgcred)]
     fn try_parse(mut cmsg: Cmsg<'a>) -> ParseResult<'a, Self, SizeMismatch> {
         cmsg = check_level(cmsg)?;
-        let expected = if !cfg!(uds_sockcred2) { Some(SCM_CREDS) } else { None };
-        match cmsg.cmsg_type() {
-            SCM_CREDS => unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(Self::Cmsgcred),
+        let expected = if !cfg!(uds_sockcred2) {
+            Some(libc::SCM_CREDS)
+        } else {
+            None
+        };
+        let inner = match cmsg.cmsg_type() {
+            libc::SCM_CREDS => {
+                unsafe { into_fixed_size_contents::<cmsgcred_packed>(cmsg) }.map(CredentialsInner::Cmsgcred)?
+            }
             #[cfg(uds_sockcred2)]
-            SCM_CREDS2 => {
+            libc::SCM_CREDS2 => {
                 let min_expected = size_of::<sockcred2>();
                 let len = cmsg.data().len();
                 if len < min_expected {
@@ -253,10 +258,11 @@ impl<'a> FromCmsg<'a> for Credentials<'a> {
                     return Err(ParseErrorKind::MalformedPayload(SizeMismatch { expected, got: len }).wrap(cmsg));
                 }
 
-                Ok(Self::Sockcred2(creds.as_ref()))
+                CredentialsInner::Sockcred2(creds.as_ref())
             }
-            els => Err(ParseErrorKind::WrongType { expected, got: els }.wrap(cmsg)),
-        }
+            els => return Err(ParseErrorKind::WrongType { expected, got: els }.wrap(cmsg)),
+        };
+        Ok(Self(inner))
     }
 }
 

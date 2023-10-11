@@ -35,6 +35,7 @@ fn enable_passcred(sock: &UdStream) -> TestResult {
 
     #[cfg(not(uds_cont_credentials))]
     {
+        let _ = sock;
         bail!("Attempted to enable credential passing on a platform that doesn't support it (misconfigured test)")
     }
 }

@@ -30,6 +30,6 @@ pub(crate) mod local_socket;
 pub(crate) mod unnamed_pipe;
 
 mod unixprelude {
-    pub use libc::{c_int, gid_t, mode_t, pid_t, size_t, uid_t};
+    pub use libc::{c_int, c_short, gid_t, mode_t, pid_t, size_t, uid_t};
     pub use std::os::unix::prelude::*;
 }

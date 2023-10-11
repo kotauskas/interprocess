@@ -3,6 +3,7 @@
 //! [`Credentials`] is the table type itself – see its own documentation for more on where and how it is used.
 //! [`Groups`] is an iterator produced by `Credentials` that enumerates supplementary groups stored in the table.
 
+use crate::os::unix::unixprelude::*;
 #[cfg(uds_cmsgcred)]
 use libc::cmsgcred;
 #[cfg(uds_sockcred2)]
@@ -11,9 +12,12 @@ use libc::sockcred2;
 use libc::ucred;
 #[cfg(uds_xucred)]
 use libc::xucred;
-use libc::{gid_t, pid_t, uid_t};
 use std::{iter::FusedIterator, marker::PhantomData, mem::size_of};
-use to_method::To;
+#[allow(unused_imports)]
+use {
+    std::{cmp::min, ptr::addr_of},
+    to_method::To,
+};
 
 /// A table of credentials for portable secure authentication.
 ///
@@ -85,7 +89,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => Some(c.sc_uid),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => None,
+            CredentialsInner::Xucred(..) => None,
         }
     }
     /// Returns the **closest thing to the real user ID** among what's stored in the credentials table. If a real UID is
@@ -118,7 +122,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => Some(c.sc_egid),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => None,
+            CredentialsInner::Xucred(..) => None,
         }
     }
     /// Returns the **real** group ID stored in the credentials table, or `None` if no such information is available.
@@ -137,7 +141,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => Some(c.sc_gid),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => None,
+            CredentialsInner::Xucred(..) => None,
         }
     }
     /// Returns the **closest thing to the real group ID** among what's stored in the credentials table. If a real GID
@@ -171,7 +175,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => Some(c.sc_pid),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => None, // TODO available on FreeBSD, but extremely scuffed
+            CredentialsInner::Xucred(..) => None, // TODO available on FreeBSD, but extremely scuffed
         }
     }
     /// Returns an iterator over the supplementary groups in the credentials table.
@@ -205,7 +209,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => c.sc_ngroups,
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => c.cr_ngroups,
+            CredentialsInner::Xucred(c) => c.cr_ngroups.to::<c_int>(),
         }
         .try_to::<usize>()
         .unwrap()
