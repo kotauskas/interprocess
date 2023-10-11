@@ -47,7 +47,7 @@ pub(super) enum CredentialsInner<'a> {
     #[cfg(uds_sockcred2)]
     Sockcred2(&'a sockcred2_packed),
     #[cfg(uds_xucred)]
-    Xucred(xucred),
+    Xucred(xucred, PhantomData<&'a xucred>),
 }
 /// Methods that read the received/stored credentials.
 impl<'a> Credentials<'a> {
@@ -70,7 +70,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => Some(c.sc_euid),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => Some(c.cr_uid),
+            CredentialsInner::Xucred(c, _) => Some(c.cr_uid),
         }
     }
     /// Returns the **real** user ID stored in the credentials table, or `None` if no such information is available.
@@ -209,7 +209,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => c.sc_ngroups,
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => c.cr_ngroups.to::<c_int>(),
+            CredentialsInner::Xucred(c, _) => c.cr_ngroups.to::<c_int>(),
         }
         .try_to::<usize>()
         .unwrap()
@@ -223,7 +223,7 @@ impl<'a> Credentials<'a> {
             #[cfg(uds_sockcred2)]
             CredentialsInner::Sockcred2(c) => addr_of!(c.sc_groups).cast::<gid_packed>(),
             #[cfg(uds_xucred)]
-            CredentialsInner::Xucred(c) => addr_of!(c.cr_groups).cast::<gid_packed>(),
+            CredentialsInner::Xucred(c, _) => addr_of!(c.cr_groups).cast::<gid_packed>(),
         }
     }
 }

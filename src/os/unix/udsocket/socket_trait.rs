@@ -63,7 +63,7 @@ pub trait UdSocket: AsFd {
         #[cfg(uds_xucred)]
         let cred = {
             let xucred = c_wrappers::get_peer_xucred(self.as_fd())?;
-            CredentialsInner::Xucred(xucred)
+            CredentialsInner::Xucred(xucred, std::marker::PhantomData)
         };
         Ok(Credentials(cred))
     }
