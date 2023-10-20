@@ -1,6 +1,6 @@
 macro_rules! derive_sync_mut_read {
-    ($ty:ident) => {
-        impl ::std::io::Read for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::std::io::Read for $ty {
             #[inline(always)]
             fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
                 (self as &Self).read(buf)
@@ -17,8 +17,8 @@ macro_rules! derive_sync_mut_read {
 }
 
 macro_rules! derive_sync_mut_write {
-    ($ty:ident) => {
-        impl ::std::io::Write for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::std::io::Write for $ty {
             #[inline(always)]
             fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
                 (self as &Self).write(buf)
@@ -37,15 +37,15 @@ macro_rules! derive_sync_mut_write {
 }
 
 macro_rules! derive_sync_mut_rw {
-    ($ty:ident) => {
-        forward_sync_read!($ty);
-        forward_sync_write!($ty);
+    ($({$($lt:tt)*})? $ty:ty) => {
+        forward_sync_read!($({$($lt)*})? $ty);
+        forward_sync_write!($({$($lt)*})? $ty);
     };
 }
 
 macro_rules! derive_futures_mut_read {
-    ($ty:ident) => {
-        impl ::futures_io::AsyncRead for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::futures_io::AsyncRead for $ty {
             #[inline(always)]
             fn poll_read(
                 mut self: ::std::pin::Pin<&mut Self>,
@@ -66,8 +66,8 @@ macro_rules! derive_futures_mut_read {
     };
 }
 macro_rules! derive_futures_mut_write {
-    ($ty:ident) => {
-        impl ::futures_io::AsyncWrite for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::futures_io::AsyncWrite for $ty {
             #[inline(always)]
             fn poll_write(
                 mut self: ::std::pin::Pin<&mut Self>,
@@ -103,8 +103,8 @@ macro_rules! derive_futures_mut_write {
 }
 
 macro_rules! derive_futures_mut_rw {
-    ($ty:ident) => {
-        derive_futures_mut_read!($ty);
-        derive_futures_mut_write!($ty);
+    ($({$($lt:tt)*})? $ty:ty) => {
+        derive_futures_mut_read!($({$($lt)*})? $ty);
+        derive_futures_mut_write!($({$($lt)*})? $ty);
     };
 }

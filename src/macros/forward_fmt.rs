@@ -4,16 +4,16 @@ pub(crate) fn debug_forward_with_custom_name(nm: &str, fld: &dyn Debug, f: &mut 
 }
 
 macro_rules! forward_debug {
-    ($ty:ident, $nm:literal) => {
-        impl ::std::fmt::Debug for $ty {
+    ($({$($lt:tt)*})? $ty:ty, $nm:literal) => {
+        impl $(<$($lt)*>)? ::std::fmt::Debug for $ty {
             #[inline(always)]
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 $crate::macros::debug_forward_with_custom_name($nm, &self.0, f)
             }
         }
     };
-    ($ty:ident) => {
-        impl ::std::fmt::Debug for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::std::fmt::Debug for $ty {
             #[inline(always)]
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 ::std::fmt::Debug::fmt(&self.0, f)

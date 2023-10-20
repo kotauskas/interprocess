@@ -1,7 +1,7 @@
 macro_rules! forward_sync_read {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta])?)?)?) => {
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta])?)?)?) => {
         $(#[$a1])?
-        impl ::std::io::Read for $ty {
+        impl $(<$($lt)*>)? ::std::io::Read for $ty {
             $($(#[$a2])?)?
             #[inline(always)]
             fn read(&mut self, buf: &mut [u8]) -> ::std::io::Result<usize> {
@@ -20,9 +20,9 @@ macro_rules! forward_sync_read {
 }
 
 macro_rules! forward_sync_write {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
         $(#[$a1])?
-        impl ::std::io::Write for $ty {
+        impl $(<$($lt)*>)? ::std::io::Write for $ty {
             $($(#[$a2])?)?
             #[inline(always)]
             fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
@@ -44,16 +44,16 @@ macro_rules! forward_sync_write {
 }
 
 macro_rules! forward_sync_rw {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
-        forward_sync_read!($ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
-        forward_sync_write!($ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+        forward_sync_read!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
+        forward_sync_write!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
     };
 }
 
 macro_rules! forward_sync_ref_read {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta])?)?)?) => {
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta])?)?)?) => {
         $(#[$a1])?
-        impl ::std::io::Read for &$ty {
+        impl $(<$($lt)*>)? ::std::io::Read for &$ty {
             $($(#[$a2])?)?
             #[inline(always)]
             fn read(&mut self, buf: &mut [u8]) -> ::std::io::Result<usize> {
@@ -70,9 +70,9 @@ macro_rules! forward_sync_ref_read {
 }
 
 macro_rules! forward_sync_ref_write {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
         $(#[$a1])?
-        impl ::std::io::Write for &$ty {
+        impl $(<$($lt)*>)? ::std::io::Write for &$ty {
             $($(#[$a2])?)?
             #[inline(always)]
             fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
@@ -94,15 +94,15 @@ macro_rules! forward_sync_ref_write {
 }
 
 macro_rules! forward_sync_ref_rw {
-    ($ty:ident $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
-        forward_sync_ref_read!($ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
-        forward_sync_ref_write!($ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
+    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+        forward_sync_ref_read!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
+        forward_sync_ref_write!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
     };
 }
 
 macro_rules! forward_futures_read {
-    ($ty:ident) => {
-        impl ::futures_io::AsyncRead for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::futures_io::AsyncRead for $ty {
             #[inline(always)]
             fn poll_read(
                 mut self: ::std::pin::Pin<&mut Self>,
@@ -123,8 +123,8 @@ macro_rules! forward_futures_read {
     };
 }
 macro_rules! forward_futures_write {
-    ($ty:ident) => {
-        impl ::futures_io::AsyncWrite for $ty {
+    ($({$($lt:tt)*})? $ty:ty) => {
+        impl $(<$($lt)*>)? ::futures_io::AsyncWrite for $ty {
             #[inline(always)]
             fn poll_write(
                 mut self: ::std::pin::Pin<&mut Self>,
@@ -160,9 +160,9 @@ macro_rules! forward_futures_write {
 }
 
 macro_rules! forward_futures_rw {
-    ($ty:ident) => {
-        forward_futures_read!($ty);
-        forward_futures_write!($ty);
+    ($({$($lt:tt)*})? $ty:ty) => {
+        forward_futures_read!($({$($lt)*})? $ty);
+        forward_futures_write!($({$($lt)*})? $ty);
     };
 }
 

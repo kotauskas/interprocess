@@ -20,7 +20,7 @@ macro_rules! ok_or_ret_errno {
 }
 
 macro_rules! pinproj_for_unpin {
-    ($src:ident, $dst:ty) => {
+    ($src:ty, $dst:ty) => {
         impl $src {
             #[inline(always)]
             fn pinproj(&mut self) -> ::std::pin::Pin<&mut $dst> {
@@ -31,8 +31,11 @@ macro_rules! pinproj_for_unpin {
 }
 
 macro_rules! multimacro {
-    ($tok:tt, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
-        $macro!($tok $(, $($arg)+)?);
+    ({$($lt:tt)*} $ty:ty, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
+        $macro!({$($lt)*} $ty $(, $($arg)+)?);
+    )+};
+    ($ty:ty, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
+        $macro!($ty $(, $($arg)+)?);
     )+};
 }
 
@@ -45,17 +48,17 @@ macro_rules! make_macro_modules {
 }
 
 macro_rules! forward_rbv {
-    (@$slf:ident &) => {
+    (@$slf:ident, &) => {
         &$slf.0
     };
-    (@$slf:ident *) => {
+    (@$slf:ident, *) => {
         &&*$slf.0
     };
-    ($ty:ident, $int:ident, $kind:tt) => {
+    ($ty:ty, $int:ty, $kind:tt) => {
         impl $ty {
             #[inline(always)]
             fn refwd(&self) -> &$int {
-                forward_rbv!(@self $kind)
+                forward_rbv!(@self, $kind)
             }
         }
     };
