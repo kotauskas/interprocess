@@ -31,8 +31,8 @@ macro_rules! pinproj_for_unpin {
 }
 
 macro_rules! multimacro {
-    ({$($lt:tt)*} $ty:ty, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
-        $macro!({$($lt)*} $ty $(, $($arg)+)?);
+    ($pre:tt $ty:ty, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
+        $macro!($pre $ty $(, $($arg)+)?);
     )+};
     ($ty:ty, $($macro:ident $(($($arg:tt)+))?),+ $(,)?) => {$(
         $macro!($ty $(, $($arg)+)?);

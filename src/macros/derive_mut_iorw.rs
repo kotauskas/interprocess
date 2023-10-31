@@ -48,19 +48,19 @@ macro_rules! derive_futures_mut_read {
         impl $(<$($lt)*>)? ::futures_io::AsyncRead for $ty {
             #[inline(always)]
             fn poll_read(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
                 buf: &mut [u8],
             ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                Pin::new(&mut &*self).poll_read(cx, buf)
+                ::std::pin::Pin::new(&mut &*self).poll_read(cx, buf)
             }
             #[inline(always)]
             fn poll_read_vectored(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
                 bufs: &mut [::std::io::IoSliceMut<'_>],
             ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                Pin::new(&mut &*self).poll_read_vectored(cx, bufs)
+                ::std::pin::Pin::new(&mut &*self).poll_read_vectored(cx, bufs)
             }
         }
     };
@@ -70,33 +70,33 @@ macro_rules! derive_futures_mut_write {
         impl $(<$($lt)*>)? ::futures_io::AsyncWrite for $ty {
             #[inline(always)]
             fn poll_write(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
                 buf: &[u8],
             ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                Pin::new(&mut &*self).poll_write(cx, buf)
+                ::std::pin::Pin::new(&mut &*self).poll_write(cx, buf)
             }
             #[inline(always)]
             fn poll_write_vectored(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
                 bufs: &[::std::io::IoSlice<'_>],
             ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                Pin::new(&mut &*self).poll_write_vectored(cx, bufs)
+                ::std::pin::Pin::new(&mut &*self).poll_write_vectored(cx, bufs)
             }
             #[inline(always)]
             fn poll_flush(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
             ) -> ::std::task::Poll<::std::io::Result<()>> {
-                Pin::new(&mut &*self).poll_flush(cx)
+                ::std::pin::Pin::new(&mut &*self).poll_flush(cx)
             }
             #[inline(always)]
             fn poll_close(
-                mut self: ::std::pin::Pin<&mut Self>,
+                self: ::std::pin::Pin<&mut Self>,
                 cx: &mut ::std::task::Context<'_>,
             ) -> ::std::task::Poll<::std::io::Result<()>> {
-                Pin::new(&mut &*self).poll_close(cx)
+                ::std::pin::Pin::new(&mut &*self).poll_close(cx)
             }
         }
     };
