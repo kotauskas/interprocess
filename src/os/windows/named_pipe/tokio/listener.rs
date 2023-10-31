@@ -21,6 +21,9 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 /// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing
 /// asynchronous pipe streams.
 ///
+/// Note that this type does not correspond to any Tokio object, and is an invention of Interprocess
+/// in its entirety.
+///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
 ///
 /// # Examples

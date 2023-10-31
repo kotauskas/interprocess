@@ -29,6 +29,19 @@ pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong 
 /// implement I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a
 /// receive half and a send half, and can be reverted via [`.reunite()`](PipeStream::reunite).
 ///
+/// # Semantic peculiarities
+/// - [`BrokenPipe`](io::ErrorKind::BrokenPipe) errors from read methods are converted to EOF
+///   (`Ok(0)`)
+/// - Upon drop, streams that haven't been flushed since the last write are transparently sent to
+///   **limbo** – a thread pool that ensures that the peer does not get a `BrokenPipe` (EOF if peer
+///   also uses Interprocess) immediately after the server is done sending data, which would discard
+///   everything
+///     - At the time of dropping, if the stream hasn't seen a single write since the last explicit
+///       flush, it will evade limbo (can be overriden with
+///       [`.mark_dirty()`](PipeStream::mark_dirty))
+/// - Flush elision, analogous to limbo elision but also happens on explicit flush (i.e. flushing
+///   two times in a row only makes one system call)
+///
 /// # Examples
 ///
 /// ## Basic bytestream client

@@ -32,12 +32,12 @@ use tokio::{
 ///
 /// Pipe streams can be split by reference and by value for concurrent receive and send operations. Splitting by
 /// reference is ephemeral and can be achieved by simply borrowing the stream, since both `PipeStream` and `&PipeStream`
-/// implement I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a
-/// [`RecvHalf`] and a [`SendHalf`], and can be reverted via the `.reunite()` method defined on the halves.
+/// implement the I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a
+/// receive half and a send half, and can be reverted via [`.reunite()`](Self::reunite).
 ///
 /// # Examples
 ///
-/// ## Basic client
+/// ## Basic bytestream client
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,6 +63,7 @@ use tokio::{
 ///     writer.write_all(b"Hello from client!").await?;
 ///     // Because only the trait from futures is implemented for now, it's "close" instead of
 ///     // "shutdown".
+/// #   // TODO Use shutdown here
 ///     writer.close().await?;
 ///     Ok(())
 /// };
