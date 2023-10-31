@@ -6,11 +6,12 @@ use super::{
 };
 use crate::{
     os::windows::{
-        named_pipe::{path_conversion, set_nonblocking_for_stream, PipeMode},
+        c_wrappers,
+        named_pipe::{needs_flush::NeedsFlushVal, path_conversion, set_nonblocking_for_stream, PipeMode},
         FileHandle,
     },
     reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
-    weaken_buf_init_mut,
+    weaken_buf_init_mut, TryClone,
 };
 use std::{
     ffi::OsStr,
@@ -20,7 +21,6 @@ use std::{
     mem::MaybeUninit,
     os::windows::prelude::*,
     slice,
-    sync::atomic::Ordering,
 };
 use winapi::{
     shared::winerror::ERROR_MORE_DATA,
@@ -45,7 +45,7 @@ impl RawPipeStream {
         Self {
             handle: Some(handle),
             is_server,
-            needs_flush: AtomicBool::new(false),
+            needs_flush: NeedsFlush::from(NeedsFlushVal::No),
         }
     }
     pub(crate) fn new_server(handle: FileHandle) -> Self {
@@ -81,29 +81,21 @@ impl RawPipeStream {
     fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let r = self.file_handle().write(buf);
         if r.is_ok() {
-            self.needs_flush.store(true, Ordering::Release);
+            self.needs_flush.mark_dirty();
         }
         r
     }
 
     fn flush(&self) -> io::Result<()> {
-        if self
-            .needs_flush
-            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
+        if self.needs_flush.on_flush() {
             let r = self.file_handle().flush();
             if r.is_err() {
-                self.needs_flush.store(true, Ordering::Release);
+                self.needs_flush.mark_dirty();
             }
             r
         } else {
             Ok(())
         }
-    }
-
-    fn assume_flushed(&self) {
-        self.needs_flush.store(false, Ordering::Release);
     }
 
     fn try_recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
@@ -167,7 +159,7 @@ impl RawPipeStream {
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
         let corpse = self.reap();
-        if *self.needs_flush.get_mut() {
+        if self.needs_flush.get() {
             send_off(corpse);
         }
     }
@@ -345,23 +337,30 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
-    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other end in its
-    /// entirety).
+    /// Flushes the stream, blocking until the send buffer is empty (has been received by the other
+    /// end in its entirety).
     ///
     /// Only available on streams that have a send mode.
     #[inline]
     pub fn flush(&self) -> io::Result<()> {
         self.raw.flush()
     }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
-    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
-    /// limbo.
+    /// Marks the stream as unflushed, preventing elision of the next flush operation (which
+    /// includes limbo).
+    #[inline]
+    pub fn mark_dirty(&self) {
+        self.raw.needs_flush.mark_dirty();
+    }
+    /// Assumes that the other side has consumed everything that's been written so far. This will
+    /// turn the next flush into a no-op, but will cause the send buffer to be cleared when the
+    /// stream is closed, since it won't be sent to limbo.
     #[inline]
     pub fn assume_flushed(&self) {
-        self.raw.assume_flushed()
+        self.raw.needs_flush.on_flush();
     }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
-    /// dropping it.
+    /// Drops the stream without sending it to limbo. This is the same as calling
+    /// `assume_flushed()` right before dropping it.
+    #[inline]
     pub fn evade_limbo(self) {
         self.assume_flushed();
     }
@@ -472,6 +471,18 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
             }
         }
         Ok(Self::new(raw))
+    }
+}
+
+impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
+    fn try_clone(&self) -> io::Result<Self> {
+        let handle = c_wrappers::duplicate_handle(self.as_handle())?;
+        self.raw.needs_flush.on_clone();
+        Ok(Self::new(RawPipeStream {
+            handle: Some(FileHandle(handle)),
+            is_server: self.is_server(),
+            needs_flush: NeedsFlush::from(NeedsFlushVal::Always),
+        }))
     }
 }
 

@@ -9,6 +9,7 @@ use crate::{
         downgrade_eof, downgrade_poll_eof,
         named_pipe::{
             maybe_arc::MaybeArc,
+            needs_flush::NeedsFlushVal,
             path_conversion,
             stream::{
                 block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
@@ -25,11 +26,10 @@ use futures_io::{AsyncRead, AsyncWrite};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
-    future::Future,
+    future::{self, Future},
     mem::{ManuallyDrop, MaybeUninit},
     ops::Deref,
     pin::Pin,
-    sync::atomic::Ordering,
     task::{Context, Poll},
 };
 use tokio::{
@@ -63,7 +63,7 @@ impl RawPipeStream {
     fn new(inner: InnerTokio) -> Self {
         Self {
             inner: Some(inner),
-            needs_flush: AtomicBool::new(false),
+            needs_flush: NeedsFlush::from(NeedsFlushVal::No),
         }
     }
     pub(crate) fn new_server(server: TokioNPServer) -> Self {
@@ -146,7 +146,7 @@ impl RawPipeStream {
             match same_clsrv!(x in self.inner() => x.try_write(buf)) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 els => {
-                    self.needs_flush.store(true, Ordering::Release);
+                    self.needs_flush.mark_dirty();
                     return Poll::Ready(els);
                 }
             }
@@ -155,16 +155,6 @@ impl RawPipeStream {
     #[inline]
     fn write<'a>(&'a self, buf: &'a [u8]) -> Write<'a> {
         Write(self, buf)
-    }
-
-    /// Removes the needs-flush flag if it is set, returning its previous value.
-    fn cas_flush(&self) -> bool {
-        self.needs_flush
-            .compare_exchange(true, false, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-    }
-    fn assume_flushed(&self) {
-        self.needs_flush.store(false, Ordering::Release);
     }
 
     fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
@@ -211,7 +201,7 @@ impl RawPipeStream {
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
         let corpse = self.reap();
-        if *self.needs_flush.get_mut() {
+        if self.needs_flush.get() {
             send_off(corpse);
         }
     }
@@ -436,82 +426,20 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     /// Flushes the stream, waiting until the send buffer is empty (has been received by the other end in its entirety).
     ///
     /// Only available on streams that have a send mode.
+    #[inline]
     pub async fn flush(&self) -> io::Result<()> {
-        if !self.raw.cas_flush() {
-            // No flush required.
-            return Ok(());
-        }
+        future::poll_fn(|cx| self.poll_flush(cx)).await
+    }
 
-        let mut slf_flush = self.flush.lock().await;
-        let rslt = loop {
-            match slf_flush.as_mut() {
-                Some(fl) => match fl.await {
-                    Err(e) => {
-                        *slf_flush = None;
-                        panic!("flush task panicked: {e}")
-                    }
-                    Ok(ok) => break ok,
-                },
-                None => self.ensure_flush_start(&mut slf_flush),
-            }
-        };
-        *slf_flush = None;
-        if rslt.is_err() {
-            self.raw.needs_flush.store(true, Ordering::Release);
-        }
-        rslt
-    }
-    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
-    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
-    /// limbo.
-    ///
-    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
-    #[inline]
-    pub fn assume_flushed(&self) {
-        self.raw.assume_flushed()
-    }
-    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
-    /// dropping it.
-    ///
-    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
-    pub fn evade_limbo(self) {
-        self.assume_flushed();
-    }
-}
-
-impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
-    #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.raw.poll_read_init(cx, buf)
-    }
-}
-impl<Sm: PipeModeTag> AsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
-    #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.deref()).poll_read(cx, buf)
-    }
-}
-// TODO TokioAsyncRead on ref
-impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
-    #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
-        self.get_mut().raw.poll_read_readbuf(cx, buf)
-    }
-}
-impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
-    #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.raw.poll_write(cx, buf)
-    }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if !self.raw.cas_flush() {
+    fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if !self.raw.needs_flush.on_flush() {
             // No flush required.
             return Poll::Ready(Ok(()));
         }
 
         let mut lockfut = self.flush.lock();
         let lfpin = unsafe {
-            // SAFETY: i promise,,,
+            // SAFETY: i promise,,, (nah fr tho i'm just stack-pinning without the macro)
             Pin::new_unchecked(&mut lockfut)
         };
         let mut slf_flush = ready!(lfpin.poll(cx));
@@ -523,27 +451,62 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
         };
         *slf_flush = None;
         if rslt.is_err() {
-            self.raw.needs_flush.store(true, Ordering::Release);
+            self.raw.needs_flush.mark_dirty();
         }
         Poll::Ready(rslt)
+    }
+
+    /// Marks the stream as unflushed, preventing elision of the next flush operation (which
+    /// includes limbo).
+    #[inline]
+    pub fn mark_dirty(&self) {
+        self.raw.needs_flush.mark_dirty();
+    }
+    /// Assumes that the other side has consumed everything that's been written so far. This will turn the next flush
+    /// into a no-op, but will cause the send buffer to be cleared when the stream is closed, since it won't be sent to
+    /// limbo.
+    ///
+    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
+    #[inline]
+    pub fn assume_flushed(&self) {
+        self.raw.needs_flush.on_flush();
+    }
+    /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()` right before
+    /// dropping it.
+    ///
+    /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
+    #[inline]
+    pub fn evade_limbo(self) {
+        self.assume_flushed();
+    }
+}
+
+impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        self.raw.poll_read_init(cx, buf)
+    }
+}
+// TODO TokioAsyncRead on ref
+impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+        self.get_mut().raw.poll_read_readbuf(cx, buf)
+    }
+}
+
+impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        self.raw.poll_write(cx, buf)
+    }
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.get_mut().poll_flush(cx)
     }
     #[inline(always)]
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
-    }
-}
-impl<Rm: PipeModeTag> AsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
-    #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.deref()).poll_write(cx, buf)
-    }
-    #[inline]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.deref()).poll_flush(cx)
-    }
-    #[inline]
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.deref()).poll_close(cx)
     }
 }
 // TODO TokioAsyncWrite on ref
@@ -561,6 +524,7 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
         <Self as TokioAsyncWrite>::poll_flush(self, cx)
     }
 }
+
 impl<Sm: PipeModeTag> AsyncReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     #[inline]
     fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
@@ -577,6 +541,7 @@ impl<Sm: PipeModeTag> AsyncReliableRecvMsg for PipeStream<pipe_mode::Messages, S
         Pin::new(&mut self.deref()).poll_recv(cx, buf)
     }
 }
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("PipeStream");
@@ -629,4 +594,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
     }
 }
 
-derive_asraw!({Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>, windows);
+multimacro! {
+    {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>,
+    derive_asraw(windows),
+}
+derive_futures_mut_read!({Sm: PipeModeTag} PipeStream<pipe_mode::Bytes, Sm>);
+derive_futures_mut_write!({Rm: PipeModeTag} PipeStream<Rm, pipe_mode::Bytes>);

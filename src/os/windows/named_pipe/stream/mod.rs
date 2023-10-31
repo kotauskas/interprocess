@@ -7,7 +7,7 @@ mod wrapper_fns;
 pub(super) use impls::{LIMBO_ERR, REBURY_ERR};
 pub(crate) use wrapper_fns::*;
 
-use super::maybe_arc::MaybeArc;
+use super::{maybe_arc::MaybeArc, needs_flush::NeedsFlush};
 use crate::{error::ConversionError, os::windows::FileHandle};
 use std::{
     error::Error,
@@ -15,7 +15,6 @@ use std::{
     io,
     marker::PhantomData,
     os::windows::prelude::*,
-    sync::atomic::AtomicBool,
 };
 
 pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong to different pipe stream objects";
@@ -124,7 +123,7 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 pub(crate) struct RawPipeStream {
     handle: Option<FileHandle>,
     is_server: bool,
-    needs_flush: AtomicBool,
+    needs_flush: NeedsFlush,
 }
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.

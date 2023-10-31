@@ -8,18 +8,17 @@ use crate::{
     os::windows::{
         named_pipe::{
             maybe_arc::MaybeArc,
+            needs_flush::NeedsFlush,
             stream::{pipe_mode, PipeModeTag, REUNITE_ERROR_MSG},
         },
         winprelude::*,
     },
 };
-
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     io,
     marker::PhantomData,
-    sync::atomic::AtomicBool,
 };
 use tokio::{
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
@@ -103,7 +102,7 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 pub(crate) struct RawPipeStream {
     inner: Option<InnerTokio>,
     // Cleared by the generic pipes rather than the raw pipe stream unlike in sync land.
-    needs_flush: AtomicBool,
+    needs_flush: NeedsFlush,
 }
 enum InnerTokio {
     Server(TokioNPServer),

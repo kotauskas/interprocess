@@ -56,6 +56,7 @@ multimacro! {
     forward_rbv(StreamImpl, &),
     forward_sync_ref_rw, // The thunking already happens inside.
     forward_as_handle,
+    forward_try_clone,
     derive_sync_mut_rw,
 }
 
