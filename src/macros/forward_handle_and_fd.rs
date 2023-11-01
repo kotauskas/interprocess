@@ -97,6 +97,7 @@ macro_rules! forward_handle {
     };
 }
 
+// TODO deal with this documentation mess (also allow replacing that Error signature with a name)
 macro_rules! forward_try_into_handle {
     (@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
         /// Releases ownership of the handle/file descriptor, detaches the object from the async runtime and returns the
