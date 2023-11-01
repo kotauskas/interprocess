@@ -1,4 +1,4 @@
-use super::super::PipeMode;
+use super::super::*;
 
 /// Tags for [`PipeStream`]'s generic arguments that specify the directionality of the stream and how it receives and/or
 /// sends data (as bytes or as messages).
@@ -12,8 +12,7 @@ use super::super::PipeMode;
 /// - **`PipeStream<Messages, ()>`** is a receive-only message stream.
 /// - **`PipeStream<Bytes, Messages>`** is a duplex stream that receives bytes but sends messages.
 ///
-/// [`PipeStream`]: super::PipeStream
-/// [`PipeMode`]: super::super::super::PipeMode
+/// [`PipeMode`]: super::super::PipeMode
 pub mod pipe_mode {
     use super::*;
 

@@ -152,10 +152,11 @@ pub struct PipeListenerOptions<'a> {
     ///   client currently attempting to connect to the named pipe server, the method will return
     ///   immediately with the [`WouldBlock`](io::ErrorKind::WouldBlock) error instead of blocking
     ///   until one arrives.
-    /// - The streams created by [`accept`](PipeListener::accept) and
-    ///   [`incoming`](PipeListener::incoming) behave similarly to how client-side streams behave in
-    ///   nonblocking mode. See the documentation for `set_nonblocking` for an explanation of the
-    ///   exact effects.
+    /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side
+    ///   streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an
+    ///   explanation of the exact effects.
+    /// [`accept`]: PipeListener::accept
+    /// [`incoming`]: PipeListener::incoming
     pub nonblocking: bool,
     /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many
     /// clients can be communicated with at once. If set to 1, trying to create multiple instances

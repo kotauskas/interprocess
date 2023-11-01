@@ -27,16 +27,17 @@ pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
 /// A handle to the reading end of an unnamed pipe, created by the [`pipe()`] function together with the
 /// [writing end](UnnamedPipeWriter).
 ///
-/// The core functionality is exposed in a file-like [`Read`] interface. On Windows, the
-/// [`ShareHandle`](crate::os::windows::ShareHandle) and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`][FRH] traits are
-/// also implemented, along with [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`][FRF] on Unix.
+/// The core functionality is exposed in a file-like [`Read`](io::Read) interface. On Windows,
+/// the [`ShareHandle`](crate::os::windows::ShareHandle) and
+/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented, along with
+/// [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
 ///
 /// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
 /// [IRH]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
-/// [FRH]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
+/// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
 /// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
-/// [FRF]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
+/// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 // field is pub(crate) to allow the platform specific builders to create the public-facing pipe types
 pub struct UnnamedPipeReader(pub(crate) UnnamedPipeReaderImpl);
 multimacro! {
@@ -51,16 +52,17 @@ multimacro! {
 /// A handle to the writing end of an unnamed pipe, created by the [`pipe()`] function together with the
 /// [reading end](UnnamedPipeReader).
 ///
-/// The core functionality is exposed in a file-like [`Write`] interface. On Windows, the
-/// [`ShareHandle`](crate::os::windows::ShareHandle) and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`][FRH] traits are
-/// also implemented, along with [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`][FRF] on Unix.
+/// The core functionality is exposed in a file-like [`Write`](io::Write) interface. On Windows,
+/// the [`ShareHandle`](crate::os::windows::ShareHandle) and
+/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented, along with
+/// [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
 ///
-/// [AsRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
-/// [IntoRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
-/// [FromRawHandle]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
-/// [AsRawFd]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
-/// [IntoRawFd]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
-/// [FromRawFd]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
+/// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
+/// [IRH]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
+/// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
+/// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
+/// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
+/// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 pub struct UnnamedPipeWriter(pub(crate) UnnamedPipeWriterImpl);
 multimacro! {
     UnnamedPipeWriter,

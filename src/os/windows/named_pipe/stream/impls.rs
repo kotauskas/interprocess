@@ -320,7 +320,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// for all current instances and future ones.
     ///
     /// [`nonblocking`]: super::super::PipeListenerOptions::nonblocking
-    /// [`set_nonblocking`]: super::super::PipeListenerOptions::set_nonblocking
+    /// [`set_nonblocking`]: super::super::PipeListener::set_nonblocking
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.raw.set_nonblocking(Rm::MODE, nonblocking)

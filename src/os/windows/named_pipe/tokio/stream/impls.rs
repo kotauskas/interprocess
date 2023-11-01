@@ -290,8 +290,8 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
 }
 */
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
-    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
-    /// what was requested to be sent).
+    /// Sends a message into the pipe, returning how many bytes were successfully sent (typically
+    /// equal to the size of what was requested to be sent).
     #[inline]
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.write(buf).await
@@ -299,7 +299,8 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
 }
 
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
-    /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
+    /// Same as `.read()` from [`AsyncReadExt`](::futures::AsyncReadExt), but accepts an uninitialized
+    /// buffer.
     #[inline]
     pub async fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         self.raw.read_uninit(buf).await

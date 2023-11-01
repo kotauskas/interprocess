@@ -20,13 +20,16 @@ use {
 /// special processing. Please read its documentation if you haven't already – the rest of this page assumes you did.
 ///
 /// # Validity
-/// As mentioned in the [module-level documentation](super), not all platforms support all types of local socket names.
-/// A name pointing to a filesystem location is only supported on Unix-like systems, and names pointing to an abstract
-/// namespace reserved specifically for local sockets are only available on Linux and Windows. Due to the diversity of
-/// those differences, `LocalSocketName` does not provide any forced validation by itself – the [`is_supported`] and
-/// [`is_always_supported`] checks are not enforced to succeed. Instead, they are intended as helpers for the process of
-/// user input validation, if any local socket names are ever read from environment variables, configuration files or
-/// other methods of user input.
+/// As mentioned in the [module-level documentation](super), not all platforms support all types of
+/// local socket names. A name pointing to a filesystem location is only supported on Unix-like
+/// systems, and names pointing to an abstract namespace reserved specifically for local sockets are
+/// only available on Linux and Windows. Due to the diversity of those differences,
+/// `LocalSocketName` does not provide any forced validation by itself – the
+/// [`is_supported`](LocalSocketName::is_supported) and
+/// [`is_always_supported`](LocalSocketName::is_always_supported) checks are not enforced to
+/// succeed. Instead, they are intended as helpers for the process of user input validation, if any
+/// local socket names are ever read from environment variables, configuration files or other
+/// methods of user input.
 ///
 /// If an invalid local socket name is used to create a local socket or connect to it, the creation/connection method
 /// will fail.
@@ -67,35 +70,36 @@ impl<'a> LocalSocketName<'a> {
     pub const fn is_path(&self) -> bool {
         !self.namespaced
     }
-    /// Returns the name as an `OsStr`. The returned value does not retain the type of the name (whether it was a
-    /// filesystem path or a namespaced name).
+    /// Returns the name as an `OsStr`. The returned value does not retain the type of the name
+    /// (whether it was a filesystem path or a namespaced name).
     ///
-    /// If you need the value as an owned `OsString` instead, see [`.into_inner()`](Self::into_inner).
+    /// If you need the value as an owned `OsString` instead, see
+    /// [`.into_inner()`](Self::into_inner).
     pub fn inner(&'a self) -> &'a OsStr {
         &self.inner
     }
-    /// Returns the name as an `OsString`. The returned value does not retain the type of the name (whether it was a
-    /// filesystem path or a namespaced name).
+    /// Returns the name as an `OsString`. The returned value does not retain the type of the name
+    /// (whether it was a filesystem path or a namespaced name).
     ///
-    /// If you need the value as a borrowed `OsStr` instead, see [`.inner()`](Self::inner).
+    /// If you need the value as a borrowed `OsStr` instead, see [`.inner()`](Self::inner()).
     pub fn into_inner(self) -> OsString {
         self.inner.into_owned()
     }
-    /// Returns the name as a *borrowed* `Cow<'_, OsStr>`. The returned value does not retain the type of the name
-    /// (whether it was a filesystem path or a namespaced name).
+    /// Returns the name as a *borrowed* `Cow<'_, OsStr>`. The returned value does not retain
+    /// thetype of the name (whether it was a filesystem path or a namespaced name).
     ///
-    /// If you need the value as a borrowed `OsStr`, see [`.inner()`](Self::inner); if you need the value as an owned
-    /// `OsString`, see [`.into_inner()`](Self::into_inner). If you need to take ownership of the `Cow`, see
-    /// [`.into_inner_cow()`](Self::into_inner_cow).
+    /// If you need the value as a borrowed `OsStr`, see [`.inner()`](Self::inner()); if you need
+    /// the value as an owned `OsString`, see [`.into_inner()`](Self::into_inner). If you need to
+    /// take ownership of the `Cow`, see [`.into_inner_cow()`](Self::into_inner_cow).
     pub const fn inner_cow(&'a self) -> &'a Cow<'a, OsStr> {
         &self.inner
     }
-    /// Returns the name as a `Cow<'_, OsStr>`. The returned value does not retain the type of the name (whether it was
-    /// a filesystem path or a namespaced name).
+    /// Returns the name as a `Cow<'_, OsStr>`. The returned value does not retain the type of the
+    /// name (whether it was a filesystem path or a namespaced name).
     ///
-    /// If you need the value as a borrowed `OsStr`, see [`inner`]; if you need the value as an owned `OsString`, see
-    /// [`.into_inner()`](Self::into_inner). If you don't need to take ownership of the `Cow`, see
-    /// [`.inner_cow()`](Self::inner_cow).
+    /// If you need the value as a borrowed `OsStr`, see [`.inner()`](Self::inner()); if you need the
+    /// value as an owned `OsString`, see [`.into_inner()`](Self::into_inner). If you don't need to
+    /// take ownership of the `Cow`, see [`.inner_cow()`](Self::inner_cow).
     pub fn into_inner_cow(self) -> Cow<'a, OsStr> {
         self.inner
     }
