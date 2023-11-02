@@ -95,6 +95,7 @@ multimacro! {
 
 /// A read half of a local socket stream, obtained by splitting a [`LocalSocketStream`](super::LocalSocketStream).
 // TODO example
+// TODO rename to RecvHalf
 pub struct ReadHalf(pub(super) ReadHalfImpl);
 
 multimacro! {
@@ -108,6 +109,7 @@ multimacro! {
 }
 
 /// A write half of a local socket stream, obtained by splitting a [`LocalSocketStream`](super::LocalSocketStream).
+// TODO rename to SendHalf
 pub struct WriteHalf(pub(super) WriteHalfImpl);
 
 multimacro! {
@@ -119,3 +121,8 @@ multimacro! {
     derive_sync_mut_write,
     derive_asraw,
 }
+
+/// [`ReuniteError`](crate::error::ReuniteError) for sync local socket streams.
+pub type ReuniteError = crate::error::ReuniteError<ReadHalf, WriteHalf>;
+/// Result type for [`LocalSocketStream::reunite()`].
+pub type ReuniteResult = Result<LocalSocketStream, ReuniteError>;

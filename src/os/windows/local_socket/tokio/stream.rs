@@ -1,11 +1,11 @@
 // TODO reunite
 
 use crate::{
-    error::FromHandleError,
+    error::{FromHandleError, ReuniteError},
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{
         pipe_mode::Bytes,
-        tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
+        tokio::{DuplexPipeStream, RecvPipeStream, ReuniteError as InnerReuniteError, SendPipeStream},
     },
 };
 use std::{io, os::windows::prelude::*};
@@ -23,10 +23,14 @@ impl LocalSocketStream {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
-    pub fn reunite(rh: ReadHalf, wh: WriteHalf) -> io::Result<Self> {
-        match DuplexPipeStream::reunite(rh.0, wh.0) {
+    #[inline]
+    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+        match DuplexPipeStream::reunite(rh.0, sh.0) {
             Ok(inner) => Ok(Self(inner)),
-            Err(_) => todo!(),
+            Err(InnerReuniteError { rh, sh }) => Err(ReuniteError {
+                rh: ReadHalf(rh),
+                sh: WriteHalf(sh),
+            }),
         }
     }
 }
