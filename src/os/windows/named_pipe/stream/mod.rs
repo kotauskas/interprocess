@@ -10,14 +10,11 @@ pub(crate) use wrapper_fns::*;
 use super::{maybe_arc::MaybeArc, needs_flush::NeedsFlush};
 use crate::{error::ConversionError, os::windows::FileHandle};
 use std::{
-    error::Error,
     fmt::{self, Debug, Display, Formatter},
     io,
     marker::PhantomData,
     os::windows::prelude::*,
 };
-
-pub(crate) static REUNITE_ERROR_MSG: &str = "the receive and self halves belong to different pipe stream objects";
 
 /// A named pipe stream, created by a server-side listener or by connecting to a server.
 ///
@@ -178,19 +175,8 @@ impl Display for FromHandleErrorKind {
 /// Not to be confused with the Tokio version.
 pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
 
-/// Error type for `.reunite()` on split receive and send halves.
-///
-/// The error indicates that the halves belong to different streams and allows to recover both of them.
-#[derive(Debug)]
-pub struct ReuniteError<Rm: PipeModeTag, Sm: PipeModeTag> {
-    /// The receive half that didn't go anywhere, in case you still need it.
-    pub recv_half: RecvPipeStream<Rm>,
-    /// The send half that didn't go anywhere, in case you still need it.
-    pub send_half: SendPipeStream<Sm>,
-}
-impl<Rm: PipeModeTag, Sm: PipeModeTag> Display for ReuniteError<Rm, Sm> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.pad(REUNITE_ERROR_MSG)
-    }
-}
-impl<Rm: PipeModeTag, Sm: PipeModeTag> Error for ReuniteError<Rm, Sm> {}
+/// [`ReuniteError`](crate::error::ReuniteError) for sync named pipe streams.
+pub type ReuniteError<Rm, Sm> = crate::error::ReuniteError<RecvPipeStream<Rm>, SendPipeStream<Sm>>;
+
+/// Result type for [`PipeStream::reunite()`].
+pub type ReuniteResult<Rm, Sm> = Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>>;

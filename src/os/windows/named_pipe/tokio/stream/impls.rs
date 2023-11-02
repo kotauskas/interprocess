@@ -346,18 +346,12 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
     /// returning both halves as an error if they belong to different streams (or when using
     /// this method on streams that were never split to begin with).
-    pub fn reunite(
-        recver: RecvPipeStream<Rm>,
-        sender: SendPipeStream<Sm>,
-    ) -> Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>> {
-        if !MaybeArc::ptr_eq(&recver.raw, &sender.raw) {
-            return Err(ReuniteError {
-                recv_half: recver,
-                send_half: sender,
-            });
+    pub fn reunite(rh: RecvPipeStream<Rm>, sh: SendPipeStream<Sm>) -> ReuniteResult<Rm, Sm> {
+        if !MaybeArc::ptr_eq(&rh.raw, &sh.raw) {
+            return Err(ReuniteError { rh, sh });
         }
-        let PipeStream { mut raw, flush, .. } = sender;
-        drop(recver);
+        let PipeStream { mut raw, flush, .. } = sh;
+        drop(rh);
         raw.try_make_owned();
         Ok(PipeStream {
             raw,
