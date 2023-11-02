@@ -187,3 +187,19 @@ pub type FromHandleError<E = NoDetails> = ConversionError<std::os::windows::io::
 #[cfg(unix)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
 pub type FromFdError<E = NoDetails> = ConversionError<std::os::unix::io::OwnedFd, E>;
+
+/// Error type of `.reunite()` on splittable stream types, indicating that the two halves belong to
+/// different streams.
+#[derive(Debug)]
+pub struct ReuniteError<R, S> {
+    /// Ownership of the receive half.
+    pub rh: R,
+    /// Ownership of the send half.
+    pub sh: S,
+}
+impl<R, S> Display for ReuniteError<R, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("tried to reunite halves of different streams")
+    }
+}
+impl<R: Debug, S: Debug> Error for ReuniteError<R, S> {}
