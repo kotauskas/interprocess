@@ -53,25 +53,28 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 // TODO I/O by ref, including Tokio traits
 multimacro! {
     LocalSocketStream,
-    pinproj_for_unpin(DuplexPipeStream<Bytes>),
-    forward_futures_rw,
+    forward_rbv(DuplexPipeStream<Bytes>, &),
+    forward_futures_ref_rw,
     forward_as_handle,
+    derive_futures_mut_rw,
 }
 
 pub struct ReadHalf(pub(super) RecvPipeStream<Bytes>);
 multimacro! {
     ReadHalf,
-    pinproj_for_unpin(RecvPipeStream<Bytes>),
-    forward_futures_read,
+    forward_rbv(RecvPipeStream<Bytes>, &),
+    forward_futures_ref_read,
     forward_as_handle,
     forward_debug("local_socket::ReadHalf"),
+    derive_futures_mut_read,
 }
 
 pub struct WriteHalf(pub(super) SendPipeStream<Bytes>);
 multimacro! {
     WriteHalf,
-    pinproj_for_unpin(SendPipeStream<Bytes>),
-    forward_futures_write,
+    forward_rbv(SendPipeStream<Bytes>, &),
+    forward_futures_ref_write,
     forward_as_handle,
     forward_debug("local_socket::WriteHalf"),
+    derive_futures_mut_write,
 }

@@ -85,14 +85,15 @@ impl From<LocalSocketStreamImpl> for LocalSocketStream {
     }
 }
 
-// TODO I/O by ref
+// TODO Tokio I/O by ref
 multimacro! {
     LocalSocketStream,
-    pinproj_for_unpin(LocalSocketStreamImpl),
-    forward_futures_rw,
+    forward_rbv(LocalSocketStreamImpl, &),
+    forward_futures_ref_rw,
     forward_as_handle,
     forward_try_from_handle(LocalSocketStreamImpl),
     forward_debug,
+    derive_futures_mut_rw,
     derive_asraw,
 }
 
@@ -104,10 +105,11 @@ multimacro! {
 pub struct ReadHalf(pub(super) ReadHalfImpl);
 multimacro! {
     ReadHalf,
-    pinproj_for_unpin(ReadHalfImpl),
-    forward_futures_read,
+    forward_rbv(ReadHalfImpl, &),
+    forward_futures_ref_read,
     forward_as_handle,
     forward_debug,
+    derive_futures_mut_read,
     derive_asraw,
 }
 /// A write half of a Tokio-based local socket stream, obtained by splitting a
@@ -119,9 +121,10 @@ multimacro! {
 pub struct WriteHalf(pub(super) WriteHalfImpl);
 multimacro! {
     WriteHalf,
-    pinproj_for_unpin(WriteHalfImpl),
-    forward_futures_write,
+    forward_rbv(WriteHalfImpl, &),
+    forward_futures_ref_write,
     forward_as_handle,
     forward_debug,
+    derive_futures_mut_write,
     derive_asraw,
 }

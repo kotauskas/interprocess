@@ -48,12 +48,8 @@ macro_rules! make_macro_modules {
 }
 
 macro_rules! forward_rbv {
-    (@$slf:ident, &) => {
-        &$slf.0
-    };
-    (@$slf:ident, *) => {
-        &&*$slf.0
-    };
+    (@$slf:ident, &) => { &$slf.0 };
+    (@$slf:ident, *) => { &&*$slf.0 };
     ($ty:ty, $int:ty, $kind:tt) => {
         impl $ty {
             #[inline(always)]

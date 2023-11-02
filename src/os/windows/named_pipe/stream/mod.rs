@@ -18,13 +18,15 @@ use std::{
 
 /// A named pipe stream, created by a server-side listener or by connecting to a server.
 ///
-/// This type combines in itself all possible combinations of receive modes and send modes, plugged into it using the
-/// `Rm` and `Sm` generic parameters respectively.
+/// This type combines in itself all possible combinations of
+/// [receive modes and send modes](pipe_mode), plugged into it using the `Rm` and `Sm` generic
+/// parameters respectively.
 ///
-/// Pipe streams can be split by reference and by value for concurrent receive and send operations. Splitting by
-/// reference is ephemeral and can be achieved by simply borrowing the stream, since both `PipeStream` and `&PipeStream`
-/// implement I/O traits. Splitting by value is done using the [`.split()`](Self::split) method, producing a
-/// receive half and a send half, and can be reverted via [`.reunite()`](PipeStream::reunite).
+/// Pipe streams can be split by reference and by value for concurrent receive and send operations.
+/// Splitting by reference is ephemeral and can be achieved by simply borrowing the stream, since
+/// both `PipeStream` and `&PipeStream` implement I/O traits. Splitting by value is done using the
+/// [`.split()`](Self::split) method, producing a receive half and a send half, and can be reverted
+/// via [`.reunite()`](PipeStream::reunite).
 ///
 /// # Semantic peculiarities
 /// - [`BrokenPipe`](io::ErrorKind::BrokenPipe) errors from read methods are converted to EOF
