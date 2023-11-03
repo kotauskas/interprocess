@@ -260,7 +260,8 @@ impl From<RecvResult> for Result<usize, Vec<u8>> {
 ///
 /// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it
 /// doesn't and hence wasn't written into the buffer. Both variants' payload is the total size of the message.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+// TODO fix the EOF issue
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct TryRecvResult {
     /// The size of the message.
     pub size: usize,
