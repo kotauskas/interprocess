@@ -1,6 +1,7 @@
 //! Does not use the limbo pool.
 
 use super::*;
+use crate::os::windows::get_borrowed;
 use crate::{
     os::windows::{winprelude::*, FileHandle},
     DebugExpectExt,
@@ -45,7 +46,7 @@ outside of another Tokio runtime)",
 
 fn bury(c: Corpse) {
     task::spawn_blocking(move || {
-        let handle = c.0.as_handle().as_raw_handle();
+        let handle = get_borrowed(c.0.as_handle());
         FileHandle::flush_hndl(handle).debug_expect("limbo flush failed");
     });
 }

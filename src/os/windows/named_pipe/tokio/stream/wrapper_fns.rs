@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, io};
 use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient as TokioNPClient};
-use winapi::shared::winerror::ERROR_PIPE_BUSY;
+use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
 
 pub(crate) fn _connect(path: &OsStr, read: bool, write: bool) -> io::Result<TokioNPClient> {
     let result = ClientOptions::new().read(read).write(write).open(path);

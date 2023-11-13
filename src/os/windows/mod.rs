@@ -13,14 +13,9 @@ pub(crate) use file_handle::*;
 use std::{io, task::Poll};
 mod winprelude {
     pub use std::os::windows::prelude::*;
-    pub use winapi::{
-        shared::{
-            minwindef::{BOOL, DWORD, LPVOID},
-            ntdef::HANDLE,
-        },
-        um::handleapi::INVALID_HANDLE_VALUE,
-    };
+    pub use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 }
+use windows_sys::Win32::Foundation::ERROR_PIPE_NOT_CONNECTED;
 use winprelude::*;
 
 mod c_wrappers;
@@ -29,7 +24,7 @@ mod c_wrappers;
 ///
 /// On Windows, like with most other operating systems, handles belong to specific processes. You shouldn't just send
 /// the value of a handle to another process (with a named pipe, for example) and expect it to work on the other side.
-/// For this to work, you need [`DuplicateHandle`](winapi::um::handleapi::DuplicateHandle) – the Win32 API function
+/// For this to work, you need [`DuplicateHandle`](windows_sys::Win32::Foundation::DuplicateHandle) – the Win32 API function
 /// which duplicates a handle into the handle table of the specified process (the receiver is referred to by its
 /// handle). This trait exposes the `DuplicateHandle` functionality in a safe manner.
 ///
@@ -44,7 +39,7 @@ pub trait ShareHandle: AsHandle {
     /// the only way to use any form of IPC other than named pipes to communicate between two processes which do not
     /// have a parent-child relationship or if the handle wasn't created as inheritable.
     ///
-    /// Backed by [`DuplicateHandle`](winapi::um::handleapi::DuplicateHandle). Doesn't require unsafe code since
+    /// Backed by [`DuplicateHandle`](windows_sys::Win32::Foundation::DuplicateHandle). Doesn't require unsafe code since
     /// `DuplicateHandle` never leads to undefined behavior if the `lpTargetHandle` parameter is a valid pointer, only
     /// creates an error.
     #[allow(clippy::not_unsafe_ptr_arg_deref)] // Handles are not pointers, they have handle checks
@@ -56,8 +51,7 @@ impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
 
 fn is_eof_like(e: &io::Error) -> bool {
-    e.kind() == io::ErrorKind::BrokenPipe
-        || e.raw_os_error() == Some(winapi::shared::winerror::ERROR_PIPE_NOT_CONNECTED as _)
+    e.kind() == io::ErrorKind::BrokenPipe || e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _)
 }
 
 #[allow(unused)]
@@ -69,4 +63,12 @@ fn downgrade_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
         Err(e) if is_eof_like(&e) => Ok(T::default()),
         els => els,
     }
+}
+
+fn get_borrowed(h: BorrowedHandle<'_>) -> HANDLE {
+    h.as_raw_handle() as HANDLE
+}
+
+fn get_owned(h: &OwnedHandle) -> HANDLE {
+    h.as_raw_handle() as HANDLE
 }

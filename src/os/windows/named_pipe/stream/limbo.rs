@@ -1,3 +1,4 @@
+use crate::os::windows::get_owned;
 use crate::{
     os::windows::{
         named_pipe::limbo_pool::{LimboPool, MaybeReject},
@@ -14,7 +15,7 @@ use std::{
     },
     thread,
 };
-use winapi::um::namedpipeapi::DisconnectNamedPipe;
+use windows_sys::Win32::System::Pipes::DisconnectNamedPipe;
 
 pub(super) struct Corpse {
     pub handle: FileHandle,
@@ -23,7 +24,7 @@ pub(super) struct Corpse {
 impl Corpse {
     #[inline]
     pub fn disconnect(&self) -> io::Result<()> {
-        let success = unsafe { DisconnectNamedPipe(self.handle.0.as_raw_handle()) != 0 };
+        let success = unsafe { DisconnectNamedPipe(get_owned(&self.handle.0)) != 0 };
         ok_or_ret_errno!(success => ())
     }
 }

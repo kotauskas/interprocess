@@ -43,8 +43,9 @@ mod path_conversion;
 pub mod tokio;
 
 use super::winprelude::*;
+use crate::os::windows::get_borrowed;
 use std::{io, ptr};
-use winapi::um::namedpipeapi::SetNamedPipeHandleState;
+use windows_sys::Win32::System::Pipes::SetNamedPipeHandleState;
 
 unsafe fn set_nonblocking_for_stream(
     handle: BorrowedHandle<'_>,
@@ -57,7 +58,7 @@ unsafe fn set_nonblocking_for_stream(
     let mut mode: u32 = read_mode | nonblocking as u32;
     let success = unsafe {
         SetNamedPipeHandleState(
-            handle.as_raw_handle(),
+            get_borrowed(handle),
             &mut mode as *mut _,
             ptr::null_mut(),
             ptr::null_mut(),

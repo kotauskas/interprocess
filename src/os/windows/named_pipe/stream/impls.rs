@@ -22,9 +22,9 @@ use std::{
     slice,
     sync::atomic::Ordering,
 };
-use winapi::{
-    shared::winerror::ERROR_MORE_DATA,
-    um::winbase::{
+use windows_sys::Win32::{
+    Foundation::ERROR_MORE_DATA,
+    System::Pipes::{
         GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
         GetNamedPipeServerSessionId,
     },

@@ -37,9 +37,9 @@ use tokio::{
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
     sync::MutexGuard as TokioMutexGuard,
 };
-use winapi::{
-    shared::winerror::ERROR_MORE_DATA,
-    um::winbase::{
+use windows_sys::Win32::{
+    Foundation::ERROR_MORE_DATA,
+    System::Pipes::{
         GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
         GetNamedPipeServerSessionId,
     },
@@ -424,7 +424,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
             return;
         }
 
-        let handle = AssertHandleSyncSend(self.as_raw_handle());
+        let handle = AssertHandleSyncSend(self.as_raw_handle() as HANDLE);
         #[allow(clippy::redundant_locals)]
         let task = tokio::task::spawn_blocking(move || {
             let handle = handle;

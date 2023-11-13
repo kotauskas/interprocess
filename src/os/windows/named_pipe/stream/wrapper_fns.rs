@@ -1,30 +1,31 @@
-use crate::os::windows::{winprelude::*, FileHandle};
-use std::{io, os::windows::prelude::*, ptr};
-use winapi::{
-    shared::winerror::ERROR_PIPE_BUSY,
-    um::{
-        fileapi::{CreateFileW, OPEN_EXISTING},
-        handleapi::INVALID_HANDLE_VALUE,
-        namedpipeapi::{GetNamedPipeInfo, PeekNamedPipe, WaitNamedPipeW},
-        winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE},
-    },
+use crate::os::windows::{get_borrowed, winprelude::*, FileHandle};
+use std::{
+    io,
+    os::windows::{io::RawHandle, prelude::*},
+    ptr,
+};
+use windows::core::imp::BOOL;
+use windows_sys::Win32::{
+    Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+    Storage::FileSystem::{CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING},
+    System::Pipes::{GetNamedPipeInfo, PeekNamedPipe, WaitNamedPipeW},
 };
 
-/// Helper for several functions that take a handle and a DWORD out-pointer.
+/// Helper for several functions that take a handle and a u32 out-pointer.
 pub(crate) unsafe fn hget(
     handle: BorrowedHandle<'_>,
-    f: unsafe extern "system" fn(HANDLE, *mut DWORD) -> BOOL,
-) -> io::Result<DWORD> {
+    f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
+) -> io::Result<u32> {
     let mut x: u32 = 0;
-    let ok = unsafe { f(handle.as_raw_handle(), &mut x as *mut _) != 0 };
+    let ok = unsafe { f(get_borrowed(handle), &mut x as *mut _) != 0 };
     ok_or_ret_errno!(ok => x)
 }
 
-pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<DWORD> {
+pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
     let mut flags: u32 = 0;
     let success = unsafe {
         GetNamedPipeInfo(
-            handle.as_raw_handle(),
+            get_borrowed(handle),
             &mut flags as *mut _,
             ptr::null_mut(),
             ptr::null_mut(),
@@ -48,10 +49,10 @@ pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Res
     Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
 }
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
-    let mut len: DWORD = 0;
+    let mut len: u32 = 0;
     let ok = unsafe {
         PeekNamedPipe(
-            handle.as_raw_handle(),
+            get_borrowed(handle),
             ptr::null_mut(),
             0,
             ptr::null_mut(),
@@ -80,7 +81,7 @@ fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<
         let handle = CreateFileW(
             path.as_ptr().cast(),
             {
-                let mut access_flags: DWORD = 0;
+                let mut access_flags: u32 = 0;
                 if read {
                     access_flags |= GENERIC_READ;
                 }
@@ -93,17 +94,17 @@ fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<
             ptr::null_mut(),
             OPEN_EXISTING,
             0,
-            ptr::null_mut(),
+            0,
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };
     ok_or_ret_errno!(success => unsafe {
         // SAFETY: we just created this handle
-        FileHandle(OwnedHandle::from_raw_handle(handle))
+        FileHandle(OwnedHandle::from_raw_handle(handle as RawHandle))
     })
 }
 
-#[repr(transparent)] // #[repr(DWORD)]
+#[repr(transparent)] // #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct WaitTimeout(u32);
 impl WaitTimeout {

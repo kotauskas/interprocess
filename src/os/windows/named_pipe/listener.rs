@@ -1,5 +1,5 @@
 use super::{path_conversion, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
-use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
+use crate::os::windows::{c_wrappers::init_security_attributes, get_borrowed, winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
     ffi::OsStr,
@@ -15,15 +15,10 @@ use std::{
     },
 };
 use to_method::To;
-use winapi::{
-    shared::winerror::ERROR_PIPE_CONNECTED,
-    um::{
-        namedpipeapi::{ConnectNamedPipe, CreateNamedPipeW},
-        winbase::{
-            FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH, PIPE_NOWAIT,
-            PIPE_REJECT_REMOTE_CLIENTS,
-        },
-    },
+use windows_sys::Win32::{
+    Foundation::ERROR_PIPE_CONNECTED,
+    Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH},
+    System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
 };
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
@@ -170,10 +165,10 @@ pub struct PipeListenerOptions<'a> {
     pub accept_remote: bool,
     /// Specifies how big the input buffer should be. The system will automatically adjust this size to align it as
     /// required or clip it by the minimum or maximum buffer size.
-    pub input_buffer_size_hint: DWORD,
+    pub input_buffer_size_hint: u32,
     /// Specifies how big the output buffer should be. The system will automatically adjust this size to align it as
     /// required or clip it by the minimum or maximum buffer size.
-    pub output_buffer_size_hint: DWORD,
+    pub output_buffer_size_hint: u32,
     /// The default timeout clients use when connecting. Used unless another timeout is specified when waiting by a
     /// client.
     // TODO use WaitTimeout struct
@@ -239,8 +234,8 @@ impl<'a> PipeListenerOptions<'a> {
         instance_limit: Option<NonZeroU8>,
         write_through: bool,
         accept_remote: bool,
-        input_buffer_size_hint: DWORD,
-        output_buffer_size_hint: DWORD,
+        input_buffer_size_hint: u32,
+        output_buffer_size_hint: u32,
         wait_timeout: NonZeroU32,
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the first-instance flag set
@@ -277,7 +272,7 @@ cannot create pipe server that has byte type but reads messages – have you for
                     "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
                 ))
             }
-            Some(x) => x.to::<DWORD>(),
+            Some(x) => x.to::<u32>(),
             None => 255,
         };
 
@@ -296,7 +291,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         };
         ok_or_ret_errno!(success => unsafe {
             // SAFETY: we just made it and received ownership
-            OwnedHandle::from_raw_handle(handle)
+            OwnedHandle::from_raw_handle(handle as RawHandle)
         })
     }
     /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the type of pipe stream
@@ -343,9 +338,9 @@ cannot create pipe server that has byte type but reads messages – have you for
         Ok((owned_config, instance))
     }
 
-    fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> DWORD {
+    fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> u32 {
         let mut open_mode = 0_u32;
-        open_mode |= role.direction_as_server().to::<DWORD>();
+        open_mode |= role.direction_as_server().to::<u32>();
         if first {
             open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
         }
@@ -357,7 +352,7 @@ cannot create pipe server that has byte type but reads messages – have you for
         }
         open_mode
     }
-    fn pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> DWORD {
+    fn pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> u32 {
         let mut pipe_mode = 0_u32;
         pipe_mode |= self.mode.to_pipe_type();
         pipe_mode |= read_mode.map_or(0, PipeMode::to_readmode);
@@ -378,7 +373,7 @@ impl Default for PipeListenerOptions<'_> {
 }
 
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    let success = unsafe { ConnectNamedPipe(handle.as_raw_handle(), ptr::null_mut()) != 0 };
+    let success = unsafe { ConnectNamedPipe(get_borrowed(handle), ptr::null_mut()) != 0 };
     if success {
         Ok(())
     } else {

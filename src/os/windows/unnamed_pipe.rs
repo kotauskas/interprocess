@@ -11,13 +11,14 @@ use crate::{
     unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter},
     weaken_buf_init_mut,
 };
+use core::ffi::c_void;
 use std::{
     fmt::{self, Debug, Formatter},
     io::{self, Read, Write},
     num::NonZeroUsize,
     ptr,
 };
-use winapi::um::{minwinbase::SECURITY_ATTRIBUTES, namedpipeapi::CreatePipe};
+use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePipe};
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///
@@ -35,7 +36,7 @@ pub struct UnnamedPipeCreationOptions {
     /// specific.
     ///
     /// [security descriptor]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-security_descriptor " "
-    pub security_descriptor: LPVOID,
+    pub security_descriptor: *mut c_void,
     /// A hint on the buffer size for the pipe. There is no way to ensure or check that the system actually uses this
     /// exact size, since it's only a hint. Set to `None` to disable the hint and rely entirely on the system's default
     /// buffer size.
@@ -66,7 +67,7 @@ impl UnnamedPipeCreationOptions {
     ///
     /// [associated field]: #structfield.security_descriptor " "
     #[must_use = "this is not an in-place operation"]
-    pub fn security_descriptor(mut self, security_descriptor: LPVOID) -> Self {
+    pub fn security_descriptor(mut self, security_descriptor: *mut c_void) -> Self {
         self.security_descriptor = security_descriptor;
         self
     }
@@ -134,8 +135,8 @@ impl UnnamedPipeCreationOptions {
         if success {
             let (w, r) = unsafe {
                 // SAFETY: we just created those handles which means that we own them
-                let w = OwnedHandle::from_raw_handle(w);
-                let r = OwnedHandle::from_raw_handle(r);
+                let w = OwnedHandle::from_raw_handle(w as RawHandle);
+                let r = OwnedHandle::from_raw_handle(r as RawHandle);
                 (w, r)
             };
             let w = PubWriter(UnnamedPipeWriter(FileHandle(w)));
