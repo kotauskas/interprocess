@@ -4,6 +4,7 @@ use std::{
     os::windows::{io::RawHandle, prelude::*},
     ptr,
 };
+use std::ptr::null_mut;
 use windows::core::imp::BOOL;
 use windows_sys::Win32::{
     Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
@@ -94,7 +95,7 @@ fn connect_without_waiting(path: &[u16], read: bool, write: bool) -> io::Result<
             ptr::null_mut(),
             OPEN_EXISTING,
             0,
-            0,
+            INVALID_HANDLE_VALUE,
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };
