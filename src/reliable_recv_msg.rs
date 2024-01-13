@@ -49,42 +49,82 @@
 //! - Unix domain pipes, but only on Linux (module `interprocess::os::unix::udsocket`)
 //!     - This is because only Linux provides a special flag for `recv` which returns the amount of bytes in the message
 //!       regardless of the provided buffer size when peeking.
+// TODO redocument for new API
+// TODO API for receiving multiple messages
 
 use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     future::Future,
     io,
+    mem::{self, transmute, MaybeUninit},
     pin::Pin,
     task::{Context, Poll},
 };
+
+fn check_second_try_recv_length(expected: usize, found: usize, try_recv: &str) {
+    assert_eq!(
+        expected, found,
+        "\
+message at the front of the queue has different length from what was reported by a prior \
+.{try_recv}() call"
+    )
+}
+fn check_base_pointer(expected: *const u8, found: *const u8, try_recv: &str, recv: &str) {
+    assert_eq!(
+        expected, found,
+        "\
+base pointer of the message slice returned by the second .{try_recv}() call does not match that of \
+the internal buffer allocated by the default implementation of .{recv}()"
+    )
+}
+fn panic_try_recv_retcon() -> ! {
+    panic!(
+        "\
+try_recv() returned TryRecvResult::Failed for a buffer of a size that it reported was sufficient"
+    )
+}
 
 /// Receiving from IPC channels with message boundaries reliably, without truncation.
 ///
 /// See the [module-level documentation](self) for more.
 pub trait ReliableRecvMsg {
-    /// Attempts to receive one message from the stream into the specified buffer, returning the size of the message,
-    /// which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into the provided
-    /// buffer, respectively; if the operation could not be completed for OS reasons, an error from the outermost
-    /// `Result` is returned.
-    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult>;
+    /// Attempts to receive one message from the stream using the given buffer, returning a borrowed
+    /// message, which, depending on the variant of [`TryRecvResult`], either did fit or did not fit
+    /// into the provided buffer.
+    ///
+    /// The buffer in this case is used solely as a scratchpad – the returned message slice
+    /// constitutes this method's useful output – although it is incorrect, given a return value of
+    /// `TryRecvResult::Fit(msg)`, for `buf.as_ptr() == msg.as_ptr()` to be false.
+    ///
+    /// If the operation could not be completed for OS reasons, an error from the outermost `Result`
+    /// is returned.
+    fn try_recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>>;
 
-    /// Receives one message from the stream into the specified buffer, returning either the size of the message
-    /// written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the
-    /// operation could not be completed for OS reasons.
-    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        let TryRecvResult { size, fit } = self.try_recv(buf)?;
-        if fit {
-            Ok(RecvResult::Fit(size))
-        } else {
-            let mut new_buf = vec![0; size];
-            let TryRecvResult { size, fit } = self.try_recv(&mut new_buf)?;
-            assert!(
-                fit,
-                "try_recv() returned fit = false for a buffer of a size that it reported was sufficient"
-            );
-            new_buf.truncate(size);
-            Ok(RecvResult::Alloc(new_buf))
+    /// Receives one message from the stream using the given buffer, returning either a borrowed
+    /// slice of the message, a bigger buffer if the one provided was too small, or an error in the
+    /// outermost `Result` if the operation could not be completed for OS reasons.
+    fn recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
+        match self.try_recv(buf)? {
+            TryRecvResult::Fit(msg) => Ok(RecvResult::Fit(msg)),
+            TryRecvResult::EndOfStream => Ok(RecvResult::EndOfStream),
+            TryRecvResult::Failed(size) => {
+                let mut alloc = Vec::with_capacity(size);
+
+                let msg = match self.try_recv(alloc.spare_capacity_mut())? {
+                    TryRecvResult::Fit(msg) => msg,
+                    #[rustfmt::skip] TryRecvResult::Failed(..) => panic_try_recv_retcon(),
+                    TryRecvResult::EndOfStream => return Ok(RecvResult::EndOfStream),
+                };
+
+                check_second_try_recv_length(size, msg.len(), "try_recv");
+                check_base_pointer(msg.as_ptr(), alloc.as_ptr(), "try_recv", "recv");
+
+                unsafe {
+                    alloc.set_len(size);
+                }
+                Ok(RecvResult::Alloc(alloc))
+            }
         }
     }
 }
@@ -93,36 +133,52 @@ pub trait ReliableRecvMsg {
 ///
 /// See the [module-level documentation](self) for more.
 pub trait AsyncReliableRecvMsg {
+    // TODO redocument
     /// Polls a future that attempts to receive one message from the stream into the specified buffer, returning the
     /// size of the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not
     /// fit into the provided buffer, respectively; if the operation could not be completed for OS reasons, an error
     /// from the outermost `Result` is returned.
-    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>>;
+    fn poll_try_recv<'buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &'buf mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<TryRecvResult<'buf>>>;
 
     /// Polls a future that aeceives one message from the stream into the specified buffer, returning either the size of
     /// the message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if
     /// the operation could not be completed for OS reasons.
-    fn poll_recv(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
-        let TryRecvResult { size, fit } = match self.as_mut().poll_try_recv(cx, buf) {
-            Poll::Ready(r) => r?,
-            Poll::Pending => return Poll::Pending,
+    fn poll_recv<'buf>(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &'buf mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<RecvResult<'buf>>> {
+        let Poll::Ready(trr) = self.as_mut().poll_try_recv(cx, buf) else {
+            return Poll::Pending;
         };
-        if fit {
-            Poll::Ready(Ok(RecvResult::Fit(size)))
-        } else {
-            let mut new_buf = vec![0; size];
-            let TryRecvResult { size, fit } = match self.poll_try_recv(cx, &mut new_buf) {
-                Poll::Ready(r) => r?,
-                // This isn't supposed to be hit normally, since the buffer would be wasted then.
-                Poll::Pending => return Poll::Pending,
-            };
-            assert!(
-                fit,
-                "try_recv() returned fit = false for a buffer of a size that it reported was sufficient"
-            );
-            new_buf.truncate(size);
-            Poll::Ready(Ok(RecvResult::Alloc(new_buf)))
-        }
+        Poll::Ready(match trr? {
+            TryRecvResult::Fit(size) => Ok(RecvResult::Fit(size)),
+            TryRecvResult::EndOfStream => Ok(RecvResult::EndOfStream),
+            TryRecvResult::Failed(size) => {
+                let mut alloc = Vec::with_capacity(size);
+                let Poll::Ready(trr) = self.as_mut().poll_try_recv(cx, alloc.spare_capacity_mut()) else {
+                    // This isn't supposed to be hit normally, since the buffer would be wasted then.
+                    return Poll::Pending;
+                };
+                let msg = match trr? {
+                    TryRecvResult::Fit(msg) => msg,
+                    #[rustfmt::skip] TryRecvResult::Failed(..) => panic_try_recv_retcon(),
+                    TryRecvResult::EndOfStream => return Poll::Ready(Ok(RecvResult::EndOfStream)),
+                };
+
+                check_second_try_recv_length(size, msg.len(), "poll_try_recv");
+                check_base_pointer(msg.as_ptr(), alloc.as_ptr(), "poll_try_recv", "poll_recv");
+
+                unsafe {
+                    alloc.set_len(size);
+                }
+                Ok(RecvResult::Alloc(alloc))
+            }
+        })
     }
 }
 
@@ -130,47 +186,127 @@ pub trait AsyncReliableRecvMsg {
 ///
 /// See the [module-level documentation](self) for more.
 pub trait AsyncReliableRecvMsgExt: AsyncReliableRecvMsg {
+    // TODO redocument
     /// Asynchronously receives one message from the stream into the specified buffer, returning either the size of the
     /// message written, a bigger buffer if the one provided was too small, or an error in the outermost `Result` if the
     /// operation could not be completed for OS reasons.
-    fn recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> Recv<'a, 'b, Self>
+    #[inline]
+    fn recv<'io, 'buf>(&'io mut self, buf: &'buf mut [MaybeUninit<u8>]) -> Recv<'io, 'buf, Self>
     where
         Self: Unpin,
     {
-        Recv(self, buf)
+        Recv {
+            recver: Some(Pin::new(self)),
+            buf,
+        }
     }
 
     /// Asynchronously attempts to receive one message from the stream into the specified buffer, returning the size of
     /// the message, which, depending on whether it was in the `Ok` or `Err` variant, either did fit or did not fit into
     /// the provided buffer, respectively; if the operation could not be completed for OS reasons, an error from the
     /// outermost `Result` is returned.
-    fn try_recv<'a, 'b>(&'a mut self, buf: &'b mut [u8]) -> TryRecv<'a, 'b, Self>
+    #[inline]
+    fn try_recv<'io, 'buf>(&'io mut self, buf: &'buf mut [MaybeUninit<u8>]) -> TryRecv<'io, 'buf, Self>
     where
         Self: Unpin,
     {
-        TryRecv(self, buf)
+        TryRecv {
+            recver: Some(Pin::new(self)),
+            buf,
+        }
     }
 }
 impl<T: AsyncReliableRecvMsg> AsyncReliableRecvMsgExt for T {}
 
+static REPOLL_ERR: &str = "attempt to poll a future which has already completed";
+
 /// Future type returned by [`.recv()`](AsyncReliableRecvMsgExt::recv).
 #[derive(Debug)]
-pub struct Recv<'a, 'b, T: ?Sized>(&'a mut T, &'b mut [u8]);
-impl<T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for Recv<'_, '_, T> {
-    type Output = io::Result<RecvResult>;
+pub struct Recv<'io, 'buf, T: ?Sized> {
+    recver: Option<Pin<&'io mut T>>,
+    buf: &'buf mut [MaybeUninit<u8>],
+}
+impl<'buf, T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for Recv<'_, 'buf, T> {
+    type Output = io::Result<RecvResult<'buf>>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let Recv(slf, buf) = self.get_mut();
-        Pin::new(&mut **slf).poll_recv(cx, buf)
+        let Recv {
+            recver: self_recver,
+            buf: self_buf,
+        } = self.get_mut();
+        let mut recver = self_recver.take().expect(REPOLL_ERR);
+        let buf = mem::take(self_buf);
+        let ret = match recver.as_mut().poll_recv(cx, buf) {
+            Poll::Ready(ret) => {
+                match ret {
+                    Ok(RecvResult::Fit(msg)) => {
+                        let msg = unsafe {
+                            // SAFETY: `self.buf` at this point is empty, and the slice we're
+                            // getting here is a direct descendant (reborrow) of that slice, which
+                            // means that this is the only instance of that slice in existence at
+                            // this level in the borrow stack (I *think* that's how this sort of
+                            // thing is called). What we're essentially doing here is avoiding a
+                            // reborrow of `self` (which would infect it with an anonymous lifetime
+                            // we can't name because `Future::Output` is not a GAT) and instead
+                            // "unearthing" the 'buf lifetime within the return value.
+                            //
+                            // pizzapants184 told me on RPLCS (in #dark-arts) that Polonius would
+                            // be smart enough to allow this in safe code (and also kindly provided
+                            // me with a snippet which this whole function is based on). I haven't
+                            // tried using the `polonius_the_crab` crate because that's a whole
+                            // extra dependency, but it should be doable with that crate if need be.
+                            transmute::<&'_ [u8], &'buf [u8]>(msg)
+                        };
+                        Ok(RecvResult::Fit(msg))
+                    }
+                    Ok(els) => Ok(els.make_static().unwrap()),
+                    Err(e) => Err(e),
+                }
+            }
+            Poll::Pending => {
+                *self_recver = Some(recver);
+                *self_buf = buf;
+                return Poll::Pending;
+            }
+        };
+        Poll::Ready(ret)
     }
 }
 /// Future type returned by [`.try_recv()`](AsyncReliableRecvMsgExt::try_recv).
 #[derive(Debug)]
-pub struct TryRecv<'a, 'b, T: ?Sized>(&'a mut T, &'b mut [u8]);
-impl<T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for TryRecv<'_, '_, T> {
-    type Output = io::Result<TryRecvResult>;
+pub struct TryRecv<'io, 'buf, T: ?Sized> {
+    recver: Option<Pin<&'io mut T>>,
+    buf: &'buf mut [MaybeUninit<u8>],
+}
+impl<'buf, T: AsyncReliableRecvMsg + Unpin + ?Sized> Future for TryRecv<'_, 'buf, T> {
+    type Output = io::Result<TryRecvResult<'buf>>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let TryRecv(slf, buf) = self.get_mut();
-        Pin::new(&mut **slf).poll_try_recv(cx, buf)
+        let TryRecv {
+            recver: self_recver,
+            buf: self_buf,
+        } = self.get_mut();
+        let mut recver = self_recver.take().expect(REPOLL_ERR);
+        let buf = mem::take(self_buf);
+        let ret = match recver.as_mut().poll_try_recv(cx, buf) {
+            Poll::Ready(ret) => {
+                match ret {
+                    Ok(TryRecvResult::Fit(msg)) => {
+                        let msg = unsafe {
+                            // SAFETY: same as above.
+                            transmute::<&'_ [u8], &'buf [u8]>(msg)
+                        };
+                        Ok(TryRecvResult::Fit(msg))
+                    }
+                    Ok(els) => Ok(els.make_static().unwrap()),
+                    Err(e) => Err(e),
+                }
+            }
+            Poll::Pending => {
+                *self_recver = Some(recver);
+                *self_buf = buf;
+                return Poll::Pending;
+            }
+        };
+        Poll::Ready(ret)
     }
 }
 
@@ -190,69 +326,35 @@ impl Error for PartialMsgWriteError {}
 
 /// Result type for `.recv()` methods.
 #[derive(Clone, Debug)]
-pub enum RecvResult {
-    /// Indicates that the message successfully fit into the provided buffer.
-    Fit(usize),
-    /// Indicates that it didn't fit into the provided buffer and contains a new, bigger buffer which it was written to
-    /// instead.
+pub enum RecvResult<'buf> {
+    /// The message successfully fit into the provided buffer.
+    Fit(&'buf [u8]),
+    /// The message didn't fit into the provided buffer and the given bigger buffer has been
+    /// allocated which it's been written to instead.
     Alloc(Vec<u8>),
+    /// Indicates that the message stream has ended and no more messages will be received.
+    EndOfStream,
 }
-impl RecvResult {
-    /// Returns the size of the message.
+impl RecvResult<'_> {
+    // TODO remove all mentions of borrow_to_size
+    /// Extends the lifetime to `'static` if the variant is not `Fit`.
     #[inline]
-    pub fn size(&self) -> usize {
+    pub fn make_static(self) -> Result<RecvResult<'static>, Self> {
         match self {
-            Self::Fit(s) => *s,
-            Self::Alloc(v) => v.len(),
-        }
-    }
-    /// Returns whether the message fit into the buffer or had to have been put into a new one.
-    #[inline]
-    pub fn fit(&self) -> bool {
-        matches!(self, Self::Fit(..))
-    }
-    /// If `Fit`, subslices `buf` to length; if `Alloc`, borrows own buffer.
-    ///
-    /// This is intended to be used right after `.recv()` to access the message, kinda like this:
-    /// ```no_run
-    /// # use interprocess::reliable_recv_msg::*;
-    /// # fn _swag(conn: &mut dyn ReliableRecvMsg) -> Result<(), Box<dyn std::error::Error>> {
-    /// let mut buf = [0_u8; 32];
-    /// let rslt = conn.recv(&mut buf)?;
-    /// let msg = rslt.borrow_to_size(&buf);
-    /// // do stuff with the message
-    /// # let _ = msg;
-    /// # let _ = rslt;
-    /// # Ok(())}
-    /// ```
-    #[inline]
-    pub fn borrow_to_size<'a>(&'a self, buf: &'a [u8]) -> &'a [u8] {
-        match self {
-            Self::Fit(sz) => &buf[0..*sz],
-            Self::Alloc(buf) => buf,
-        }
-    }
-    /// Same as [`.borrow_to_size()`](Self::borrow_to_size), but with mutable references.
-    #[inline]
-    pub fn borrow_to_size_mut<'a>(&'a mut self, buf: &'a mut [u8]) -> &'a mut [u8] {
-        match self {
-            Self::Fit(sz) => &mut buf[0..*sz],
-            Self::Alloc(buf) => buf,
-        }
-    }
-    /// Converts to a `Result<usize, Vec<u8>>`, where `Ok` represents `Fit` and `Err` represents `Alloc`.
-    #[inline]
-    pub fn into_result(self) -> Result<usize, Vec<u8>> {
-        match self {
-            Self::Fit(f) => Ok(f),
-            Self::Alloc(a) => Err(a),
+            Self::Fit(..) => Err(self),
+            Self::Alloc(alloc) => Ok(RecvResult::Alloc(alloc)),
+            Self::EndOfStream => Ok(RecvResult::EndOfStream),
         }
     }
 }
-impl From<RecvResult> for Result<usize, Vec<u8>> {
-    /// See `.into_result()`.
-    fn from(x: RecvResult) -> Self {
-        x.into_result()
+impl AsRef<[u8]> for RecvResult<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Fit(msg) => msg,
+            Self::Alloc(buf) => buf,
+            Self::EndOfStream => &[],
+        }
     }
 }
 
@@ -260,27 +362,35 @@ impl From<RecvResult> for Result<usize, Vec<u8>> {
 ///
 /// `Ok` indicates that the message fits in the provided buffer and was successfully received, `Err` indicates that it
 /// doesn't and hence wasn't written into the buffer. Both variants' payload is the total size of the message.
-// TODO fix the EOF issue
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct TryRecvResult {
-    /// The size of the message.
-    pub size: usize,
-    /// Whether the message was written to the buffer and taken off the OS queue or not.
-    pub fit: bool,
+pub enum TryRecvResult<'buf> {
+    /// The message successfully fit into the provided buffer.
+    Fit(&'buf [u8]),
+    /// The message didn't fit into the provided buffer and hasn't been written anywhere or taken
+    /// off any queue.
+    Failed(usize),
+    /// Indicates that the message stream has ended and no more messages will be received.
+    #[default]
+    EndOfStream,
 }
-impl TryRecvResult {
-    /// Converts to a `Result<usize, usize>`, where `Ok` represents `fit = true` and `Err` represents `fit = false`.
-    #[inline(always)]
-    pub fn to_result(self) -> Result<usize, usize> {
-        match (self.size, self.fit) {
-            (s, true) => Ok(s),
-            (s, false) => Err(s),
+impl TryRecvResult<'_> {
+    // TODO remove all mentions of borrow_to_size
+    /// Extends the lifetime to `'static` if the variant is not `Fit`.
+    #[inline]
+    pub fn make_static(self) -> Result<TryRecvResult<'static>, Self> {
+        match self {
+            Self::Fit(..) => Err(self),
+            Self::Failed(sz) => Ok(TryRecvResult::Failed(sz)),
+            Self::EndOfStream => Ok(TryRecvResult::EndOfStream),
         }
     }
 }
-impl From<TryRecvResult> for Result<usize, usize> {
-    /// See `.into_result()`.
-    fn from(x: TryRecvResult) -> Self {
-        x.to_result()
+impl AsRef<[u8]> for TryRecvResult<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Fit(msg) => msg,
+            Self::Failed(..) | Self::EndOfStream => &[],
+        }
     }
 }

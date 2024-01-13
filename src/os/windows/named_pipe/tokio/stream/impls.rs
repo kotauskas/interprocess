@@ -22,7 +22,6 @@ use crate::{
     reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
 };
 use futures_core::ready;
-use futures_io::{AsyncRead, AsyncWrite};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
@@ -124,10 +123,6 @@ impl RawPipeStream {
         ready!(downgrade_poll_eof(self.poll_read_readbuf(cx, &mut readbuf)))?;
         Poll::Ready(Ok(readbuf.filled().len()))
     }
-    #[inline]
-    fn read_uninit<'a, 'b>(&'a self, buf: &'b mut [MaybeUninit<u8>]) -> ReadUninit<'a, 'b> {
-        ReadUninit(self, buf)
-    }
 
     fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
@@ -152,12 +147,12 @@ impl RawPipeStream {
             }
         }
     }
-    #[inline]
-    fn write<'a>(&'a self, buf: &'a [u8]) -> Write<'a> {
-        Write(self, buf)
-    }
 
-    fn poll_try_recv_msg(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+    fn poll_try_recv_msg(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<TryRecvResult<'_>>> {
         let (mut size, mut fit);
         loop {
             size = downgrade_eof(peek_msg_len(self.as_handle()))?;
@@ -165,7 +160,7 @@ impl RawPipeStream {
             if !fit {
                 break;
             }
-            match ready!(self.poll_read_init(cx, buf)) {
+            match ready!(self.poll_read_uninit(cx, buf)) {
                 // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the
                 // `.poll_read()` to wait until a message arrives, so that we could figure out for real if it fits
                 // or not. It doesn't mean that the message gets torn, as it normally does if the buffer given to
@@ -176,7 +171,7 @@ impl RawPipeStream {
             }
         }
 
-        Poll::Ready(Ok(TryRecvResult { size, fit }))
+        todo!("eof handling")
     }
 
     fn fill_fields<'a, 'b, 'c>(
@@ -255,46 +250,21 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
 // Tokio does not implement TryInto<OwnedHandle>
 derive_asraw!(RawPipeStream);
 
-struct Write<'a>(&'a RawPipeStream, &'a [u8]);
-impl Future for Write<'_> {
-    type Output = io::Result<usize>;
-    #[inline]
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let slf = self.get_mut();
-        slf.0.poll_write(cx, slf.1)
-    }
-}
-
-struct ReadUninit<'a, 'b>(&'a RawPipeStream, &'b mut [MaybeUninit<u8>]);
-impl Future for ReadUninit<'_, '_> {
-    type Output = io::Result<usize>;
-    #[inline]
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let slf = self.get_mut();
-        downgrade_poll_eof(slf.0.poll_read_uninit(cx, slf.1))
-    }
-}
-
-/* TODO
-impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
-    /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
-    #[inline]
-    pub async fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
-        self.raw.recv_msg(buf).await
-    }
-    /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
-    #[inline]
-    pub async fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
-        self.raw.try_recv_msg(buf).await
-    }
-}
-*/
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically
     /// equal to the size of what was requested to be sent).
     #[inline]
     pub async fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.raw.write(buf).await
+        struct Write<'a>(&'a RawPipeStream, &'a [u8]);
+        impl Future for Write<'_> {
+            type Output = io::Result<usize>;
+            #[inline]
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let slf = self.get_mut();
+                slf.0.poll_write(cx, slf.1)
+            }
+        }
+        Write(&self.raw, buf).await
     }
 }
 
@@ -303,7 +273,16 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// buffer.
     #[inline]
     pub async fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        self.raw.read_uninit(buf).await
+        struct ReadUninit<'a, 'b>(&'a RawPipeStream, &'b mut [MaybeUninit<u8>]);
+        impl Future for ReadUninit<'_, '_> {
+            type Output = io::Result<usize>;
+            #[inline]
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let slf = self.get_mut();
+                downgrade_poll_eof(slf.0.poll_read_uninit(cx, slf.1))
+            }
+        }
+        ReadUninit(&self.raw, buf).await
     }
 }
 
@@ -476,63 +455,75 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     }
 }
 
-impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
-    #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        self.raw.poll_read_init(cx, buf)
-    }
-}
-// TODO TokioAsyncRead on ref
-impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
-    #[inline]
+impl<Sm: PipeModeTag> TokioAsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
+    #[inline(always)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
         self.get_mut().raw.poll_read_readbuf(cx, buf)
     }
 }
-
-impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
-    #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
-        self.raw.poll_write(cx, buf)
-    }
+impl<Sm: PipeModeTag> TokioAsyncRead for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline(always)]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.get_mut().poll_flush(cx)
-    }
-    #[inline(always)]
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut TokioReadBuf<'_>) -> Poll<io::Result<()>> {
+        TokioAsyncRead::poll_read(Pin::new(&mut &*self), cx, buf)
     }
 }
-// TODO TokioAsyncWrite on ref
-impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
-    #[inline]
+
+impl<Rm: PipeModeTag> TokioAsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline(always)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         self.get_mut().raw.poll_write(cx, buf)
     }
-    #[inline]
+    #[inline(always)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        <&Self as AsyncWrite>::poll_flush(Pin::new(&mut &*self), cx)
+        self.get_mut().poll_flush(cx)
     }
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        <Self as TokioAsyncWrite>::poll_flush(self, cx)
+        // TODO actually close connection here
+        TokioAsyncWrite::poll_flush(self, cx)
+    }
+}
+impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
+    #[inline]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
+        TokioAsyncWrite::poll_write(Pin::new(&mut &*self), cx, buf)
+    }
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        TokioAsyncWrite::poll_flush(Pin::new(&mut &*self), cx)
+    }
+    #[inline]
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        TokioAsyncWrite::poll_shutdown(Pin::new(&mut &*self), cx)
     }
 }
 
 impl<Sm: PipeModeTag> AsyncReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     #[inline]
-    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
-        self.raw.poll_try_recv_msg(cx, buf)
+    fn poll_try_recv<'buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &'buf mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<TryRecvResult<'buf>>> {
+        // self.raw.poll_try_recv_msg(cx, buf)
+        todo!()
     }
 }
 impl<Sm: PipeModeTag> AsyncReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
     #[inline]
-    fn poll_try_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<TryRecvResult>> {
+    fn poll_try_recv<'buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &'buf mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<TryRecvResult<'buf>>> {
         Pin::new(&mut self.deref()).poll_try_recv(cx, buf)
     }
     #[inline]
-    fn poll_recv(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<RecvResult>> {
+    fn poll_recv<'buf>(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &'buf mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<RecvResult<'buf>>> {
         Pin::new(&mut self.deref()).poll_recv(cx, buf)
     }
 }
@@ -589,9 +580,15 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
     }
 }
 
+derive_asraw!({Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>, windows);
+
 multimacro! {
-    {Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>,
-    derive_asraw(windows),
+    {Sm: PipeModeTag} PipeStream<pipe_mode::Bytes, Sm>,
+    derive_futures_ref_read_from_tokio,
+    derive_futures_mut_read,
 }
-derive_futures_mut_read!({Sm: PipeModeTag} PipeStream<pipe_mode::Bytes, Sm>);
-derive_futures_mut_write!({Rm: PipeModeTag} PipeStream<Rm, pipe_mode::Bytes>);
+multimacro! {
+    {Rm: PipeModeTag} PipeStream<Rm, pipe_mode::Bytes>,
+    derive_futures_ref_write_from_tokio,
+    derive_futures_mut_write,
+}

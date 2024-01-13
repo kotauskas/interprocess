@@ -158,3 +158,12 @@ fn weaken_buf_init_mut<T>(r: &mut [T]) -> &mut [MaybeUninit<T>] {
         transmute(r)
     }
 }
+
+#[inline(always)]
+#[allow(dead_code)]
+unsafe fn assume_slice_init<T>(r: &[MaybeUninit<T>]) -> &[T] {
+    unsafe {
+        // SAFETY: same slice, stronger refinement
+        transmute(r)
+    }
+}

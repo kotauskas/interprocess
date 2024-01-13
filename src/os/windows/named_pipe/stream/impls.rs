@@ -5,8 +5,9 @@ use super::{
     *,
 };
 use crate::{
+    assume_slice_init,
     os::windows::{
-        c_wrappers,
+        c_wrappers, is_eof_like,
         named_pipe::{needs_flush::NeedsFlushVal, path_conversion, set_nonblocking_for_stream, PipeMode},
         FileHandle,
     },
@@ -98,7 +99,7 @@ impl RawPipeStream {
         }
     }
 
-    fn try_recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
+    fn try_recv_msg<'buf>(&self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
         let mut size = 0;
         let mut fit = false;
         while size == 0 {
@@ -111,6 +112,7 @@ impl RawPipeStream {
                     // It doesn't mean that the message gets torn, as it normally does if the buffer given to the
                     // ReadFile call is non-zero in size.
                     Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
+                    Err(e) if is_eof_like(&e) => return Ok(TryRecvResult::EndOfStream),
                     Err(e) => return Err(e),
                     Ok(nsz) => size = nsz,
                 }
@@ -118,23 +120,31 @@ impl RawPipeStream {
                 break;
             }
         }
-        Ok(TryRecvResult { size, fit })
-    }
-    fn recv_msg(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
-        let TryRecvResult { mut size, fit } = self.try_recv_msg(buf)?;
-        if fit {
-            Ok(RecvResult::Fit(size))
+        let ret = if fit {
+            unsafe { TryRecvResult::Fit(assume_slice_init(&buf[..size])) }
         } else {
-            let mut buf = Vec::with_capacity(size);
-            debug_assert!(buf.capacity() >= size);
+            TryRecvResult::Failed(size)
+        };
+        Ok(ret)
+    }
+    fn recv_msg<'buf>(&self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
+        Ok(match self.try_recv_msg(buf)? {
+            TryRecvResult::Fit(msg) => RecvResult::Fit(msg),
+            TryRecvResult::EndOfStream => RecvResult::EndOfStream,
+            TryRecvResult::Failed(size) => {
+                let mut alloc = Vec::with_capacity(size);
+                debug_assert!(alloc.capacity() >= size);
 
-            size = self.file_handle().read(vec_as_uninit(&mut buf))?;
-            unsafe {
-                // SAFETY: Win32 guarantees that at least this much is initialized.
-                buf.set_len(size)
-            };
-            Ok(RecvResult::Alloc(buf))
-        }
+                let new_size = self.file_handle().read(vec_as_uninit(&mut alloc))?;
+                debug_assert_eq!(size, new_size);
+
+                unsafe {
+                    // SAFETY: Win32 guarantees that at least this much is initialized.
+                    alloc.set_len(size)
+                };
+                RecvResult::Alloc(alloc)
+            }
+        })
     }
 
     fn set_nonblocking(&self, readmode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
@@ -195,18 +205,6 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
     }
 }
 
-impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
-    /// Same as [`.recv()`](Self::recv), but accepts an uninitialized buffer.
-    #[inline]
-    pub fn recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<RecvResult> {
-        self.raw.recv_msg(buf)
-    }
-    /// Same as [`.try_recv()`](Self::try_recv), but accepts an uninitialized buffer.
-    #[inline]
-    pub fn try_recv_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult> {
-        self.raw.try_recv_msg(buf)
-    }
-}
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically equal to the size of
     /// what was requested to be sent).
@@ -392,18 +390,22 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
     }
 }
 impl<Sm: PipeModeTag> ReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
-    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
-        self.recv_to_uninit(weaken_buf_init_mut(buf))
+    #[inline]
+    fn recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
+        self.raw.recv_msg(buf)
     }
-    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
-        self.try_recv_to_uninit(weaken_buf_init_mut(buf))
+    #[inline]
+    fn try_recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
+        self.raw.try_recv_msg(buf)
     }
 }
 impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
-    fn recv(&mut self, buf: &mut [u8]) -> io::Result<RecvResult> {
+    #[inline]
+    fn recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
         (self as &PipeStream<_, _>).recv(buf)
     }
-    fn try_recv(&mut self, buf: &mut [u8]) -> io::Result<TryRecvResult> {
+    #[inline]
+    fn try_recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
         (self as &PipeStream<_, _>).try_recv(buf)
     }
 }
