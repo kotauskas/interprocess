@@ -75,6 +75,13 @@ pub trait ToLocalSocketName<'a> {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>>;
 }
 
+/// Returns self.
+impl<'a> ToLocalSocketName<'a> for LocalSocketName<'a> {
+    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
+        Ok(self)
+    }
+}
+
 /// Converts a borrowed [`Path`] to a borrowed file-type [`LocalSocketName`] with the same lifetime.
 impl<'a> ToLocalSocketName<'a> for &'a Path {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
