@@ -24,6 +24,25 @@ pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
+fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<i32> {
+    let (val, success) = unsafe {
+        let ret = libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0);
+        (ret, ret != -1)
+    };
+    ok_or_ret_errno!(success => val)
+}
+#[cfg(not(target_os = "linux"))]
+fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
+    let success = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, flags) != -1 };
+    ok_or_ret_errno!(success => ())
+}
+#[cfg(not(target_os = "linux"))]
+fn set_cloexec(fd: BorrowedFd<'_>) -> io::Result<()> {
+    set_fdflags(fd, get_fdflags(fd)? | libc::FD_CLOEXEC)?;
+    Ok(())
+}
+
 #[cfg(feature = "tokio")]
 pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
     let how = match how {
