@@ -18,11 +18,8 @@ impmod! {local_socket::tokio,
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{
-///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-///     try_join,
-/// };
 /// use interprocess::local_socket::{tokio::LocalSocketStream, NameTypeSupport};
+/// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.

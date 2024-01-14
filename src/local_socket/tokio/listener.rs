@@ -7,6 +7,8 @@ impmod! {local_socket::tokio,
     LocalSocketListener as LocalSocketListenerImpl
 }
 
+// TODO borrowed split in examples
+
 /// A Tokio-based local socket server, listening for connections.
 ///
 /// # Examples
@@ -15,14 +17,11 @@ impmod! {local_socket::tokio,
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{
-///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-///     try_join,
-/// };
 /// use interprocess::local_socket::{
 ///     tokio::{LocalSocketListener, LocalSocketStream},
 ///     NameTypeSupport,
 /// };
+/// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 /// use std::io;
 ///
 /// // Describe the things we do when we've got a connection ready.

@@ -82,6 +82,7 @@
 // TODO the Intra Doc Link Sweep
 // TODO add OS-specific ext-traits
 // TODO un-mod.rs
+// TODO make doctests not no_run
 // - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across
 // the network
 

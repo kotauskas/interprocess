@@ -42,7 +42,7 @@ impmod! {local_socket,
 /// - If the string is a [`str`]/[`String`], it can be cheaply converted to [`OsStr`]/[`OsString`]; then the above
 ///   method can be applied
 /// - If the string is a [`CStr`]/[`CString`], it can be converted to [`str`]/[`String`] using the following code:
-/// ```
+/// ```no_run
 /// # use std::{
 /// #     str::Utf8Error,
 /// #     ffi::{CStr, CString},
