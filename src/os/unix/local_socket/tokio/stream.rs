@@ -1,7 +1,8 @@
 use super::super::name_to_addr;
-use crate::local_socket::ToLocalSocketName;
+use crate::{local_socket::ToLocalSocketName, os::unix::c_wrappers};
 use std::{
     io::{self, ErrorKind::WouldBlock},
+    net::Shutdown,
     os::{
         fd::{AsFd, OwnedFd},
         unix::{
@@ -19,6 +20,10 @@ use tokio::{
         UnixStream,
     },
 };
+
+fn shutdown(slf: impl AsFd) -> Poll<io::Result<()>> {
+    c_wrappers::shutdown(slf.as_fd(), Shutdown::Write).into()
+}
 
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) UnixStream);
@@ -100,7 +105,7 @@ impl AsyncWrite for &LocalSocketStream {
     }
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        todo!()
+        shutdown(self.get_mut())
     }
 }
 impl TryFrom<LocalSocketStream> for OwnedFd {
@@ -172,7 +177,7 @@ impl AsyncWrite for &WriteHalf {
     }
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        todo!()
+        shutdown(self.get_mut())
     }
 }
 impl AsFd for WriteHalf {
