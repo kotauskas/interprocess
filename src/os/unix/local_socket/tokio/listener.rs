@@ -1,16 +1,23 @@
 use super::LocalSocketStream;
-use crate::{local_socket::ToLocalSocketName, os::unix::local_socket::listener as synclistener};
+use crate::{
+    local_socket::LocalSocketName,
+    os::unix::local_socket::{listener as synclistener, name_to_addr},
+};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
-    os::{fd::OwnedFd, unix::io::AsRawFd},
+    os::{
+        fd::OwnedFd,
+        unix::{io::AsRawFd, net::UnixListener as SyncUnixListener},
+    },
 };
 use tokio::net::UnixListener;
 
 pub struct LocalSocketListener(UnixListener);
 impl LocalSocketListener {
-    pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let sync = synclistener::LocalSocketListener::bind(name)?.into(); // TODO clean up
+    pub fn bind(name: LocalSocketName<'_>) -> io::Result<Self> {
+        let sync = SyncUnixListener::bind_addr(&name_to_addr(name)?)?;
+        sync.set_nonblocking(true)?;
         Ok(UnixListener::from_std(sync)?.into())
     }
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {

@@ -1,15 +1,14 @@
 use super::name_to_addr;
-use crate::local_socket::ToLocalSocketName;
+use crate::local_socket::LocalSocketName;
 use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) UnixStream);
 impl LocalSocketStream {
-    pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let addr = name_to_addr(name.to_local_socket_name()?)?;
-        let inner = UnixStream::connect_addr(&addr)?;
-        Ok(Self(inner))
+    pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+        UnixStream::connect_addr(&name_to_addr(name)?).map(Self)
     }
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }

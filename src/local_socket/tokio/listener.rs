@@ -102,7 +102,7 @@ impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     #[inline]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name).map(Self::from)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self::from)
     }
     /// Listens for incoming connections to the socket, asynchronously waiting until a client is connected.
     #[inline]

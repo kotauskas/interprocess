@@ -104,7 +104,7 @@ pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name).map(Self)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self)
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///

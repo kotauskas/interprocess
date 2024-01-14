@@ -1,5 +1,5 @@
 use super::super::name_to_addr;
-use crate::{local_socket::ToLocalSocketName, os::unix::c_wrappers};
+use crate::{local_socket::LocalSocketName, os::unix::c_wrappers};
 use std::{
     io::{self, ErrorKind::WouldBlock},
     net::Shutdown,
@@ -28,19 +28,21 @@ fn shutdown(slf: impl AsFd) -> Poll<io::Result<()>> {
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) UnixStream);
 impl LocalSocketStream {
-    pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let addr = name_to_addr(name.to_local_socket_name()?)?;
-
-        Self::_connect(addr).await.map(Self::from)
+    pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+        Self::_connect(name_to_addr(name)?).await.map(Self::from)
     }
     async fn _connect(addr: SocketAddr) -> io::Result<UnixStream> {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             use std::os::linux::net::SocketAddrExt;
             if addr.as_abstract_name().is_some() {
-                return tokio::task::spawn_blocking(move || SyncUnixStream::connect_addr(&addr))
-                    .await??
-                    .try_into();
+                return tokio::task::spawn_blocking(move || {
+                    let stream = SyncUnixStream::connect_addr(&addr)?;
+                    stream.set_nonblocking(true)?;
+                    Ok::<_, io::Error>(stream)
+                })
+                .await??
+                .try_into();
             }
         }
         UnixStream::connect(addr.as_pathname().unwrap()).await

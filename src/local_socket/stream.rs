@@ -60,7 +60,7 @@ pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        Ok(Self(LocalSocketStreamImpl::connect(name)?))
+        LocalSocketStreamImpl::connect(name.to_local_socket_name()?).map(Self)
     }
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
@@ -70,6 +70,7 @@ impl LocalSocketStream {
     /// - When reading is attempted and there is no new data available;
     /// - When writing is attempted and the buffer is full due to the other side not yet having read previously sent
     /// data.
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
