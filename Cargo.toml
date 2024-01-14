@@ -44,19 +44,6 @@ futures-util = { version = "0.3.28", features = ["io"], optional = true }
 to_method = "1.1"
 cfg-if = "1.0.0"
 
-[build-dependencies]
-rustc_version = "0.4"
-
-[dev-dependencies]
-tokio = { version = "1.28.0", features = [
-    "rt-multi-thread",
-    "io-util",
-    "sync",
-    "macros",
-] }
-futures = "0.3.28"
-color-eyre = "0.6.2"
-
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [
     "std",
@@ -70,6 +57,16 @@ winapi = { version = "0.3", features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.137", features = ["extra_traits"] }
+
+[dev-dependencies]
+tokio = { version = "1.28.0", features = [
+    "rt-multi-thread",
+    "io-util",
+    "sync",
+    "macros",
+] }
+futures = "0.3.28"
+color-eyre = "0.6.2"
 
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]

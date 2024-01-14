@@ -15,7 +15,7 @@ async fn tokio_local_socket_stream(nmspc: bool) -> TestResult {
     util::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client).await
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+#[tokio::test]
 async fn tokio_local_socket_stream_file() -> TestResult {
     if NameTypeSupport::query().paths_supported() {
         tokio_local_socket_stream(false).await?;
