@@ -2,39 +2,47 @@
 #[path = "../util/mod.rs"]
 #[macro_use]
 mod util;
-use util::{install_color_eyre, TestResult};
+use util::{testinit, TestResult};
 
 mod no_server;
 mod stream;
 
-use {interprocess::local_socket::NameTypeSupport, tokio::try_join};
+use interprocess::local_socket::NameTypeSupport;
 
-#[tokio::test]
-async fn tokio_local_socket_stream() -> TestResult {
+async fn tokio_local_socket_stream(nmspc: bool) -> TestResult {
     use stream::*;
-    install_color_eyre();
-    // If only one name type is supported, this one will choose the supported one. If both are
-    // supported, this will try paths first.
-    let f1 = util::tokio::drive_server_and_multiple_clients(|s, n| server(s, n, false), client);
-    if NameTypeSupport::query() == NameTypeSupport::Both {
-        // Try the namespace now.
-        let f2 = util::tokio::drive_server_and_multiple_clients(|s, n| server(s, n, true), client);
-        try_join!(f1, f2)?;
-    } else {
-        f1.await?;
+    testinit();
+    util::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+async fn tokio_local_socket_stream_file() -> TestResult {
+    if NameTypeSupport::query().paths_supported() {
+        tokio_local_socket_stream(false).await?;
     }
     Ok(())
 }
 #[tokio::test]
-async fn tokio_local_socket_no_server() -> TestResult {
-    install_color_eyre();
-    // Same as above.
-    let f1 = no_server::run_and_verify_error(false);
-    if NameTypeSupport::query() == NameTypeSupport::Both {
-        let f2 = no_server::run_and_verify_error(true);
-        try_join!(f1, f2)?;
-    } else {
-        f1.await?;
+async fn tokio_local_socket_stream_namespaced() -> TestResult {
+    if NameTypeSupport::query().namespace_supported() {
+        tokio_local_socket_stream(true).await?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn tokio_local_socket_no_server_file() -> TestResult {
+    testinit();
+    if NameTypeSupport::query().paths_supported() {
+        no_server::run_and_verify_error(false).await?;
+    }
+    Ok(())
+}
+#[tokio::test]
+async fn tokio_local_socket_no_server_namespaced() -> TestResult {
+    testinit();
+    if NameTypeSupport::query().namespace_supported() {
+        no_server::run_and_verify_error(true).await?;
     }
     Ok(())
 }

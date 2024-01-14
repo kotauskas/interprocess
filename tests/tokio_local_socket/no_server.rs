@@ -1,7 +1,7 @@
 //! Tests what happens when a client attempts to connect to a local socket that doesn't exist.
 
 use super::util::*;
-use color_eyre::eyre::*;
+use color_eyre::eyre::{bail, ensure, Context};
 use interprocess::local_socket::tokio::LocalSocketStream;
 use std::io;
 

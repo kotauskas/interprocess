@@ -3,7 +3,7 @@ use std::sync::Mutex;
 pub type TestResult<T = ()> = color_eyre::eyre::Result<T>;
 
 static COLOR_EYRE_INSTALLED: Mutex<bool> = Mutex::new(false);
-pub fn install_color_eyre() {
+pub(super) fn install() {
     let mut lock = COLOR_EYRE_INSTALLED.lock().unwrap();
     if !*lock {
         let _ = color_eyre::install();

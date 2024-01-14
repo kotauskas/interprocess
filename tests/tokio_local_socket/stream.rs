@@ -5,7 +5,7 @@ use ::tokio::{
     task, try_join,
 };
 use color_eyre::eyre::Context;
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream, ReadHalf, WriteHalf};
+use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{convert::TryInto, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {
@@ -21,11 +21,11 @@ pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, prefer_name
 
     let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
     for _ in 0..num_clients {
-        let (reader, writer) = listener.accept().await.context("accept failed")?.split();
-        tasks.push(task::spawn(async {
+        let stream = listener.accept().await.context("accept failed")?;
+        tasks.push(task::spawn(async move {
             try_join!(
-                read(reader, msg(false, false), msg(false, true)),
-                write(writer, msg(true, false), msg(true, true)),
+                read(&stream, msg(false, false), msg(false, true)),
+                write(&stream, msg(true, false), msg(true, true)),
             )
         }));
     }
@@ -37,19 +37,16 @@ pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, prefer_name
     Ok(())
 }
 pub async fn client(nm: Arc<str>) -> TestResult {
-    let (reader, writer) = LocalSocketStream::connect(&*nm)
-        .await
-        .context("connect failed")?
-        .split();
+    let stream = LocalSocketStream::connect(&*nm).await.context("connect failed")?;
     try_join!(
-        read(reader, msg(true, false), msg(true, true)),
-        write(writer, msg(false, false), msg(false, true)),
+        read(&stream, msg(true, false), msg(true, true)),
+        write(&stream, msg(false, false), msg(false, true)),
     )
     .map(|((), ())| ())
 }
 
-async fn read(reader: ReadHalf, exp1: impl AsRef<str>, exp2: impl AsRef<str>) -> TestResult {
-    let mut reader = BufReader::new(reader);
+async fn read(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRef<str>) -> TestResult {
+    let mut reader = BufReader::new(stream);
     let mut sbuffer = String::with_capacity(128);
 
     reader.read_line(&mut sbuffer).await.context("first receive failed")?;
@@ -68,12 +65,12 @@ async fn read(reader: ReadHalf, exp1: impl AsRef<str>, exp2: impl AsRef<str>) ->
 
     Ok(())
 }
-async fn write(mut writer: WriteHalf, msg1: impl AsRef<str>, msg2: impl AsRef<str>) -> TestResult {
-    writer
+async fn write(mut stream: &LocalSocketStream, msg1: impl AsRef<str>, msg2: impl AsRef<str>) -> TestResult {
+    stream
         .write_all(msg1.as_ref().as_bytes())
         .await
         .context("first send failed")?;
-    writer
+    stream
         .write_all(msg2.as_ref().as_bytes())
         .await
         .context("second send failed")?;

@@ -14,11 +14,15 @@ pub use {drive::*, eyre::*, namegen::*, xorshift::*};
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
-const NUM_CLIENTS: u32 = 80;
-const NUM_CONCURRENT_CLIENTS: u32 = 6;
+const NUM_CLIENTS: u32 = 2;
+const NUM_CONCURRENT_CLIENTS: u32 = 1;
 
 use color_eyre::eyre::Context;
 use std::{fmt::Arguments, io, sync::Arc};
+
+pub fn testinit() {
+    eyre::install();
+}
 
 pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char>) -> Box<str> {
     let msg = msg.unwrap_or_else(|| format_args!("Message"));

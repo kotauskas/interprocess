@@ -15,6 +15,7 @@ impl NameGen {
         }
     }
     /// Automatically chooses name type based on OS support and preference.
+    // TODO get rid of the preference thing
     pub fn new_auto(id: &'static str, prefer_namespaced: bool) -> Self {
         let namespaced = {
             use NameTypeSupport::*;
