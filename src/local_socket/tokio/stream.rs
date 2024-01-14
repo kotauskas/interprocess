@@ -1,5 +1,7 @@
+use crate::UnpinExt;
+
 use super::super::ToLocalSocketName;
-use std::io;
+use std::{io, pin::Pin};
 
 impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl,
@@ -76,6 +78,10 @@ impl LocalSocketStream {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
+    #[inline]
+    fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
+        self.0.pin()
+    }
 }
 #[doc(hidden)]
 impl From<LocalSocketStreamImpl> for LocalSocketStream {
@@ -85,15 +91,14 @@ impl From<LocalSocketStreamImpl> for LocalSocketStream {
     }
 }
 
-// TODO Tokio I/O by ref
 multimacro! {
     LocalSocketStream,
     forward_rbv(LocalSocketStreamImpl, &),
-    forward_futures_ref_rw,
+    forward_tokio_rw,
+    forward_tokio_ref_rw,
     forward_as_handle,
     forward_try_from_handle(LocalSocketStreamImpl),
     forward_debug,
-    derive_futures_mut_rw,
     derive_asraw,
 }
 
@@ -103,13 +108,19 @@ multimacro! {
 /// # Examples
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 pub struct ReadHalf(pub(super) ReadHalfImpl);
+impl ReadHalf {
+    #[inline]
+    fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
+        self.0.pin()
+    }
+}
 multimacro! {
     ReadHalf,
     forward_rbv(ReadHalfImpl, &),
-    forward_futures_ref_read,
+    forward_tokio_read,
+    forward_tokio_ref_read,
     forward_as_handle,
     forward_debug,
-    derive_futures_mut_read,
     derive_asraw,
 }
 /// A write half of a Tokio-based local socket stream, obtained by splitting a
@@ -119,12 +130,18 @@ multimacro! {
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 // TODO remove this GitHub link and others like it
 pub struct WriteHalf(pub(super) WriteHalfImpl);
+impl WriteHalf {
+    #[inline]
+    fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
+        self.0.pin()
+    }
+}
 multimacro! {
     WriteHalf,
     forward_rbv(WriteHalfImpl, &),
-    forward_futures_ref_write,
+    forward_tokio_write,
+    forward_tokio_ref_write,
     forward_as_handle,
     forward_debug,
-    derive_futures_mut_write,
     derive_asraw,
 }

@@ -1,7 +1,10 @@
 use super::util::*;
-use ::tokio::{sync::oneshot::Sender, task, try_join};
+use ::tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    sync::oneshot::Sender,
+    task, try_join,
+};
 use color_eyre::eyre::Context;
-use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream, ReadHalf, WriteHalf};
 use std::{convert::TryInto, str, sync::Arc};
 

@@ -4,7 +4,7 @@ use super::*;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ImplType {
-    /// Local sockets implemented on top of Ud-sockets (Unix domain sockets).
+    /// Local sockets implemented on top of Unix-domain sockets (Unix domain sockets).
     ///
     /// ## Implementation behavior
     /// - Closing the connection on one side does not immediately destroy buffers, allowing one side to read data sent
@@ -43,7 +43,7 @@ impl ImplType {
     ///
     /// For example, querying this for `UdSocket` on Windows will return `Some(...)` on Windows 10 update 1803 and
     /// later, unlike [`get_always_supported_properties()`] which will err on the side of caution and state that not all
-    /// Windows systems support Ud-sockets.
+    /// Windows systems support Unix-domain sockets.
     pub fn get_properties(self) -> Option<ImplProperties> {
         todo!()
     }

@@ -43,126 +43,73 @@ macro_rules! derive_sync_mut_rw {
     };
 }
 
-macro_rules! derive_futures_mut_read {
+macro_rules! derive_tokio_mut_read {
     ($({$($lt:tt)*})? $ty:ty) => {
-        impl $(<$($lt)*>)? ::futures_io::AsyncRead for $ty {
-            #[inline(always)]
-            fn poll_read(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                buf: &mut [u8],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                ::futures_io::AsyncRead::poll_read(::std::pin::Pin::new(&mut &*self), cx, buf)
+        const _: () = {
+            use ::tokio::io::{AsyncRead, ReadBuf};
+            use ::std::{io, pin::Pin, task::{Context, Poll}};
+            impl $(<$($lt)*>)? AsyncRead for $ty {
+                #[inline(always)]
+                fn poll_read(
+                    self: Pin<&mut Self>,
+                    cx: &mut Context<'_>,
+                    buf: &mut ReadBuf<'_>,
+                ) -> Poll<io::Result<()>> {
+                    AsyncRead::poll_read(Pin::new(&mut &*self), cx, buf)
+                }
             }
-            #[inline(always)]
-            fn poll_read_vectored(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                bufs: &mut [::std::io::IoSliceMut<'_>],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                ::futures_io::AsyncRead::poll_read_vectored(::std::pin::Pin::new(&mut &*self), cx, bufs)
-            }
-        }
+        };
     };
 }
 
-macro_rules! derive_futures_mut_write {
+macro_rules! derive_tokio_mut_write {
     ($({$($lt:tt)*})? $ty:ty) => {
-        impl $(<$($lt)*>)? ::futures_io::AsyncWrite for $ty {
-            #[inline(always)]
-            fn poll_write(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                buf: &[u8],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                ::futures_io::AsyncWrite::poll_write(::std::pin::Pin::new(&mut &*self), cx, buf)
+        const _: () = {
+            use ::tokio::io::AsyncWrite;
+            use ::std::{io::{self, IoSlice}, pin::Pin, task::{Context, Poll}};
+            impl $(<$($lt)*>)? AsyncWrite for $ty {
+                #[inline(always)]
+                fn poll_write(
+                    self: Pin<&mut Self>,
+                    cx: &mut Context<'_>,
+                    buf: &[u8],
+                ) -> Poll<io::Result<usize>> {
+                    AsyncWrite::poll_write(Pin::new(&mut &*self), cx, buf)
+                }
+                #[inline(always)]
+                fn poll_write_vectored(
+                    self: Pin<&mut Self>,
+                    cx: &mut Context<'_>,
+                    bufs: &[IoSlice<'_>],
+                ) -> Poll<io::Result<usize>> {
+                    AsyncWrite::poll_write_vectored(Pin::new(&mut &*self), cx, bufs)
+                }
+                #[inline(always)]
+                fn is_write_vectored(&self) -> bool {
+                    AsyncWrite::is_write_vectored(self.refwd())
+                }
+                #[inline(always)]
+                fn poll_flush(
+                    self: Pin<&mut Self>,
+                    cx: &mut Context<'_>,
+                ) -> Poll<io::Result<()>> {
+                    AsyncWrite::poll_flush(Pin::new(&mut &*self), cx)
+                }
+                #[inline(always)]
+                fn poll_shutdown(
+                    self: Pin<&mut Self>,
+                    cx: &mut Context<'_>,
+                ) -> Poll<io::Result<()>> {
+                    AsyncWrite::poll_shutdown(Pin::new(&mut &*self), cx)
+                }
             }
-            #[inline(always)]
-            fn poll_write_vectored(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                bufs: &[::std::io::IoSlice<'_>],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                ::futures_io::AsyncWrite::poll_write_vectored(::std::pin::Pin::new(&mut &*self), cx, bufs)
-            }
-            #[inline(always)]
-            fn poll_flush(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-            ) -> ::std::task::Poll<::std::io::Result<()>> {
-                ::futures_io::AsyncWrite::poll_flush(::std::pin::Pin::new(&mut &*self), cx)
-            }
-            #[inline(always)]
-            fn poll_close(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-            ) -> ::std::task::Poll<::std::io::Result<()>> {
-                ::futures_io::AsyncWrite::poll_close(::std::pin::Pin::new(&mut &*self), cx)
-            }
-        }
+        };
     };
 }
 
-macro_rules! derive_futures_mut_rw {
+macro_rules! derive_tokio_mut_rw {
     ($({$($lt:tt)*})? $ty:ty) => {
-        derive_futures_mut_read!($({$($lt)*})? $ty);
-        derive_futures_mut_write!($({$($lt)*})? $ty);
-    };
-}
-
-macro_rules! derive_futures_ref_read_from_tokio {
-    ($({$($lt:tt)*})? $ty:ty) => {
-        impl $(<$($lt)*>)? ::futures_io::AsyncRead for &$ty {
-            #[inline(always)]
-            fn poll_read(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                buf: &mut [u8],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                let mut readbuf = ::tokio::io::ReadBuf::new(buf);
-                let ::std::task::Poll::Ready(rdy)
-                    = ::tokio::io::AsyncRead::poll_read(::std::pin::Pin::new(&mut &**self), cx, &mut readbuf) else {
-                    return ::std::task::Poll::Pending;
-                };
-                rdy?;
-                ::std::task::Poll::Ready(::std::result::Result::Ok(readbuf.filled().len()))
-            }
-        }
-    };
-}
-
-macro_rules! derive_futures_ref_write_from_tokio {
-    ($({$($lt:tt)*})? $ty:ty) => {
-        impl $(<$($lt)*>)? ::futures_io::AsyncWrite for &$ty {
-            #[inline(always)]
-            fn poll_write(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-                buf: &[u8],
-            ) -> ::std::task::Poll<::std::io::Result<usize>> {
-                ::tokio::io::AsyncWrite::poll_write(::std::pin::Pin::new(&mut &**self), cx, buf)
-            }
-            #[inline(always)]
-            fn poll_flush(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-            ) -> ::std::task::Poll<::std::io::Result<()>> {
-                ::tokio::io::AsyncWrite::poll_flush(::std::pin::Pin::new(&mut &**self), cx)
-            }
-            #[inline(always)]
-            fn poll_close(
-                self: ::std::pin::Pin<&mut Self>,
-                cx: &mut ::std::task::Context<'_>,
-            ) -> ::std::task::Poll<::std::io::Result<()>> {
-                ::tokio::io::AsyncWrite::poll_shutdown(::std::pin::Pin::new(&mut &**self), cx)
-            }
-        }
-    };
-}
-
-macro_rules! derive_futures_ref_rw_from_tokio {
-    ($({$($lt:tt)*})? $ty:ty) => {
-        derive_futures_ref_read_from_tokio!($({$($lt)*})? $ty);
-        derive_futures_ref_write_from_tokio!($({$($lt)*})? $ty);
+        derive_tokio_mut_read!($({$($lt)*})? $ty);
+        derive_tokio_mut_write!($({$($lt)*})? $ty);
     };
 }

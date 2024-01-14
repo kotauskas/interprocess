@@ -4,46 +4,34 @@
 pub mod tokio;
 
 mod listener;
+
 pub use listener::*;
 
 mod stream;
 pub use stream::*;
 
-use {
-    crate::{
-        local_socket::{LocalSocketName, NameTypeSupport},
-        os::unix::udsocket::UdSocketPath,
+use crate::local_socket::{LocalSocketName, NameTypeSupport};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::linux::net::SocketAddrExt;
+use std::{
+    borrow::Cow,
+    ffi::{OsStr, OsString},
+    io,
+    os::unix::{
+        ffi::{OsStrExt, OsStringExt},
+        net::SocketAddr,
     },
-    std::{
-        borrow::Cow,
-        ffi::{CStr, CString, OsStr, OsString},
-        io,
-        os::unix::ffi::{OsStrExt, OsStringExt},
-    },
+    path::Path,
 };
 
-fn local_socket_name_to_ud_socket_path(name: LocalSocketName<'_>) -> io::Result<UdSocketPath<'_>> {
-    fn cow_osstr_to_cstr(osstr: Cow<'_, OsStr>) -> io::Result<Cow<'_, CStr>> {
-        match osstr {
-            Cow::Borrowed(val) => {
-                if val.as_bytes().last() == Some(&0) {
-                    Ok(Cow::Borrowed(
-                        CStr::from_bytes_with_nul(val.as_bytes())
-                            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?,
-                    ))
-                } else {
-                    let owned = val.to_os_string();
-                    Ok(Cow::Owned(CString::new(owned.into_vec())?))
-                }
-            }
-            Cow::Owned(val) => Ok(Cow::Owned(CString::new(val.into_vec())?)),
-        }
+fn name_to_addr(name: LocalSocketName<'_>) -> io::Result<SocketAddr> {
+    let _is_ns = name.is_namespaced();
+    let name = name.into_inner_cow();
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    if _is_ns {
+        return SocketAddr::from_abstract_name(name.as_bytes());
     }
-    #[cfg(uds_linux_namespace)]
-    if name.is_namespaced() {
-        return Ok(UdSocketPath::Namespaced(cow_osstr_to_cstr(name.into_inner_cow())?));
-    }
-    Ok(UdSocketPath::File(cow_osstr_to_cstr(name.into_inner_cow())?))
+    SocketAddr::from_pathname(Path::new(&name))
 }
 
 pub fn name_type_support_query() -> NameTypeSupport {

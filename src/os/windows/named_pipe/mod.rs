@@ -25,7 +25,7 @@
 //!
 //! If you carefully read through this list, you'd notice how Windows named pipes are similar to
 //! Unix domain sockets. For this reason, the implementation of "local sockets" in the
-//! `local_socket` module of this crate uses named pipes on Windows and Ud-sockets on Unix.
+//! `local_socket` module of this crate uses named pipes on Windows and Unix-domain sockets on Unix.
 //!
 //! # Semantic peculiarities
 //! Methods and I/O trait implementations on types presented in this module do not exactly map 1:1

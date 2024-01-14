@@ -80,6 +80,8 @@
 //! [blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
 // TODO mailslots
 // TODO the Intra Doc Link Sweep
+// TODO add OS-specific ext-traits
+// TODO un-mod.rs
 // - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across
 // the network
 
@@ -165,3 +167,12 @@ unsafe fn assume_slice_init<T>(r: &[MaybeUninit<T>]) -> &[T] {
         transmute(r)
     }
 }
+
+// TODO use this everywhere
+trait UnpinExt: Unpin {
+    #[inline]
+    fn pin(&mut self) -> std::pin::Pin<&mut Self> {
+        std::pin::Pin::new(self)
+    }
+}
+impl<T: Unpin + ?Sized> UnpinExt for T {}

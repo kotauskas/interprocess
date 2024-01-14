@@ -1,16 +1,13 @@
-use super::local_socket_name_to_ud_socket_path;
-use crate::{
-    local_socket::ToLocalSocketName,
-    os::unix::udsocket::{UdSocket, UdStream},
-};
-use std::{io, sync::Arc};
+use super::name_to_addr;
+use crate::local_socket::ToLocalSocketName;
+use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) UdStream);
+pub struct LocalSocketStream(pub(super) UnixStream);
 impl LocalSocketStream {
     pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
-        let inner = UdStream::connect(path)?;
+        let addr = name_to_addr(name.to_local_socket_name()?)?;
+        let inner = UnixStream::connect_addr(&addr)?;
         Ok(Self(inner))
     }
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
@@ -23,7 +20,7 @@ impl LocalSocketStream {
 }
 multimacro! {
     LocalSocketStream,
-    forward_rbv(UdStream, &),
+    forward_rbv(UnixStream, &),
     forward_sync_ref_rw,
     forward_handle(unix),
     derive_sync_mut_rw,
