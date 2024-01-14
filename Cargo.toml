@@ -26,7 +26,7 @@ exclude = [
 
 [features]
 default = []
-async = ["futures-core", "futures-io", "futures-util"]
+async = []
 tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
@@ -38,9 +38,6 @@ tokio = { version = "1.32.0", features = [
     "time",
     "io-util",
 ], optional = true }
-futures-core = { version = "0.3.28", optional = true }
-futures-io = { version = "0.3.28", optional = true }
-futures-util = { version = "0.3.28", features = ["io"], optional = true }
 to_method = "1.1"
 cfg-if = "1.0.0"
 
@@ -65,7 +62,6 @@ tokio = { version = "1.28.0", features = [
     "sync",
     "macros",
 ] }
-futures = "0.3.28"
 color-eyre = "0.6.2"
 
 [package.metadata.docs.rs]

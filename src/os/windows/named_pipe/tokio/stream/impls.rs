@@ -21,7 +21,6 @@ use crate::{
     },
     reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
 };
-use futures_core::ready;
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
@@ -29,7 +28,7 @@ use std::{
     mem::{ManuallyDrop, MaybeUninit},
     ops::Deref,
     pin::Pin,
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 use tokio::{
     io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
