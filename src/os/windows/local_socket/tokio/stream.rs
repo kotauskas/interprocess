@@ -10,12 +10,16 @@ use crate::{
 };
 use std::{io, os::windows::prelude::*};
 
+type LocalSocketStreamImpl = DuplexPipeStream<Bytes>;
+type ReadHalfImpl = RecvPipeStream<Bytes>;
+type WriteHalfImpl = SendPipeStream<Bytes>;
+
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) DuplexPipeStream<Bytes>);
+pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = DuplexPipeStream::connect(name.inner()).await?;
+        let inner = LocalSocketStreamImpl::connect(name.inner()).await?;
         Ok(Self(inner))
     }
     #[inline]
@@ -25,7 +29,7 @@ impl LocalSocketStream {
     }
     #[inline]
     pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
-        match DuplexPipeStream::reunite(rh.0, sh.0) {
+        match LocalSocketStreamImpl::reunite(rh.0, sh.0) {
             Ok(inner) => Ok(Self(inner)),
             Err(InnerReuniteError { rh, sh }) => Err(ReuniteError {
                 rh: ReadHalf(rh),
@@ -39,7 +43,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        match DuplexPipeStream::try_from(handle) {
+        match LocalSocketStreamImpl::try_from(handle) {
             Ok(s) => Ok(Self(s)),
             Err(e) => Err(FromHandleError {
                 details: Default::default(),
@@ -50,31 +54,33 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     }
 }
 
-// TODO I/O by ref, including Tokio traits
 multimacro! {
     LocalSocketStream,
-    forward_rbv(DuplexPipeStream<Bytes>, &),
-    forward_futures_ref_rw,
+    pinproj_for_unpin(LocalSocketStreamImpl),
+    forward_rbv(LocalSocketStreamImpl, &),
+    forward_tokio_rw,
+    forward_tokio_ref_rw,
     forward_as_handle,
-    derive_futures_mut_rw,
 }
 
-pub struct ReadHalf(pub(super) RecvPipeStream<Bytes>);
+pub struct ReadHalf(pub(super) ReadHalfImpl);
 multimacro! {
     ReadHalf,
-    forward_rbv(RecvPipeStream<Bytes>, &),
-    forward_futures_ref_read,
+    pinproj_for_unpin(ReadHalfImpl),
+    forward_rbv(ReadHalfImpl, &),
+    forward_tokio_read,
+    forward_tokio_ref_read,
     forward_as_handle,
     forward_debug("local_socket::ReadHalf"),
-    derive_futures_mut_read,
 }
 
-pub struct WriteHalf(pub(super) SendPipeStream<Bytes>);
+pub struct WriteHalf(pub(super) WriteHalfImpl);
 multimacro! {
     WriteHalf,
-    forward_rbv(SendPipeStream<Bytes>, &),
-    forward_futures_ref_write,
+    pinproj_for_unpin(WriteHalfImpl),
+    forward_rbv(WriteHalfImpl, &),
+    forward_tokio_write,
+    forward_tokio_ref_write,
     forward_as_handle,
     forward_debug("local_socket::WriteHalf"),
-    derive_futures_mut_write,
 }

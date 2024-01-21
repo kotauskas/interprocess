@@ -1,7 +1,5 @@
-use crate::UnpinExt;
-
 use super::super::ToLocalSocketName;
-use std::{io, pin::Pin};
+use std::io;
 
 impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl,
@@ -77,10 +75,6 @@ impl LocalSocketStream {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
-    #[inline]
-    fn pinproj(&mut self) -> Pin<&mut LocalSocketStreamImpl> {
-        self.0.pin()
-    }
 }
 #[doc(hidden)]
 impl From<LocalSocketStreamImpl> for LocalSocketStream {
@@ -92,6 +86,7 @@ impl From<LocalSocketStreamImpl> for LocalSocketStream {
 
 multimacro! {
     LocalSocketStream,
+    pinproj_for_unpin(LocalSocketStreamImpl),
     forward_rbv(LocalSocketStreamImpl, &),
     forward_tokio_rw,
     forward_tokio_ref_rw,
@@ -107,14 +102,9 @@ multimacro! {
 /// # Examples
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 pub struct ReadHalf(pub(super) ReadHalfImpl);
-impl ReadHalf {
-    #[inline]
-    fn pinproj(&mut self) -> Pin<&mut ReadHalfImpl> {
-        self.0.pin()
-    }
-}
 multimacro! {
     ReadHalf,
+    pinproj_for_unpin(ReadHalfImpl),
     forward_rbv(ReadHalfImpl, &),
     forward_tokio_read,
     forward_tokio_ref_read,
@@ -129,14 +119,9 @@ multimacro! {
 /// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
 // TODO remove this GitHub link and others like it
 pub struct WriteHalf(pub(super) WriteHalfImpl);
-impl WriteHalf {
-    #[inline]
-    fn pinproj(&mut self) -> Pin<&mut WriteHalfImpl> {
-        self.0.pin()
-    }
-}
 multimacro! {
     WriteHalf,
+    pinproj_for_unpin(WriteHalfImpl),
     forward_rbv(WriteHalfImpl, &),
     forward_tokio_write,
     forward_tokio_ref_write,
