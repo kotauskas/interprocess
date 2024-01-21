@@ -32,7 +32,7 @@ impl From<LocalSocketStream> for OwnedHandle {
     fn from(s: LocalSocketStream) -> Self {
         // The outer local socket interface has read and write halves and is always duplex in the
         // unsplit type, so a split pipe stream can never appear here.
-        s.try_into()
+        s.0.try_into()
             .expect("split named pipe stream inside `LocalSocketStream`")
     }
 }
