@@ -51,6 +51,7 @@ winapi = { version = "0.3", features = [
     "handleapi",
     "namedpipeapi",
 ] }
+recvmsg = "1.0.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.137", features = ["extra_traits"] }
