@@ -83,6 +83,7 @@
 // TODO add OS-specific ext-traits
 // TODO un-mod.rs
 // TODO make doctests not no_run
+// TODO inspect panic points
 // - **Mailslots** – Windows-specific interprocess communication primitive for short messages, potentially even across
 // the network
 
