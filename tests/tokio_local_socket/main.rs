@@ -1,3 +1,5 @@
+// TODO test various error conditions
+// TODO test reunite in some shape or form
 #![cfg(feature = "tokio")]
 #[path = "../util/mod.rs"]
 #[macro_use]

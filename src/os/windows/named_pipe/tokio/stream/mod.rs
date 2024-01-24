@@ -1,15 +1,15 @@
 mod impls;
 mod limbo;
 mod wrapper_fns;
+use recvmsg::RecvResult;
 pub(crate) use wrapper_fns::*;
 
 use crate::{
     error::ConversionError,
     os::windows::{
         named_pipe::{
-            maybe_arc::MaybeArc,
-            needs_flush::NeedsFlush,
             stream::{pipe_mode, PipeModeTag},
+            MaybeArc, NeedsFlush, ReprU8,
         },
         winprelude::*,
     },
@@ -18,11 +18,9 @@ use std::{
     fmt::{self, Display, Formatter},
     io,
     marker::PhantomData,
+    sync::Mutex,
 };
-use tokio::{
-    net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
-    sync::Mutex as TokioMutex,
-};
+use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer};
 
 /// A Tokio-based named pipe stream, created by a server-side listener or by connecting to a server.
 ///
@@ -82,7 +80,7 @@ use tokio::{
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: MaybeArc<RawPipeStream>,
-    flush: TokioMutex<Option<FlushJH>>,
+    flush: Mutex<Option<FlushJH>>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
 type FlushJH = tokio::task::JoinHandle<io::Result<()>>;
@@ -103,11 +101,27 @@ pub(crate) struct RawPipeStream {
     inner: Option<InnerTokio>,
     // Cleared by the generic pipes rather than the raw pipe stream unlike in sync land.
     needs_flush: NeedsFlush,
+    // TODO crackhead specialization
+    recv_msg_state: Mutex<RecvMsgState>,
 }
 enum InnerTokio {
     Server(TokioNPServer),
     Client(TokioNPClient),
 }
+
+#[derive(Debug, Default)]
+#[repr(u8)]
+enum RecvMsgState {
+    #[default]
+    NotRecving,
+    Looping {
+        spilled: bool,
+    },
+    Discarding {
+        result: io::Result<RecvResult>,
+    },
+}
+unsafe impl ReprU8 for RecvMsgState {}
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
 ///

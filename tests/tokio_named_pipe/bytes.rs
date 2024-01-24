@@ -3,13 +3,16 @@ use super::{
     util::{message, TestResult},
 };
 use color_eyre::eyre::Context;
-use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use interprocess::os::windows::named_pipe::{
     pipe_mode,
     tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
 };
 use std::sync::Arc;
-use tokio::{sync::oneshot::Sender, try_join};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    sync::oneshot::Sender,
+    try_join,
+};
 
 fn msg(server: bool) -> Box<str> {
     message(None, server, Some('\n'))

@@ -47,8 +47,9 @@ pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Res
     let flags = get_flags(handle)?;
     Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
 }
+#[allow(dead_code)] // TODO give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
-    let mut len: DWORD = 0;
+    let mut msglen: DWORD = 0;
     let ok = unsafe {
         PeekNamedPipe(
             handle.as_raw_handle(),
@@ -56,10 +57,10 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
             0,
             ptr::null_mut(),
             ptr::null_mut(),
-            &mut len as *mut _,
+            &mut msglen as *mut _,
         ) != 0
     };
-    ok_or_ret_errno!(ok => len as usize)
+    ok_or_ret_errno!(ok => msglen as usize)
 }
 
 pub(crate) fn _connect(path: &[u16], read: bool, write: bool, timeout: WaitTimeout) -> io::Result<FileHandle> {

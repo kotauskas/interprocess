@@ -6,34 +6,30 @@ use super::{
 };
 use crate::{
     os::windows::{
-        downgrade_eof, downgrade_poll_eof,
+        decode_eof, downgrade_poll_eof,
         named_pipe::{
-            maybe_arc::MaybeArc,
-            needs_flush::NeedsFlushVal,
             path_conversion,
-            stream::{
-                block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, peek_msg_len, WaitTimeout,
-            },
-            PipeMode, PmtNotNone, LIMBO_ERR, REBURY_ERR,
+            stream::{block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, WaitTimeout},
+            MaybeArc, NeedsFlushVal, PipeMode, PmtNotNone, DISCARD_BUF_SIZE, LIMBO_ERR, REBURY_ERR,
         },
         winprelude::*,
         FileHandle,
     },
-    reliable_recv_msg::{AsyncReliableRecvMsg, RecvResult, TryRecvResult},
+    UnpinExt,
 };
+use recvmsg::{prelude::*, NoAddrBuf, RecvResult};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
     future::{self, Future},
-    mem::{ManuallyDrop, MaybeUninit},
-    ops::Deref,
+    mem::{replace, ManuallyDrop, MaybeUninit},
     pin::Pin,
+    sync::MutexGuard,
     task::{ready, Context, Poll},
 };
 use tokio::{
     io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
-    sync::MutexGuard as TokioMutexGuard,
 };
 use winapi::{
     shared::winerror::ERROR_MORE_DATA,
@@ -62,6 +58,7 @@ impl RawPipeStream {
         Self {
             inner: Some(inner),
             needs_flush: NeedsFlush::from(NeedsFlushVal::No),
+            recv_msg_state: Mutex::new(RecvMsgState::NotRecving),
         }
     }
     pub(crate) fn new_server(server: TokioNPServer) -> Self {
@@ -123,17 +120,6 @@ impl RawPipeStream {
         Poll::Ready(Ok(readbuf.filled().len()))
     }
 
-    fn poll_read_init(&self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
-        loop {
-            let prr = same_clsrv!(x in self.inner() => x.poll_read_ready(cx));
-            ready!(downgrade_poll_eof(prr))?;
-            match downgrade_eof(same_clsrv!(x in self.inner() => x.try_read(buf))) {
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                els => return Poll::Ready(els),
-            }
-        }
-    }
-
     fn poll_write(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         loop {
             ready!(same_clsrv!(x in self.inner() => x.poll_write_ready(cx)))?;
@@ -147,30 +133,103 @@ impl RawPipeStream {
         }
     }
 
-    fn poll_try_recv_msg(
+    fn poll_discard_msg(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
+        Poll::Ready(loop {
+            match ready!(self.poll_read_uninit(cx, &mut buf)) {
+                Ok(..) => break Ok(()),
+                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {}
+                Err(e) => break Err(e),
+            }
+        })
+    }
+
+    // TODO clarify in recvmsg that using different buffers across different polls of this function
+    // that return Pending makes for unexpected behavior
+    fn poll_recv_msg(
         &self,
         cx: &mut Context<'_>,
-        buf: &mut [MaybeUninit<u8>],
-    ) -> Poll<io::Result<TryRecvResult<'_>>> {
-        let (mut size, mut fit);
-        loop {
-            size = downgrade_eof(peek_msg_len(self.as_handle()))?;
-            fit = buf.len() >= size;
-            if !fit {
-                break;
+        buf: &mut MsgBuf<'_>,
+        lock: Option<MutexGuard<'_, RecvMsgState>>,
+    ) -> Poll<io::Result<RecvResult>> {
+        // FIXME this stupid shit isn't reentrant; recursing on discard is gonna ruin everything
+        let mut state = lock.unwrap_or_else(|| self.recv_msg_state.lock().unwrap());
+
+        match &mut *state {
+            RecvMsgState::NotRecving => {
+                buf.set_fill(0);
+                buf.has_msg = false;
+                *state = RecvMsgState::Looping { spilled: false };
+                self.poll_recv_msg(cx, buf, Some(state))
             }
-            match ready!(self.poll_read_uninit(cx, buf)) {
-                // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the
-                // `.poll_read()` to wait until a message arrives, so that we could figure out for real if it fits
-                // or not. It doesn't mean that the message gets torn, as it normally does if the buffer given to
-                // the ReadFile call is non-zero in size.
-                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
-                Err(e) => return Poll::Ready(Err(e)),
-                Ok(nsz) => break size = nsz,
+            RecvMsgState::Looping { spilled } => {
+                let mut more_data = true;
+                while more_data {
+                    let slice = buf.unfilled_part();
+                    if slice.is_empty() {
+                        match buf.grow() {
+                            Ok(()) => {
+                                *spilled = true;
+                                debug_assert!(!buf.unfilled_part().is_empty());
+                                continue;
+                            }
+                            Err(e) => {
+                                if more_data {
+                                    // A partially successful partial read must result in the rest of the
+                                    // message being discarded.
+                                    *state = RecvMsgState::Discarding {
+                                        result: Ok(RecvResult::QuotaExceeded(e)),
+                                    };
+                                    return self.poll_recv_msg(cx, buf, Some(state));
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    let rslt = ready!(self.poll_read_uninit(cx, slice));
+
+                    more_data = false;
+                    let incr = match decode_eof(rslt) {
+                        // FIXME Mio does the broken pipe thunking (this is a bug that breaks
+                        // zero-sized messages)
+                        Ok(0) => {
+                            buf.set_fill(0);
+                            return Poll::Ready(Ok(RecvResult::EndOfStream));
+                        }
+                        Ok(incr) => incr,
+                        Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
+                            more_data = true;
+                            slice.len()
+                        }
+                        Err(e) => {
+                            return if more_data {
+                                // This is irrelevant to normal operation of downstream
+                                // programs, but still makes them easier to debug.
+                                *state = RecvMsgState::Discarding { result: Err(e) };
+                                self.poll_recv_msg(cx, buf, Some(state))
+                            } else {
+                                Poll::Ready(Err(e))
+                            };
+                        }
+                    };
+                    unsafe {
+                        // SAFETY: this one is on Tokio
+                        buf.advance_init_and_set_fill(buf.len_filled() + incr)
+                    };
+                }
+
+                let ret = if *spilled { RecvResult::Spilled } else { RecvResult::Fit };
+                *state = RecvMsgState::NotRecving;
+                Poll::Ready(Ok(ret))
+            }
+            RecvMsgState::Discarding { result } => {
+                let _ = ready!(self.poll_discard_msg(cx));
+                let r = replace(result, Ok(RecvResult::EndOfStream)); // Silly little sentinel...
+                *state = RecvMsgState::NotRecving; // ...gone, so very young.
+                Poll::Ready(r)
             }
         }
-
-        todo!("eof handling")
     }
 
     fn fill_fields<'a, 'b, 'c>(
@@ -375,24 +434,20 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub(crate) fn new(raw: RawPipeStream) -> Self {
         Self {
             raw: MaybeArc::Inline(raw),
-            flush: TokioMutex::new(None),
+            flush: Mutex::new(None),
             _phantom: PhantomData,
         }
     }
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
-    fn ensure_flush_start(&self, slf_flush: &mut TokioMutexGuard<'_, Option<FlushJH>>) {
+    fn ensure_flush_start(&self, slf_flush: &mut MutexGuard<'_, Option<FlushJH>>) {
         if slf_flush.is_some() {
             return;
         }
 
         let handle = AssertHandleSyncSend(self.as_raw_handle());
-        #[allow(clippy::redundant_locals)]
-        let task = tokio::task::spawn_blocking(move || {
-            let handle = handle;
-            FileHandle::flush_hndl(handle.0)
-        });
+        let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl({ handle }.0));
 
         **slf_flush = Some(task);
     }
@@ -404,25 +459,21 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
         future::poll_fn(|cx| self.poll_flush(cx)).await
     }
 
-    fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    /// Polls the future of `.flush()`.
+    pub fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         if !self.raw.needs_flush.on_flush() {
             // No flush required.
             return Poll::Ready(Ok(()));
         }
 
-        let mut lockfut = self.flush.lock();
-        let lfpin = unsafe {
-            // SAFETY: i promise,,, (nah fr tho i'm just stack-pinning without the macro)
-            Pin::new_unchecked(&mut lockfut)
-        };
-        let mut slf_flush = ready!(lfpin.poll(cx));
+        let mut flush = self.flush.lock().unwrap();
         let rslt = loop {
-            match slf_flush.as_mut() {
+            match flush.as_mut() {
                 Some(fl) => break ready!(Pin::new(fl).poll(cx)).unwrap(),
-                None => self.ensure_flush_start(&mut slf_flush),
+                None => self.ensure_flush_start(&mut flush),
             }
         };
-        *slf_flush = None;
+        *flush = None;
         if rslt.is_err() {
             self.raw.needs_flush.mark_dirty();
         }
@@ -485,45 +536,42 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
 impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
-        TokioAsyncWrite::poll_write(Pin::new(&mut &*self), cx, buf)
+        TokioAsyncWrite::poll_write((&mut &*self).pin(), cx, buf)
     }
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        TokioAsyncWrite::poll_flush(Pin::new(&mut &*self), cx)
+        TokioAsyncWrite::poll_flush((&mut &*self).pin(), cx)
     }
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        TokioAsyncWrite::poll_shutdown(Pin::new(&mut &*self), cx)
+        TokioAsyncWrite::poll_shutdown((&mut &*self).pin(), cx)
     }
 }
 
-impl<Sm: PipeModeTag> AsyncReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
+impl<Sm: PipeModeTag> AsyncRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
+    type Error = io::Error;
+    type AddrBuf = NoAddrBuf;
     #[inline]
-    fn poll_try_recv<'buf>(
+    fn poll_recv_msg(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &'buf mut [MaybeUninit<u8>],
-    ) -> Poll<io::Result<TryRecvResult<'buf>>> {
-        // self.raw.poll_try_recv_msg(cx, buf)
-        todo!()
+        buf: &mut MsgBuf<'_>,
+        _: Option<&mut NoAddrBuf>,
+    ) -> Poll<io::Result<RecvResult>> {
+        self.raw.poll_recv_msg(cx, buf, None)
     }
 }
-impl<Sm: PipeModeTag> AsyncReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+impl<Sm: PipeModeTag> AsyncRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+    type Error = io::Error;
+    type AddrBuf = NoAddrBuf;
     #[inline]
-    fn poll_try_recv<'buf>(
+    fn poll_recv_msg(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &'buf mut [MaybeUninit<u8>],
-    ) -> Poll<io::Result<TryRecvResult<'buf>>> {
-        Pin::new(&mut self.deref()).poll_try_recv(cx, buf)
-    }
-    #[inline]
-    fn poll_recv<'buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &'buf mut [MaybeUninit<u8>],
-    ) -> Poll<io::Result<RecvResult<'buf>>> {
-        Pin::new(&mut self.deref()).poll_recv(cx, buf)
+        buf: &mut MsgBuf<'_>,
+        _: Option<&mut NoAddrBuf>,
+    ) -> Poll<io::Result<RecvResult>> {
+        AsyncRecvMsg::poll_recv_msg((&mut &*self).pin(), cx, buf, None)
     }
 }
 
@@ -580,14 +628,3 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
 }
 
 derive_asraw!({Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>, windows);
-
-multimacro! {
-    {Sm: PipeModeTag} PipeStream<pipe_mode::Bytes, Sm>,
-    derive_futures_ref_read_from_tokio,
-    derive_futures_mut_read,
-}
-multimacro! {
-    {Rm: PipeModeTag} PipeStream<Rm, pipe_mode::Bytes>,
-    derive_futures_ref_write_from_tokio,
-    derive_futures_mut_write,
-}

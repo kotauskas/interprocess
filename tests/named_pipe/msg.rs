@@ -1,9 +1,9 @@
 use super::{drive_server, util::*};
-use color_eyre::eyre::Context;
-use interprocess::{
-    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream},
-    reliable_recv_msg::*,
+use color_eyre::eyre::{ensure, Context};
+use interprocess::os::windows::named_pipe::{
+    pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream,
 };
+use recvmsg::{MsgBuf, RecvMsg, RecvResult};
 use std::{
     str,
     sync::{mpsc::Sender, Arc},
@@ -106,12 +106,14 @@ pub fn client_stc(name: &str) -> TestResult {
 fn recv(conn: &mut RecvPipeStream<pipe_mode::Messages>, exp: impl AsRef<str>, nr: u8) -> TestResult {
     let fs = ["first", "second"][nr as usize];
     let exp_ = exp.as_ref();
-    let mut buf = Vec::with_capacity(exp_.len());
+    let mut buf = MsgBuf::from(Vec::with_capacity(exp_.len() - 2));
 
-    let rslt = conn.recv(&mut buf).with_context(|| format!("{} receive failed", fs))?;
+    let rslt = conn
+        .recv_msg(&mut buf, None)
+        .with_context(|| format!("{} receive failed", fs))?;
 
-    ensure_eq!(rslt.size(), exp_.len());
-    ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp_);
+    ensure!(matches!(rslt, RecvResult::Fit));
+    ensure_eq!(futf8(buf.filled_part())?, exp_);
     Ok(())
 }
 

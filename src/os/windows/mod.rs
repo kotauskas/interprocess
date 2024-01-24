@@ -10,7 +10,10 @@ pub(crate) mod local_socket;
 mod file_handle;
 pub(crate) use file_handle::*;
 
-use std::{io, task::Poll};
+use std::{
+    io::{self, ErrorKind::BrokenPipe},
+    task::Poll,
+};
 mod winprelude {
     pub use std::os::windows::prelude::*;
     pub use winapi::{
@@ -55,18 +58,21 @@ pub trait ShareHandle: AsHandle {
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
 impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
 
-fn is_eof_like(e: &io::Error) -> bool {
-    e.kind() == io::ErrorKind::BrokenPipe
-        || e.raw_os_error() == Some(winapi::shared::winerror::ERROR_PIPE_NOT_CONNECTED as _)
+fn decode_eof<T>(r: io::Result<T>) -> io::Result<T> {
+    match r {
+        Err(e) if e.raw_os_error() == Some(winapi::shared::winerror::ERROR_PIPE_NOT_CONNECTED as _) => {
+            Err(io::Error::from(BrokenPipe))
+        }
+        els => els,
+    }
 }
-
+fn downgrade_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
+    match decode_eof(r) {
+        Err(e) if e.kind() == BrokenPipe => Ok(T::default()),
+        els => els,
+    }
+}
 #[allow(unused)]
 fn downgrade_poll_eof<T: Default>(r: Poll<io::Result<T>>) -> Poll<io::Result<T>> {
     r.map(downgrade_eof)
-}
-fn downgrade_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
-    match r {
-        Err(e) if is_eof_like(&e) => Ok(T::default()),
-        els => els,
-    }
 }

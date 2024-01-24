@@ -8,6 +8,7 @@ use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
 pub(crate) struct FileHandle(pub(crate) OwnedHandle);
 impl FileHandle {
     pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+        // TODO .unwrap_or(DWORD::MAX)
         let len = DWORD::try_from(buf.len()).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -29,6 +30,7 @@ impl FileHandle {
         downgrade_eof(ok_or_ret_errno!(success => num_bytes_read))
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        // TODO .unwrap_or(DWORD::MAX)
         let len = DWORD::try_from(buf.len()).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,

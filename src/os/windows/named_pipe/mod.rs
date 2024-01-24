@@ -51,16 +51,20 @@
 // TODO sync split
 // TODO client impersonation
 // TODO raw instance functionality
+// TODO transactions
 
 mod enums;
 mod listener;
 mod stream;
 pub use {enums::*, listener::*, stream::*};
 
+mod atomic_enum;
 mod limbo_pool;
 mod maybe_arc;
 mod needs_flush;
 mod path_conversion;
+
+use {atomic_enum::*, maybe_arc::*, needs_flush::*};
 
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]

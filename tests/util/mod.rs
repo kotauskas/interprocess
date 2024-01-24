@@ -9,6 +9,8 @@ mod eyre;
 mod xorshift;
 #[macro_use]
 mod namegen;
+
+#[allow(unused_imports)]
 pub use {drive::*, eyre::*, namegen::*, xorshift::*};
 
 #[cfg(feature = "tokio")]

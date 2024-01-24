@@ -1,3 +1,5 @@
+// TODO test various error conditions
+// TODO test reunite in some shape or form
 #[path = "../util/mod.rs"]
 #[macro_use]
 mod util;

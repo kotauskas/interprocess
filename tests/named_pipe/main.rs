@@ -17,40 +17,40 @@ use std::{
 #[test]
 fn named_pipe_bytes_bidir() -> TestResult {
     use bytes::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_duplex, client_duplex)
 }
 
 #[test]
 fn named_pipe_bytes_unidir_client_to_server() -> TestResult {
     use bytes::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_cts, client_cts)
 }
 #[test]
 fn named_pipe_bytes_unidir_server_to_client() -> TestResult {
     use bytes::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_stc, client_stc)
 }
 
 #[test]
 fn named_pipe_msg_bidir() -> TestResult {
     use msg::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_duplex, client_duplex)
 }
 
 #[test]
 fn named_pipe_msg_unidir_client_to_server() -> TestResult {
     use msg::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_cts, client_cts)
 }
 #[test]
 fn named_pipe_msg_unidir_server_to_client() -> TestResult {
     use msg::*;
-    install_color_eyre();
+    testinit();
     drive_server_and_multiple_clients(server_stc, client_stc)
 }
 

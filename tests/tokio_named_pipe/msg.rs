@@ -1,16 +1,15 @@
+// TODO graft from sync
 use super::{
     drive_server,
     util::{message, TestResult},
 };
-use color_eyre::eyre::Context;
-use interprocess::{
-    os::windows::named_pipe::{
-        pipe_mode,
-        tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
-        PipeMode,
-    },
-    reliable_recv_msg::AsyncReliableRecvMsgExt,
+use color_eyre::eyre::{ensure, Context};
+use interprocess::os::windows::named_pipe::{
+    pipe_mode,
+    tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+    PipeMode,
 };
+use recvmsg::{AsyncRecvMsgExt, MsgBuf, RecvResult};
 use std::{str, sync::Arc};
 use tokio::{sync::oneshot::Sender, try_join};
 
@@ -110,17 +109,21 @@ pub async fn client_stc(name: Arc<str>) -> TestResult {
 }
 
 async fn recv(recver: &mut RecvPipeStream<pipe_mode::Messages>, exp1: &str, exp2: &str) -> TestResult {
-    let mut buf = vec![0; exp1.len()];
+    let mut buf = MsgBuf::from(Vec::with_capacity(exp1.len() - 2));
 
-    let rslt = (&*recver).recv(&mut buf).await.context("first receive failed")?;
-    ensure_eq!(rslt.size(), exp1.len());
-    ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp1);
+    let rslt = (&*recver)
+        .recv_msg(&mut buf, None)
+        .await
+        .context("first receive failed")?;
+    ensure!(matches!(rslt, RecvResult::Fit));
+    ensure_eq!(futf8(buf.filled_part())?, exp1);
 
-    buf.clear();
-    buf.resize(exp2.len(), 0);
-    let rslt = (&*recver).recv(&mut buf).await.context("second receive failed")?;
-    ensure_eq!(rslt.size(), exp2.len());
-    ensure_eq!(futf8(rslt.borrow_to_size(&buf))?, exp2);
+    let rslt = (&*recver)
+        .recv_msg(&mut buf, None)
+        .await
+        .context("second receive failed")?;
+    ensure!(matches!(rslt, RecvResult::Fit));
+    ensure_eq!(futf8(buf.filled_part())?, exp2);
 
     Ok(())
 }

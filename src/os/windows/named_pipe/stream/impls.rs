@@ -1,19 +1,20 @@
 //! Methods and trait implementations for `PipeStream`.
 
+// TODO split into a bunch of files
+
 use super::{
     limbo::{send_off, Corpse},
     *,
 };
 use crate::{
-    assume_slice_init,
     os::windows::{
-        c_wrappers, is_eof_like,
+        c_wrappers, decode_eof,
         named_pipe::{needs_flush::NeedsFlushVal, path_conversion, set_nonblocking_for_stream, PipeMode},
         FileHandle,
     },
-    reliable_recv_msg::{RecvResult, ReliableRecvMsg, TryRecvResult},
     weaken_buf_init_mut, TryClone,
 };
+use recvmsg::{prelude::*, NoAddrBuf, RecvMsg, RecvResult};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
@@ -21,7 +22,6 @@ use std::{
     marker::PhantomData,
     mem::MaybeUninit,
     os::windows::prelude::*,
-    slice,
 };
 use winapi::{
     shared::winerror::ERROR_MORE_DATA,
@@ -31,15 +31,16 @@ use winapi::{
     },
 };
 
-/// Helper, used because `spare_capacity_mut()` on `Vec` is 1.60+. Borrows whole `Vec`, not just spare capacity.
-#[inline]
-pub(crate) fn vec_as_uninit(vec: &mut Vec<u8>) -> &mut [MaybeUninit<u8>] {
-    let cap = vec.capacity();
-    unsafe { slice::from_raw_parts_mut(vec.as_mut_ptr() as *mut MaybeUninit<u8>, cap) }
-}
-
 pub(crate) static LIMBO_ERR: &str = "attempt to perform operation on pipe stream which has been sent off to limbo";
 pub(crate) static REBURY_ERR: &str = "attempt to bury same pipe stream twice";
+pub(crate) const DISCARD_BUF_SIZE: usize = {
+    // Debug builds are more prone to stack explosions.
+    if cfg!(debug_assertions) {
+        512
+    } else {
+        4096
+    }
+};
 
 impl RawPipeStream {
     pub(crate) fn new(handle: FileHandle, is_server: bool) -> Self {
@@ -99,52 +100,88 @@ impl RawPipeStream {
         }
     }
 
-    fn try_recv_msg<'buf>(&self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
-        let mut size = 0;
-        let mut fit = false;
-        while size == 0 {
-            size = peek_msg_len(self.as_handle())?;
-            fit = buf.len() >= size;
-            if fit {
-                match self.file_handle().read(&mut buf[0..size]) {
-                    // The ERROR_MORE_DATA here can only be hit if we're spinning in the loop and using the `.read()`
-                    // to block until a message arrives, so that we could figure out for real if it fits or not.
-                    // It doesn't mean that the message gets torn, as it normally does if the buffer given to the
-                    // ReadFile call is non-zero in size.
-                    Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => continue,
-                    Err(e) if is_eof_like(&e) => return Ok(TryRecvResult::EndOfStream),
-                    Err(e) => return Err(e),
-                    Ok(nsz) => size = nsz,
+    fn discard_msg(&self) -> io::Result<()> {
+        // TODO not delegate to recv_msg
+        use RecvResult::*;
+        let mut bufbak = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
+        let mut buf = MsgBuf::from(&mut bufbak[..]);
+        buf.quota = Some(0);
+        loop {
+            match self.recv_msg_impl(&mut buf, false)? {
+                EndOfStream | Fit => break,
+                QuotaExceeded(..) => {
+                    // Because discard = false makes sure that discard_msg() isn't recursed into,
+                    // we have to manually reset the buffer into a workable state – by discarding
+                    // the received data, that is.
+                    buf.set_fill(0);
                 }
-            } else {
-                break;
+                Spilled => unreachable!(),
             }
         }
-        let ret = if fit {
-            unsafe { TryRecvResult::Fit(assume_slice_init(&buf[..size])) }
-        } else {
-            TryRecvResult::Failed(size)
-        };
-        Ok(ret)
+        Ok(())
     }
-    fn recv_msg<'buf>(&self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
-        Ok(match self.try_recv_msg(buf)? {
-            TryRecvResult::Fit(msg) => RecvResult::Fit(msg),
-            TryRecvResult::EndOfStream => RecvResult::EndOfStream,
-            TryRecvResult::Failed(size) => {
-                let mut alloc = Vec::with_capacity(size);
-                debug_assert!(alloc.capacity() >= size);
 
-                let new_size = self.file_handle().read(vec_as_uninit(&mut alloc))?;
-                debug_assert_eq!(size, new_size);
+    fn recv_msg_impl(&self, buf: &mut MsgBuf<'_>, discard: bool) -> io::Result<RecvResult> {
+        buf.set_fill(0);
+        buf.has_msg = false;
+        let mut more_data = true;
+        let mut spilled = false;
+        let fh = self.file_handle();
 
-                unsafe {
-                    // SAFETY: Win32 guarantees that at least this much is initialized.
-                    alloc.set_len(size)
-                };
-                RecvResult::Alloc(alloc)
+        while more_data {
+            let slice = buf.unfilled_part();
+            if slice.is_empty() {
+                match buf.grow() {
+                    Ok(()) => {
+                        spilled = true;
+                        debug_assert!(!buf.unfilled_part().is_empty());
+                        continue;
+                    }
+                    Err(e) => {
+                        if more_data && discard {
+                            // A partially successful partial read must result in the rest of the
+                            // message being discarded.
+                            let _ = self.discard_msg();
+                        }
+                        return Ok(RecvResult::QuotaExceeded(e));
+                    }
+                }
             }
-        })
+
+            let rslt = fh.read(slice);
+
+            more_data = false;
+            let incr = match decode_eof(rslt) {
+                Ok(incr) => incr,
+                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
+                    more_data = true;
+                    slice.len()
+                }
+                Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+                    buf.set_fill(0);
+                    return Ok(RecvResult::EndOfStream);
+                }
+                Err(e) => {
+                    if more_data && discard {
+                        // This is irrelevant to normal operation of downstream
+                        // programs, but still makes them easier to debug.
+                        let _ = self.discard_msg();
+                    }
+                    return Err(e);
+                }
+            };
+            unsafe {
+                // SAFETY: this one is on Windows
+                buf.advance_init_and_set_fill(buf.len_filled() + incr)
+            };
+        }
+        buf.has_msg = true;
+        Ok(if spilled { RecvResult::Spilled } else { RecvResult::Fit })
+    }
+
+    #[inline]
+    fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
+        self.recv_msg_impl(buf, true)
     }
 
     fn set_nonblocking(&self, readmode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
@@ -389,26 +426,24 @@ impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
         (self as &PipeStream<_, _>).flush()
     }
 }
-impl<Sm: PipeModeTag> ReliableRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
+
+impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
+    type Error = io::Error;
+    type AddrBuf = NoAddrBuf;
     #[inline]
-    fn recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
+    fn recv_msg(&mut self, buf: &mut MsgBuf<'_>, _: Option<&mut NoAddrBuf>) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf)
     }
+}
+impl<Sm: PipeModeTag> RecvMsg for PipeStream<pipe_mode::Messages, Sm> {
+    type Error = io::Error;
+    type AddrBuf = NoAddrBuf;
     #[inline]
-    fn try_recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
-        self.raw.try_recv_msg(buf)
+    fn recv_msg(&mut self, buf: &mut MsgBuf<'_>, _: Option<&mut NoAddrBuf>) -> io::Result<RecvResult> {
+        (&*self).recv_msg(buf, None)
     }
 }
-impl<Sm: PipeModeTag> ReliableRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
-    #[inline]
-    fn recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<RecvResult<'buf>> {
-        (self as &PipeStream<_, _>).recv(buf)
-    }
-    #[inline]
-    fn try_recv<'buf>(&mut self, buf: &'buf mut [MaybeUninit<u8>]) -> io::Result<TryRecvResult<'buf>> {
-        (self as &PipeStream<_, _>).try_recv(buf)
-    }
-}
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("PipeStream");
