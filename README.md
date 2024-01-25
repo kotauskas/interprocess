@@ -4,11 +4,11 @@
 ![maintenance-status](https://img.shields.io/badge/maintenance-actively%20developed-brightgreen)
 [![Rust version: 1.70+](https://img.shields.io/badge/rust%20version-1.70+-orange)][blogpost]
 
-Interprocess communication toolkit for Rust programs. The crate aims to expose as many platform-specific features as
+Interprocess communication toolkit for Rust programs. This crate aims to expose as many platform-specific features as
 possible while maintaining a uniform interface for all platforms.
 
 ## Interprocess communication primitives
-Interprocess provides both OS-specific interfaces for IPC and cross-platform abstractions for them.
+Interprocess provides both OS-specific IPC interfaces and cross-platform abstractions for them.
 
 ##### Cross-platform IPC APIs
 - **Local sockets** – similar to TCP sockets, but use filesystem or namespaced paths instead of ports on
@@ -26,7 +26,7 @@ referred to as "named pipes" but completely different from Windows named pipes
 paths instead of ports on `localhost`, optionally using a spearate namespace on Linux akin to Windows named pipes
 
 ##### Windows-only
-- **Named pipes** – closely resembles Unix domain sockets, uses a separate namespace instead of on-drive paths
+- **Named pipes** – closely resemble Unix domain sockets, use a separate namespace instead of on-drive paths
 
 ## Asynchronous I/O
 Currently, only Tokio for local sockets, Unix domain sockets and Windows named pipes is supported. Support for
@@ -76,8 +76,8 @@ public APIs because they behave here identically to how they do on an OS with a 
 - **`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
 
 ## License
-This crate, along with all community contributions made to it, is dual-licensed under the terms of either the
-[MIT license] or the [Apache 2.0 license].
+This crate, along with all community contributions made to it, is dual-licensed under [MIT] and
+[Apache 2.0].
 
 [MIT license]: https://choosealicense.com/licenses/mit/
 [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
