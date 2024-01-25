@@ -39,24 +39,29 @@
 //!   connection-based named message pipes on Windows does not allow bridging those two into a common API. You can
 //!   emulate datagrams on top of streams anyway, so no big deal, right?
 
+mod listener;
+mod name;
+mod name_type_support;
+mod stream;
+mod to_name;
+pub use {listener::*, name::*, name_type_support::*, stream::*, to_name::*};
+
+/// Asynchronous local sockets which work with the Tokio runtime and event loop.
+///
+/// The Tokio integration allows the local socket streams and listeners to be notified by the OS
+/// kernel whenever they're ready to be read from of written to, instead of spawning threads just to
+/// put them in a wait state of blocking on the I/O.
+///
+/// Types from this module will *not* work with other async runtimes, such as `async-std` or `smol`,
+/// since the Tokio types' methods will panic whenever they're called outside of a Tokio runtime
+/// context. Open an issue if you'd like to see other runtimes supported as well.
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
-pub mod tokio;
-
-mod listener;
-pub use listener::*;
-
-mod stream;
-pub use stream::*;
-
-mod name;
-pub use name::*;
-
-mod name_type_support;
-pub use name_type_support::*;
-
-mod to_name;
-pub use to_name::*;
+pub mod tokio {
+    mod listener;
+    mod stream;
+    pub use {listener::*, stream::*};
+}
 
 // TODO sync split
 // TODO I/O by ref

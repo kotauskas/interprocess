@@ -1,7 +1,5 @@
-use {
-    super::{super::ToLocalSocketName, LocalSocketStream},
-    std::io,
-};
+use super::{super::ToLocalSocketName, LocalSocketStream};
+use std::io;
 
 impmod! {local_socket::tokio,
     LocalSocketListener as LocalSocketListenerImpl
@@ -103,7 +101,8 @@ impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self::from)
     }
-    /// Listens for incoming connections to the socket, asynchronously waiting until a client is connected.
+    /// Listens for incoming connections to the socket, asynchronously waiting until a client is
+    /// connected.
     #[inline]
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
         Ok(LocalSocketStream(self.0.accept().await?))

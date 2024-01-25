@@ -7,8 +7,9 @@ impmod! {local_socket::tokio,
     WriteHalf as WriteHalfImpl,
 }
 
-/// A Tokio-based local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or
-/// by connecting to an existing local socket.
+/// A Tokio-based local socket byte stream, obtained eiter from
+/// [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local
+/// socket.
 ///
 /// # Examples
 ///
@@ -68,8 +69,8 @@ impl LocalSocketStream {
             .await
             .map(Self::from)
     }
-    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently
-    /// from independently spawned tasks, entailing a memory allocation.
+    /// Splits a stream into a read half and a write half, which can be used to read and write the
+    /// stream concurrently from independently spawned tasks, entailing a memory allocation.
     #[inline]
     pub fn split(self) -> (ReadHalf, WriteHalf) {
         let (r, w) = self.0.split();
@@ -100,7 +101,7 @@ multimacro! {
 /// [`LocalSocketStream`](super::LocalSocketStream).
 ///
 /// # Examples
-/// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
+// TODO
 pub struct ReadHalf(pub(super) ReadHalfImpl);
 multimacro! {
     ReadHalf,
@@ -116,8 +117,7 @@ multimacro! {
 /// [`LocalSocketStream`](super::LocalSocketStream).
 ///
 /// # Examples
-/// - [Basic client](https://github.com/kotauskas/interprocess/blob/main/examples/tokio_local_socket/client.rs)
-// TODO remove this GitHub link and others like it
+// TODO
 pub struct WriteHalf(pub(super) WriteHalfImpl);
 multimacro! {
     WriteHalf,
