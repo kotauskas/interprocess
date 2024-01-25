@@ -1,6 +1,5 @@
 use crate::os::windows::{named_pipe::PipeMode, winprelude::*, FileHandle};
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
-use windows::core::imp::BOOL;
 use windows_sys::Win32::{
     Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
     Storage::FileSystem::{
@@ -14,7 +13,7 @@ use windows_sys::Win32::{
 /// Helper for several functions that take a handle and a u32 out-pointer.
 pub(crate) unsafe fn hget(
     handle: BorrowedHandle<'_>,
-    f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
+    f: unsafe extern "system" fn(HANDLE, *mut u32) -> i32,
 ) -> io::Result<u32> {
     let mut x: u32 = 0;
     let ok = unsafe { f(handle.as_int_handle(), &mut x as *mut _) != 0 };
