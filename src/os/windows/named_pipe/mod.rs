@@ -32,7 +32,9 @@
 //! to Windows API system calls. Below is a list of types with significant additional behavior.
 //! - [`PipeStream`] and its async counterpart
 // TODO make plural when introducing async-std
-//!     - Conversion of [`BrokenPipe`](io::ErrorKind::BrokenPipe) reads to EOF (`Ok(0)`)
+//!     - Conversion of [`BrokenPipe`](std::io::ErrorKind::BrokenPipe) reads to EOF (`Ok(0)`) for
+//!       byte streams
+//!         - Additionally, `ERROR_PIPE_NOT_CONNECTED` is converted to `BrokenPipe`
 //!     - Limbo – transparent flush-on-close thread pool to ensure that the peer does not get a
 //!       `BrokenPipe` (EOF if peer also uses Interprocess) immediately after the server is done
 //!       sending data, which would discard everything

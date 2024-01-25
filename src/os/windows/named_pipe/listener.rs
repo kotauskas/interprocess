@@ -141,15 +141,16 @@ pub struct PipeListenerOptions<'a> {
     /// By default, it is disabled.
     ///
     /// There are two ways in which the listener is affected by nonblocking mode:
-    /// - Whenever [`accept`] is called or [`incoming`] is being iterated through, if there is no
+    /// - Whenever [`accept()`] is called or [`incoming()`] is being iterated through, if there is no
     ///   client currently attempting to connect to the named pipe server, the method will return
     ///   immediately with the [`WouldBlock`](io::ErrorKind::WouldBlock) error instead of blocking
     ///   until one arrives.
-    /// - The streams created by [`accept`] and [`incoming`] behave similarly to how client-side
+    /// - The streams created by [`accept()`] and [`incoming()`] behave similarly to how client-side
     ///   streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an
     ///   explanation of the exact effects.
-    /// [`accept`]: PipeListener::accept
-    /// [`incoming`]: PipeListener::incoming
+    ///
+    /// [`accept()`]: PipeListener::accept
+    /// [`incoming()`]: PipeListener::incoming
     pub nonblocking: bool,
     /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many
     /// clients can be communicated with at once. If set to 1, trying to create multiple instances

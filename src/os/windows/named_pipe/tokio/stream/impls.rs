@@ -354,8 +354,8 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
 }
 
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
-    /// Same as `.read()` from [`AsyncReadExt`](::futures::AsyncReadExt), but accepts an uninitialized
-    /// buffer.
+    /// Same as `.read()` from [`AsyncReadExt`](tokio::io::AsyncReadExt), but accepts an
+    /// uninitialized buffer.
     #[inline]
     pub async fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         struct ReadUninit<'a, 'b>(&'a RawPipeStream, &'b mut [MaybeUninit<u8>]);
