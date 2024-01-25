@@ -37,7 +37,7 @@ use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPip
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{prelude::*, try_join};
+/// use tokio::{io::{AsyncReadExt, AsyncWriteExt, BufReader}, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 ///
 /// // Await this here since we can't do a whole lot without a connection.
@@ -57,10 +57,7 @@ use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPip
 /// // an EOF to the other end to help it determine where the message ends.
 /// let write = async {
 ///     writer.write_all(b"Hello from client!").await?;
-///     // Because only the trait from futures is implemented for now, it's "close" instead of
-///     // "shutdown".
-/// #   // TODO Use shutdown here
-///     writer.close().await?;
+///     writer.shutdown().await?;
 ///     Ok(())
 /// };
 ///

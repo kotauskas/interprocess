@@ -77,12 +77,12 @@ use std::{
 ///
 /// ## Basic message stream client
 /// ```no_run
-/// use interprocess::{reliable_recv_msg::*, os::windows::named_pipe::*};
-/// use std::io::{BufReader, prelude::*};
+/// use recvmsg::prelude::*;
+/// use interprocess::os::windows::named_pipe::*;
 ///
 /// // Preemptively allocate a sizeable buffer for reading. Keep in mind that this will depend on
 /// // the specifics of the protocol you're using.
-/// let mut buffer = Vec::<u8>::with_capacity(128);
+/// let mut buffer = MsgBuf::from(Vec::with_capacity(128));
 ///
 /// // Create our connection. This will block until the server accepts our connection, but will fail
 /// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
@@ -98,18 +98,14 @@ use std::{
 ///
 /// // Use the reliable message receive API, which gets us a `RecvResult` from the
 /// // `reliable_recv_msg` module.
-/// let rslt = conn.recv(&mut buffer)?;
-///
-/// // This borrows our message either from the new buffer or from the old one,
-/// // cropped to its size. Note that this is one of `RecvResult`'s helpers.
-/// let received_bytes = rslt.borrow_to_size(&buffer);
+/// conn.recv_msg(&mut buffer, None)?;
 ///
 /// // Convert the data that's been read into a string. This checks for UTF-8
 /// // validity, and if invalid characters are found, a new buffer is
 /// // allocated to house a modified version of the received data, where
 /// // decoding errors are replaced with those diamond-shaped question mark
 /// // U+FFFD REPLACEMENT CHARACTER thingies: �.
-/// let received_string = String::from_utf8_lossy(received_bytes);
+/// let received_string = String::from_utf8_lossy(buffer.filled_part());
 ///
 /// // Print out the result!
 /// println!("Server answered: {received_string}");

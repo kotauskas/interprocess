@@ -32,7 +32,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{prelude::*, try_join};
+/// use tokio::{io::{AsyncReadExt, AsyncWriteExt}, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
 /// use std::{ffi::OsStr, io};
 ///
@@ -51,7 +51,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 ///     // side determine the end of the transmission.
 ///     let write = async {
 ///         writer.write_all(b"Hello from server!").await?;
-///         writer.close().await?;
+///         writer.shutdown().await?;
 ///         Ok(())
 ///     };
 ///
