@@ -1,5 +1,8 @@
 use super::name_to_addr;
-use crate::local_socket::LocalSocketName;
+use crate::{
+    error::{FromHandleError, ReuniteError},
+    local_socket::LocalSocketName,
+};
 use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]
@@ -12,9 +15,19 @@ impl LocalSocketStream {
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
+    #[inline]
     pub fn split(self) -> (ReadHalf, WriteHalf) {
         let arc = Arc::new(self);
         (ReadHalf(Arc::clone(&arc)), WriteHalf(arc))
+    }
+    #[inline]
+    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+        if !Arc::ptr_eq(&rh.0, &sh.0) {
+            return Err(ReuniteError { rh, sh });
+        }
+        let inner = Arc::into_inner(sh.0).unwrap();
+        drop(rh);
+        Ok(Self(inner))
     }
 }
 multimacro! {

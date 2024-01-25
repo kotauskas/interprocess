@@ -43,7 +43,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
     /// returning both halves as an error if they belong to different streams (or when using
-    /// this method on streams that were never split to begin with).
+    /// this method on streams that haven't been split to begin with).
     pub fn reunite(rh: RecvPipeStream<Rm>, sh: SendPipeStream<Sm>) -> ReuniteResult<Rm, Sm> {
         if !MaybeArc::ptr_eq(&rh.raw, &sh.raw) {
             return Err(ReuniteError { rh, sh });

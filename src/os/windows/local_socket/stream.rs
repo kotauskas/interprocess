@@ -1,5 +1,5 @@
 use crate::{
-    error::FromHandleError,
+    error::{FromHandleError, ReuniteError},
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
 };
@@ -25,6 +25,15 @@ impl LocalSocketStream {
     pub fn split(self) -> (ReadHalf, WriteHalf) {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
+    }
+    #[inline]
+    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+        StreamImpl::reunite(rh.0, sh.0)
+            .map(Self)
+            .map_err(|ReuniteError { rh, sh }| ReuniteError {
+                rh: ReadHalf(rh),
+                sh: WriteHalf(sh),
+            })
     }
 }
 

@@ -1,11 +1,9 @@
-// TODO reunite
-
 use crate::{
     error::{FromHandleError, ReuniteError},
     local_socket::ToLocalSocketName,
     os::windows::named_pipe::{
         pipe_mode::Bytes,
-        tokio::{DuplexPipeStream, RecvPipeStream, ReuniteError as InnerReuniteError, SendPipeStream},
+        tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
     },
 };
 use std::{io, os::windows::prelude::*};
@@ -29,13 +27,12 @@ impl LocalSocketStream {
     }
     #[inline]
     pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
-        match LocalSocketStreamImpl::reunite(rh.0, sh.0) {
-            Ok(inner) => Ok(Self(inner)),
-            Err(InnerReuniteError { rh, sh }) => Err(ReuniteError {
+        LocalSocketStreamImpl::reunite(rh.0, sh.0)
+            .map(Self)
+            .map_err(|ReuniteError { rh, sh }| ReuniteError {
                 rh: ReadHalf(rh),
                 sh: WriteHalf(sh),
-            }),
-        }
+            })
     }
 }
 

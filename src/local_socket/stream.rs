@@ -65,23 +65,34 @@ impl LocalSocketStream {
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
     /// In nonblocking mode, reading and writing will immediately return with the
-    /// [`WouldBlock`](io::ErrorKind::WouldBlock) error in situations when they would normally block for an uncontrolled
-    /// amount of time. The specific situations are:
-    /// - When reading is attempted and there is no new data available;
-    /// - When writing is attempted and the buffer is full due to the other side not yet having read previously sent
-    /// data.
+    /// [`WouldBlock`](io::ErrorKind::WouldBlock) error in situations when they would normally block
+    /// for an uncontrolled amount of time. The specific situations are:
+    /// - When receiving is attempted and there is no new data available;
+    /// - When sending is attempted and the buffer is full due to the other side not yet having read
+    ///   previously sent data.
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
-    /// Splits a stream into a read half and a write half, which can be used to read and write the stream concurrently
-    /// from independently spawned tasks, entailing a memory allocation.
+    /// Splits a stream into a read half and a write half, which can be used to read and write the
+    /// stream concurrently from different threads, entailing a memory allocation.
     #[inline]
     pub fn split(self) -> (ReadHalf, WriteHalf) {
         let (r, w) = self.0.split();
         (ReadHalf(r), WriteHalf(w))
     }
-    // TODO reunite
+    /// Attempts to reunite a receive half with a send half to yield the original stream back,
+    /// returning both halves as an error if they belong to different streams (or when using
+    /// this method on streams that haven't been split to begin with).
+    #[inline]
+    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> ReuniteResult {
+        LocalSocketStreamImpl::reunite(rh.0, sh.0)
+            .map(Self)
+            .map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+                rh: ReadHalf(rh),
+                sh: WriteHalf(sh),
+            })
+    }
 }
 multimacro! {
     LocalSocketStream,

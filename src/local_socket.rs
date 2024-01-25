@@ -63,6 +63,4 @@ pub mod tokio {
     pub use {listener::*, stream::*};
 }
 
-// TODO sync split
-// TODO I/O by ref
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
