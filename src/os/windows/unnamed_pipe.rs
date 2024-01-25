@@ -1,8 +1,7 @@
 //! Platform-specific functionality for unnamed pipes.
 //!
-//! Currently, this consists of only the [`UnnamedPipeCreationOptions`] builder, but more might be added.
-//!
-//! [`UnnamedPipeCreationOptions`]: struct.UnnamedPipeCreationOptions.html " "
+//! Currently, this consists of only the [`UnnamedPipeCreationOptions`] builder, but more might be
+//! added.
 
 // TODO add examples
 
@@ -22,24 +21,25 @@ use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePip
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///
-/// You can use this instead of the simple [`pipe` function](crate::unnamed_pipe::pipe) to supply additional
-/// Windows-specific parameters to a pipe.
+/// You can use this instead of the simple [`pipe` function](crate::unnamed_pipe::pipe) to supply
+/// additional Windows-specific parameters to a pipe.
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
 pub struct UnnamedPipeCreationOptions {
     /// Specifies whether the resulting pipe can be inherited by child processes.
     ///
-    /// The default value is `false` and you probably shouldn't modify this, unless you want all child processes to
-    /// explicitly be able to use the pipe using various fishy methods to find the handle in the parent process.
+    /// The default value is `false` and you probably shouldn't modify this, unless you want all
+    /// child processes to explicitly be able to use the pipe using various fishy methods to find
+    /// the handle in the parent process.
     pub inheritable: bool,
-    /// A pointer to the [security descriptor] for the pipe. Leave this at the default `NULL` unless you want something
-    /// specific.
+    /// A pointer to the [security descriptor] for the pipe. Leave this at the default `NULL` unless
+    /// you want something specific.
     ///
-    /// [security descriptor]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-security_descriptor " "
+    /// [security descriptor]: https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-security_descriptor
     pub security_descriptor: *mut c_void,
-    /// A hint on the buffer size for the pipe. There is no way to ensure or check that the system actually uses this
-    /// exact size, since it's only a hint. Set to `None` to disable the hint and rely entirely on the system's default
-    /// buffer size.
+    /// A hint on the buffer size for the pipe. There is no way to ensure or check that the system
+    /// actually uses this exact size, since it's only a hint. Set to `None` to disable the hint and
+    /// rely entirely on the system's default buffer size.
     pub buffer_size_hint: Option<NonZeroUsize>,
 }
 impl UnnamedPipeCreationOptions {
@@ -53,9 +53,7 @@ impl UnnamedPipeCreationOptions {
     }
     /// Specifies whether the resulting pipe can be inherited by child processes.
     ///
-    /// See the [associated field] for more.
-    ///
-    /// [associated field]: #structfield.inheritable " "
+    /// See the [associated field](#structfield.inheritable) for more.
     #[must_use = "this is not an in-place operation"]
     pub fn inheritable(mut self, inheritable: bool) -> Self {
         self.inheritable = inheritable;
@@ -63,9 +61,7 @@ impl UnnamedPipeCreationOptions {
     }
     /// Specifies the pointer to the security descriptor for the pipe.
     ///
-    /// See the [associated field] for more.
-    ///
-    /// [associated field]: #structfield.security_descriptor " "
+    /// See the [associated field](#structfield.security_descriptor) for more.
     #[must_use = "this is not an in-place operation"]
     pub fn security_descriptor(mut self, security_descriptor: *mut c_void) -> Self {
         self.security_descriptor = security_descriptor;
@@ -73,17 +69,15 @@ impl UnnamedPipeCreationOptions {
     }
     /// Specifies the hint on the buffer size for the pipe.
     ///
-    /// See the [associated field] for more.
-    ///
-    /// [associated field]: #structfield.buffer_size_hint " "
+    /// See the [associated field](#structfield.buffer_size_hint) for more.
     #[must_use = "this is not an in-place operation"]
     pub fn buffer_size_hint(mut self, buffer_size_hint: Option<NonZeroUsize>) -> Self {
         self.buffer_size_hint = buffer_size_hint;
         self
     }
 
-    /// Extracts the [`SECURITY_ATTRIBUTES`][sa] from the builder. Primarily an implementation detail, but has other
-    /// uses.
+    /// Extracts the [`SECURITY_ATTRIBUTES`][sa] from the builder. Primarily an implementation
+    /// detail, but has other uses.
     ///
     /// [sa]: https://learn.microsoft.com/en-us/windows/win32/api/wtypesbase/ns-wtypesbase-security_attributes
     pub fn extract_security_attributes(self) -> SECURITY_ATTRIBUTES {
@@ -93,11 +87,12 @@ impl UnnamedPipeCreationOptions {
         attrs
     }
 
-    /// Creates the pipe and returns its writing and reading ends, or the error if one occurred.
+    /// Creates the pipe and returns its writing and reading ends, or the error if one
+    /// occurred.
     ///
-    /// This will fail if the [`security_descriptor`](Self.security_descriptor) field is non-null. See
-    /// [`.build_with_security_descriptor()`](Self::build_with_security_descriptor) for an unsafe version that allows
-    /// the pointer to be passed.
+    /// This will fail if the [`security_descriptor`](Self.security_descriptor) field is non-null.
+    /// See [`.build_with_security_descriptor()`](Self::build_with_security_descriptor) for an
+    /// unsafe version that allows the pointer to be passed.
     pub fn build(self) -> io::Result<(PubWriter, PubReader)> {
         if !self.security_descriptor.is_null() {
             return Err(io::Error::new(
@@ -111,13 +106,13 @@ impl UnnamedPipeCreationOptions {
         }
     }
 
-    /// Creates the pipe and returns its writing and reading ends, or the error if one occurred. Allows for a security
-    /// descriptor pointer to be passed.
+    /// Creates the pipe and returns its writing and reading ends, or the error if one occurred.
+    /// Allows for a security descriptor pointer to be passed.
     ///
     /// # Safety
-    /// The [`security_descriptor`](Self.security_descriptor) field is passed directly to Win32 which is then
-    /// dereferenced there, resulting in undefined behavior if it was an invalid non-null pointer. For the default
-    /// configuration, this should never be a concern.
+    /// The [`security_descriptor`](Self.security_descriptor) field is passed directly to Win32
+    /// which is then dereferenced there, resulting in undefined behavior if it was an invalid
+    /// non-null pointer. For the default configuration, this should never be a concern.
     pub unsafe fn build_with_security_descriptor(self) -> io::Result<(PubWriter, PubReader)> {
         let hint_raw = match self.buffer_size_hint {
             Some(num) => num.get(),

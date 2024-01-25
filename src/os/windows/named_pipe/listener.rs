@@ -85,14 +85,12 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     /// Enables or disables the nonblocking mode for all existing instances of the listener and
     /// future ones. By default, it is disabled.
     ///
-    /// This should ideally be done during creation, using the [`nonblocking` field] of the creation
-    /// options, unless there's a good reason not to. This allows making one less system call during
-    /// creation.
+    /// This should generally be done during creation, using the
+    /// [`nonblocking` field](PipeListenerOptions::nonblocking) of the creation options (unless
+    /// there's a good reason not to), which allows making one less system call during creation.
     ///
     /// See the documentation of the aforementioned field for the exact effects of enabling this
     /// mode.
-    ///
-    /// [`nonblocking` field]: struct.PipeListenerOptions.html#structfield.nonblocking " "
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let instance = self.stored_instance.lock().expect("unexpected lock poison");
         // Doesn't actually even need to be atomic to begin with, but it's simpler and more
@@ -141,8 +139,8 @@ pub struct PipeListenerOptions<'a> {
     /// By default, it is disabled.
     ///
     /// There are two ways in which the listener is affected by nonblocking mode:
-    /// - Whenever [`accept()`] is called or [`incoming()`] is being iterated through, if there is no
-    ///   client currently attempting to connect to the named pipe server, the method will return
+    /// - Whenever [`accept()`] is called or [`incoming()`] is being iterated through, if there is
+    ///   no client currently attempting to connect to the named pipe server, the method will return
     ///   immediately with the [`WouldBlock`](io::ErrorKind::WouldBlock) error instead of blocking
     ///   until one arrives.
     /// - The streams created by [`accept()`] and [`incoming()`] behave similarly to how client-side

@@ -79,7 +79,6 @@
 //! [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
 //! [blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
 // TODO mailslots
-// TODO the Intra Doc Link Sweep
 // TODO add OS-specific ext-traits
 // TODO un-mod.rs
 // TODO make doctests not no_run

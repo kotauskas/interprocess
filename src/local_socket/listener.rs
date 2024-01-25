@@ -108,33 +108,30 @@ impl LocalSocketListener {
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///
-    /// See [`incoming`] for a convenient way to create a main loop for a server.
-    ///
-    /// [`incoming`]: #method.incoming " "
+    /// See [`.incoming()`](Self::incoming) for a convenient way to create a main loop for a server.
     #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         self.0.accept().map(LocalSocketStream)
     }
-    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to
-    /// conveniently create a main loop for a socket server.
+    /// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
+    /// Used together with `for` loops to conveniently create a main loop for a socket server.
     #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
     /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
     ///
-    /// In nonblocking mode, calling [`accept`] and iterating through [`incoming`] will immediately return a
-    /// [`WouldBlock`] error if there is no client attempting to connect at the moment instead of blocking until one
-    /// arrives.
+    /// In nonblocking mode, calling [`.accept()`] and iterating through [`.incoming()`] will
+    /// immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error if there is no client
+    /// attempting to connect at the moment instead of blocking until one arrives.
     ///
     /// # Platform-specific behavior
     /// ## Windows
-    /// The nonblocking mode will be also be set for the streams produced by [`accept`] and [`incoming`], both existing
-    /// and new ones.
+    /// The nonblocking mode will be also be set for the streams produced by [`.accept()`] and
+    /// [`.incoming()`], both existing and new ones.
     ///
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
-    /// [`accept`]: #method.accept " "
-    /// [`incoming`]: #method.incoming " "
+    /// [`.accept()`]: Self::accept
+    /// [`.incoming()`]: Self::incoming
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
@@ -151,10 +148,8 @@ multimacro! {
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
 ///
-/// This iterator is created by the [`incoming`] method on [`LocalSocketListener`] – see its documentation for more.
-///
-/// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
-/// [`incoming`]: struct.LocalSocketListener.html#method.incoming " "
+/// This iterator is created by the [`incoming()`](LocalSocketListener::incoming) method on
+/// [`LocalSocketListener`] – see its documentation for more.
 #[derive(Debug)]
 pub struct Incoming<'a> {
     listener: &'a LocalSocketListener,
