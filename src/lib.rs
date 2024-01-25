@@ -113,68 +113,27 @@ pub mod unnamed_pipe;
 //pub mod shared_memory;
 
 pub mod error;
-pub mod os;
-
-mod sealed;
-pub(crate) use sealed::Sealed;
 
 mod try_clone;
 pub use try_clone::*;
 
-trait DebugExpectExt: Sized {
-    fn debug_expect(self, msg: &str);
-}
-impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
-    #[inline]
-    #[track_caller]
-    fn debug_expect(self, msg: &str) {
-        if cfg!(debug_assertions) {
-            self.expect(msg);
-        }
-    }
-}
-impl<T> DebugExpectExt for Option<T> {
-    #[inline]
-    #[track_caller]
-    fn debug_expect(self, msg: &str) {
-        if cfg!(debug_assertions) {
-            self.expect(msg);
-        }
-    }
-}
+mod misc;
+pub(crate) use misc::*;
 
-use std::mem::{transmute, MaybeUninit};
-#[inline(always)]
-#[allow(dead_code)]
-fn weaken_buf_init<T>(r: &[T]) -> &[MaybeUninit<T>] {
-    unsafe {
-        // SAFETY: same slice, weaker refinement
-        transmute(r)
-    }
+/// Platform-specific functionality for various interprocess communication primitives.
+///
+/// This module houses two modules: `unix` and `windows`, although only one at a time will be
+/// visible, depending on which platform the documentation was built on. If you're using
+/// [Docs.rs](https://docs.rs/interprocess/latest/interprocess), you can view the documentation for
+/// Windows, macOS, Linux and FreeBSD using the Platform menu on the Docs.rs-specific header bar at
+/// the top of the page. Docs.rs builds also have the nightly-only `doc_cfg` feature enabled by
+/// default, with which everything platform-specific has a badge next to it which specifies the
+/// `cfg(...)` conditions for that item to be available.
+pub mod os {
+    #[cfg(unix)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+    pub mod unix;
+    #[cfg(windows)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
+    pub mod windows;
 }
-#[inline(always)]
-#[allow(dead_code)]
-fn weaken_buf_init_mut<T>(r: &mut [T]) -> &mut [MaybeUninit<T>] {
-    unsafe {
-        // SAFETY: same here
-        transmute(r)
-    }
-}
-
-#[inline(always)]
-#[allow(dead_code)]
-unsafe fn assume_slice_init<T>(r: &[MaybeUninit<T>]) -> &[T] {
-    unsafe {
-        // SAFETY: same slice, stronger refinement
-        transmute(r)
-    }
-}
-
-// TODO use this everywhere
-trait UnpinExt: Unpin {
-    #[inline]
-    fn pin(&mut self) -> std::pin::Pin<&mut Self> {
-        std::pin::Pin::new(self)
-    }
-}
-impl<T: Unpin + ?Sized> UnpinExt for T {}
