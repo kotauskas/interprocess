@@ -5,9 +5,9 @@ use color_eyre::eyre::{bail, ensure};
 use interprocess::local_socket::tokio::LocalSocketStream;
 use std::io;
 
-pub async fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
+pub async fn run_and_verify_error(namespaced: bool) -> TestResult {
     use io::ErrorKind::*;
-    let err = match client(prefer_namespaced).await {
+    let err = match client(namespaced).await {
         Err(e) => e,
         Ok(()) => bail!("client successfully connected to nonexistent server"),
     };
@@ -18,8 +18,8 @@ pub async fn run_and_verify_error(prefer_namespaced: bool) -> TestResult {
     );
     Ok(())
 }
-async fn client(prefer_namespaced: bool) -> io::Result<()> {
-    let nm = NameGen::new_auto(make_id!(), prefer_namespaced).next().unwrap();
+async fn client(namespaced: bool) -> io::Result<()> {
+    let nm = NameGen::new(make_id!(), namespaced).next().unwrap();
     LocalSocketStream::connect(&*nm).await?;
     Ok(())
 }

@@ -12,8 +12,8 @@ fn msg(server: bool, nts: bool) -> Box<str> {
     message(None, server, Some(['\n', '\0'][nts as usize]))
 }
 
-pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut NameGen::new_auto(make_id!(), prefer_namespaced), |nm| {
+pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced: bool) -> TestResult {
+    let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), namespaced), |nm| {
         LocalSocketListener::bind(nm)
     })?;
 

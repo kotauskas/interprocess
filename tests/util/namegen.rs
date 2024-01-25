@@ -1,5 +1,4 @@
 use super::Xorshift32;
-use interprocess::local_socket::NameTypeSupport;
 use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug)]
@@ -13,19 +12,6 @@ impl NameGen {
             rng: Xorshift32::from_id(id),
             namespaced,
         }
-    }
-    /// Automatically chooses name type based on OS support and preference.
-    // TODO get rid of the preference thing
-    pub fn new_auto(id: &'static str, prefer_namespaced: bool) -> Self {
-        let namespaced = {
-            use NameTypeSupport::*;
-            let nts = NameTypeSupport::query();
-            match (nts, prefer_namespaced) {
-                (OnlyPaths, _) | (Both, false) => false,
-                (OnlyNamespaced, _) | (Both, true) => true,
-            }
-        };
-        Self::new(id, namespaced)
     }
     fn next_path(&mut self) -> Arc<str> {
         format!("/tmp/interprocess-test-{:08x}.sock", self.rng.next()).into()
