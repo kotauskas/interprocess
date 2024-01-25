@@ -9,7 +9,7 @@ use super::{
 use crate::{
     os::windows::{
         c_wrappers, decode_eof,
-        named_pipe::{needs_flush::NeedsFlushVal, path_conversion, set_nonblocking_for_stream, PipeMode},
+        named_pipe::{needs_flush::NeedsFlushVal, path_conversion, PipeMode},
         FileHandle,
     },
     weaken_buf_init_mut, TryClone,
@@ -27,7 +27,7 @@ use winapi::{
     shared::winerror::ERROR_MORE_DATA,
     um::winbase::{
         GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
-        GetNamedPipeServerSessionId,
+        GetNamedPipeServerSessionId, PIPE_READMODE_MESSAGE,
     },
 };
 
@@ -68,9 +68,17 @@ impl RawPipeStream {
         }
     }
 
-    fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
+    fn connect(
+        pipename: &OsStr,
+        hostname: Option<&OsStr>,
+        read: Option<PipeMode>,
+        write: Option<PipeMode>,
+    ) -> io::Result<Self> {
         let path = path_conversion::convert_and_encode_path(pipename, hostname);
         let handle = _connect(&path, read, write, WaitTimeout::DEFAULT)?;
+        if read == Some(PipeMode::Messages) {
+            set_named_pipe_handle_state(handle.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
+        }
         Ok(Self::new_client(handle))
     }
 
@@ -125,6 +133,7 @@ impl RawPipeStream {
         buf.set_fill(0);
         buf.has_msg = false;
         let mut more_data = true;
+        let mut partial = false;
         let mut spilled = false;
         let fh = self.file_handle();
 
@@ -155,6 +164,7 @@ impl RawPipeStream {
                 Ok(incr) => incr,
                 Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
                     more_data = true;
+                    partial = true;
                     slice.len()
                 }
                 Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
@@ -162,7 +172,7 @@ impl RawPipeStream {
                     return Ok(RecvResult::EndOfStream);
                 }
                 Err(e) => {
-                    if more_data && discard {
+                    if partial && discard {
                         // This is irrelevant to normal operation of downstream
                         // programs, but still makes them easier to debug.
                         let _ = self.discard_msg();
@@ -182,10 +192,6 @@ impl RawPipeStream {
     #[inline]
     fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
         self.recv_msg_impl(buf, true)
-    }
-
-    fn set_nonblocking(&self, readmode: Option<PipeMode>, nonblocking: bool) -> io::Result<()> {
-        unsafe { set_nonblocking_for_stream(self.as_handle(), readmode, nonblocking) }
     }
 
     fn fill_fields<'a, 'b, 'c>(
@@ -261,18 +267,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), blocking until a server
     /// instance is dispatched.
     pub fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some())?;
+        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE, Sm::MODE)?;
         Ok(Self::new(raw))
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added
     /// automatically), blocking until a server instance is dispatched.
     pub fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(
-            pipename.as_ref(),
-            Some(hostname.as_ref()),
-            Rm::MODE.is_some(),
-            Sm::MODE.is_some(),
-        )?;
+        let raw = RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE)?;
         Ok(Self::new(raw))
     }
     /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
@@ -352,7 +353,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// [`set_nonblocking`]: super::super::PipeListener::set_nonblocking
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.raw.set_nonblocking(Rm::MODE, nonblocking)
+        super::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong

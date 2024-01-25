@@ -69,27 +69,3 @@ use {atomic_enum::*, maybe_arc::*, needs_flush::*};
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
-
-use super::winprelude::*;
-use std::{io, ptr};
-use winapi::um::namedpipeapi::SetNamedPipeHandleState;
-
-unsafe fn set_nonblocking_for_stream(
-    handle: BorrowedHandle<'_>,
-    read_mode: Option<PipeMode>,
-    nonblocking: bool,
-) -> io::Result<()> {
-    let read_mode: u32 = read_mode.map_or(0, PipeMode::to_readmode);
-    // Bitcast the boolean without additional transformations since
-    // the flag is in the first bit.
-    let mut mode: u32 = read_mode | nonblocking as u32;
-    let success = unsafe {
-        SetNamedPipeHandleState(
-            handle.as_raw_handle(),
-            &mut mode as *mut _,
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    } != 0;
-    ok_or_ret_errno!(success => ())
-}

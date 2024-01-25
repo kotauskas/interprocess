@@ -103,9 +103,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
         // Doesn't actually even need to be atomic to begin with, but it's simpler and more
         // convenient to do this instead. The mutex takes care of ordering.
         self.nonblocking.store(nonblocking, Relaxed);
-        unsafe {
-            super::set_nonblocking_for_stream(instance.as_handle(), Rm::MODE, nonblocking)?;
-        }
+        super::set_nonblocking_given_readmode(instance.as_handle(), nonblocking, Rm::MODE)?;
         // Make it clear that the lock survives until this moment.
         drop(instance);
         Ok(())

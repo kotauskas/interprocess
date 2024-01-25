@@ -6,23 +6,22 @@ use super::{
 };
 use crate::{
     os::windows::{
-        decode_eof, downgrade_poll_eof,
+        downgrade_poll_eof,
         named_pipe::{
-            path_conversion,
+            connect_without_waiting, path_conversion,
             stream::{block_for_server, has_msg_boundaries_from_sys, hget, is_server_from_sys, WaitTimeout},
-            MaybeArc, NeedsFlushVal, PipeMode, PmtNotNone, DISCARD_BUF_SIZE, LIMBO_ERR, REBURY_ERR,
+            MaybeArc, NeedsFlushVal, PipeMode, PmtNotNone, LIMBO_ERR, REBURY_ERR,
         },
         winprelude::*,
         FileHandle,
     },
     UnpinExt,
 };
-use recvmsg::{prelude::*, NoAddrBuf, RecvResult};
 use std::{
     ffi::OsStr,
     fmt::{self, Debug, DebugStruct, Formatter},
     future::{self, Future},
-    mem::{replace, ManuallyDrop, MaybeUninit},
+    mem::{ManuallyDrop, MaybeUninit},
     pin::Pin,
     sync::MutexGuard,
     task::{ready, Context, Poll},
@@ -31,12 +30,8 @@ use tokio::{
     io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
 };
-use winapi::{
-    shared::winerror::ERROR_MORE_DATA,
-    um::winbase::{
-        GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
-        GetNamedPipeServerSessionId,
-    },
+use winapi::um::winbase::{
+    GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
 };
 
 macro_rules! same_clsrv {
@@ -58,7 +53,7 @@ impl RawPipeStream {
         Self {
             inner: Some(inner),
             needs_flush: NeedsFlush::from(NeedsFlushVal::No),
-            recv_msg_state: Mutex::new(RecvMsgState::NotRecving),
+            //recv_msg_state: Mutex::new(RecvMsgState::NotRecving),
         }
     }
     pub(crate) fn new_server(server: TokioNPServer) -> Self {
@@ -84,22 +79,30 @@ impl RawPipeStream {
         .await
         .expect("waiting for server panicked")
     }
-    async fn connect(pipename: &OsStr, hostname: Option<&OsStr>, read: bool, write: bool) -> io::Result<Self> {
-        let path = path_conversion::convert_path(pipename, hostname);
-        let mut path16 = None::<Vec<u16>>;
+    async fn connect(
+        pipename: &OsStr,
+        hostname: Option<&OsStr>,
+        read: Option<PipeMode>,
+        write: Option<PipeMode>,
+    ) -> io::Result<Self> {
+        // FIXME should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
+
+        let mut path = Some(path_conversion::convert_and_encode_path(pipename, hostname));
         let client = loop {
-            match _connect(&path, read, write) {
+            match connect_without_waiting(path.as_ref().unwrap(), read, write, true) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    let p16_take = match path16.take() {
-                        Some(p) => p,
-                        None => path_conversion::encode_to_utf16(&path),
-                    };
-                    let p16_take = Self::wait_for_server(p16_take).await?;
-                    path16 = Some(p16_take);
+                    let path_take = Self::wait_for_server(path.take().unwrap()).await?;
+                    path = Some(path_take);
                 }
                 not_waiting => break not_waiting?,
             }
         };
+        let client = unsafe { TokioNPClient::from_raw_handle(client.0.into_raw_handle())? };
+        /* MESSAGE READING DISABLED
+        if read == Some(PipeMode::Messages) {
+            set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
+        }
+        */
         Ok(Self::new_client(client))
     }
 
@@ -133,11 +136,13 @@ impl RawPipeStream {
         }
     }
 
+    /* MESSAGE READING DISABLED
     fn poll_discard_msg(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         Poll::Ready(loop {
-            match ready!(self.poll_read_uninit(cx, &mut buf)) {
+            match decode_eof(ready!(self.poll_read_uninit(cx, &mut buf))) {
                 Ok(..) => break Ok(()),
+                Err(e) if e.kind() == io::ErrorKind::BrokenPipe => break Ok(()),
                 Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {}
                 Err(e) => break Err(e),
             }
@@ -152,17 +157,32 @@ impl RawPipeStream {
         buf: &mut MsgBuf<'_>,
         lock: Option<MutexGuard<'_, RecvMsgState>>,
     ) -> Poll<io::Result<RecvResult>> {
-        // FIXME this stupid shit isn't reentrant; recursing on discard is gonna ruin everything
+        let mut mode = 0;
+        match decode_eof(get_named_pipe_handle_state(
+            self.as_handle(),
+            Some(&mut mode),
+            None,
+            None,
+            None,
+            None,
+        )) {
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => return Poll::Ready(Ok(RecvResult::EndOfStream)),
+            els => els,
+        }?;
+        eprintln!("DBG mode {:#x}", mode);
         let mut state = lock.unwrap_or_else(|| self.recv_msg_state.lock().unwrap());
 
         match &mut *state {
             RecvMsgState::NotRecving => {
                 buf.set_fill(0);
                 buf.has_msg = false;
-                *state = RecvMsgState::Looping { spilled: false };
+                *state = RecvMsgState::Looping {
+                    spilled: false,
+                    partial: false,
+                };
                 self.poll_recv_msg(cx, buf, Some(state))
             }
-            RecvMsgState::Looping { spilled } => {
+            RecvMsgState::Looping { spilled, partial } => {
                 let mut more_data = true;
                 while more_data {
                     let slice = buf.unfilled_part();
@@ -171,39 +191,44 @@ impl RawPipeStream {
                             Ok(()) => {
                                 *spilled = true;
                                 debug_assert!(!buf.unfilled_part().is_empty());
-                                continue;
                             }
                             Err(e) => {
+                                let qer = Ok(RecvResult::QuotaExceeded(e));
                                 if more_data {
                                     // A partially successful partial read must result in the rest of the
                                     // message being discarded.
-                                    *state = RecvMsgState::Discarding {
-                                        result: Ok(RecvResult::QuotaExceeded(e)),
-                                    };
+                                    *state = RecvMsgState::Discarding { result: qer };
                                     return self.poll_recv_msg(cx, buf, Some(state));
+                                } else {
+                                    *state = RecvMsgState::NotRecving;
+                                    return Poll::Ready(qer);
                                 }
                             }
                         }
                         continue;
                     }
 
-                    let rslt = ready!(self.poll_read_uninit(cx, slice));
-
+                    let mut rslt = ready!(self.poll_read_uninit(cx, slice));
                     more_data = false;
-                    let incr = match decode_eof(rslt) {
-                        // FIXME Mio does the broken pipe thunking (this is a bug that breaks
+
+                    if matches!(&rslt, Ok(0)) {
+                        // FIXME Mio sometimes does broken pipe thunking (this is a bug that breaks
                         // zero-sized messages)
-                        Ok(0) => {
-                            buf.set_fill(0);
-                            return Poll::Ready(Ok(RecvResult::EndOfStream));
-                        }
+                        rslt = Err(io::Error::from(io::ErrorKind::BrokenPipe));
+                    }
+                    let incr = match decode_eof(rslt) {
                         Ok(incr) => incr,
                         Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
                             more_data = true;
+                            *partial = true;
                             slice.len()
                         }
+                        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+                            buf.set_fill(0);
+                            return Poll::Ready(Ok(RecvResult::EndOfStream));
+                        }
                         Err(e) => {
-                            return if more_data {
+                            return if *partial {
                                 // This is irrelevant to normal operation of downstream
                                 // programs, but still makes them easier to debug.
                                 *state = RecvMsgState::Discarding { result: Err(e) };
@@ -231,6 +256,7 @@ impl RawPipeStream {
             }
         }
     }
+    */
 
     fn fill_fields<'a, 'b, 'c>(
         &self,
@@ -348,19 +374,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically), waiting until a server
     /// instance is dispatched.
     pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE.is_some(), Sm::MODE.is_some()).await?;
+        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE, Sm::MODE).await?;
         Ok(Self::new(raw))
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix is added
     /// automatically), blocking until a server instance is dispatched.
     pub async fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(
-            pipename.as_ref(),
-            Some(hostname.as_ref()),
-            Rm::MODE.is_some(),
-            Sm::MODE.is_some(),
-        )
-        .await?;
+        let raw = RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE).await?;
         Ok(Self::new(raw))
     }
     /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
@@ -548,6 +568,7 @@ impl<Rm: PipeModeTag> TokioAsyncWrite for PipeStream<Rm, pipe_mode::Bytes> {
     }
 }
 
+/* MESSAGE READING DISABLED
 impl<Sm: PipeModeTag> AsyncRecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;
@@ -574,6 +595,7 @@ impl<Sm: PipeModeTag> AsyncRecvMsg for PipeStream<pipe_mode::Messages, Sm> {
         AsyncRecvMsg::poll_recv_msg((&mut &*self).pin(), cx, buf, None)
     }
 }
+*/
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

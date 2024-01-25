@@ -106,14 +106,22 @@ pub fn client_stc(name: &str) -> TestResult {
 fn recv(conn: &mut RecvPipeStream<pipe_mode::Messages>, exp: impl AsRef<str>, nr: u8) -> TestResult {
     let fs = ["first", "second"][nr as usize];
     let exp_ = exp.as_ref();
-    let mut buf = MsgBuf::from(Vec::with_capacity(exp_.len() - 2));
+    let mut len = exp_.len();
+    if nr == 2 {
+        len -= 1; // tests spill
+    }
+    let mut buf = MsgBuf::from(Vec::with_capacity(len));
 
     let rslt = conn
         .recv_msg(&mut buf, None)
         .with_context(|| format!("{} receive failed", fs))?;
 
-    ensure!(matches!(rslt, RecvResult::Fit));
     ensure_eq!(futf8(buf.filled_part())?, exp_);
+    if nr == 2 {
+        ensure!(matches!(rslt, RecvResult::Spilled));
+    } else {
+        ensure!(matches!(rslt, RecvResult::Fit));
+    }
     Ok(())
 }
 

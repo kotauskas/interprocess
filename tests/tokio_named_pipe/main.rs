@@ -4,7 +4,6 @@
 mod util;
 
 mod bytes;
-mod msg;
 
 use color_eyre::eyre::Context;
 use interprocess::os::windows::named_pipe::PipeListenerOptions;
@@ -28,26 +27,6 @@ async fn tokio_named_pipe_bytes_unidir_client_to_server() -> TestResult {
 #[tokio::test]
 async fn tokio_named_pipe_bytes_unidir_server_to_client() -> TestResult {
     use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_stc, client_stc).await
-}
-
-#[tokio::test]
-async fn tokio_named_pipe_msg_bidir() -> TestResult {
-    use msg::*;
-    testinit();
-    drive_server_and_multiple_clients(server_duplex, client_duplex).await
-}
-
-#[tokio::test]
-async fn tokio_named_pipe_msg_unidir_client_to_server() -> TestResult {
-    use msg::*;
-    testinit();
-    drive_server_and_multiple_clients(server_cts, client_cts).await
-}
-#[tokio::test]
-async fn tokio_named_pipe_msg_unidir_server_to_client() -> TestResult {
-    use msg::*;
     testinit();
     drive_server_and_multiple_clients(server_stc, client_stc).await
 }

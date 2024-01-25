@@ -1,15 +1,14 @@
+// TODO message reading disabled due to a lack of support in Mio; we should try to figure something
+// out, they need to add first-class message pipe support and handling of ERROR_MORE_DATA
 mod impls;
 mod limbo;
-mod wrapper_fns;
-use recvmsg::RecvResult;
-pub(crate) use wrapper_fns::*;
 
 use crate::{
     error::ConversionError,
     os::windows::{
         named_pipe::{
             stream::{pipe_mode, PipeModeTag},
-            MaybeArc, NeedsFlush, ReprU8,
+            MaybeArc, NeedsFlush,
         },
         winprelude::*,
     },
@@ -99,16 +98,18 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
     inner: Option<InnerTokio>,
+    // TODO crackhead specialization
     // Cleared by the generic pipes rather than the raw pipe stream unlike in sync land.
     needs_flush: NeedsFlush,
-    // TODO crackhead specialization
-    recv_msg_state: Mutex<RecvMsgState>,
+    // MESSAGE READING DISABLED
+    //recv_msg_state: Mutex<RecvMsgState>,
 }
 enum InnerTokio {
     Server(TokioNPServer),
     Client(TokioNPClient),
 }
 
+/* MESSAGE READING DISABLED
 #[derive(Debug, Default)]
 #[repr(u8)]
 enum RecvMsgState {
@@ -116,12 +117,14 @@ enum RecvMsgState {
     NotRecving,
     Looping {
         spilled: bool,
+        partial: bool,
     },
     Discarding {
         result: io::Result<RecvResult>,
     },
 }
 unsafe impl ReprU8 for RecvMsgState {}
+*/
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
 ///
