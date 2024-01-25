@@ -3,7 +3,7 @@ use crate::os::windows::named_pipe::path_conversion;
 use windows_sys::Win32::{Foundation::ERROR_PIPE_BUSY, System::Pipes::PIPE_READMODE_MESSAGE};
 
 impl RawPipeStream {
-    pub(crate) fn new(handle: FileHandle, is_server: bool) -> Self {
+    pub(super) fn new(handle: FileHandle, is_server: bool) -> Self {
         Self {
             handle: Some(handle),
             is_server,
@@ -13,7 +13,7 @@ impl RawPipeStream {
     pub(crate) fn new_server(handle: FileHandle) -> Self {
         Self::new(handle, true)
     }
-    pub(crate) fn new_client(handle: FileHandle) -> Self {
+    fn new_client(handle: FileHandle) -> Self {
         Self::new(handle, false)
     }
 

@@ -4,10 +4,7 @@ pub(super) mod winprelude {
     pub(crate) use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 }
 
-use std::{
-    io::{self, ErrorKind::BrokenPipe},
-    task::Poll,
-};
+use std::io::{self, ErrorKind::BrokenPipe};
 use winprelude::*;
 
 pub(crate) trait AsRawHandleExt: AsRawHandle {
@@ -30,8 +27,4 @@ pub(super) fn downgrade_eof<T: Default>(r: io::Result<T>) -> io::Result<T> {
         Err(e) if e.kind() == BrokenPipe => Ok(T::default()),
         els => els,
     }
-}
-#[allow(unused)]
-pub(super) fn downgrade_poll_eof<T: Default>(r: Poll<io::Result<T>>) -> Poll<io::Result<T>> {
-    r.map(downgrade_eof)
 }
