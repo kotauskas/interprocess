@@ -1,7 +1,7 @@
 use crate::os::windows::{named_pipe::PipeMode, winprelude::*, FileHandle};
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use windows_sys::Win32::{
-    Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+    Foundation::{GENERIC_READ, GENERIC_WRITE},
     Storage::FileSystem::{
         CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
     },
@@ -61,24 +61,6 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
         ) != 0
     };
     ok_or_ret_errno!(ok => msglen as usize)
-}
-
-/// This is used by sync named pipes only. Tokio ones call connect_without_waiting() directly.
-pub(crate) fn _connect(
-    path: &[u16],
-    read: Option<PipeMode>,
-    write: Option<PipeMode>,
-    timeout: WaitTimeout,
-) -> io::Result<FileHandle> {
-    loop {
-        match connect_without_waiting(path, read, write, false) {
-            Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
-                block_for_server(path, timeout)?;
-                continue;
-            }
-            els => return els,
-        }
-    }
 }
 
 fn modes_to_access_flags(read: Option<PipeMode>, write: Option<PipeMode>) -> u32 {

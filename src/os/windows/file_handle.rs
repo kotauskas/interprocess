@@ -21,7 +21,7 @@ impl FileHandle {
             );
             (result != 0, num_bytes_read as usize)
         };
-        downgrade_eof(ok_or_ret_errno!(success => num_bytes_read))
+        ok_or_ret_errno!(success => num_bytes_read)
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);

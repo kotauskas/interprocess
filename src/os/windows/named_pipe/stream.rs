@@ -1,10 +1,10 @@
 mod enums;
 pub use enums::*;
 
-mod impls;
+mod r#impl;
 mod limbo;
 mod wrapper_fns;
-pub(super) use impls::*;
+pub(super) use r#impl::*;
 pub(crate) use wrapper_fns::*;
 
 use super::{MaybeArc, NeedsFlush};
