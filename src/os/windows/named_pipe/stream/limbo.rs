@@ -14,7 +14,7 @@ use std::{
     },
     thread,
 };
-use winapi::um::namedpipeapi::DisconnectNamedPipe;
+use windows_sys::Win32::System::Pipes::DisconnectNamedPipe;
 
 pub(super) struct Corpse {
     pub handle: FileHandle,
@@ -23,7 +23,7 @@ pub(super) struct Corpse {
 impl Corpse {
     #[inline]
     pub fn disconnect(&self) -> io::Result<()> {
-        let success = unsafe { DisconnectNamedPipe(self.handle.0.as_raw_handle()) != 0 };
+        let success = unsafe { DisconnectNamedPipe(self.handle.as_int_handle()) != 0 };
         ok_or_ret_errno!(success => ())
     }
 }

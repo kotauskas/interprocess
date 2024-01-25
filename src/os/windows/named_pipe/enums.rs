@@ -1,18 +1,17 @@
 use super::PipeModeTag;
-use crate::os::windows::winprelude::*;
 use std::{convert::TryFrom, mem};
-use winapi::um::winbase::{
-    PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND, PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE,
-    PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE,
+use windows_sys::Win32::{
+    Storage::FileSystem::{PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND},
+    System::Pipes::{PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE},
 };
 
 /// The direction of a named pipe connection, designating who can read data and who can write it. This describes the
 /// direction of the data flow unambiguously, so that the meaning of the values is the same for the client and server –
 /// [`ClientToServer`](PipeDirection::ClientToServer) always means client → server, for example.
 #[repr(u32)]
-// We depend on the fact that DWORD always maps to u32, which, thankfully, will always stay true
+// We depend on the fact that u32 always maps to u32, which, thankfully, will always stay true
 // since the public WinAPI is supposed to be ABI-compatible. Just keep in mind that the
-// #[repr(u32)] means that we can transmute this enumeration to the Windows DWORD type.
+// #[repr(u32)] means that we can transmute this enumeration to the Windows u32 type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PipeDirection {
     /// Represents server ← client data flow: clients write data, the server reads it.
@@ -75,19 +74,19 @@ impl PipeDirection {
         }
     }
 }
-impl TryFrom<DWORD> for PipeDirection {
+impl TryFrom<u32> for PipeDirection {
     type Error = ();
     /// Converts a Windows constant to a `PipeDirection` if it's in range.
     ///
     /// # Errors
     /// Returns `Err` if the value is not a valid pipe direction constant.
-    fn try_from(op: DWORD) -> Result<Self, ()> {
+    fn try_from(op: u32) -> Result<Self, ()> {
         assert!((1..=3).contains(&op));
         // See the comment block above for why this is safe.
         unsafe { mem::transmute(op) }
     }
 }
-impl From<PipeDirection> for DWORD {
+impl From<PipeDirection> for u32 {
     fn from(op: PipeDirection) -> Self {
         unsafe { mem::transmute(op) }
     }
@@ -180,28 +179,28 @@ pub enum PipeMode {
     Messages = PIPE_TYPE_MESSAGE,
 }
 impl PipeMode {
-    /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending
+    /// Converts the value into a raw `u32`-typed constant, either `PIPE_TYPE_BYTE` or `PIPE_TYPE_MESSAGE` depending
     /// on the value.
-    pub const fn to_pipe_type(self) -> DWORD {
+    pub const fn to_pipe_type(self) -> u32 {
         self as _
     }
-    /// Converts the value into a raw `DWORD`-typed constant, either `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE`
+    /// Converts the value into a raw `u32`-typed constant, either `PIPE_READMODE_BYTE` or `PIPE_READMODE_MESSAGE`
     /// depending on the value.
-    pub const fn to_readmode(self) -> DWORD {
+    pub const fn to_readmode(self) -> u32 {
         match self {
             Self::Bytes => PIPE_READMODE_BYTE,
             Self::Messages => PIPE_READMODE_MESSAGE,
         }
     }
 }
-impl TryFrom<DWORD> for PipeMode {
+impl TryFrom<u32> for PipeMode {
     type Error = ();
     /// Converts a Windows constant to a `PipeMode` if it's in range. Both `PIPE_TYPE_*` and `PIPE_READMODE_*` are
     /// supported.
     ///
     /// # Errors
     /// Returns `Err` if the value is not a valid pipe stream mode constant.
-    fn try_from(op: DWORD) -> Result<Self, ()> {
+    fn try_from(op: u32) -> Result<Self, ()> {
         // It's nicer to only match than to check and transmute
         #[allow(unreachable_patterns)] // PIPE_READMODE_BYTE and PIPE_TYPE_BYTE are equal
         match op {

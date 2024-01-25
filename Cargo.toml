@@ -42,14 +42,14 @@ to_method = "1.1"
 cfg-if = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = [
-    "std",
-    "winbase",
-    "winerror",
-    "processthreadsapi",
-    "fileapi",
-    "handleapi",
-    "namedpipeapi",
+windows = "0.51.1" # TODO I don't need this dep
+windows-sys = { version = "0.48.0", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
 ] }
 recvmsg = "1.0.0"
 

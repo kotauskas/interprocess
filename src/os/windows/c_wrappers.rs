@@ -3,33 +3,31 @@ use std::{
     io,
     mem::{size_of, zeroed},
 };
-use winapi::um::{
-    handleapi::DuplicateHandle, minwinbase::SECURITY_ATTRIBUTES, processthreadsapi::GetCurrentProcess,
-    winnt::DUPLICATE_SAME_ACCESS,
+use windows_sys::Win32::{
+    Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS},
+    Security::SECURITY_ATTRIBUTES,
+    System::Threading::GetCurrentProcess,
 };
 
 pub fn duplicate_handle(handle: BorrowedHandle<'_>) -> io::Result<OwnedHandle> {
     let raw = duplicate_handle_inner(handle, None)?;
-    unsafe { Ok(OwnedHandle::from_raw_handle(raw)) }
+    unsafe { Ok(OwnedHandle::from_raw_handle(raw as RawHandle)) }
 }
 pub fn duplicate_handle_to_foreign(
     handle: BorrowedHandle<'_>,
     other_process: BorrowedHandle<'_>,
-) -> io::Result<RawHandle> {
+) -> io::Result<HANDLE> {
     duplicate_handle_inner(handle, Some(other_process))
 }
 
-fn duplicate_handle_inner(
-    handle: BorrowedHandle<'_>,
-    other_process: Option<BorrowedHandle<'_>>,
-) -> io::Result<RawHandle> {
+fn duplicate_handle_inner(handle: BorrowedHandle<'_>, other_process: Option<BorrowedHandle<'_>>) -> io::Result<HANDLE> {
     let mut new_handle = INVALID_HANDLE_VALUE;
     let success = unsafe {
         let proc = GetCurrentProcess();
         DuplicateHandle(
             proc,
-            handle.as_raw_handle(),
-            other_process.map(|h| h.as_raw_handle()).unwrap_or(proc),
+            handle.as_int_handle(),
+            other_process.map(|h| h.as_int_handle()).unwrap_or(proc),
             &mut new_handle,
             0,
             0,

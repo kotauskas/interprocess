@@ -45,7 +45,7 @@ outside of another Tokio runtime)",
 
 fn bury(c: Corpse) {
     task::spawn_blocking(move || {
-        let handle = c.0.as_handle().as_raw_handle();
+        let handle = c.0.as_int_handle();
         FileHandle::flush_hndl(handle).debug_expect("limbo flush failed");
     });
 }

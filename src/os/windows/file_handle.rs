@@ -1,19 +1,19 @@
 use super::{c_wrappers, downgrade_eof, winprelude::*};
 use crate::TryClone;
 use std::{io, mem::MaybeUninit, ptr};
-use winapi::um::fileapi::{FlushFileBuffers, ReadFile, WriteFile};
+use windows_sys::Win32::Storage::FileSystem::{FlushFileBuffers, ReadFile, WriteFile};
 
 /// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
 #[repr(transparent)]
-pub(crate) struct FileHandle(pub(crate) OwnedHandle);
+pub(crate) struct FileHandle(OwnedHandle);
 impl FileHandle {
     pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        let len = DWORD::try_from(buf.len()).unwrap_or(DWORD::MAX);
+        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
 
         let (success, num_bytes_read) = unsafe {
-            let mut num_bytes_read: DWORD = 0;
+            let mut num_bytes_read: u32 = 0;
             let result = ReadFile(
-                self.0.as_raw_handle(),
+                self.as_int_handle(),
                 buf.as_mut_ptr().cast(),
                 len,
                 &mut num_bytes_read as *mut _,
@@ -24,12 +24,12 @@ impl FileHandle {
         downgrade_eof(ok_or_ret_errno!(success => num_bytes_read))
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        let len = DWORD::try_from(buf.len()).unwrap_or(DWORD::MAX);
+        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
 
         let (success, bytes_written) = unsafe {
-            let mut bytes_written: DWORD = 0;
+            let mut bytes_written: u32 = 0;
             let result = WriteFile(
-                self.0.as_raw_handle(),
+                self.as_int_handle(),
                 buf.as_ptr().cast(),
                 len,
                 &mut bytes_written as *mut _,
@@ -41,7 +41,7 @@ impl FileHandle {
     }
     #[inline(always)]
     pub fn flush(&self) -> io::Result<()> {
-        Self::flush_hndl(self.0.as_raw_handle())
+        Self::flush_hndl(self.as_int_handle())
     }
     #[inline]
     pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
@@ -51,11 +51,13 @@ impl FileHandle {
 }
 impl TryClone for FileHandle {
     fn try_clone(&self) -> io::Result<Self> {
-        c_wrappers::duplicate_handle(self.0.as_handle()).map(Self)
+        c_wrappers::duplicate_handle(self.as_handle()).map(Self)
     }
 }
+
 multimacro! {
     FileHandle,
     forward_handle,
     forward_debug,
+    derive_raw,
 }

@@ -23,9 +23,9 @@ use std::{
     mem::MaybeUninit,
     os::windows::prelude::*,
 };
-use winapi::{
-    shared::winerror::ERROR_MORE_DATA,
-    um::winbase::{
+use windows_sys::Win32::{
+    Foundation::ERROR_MORE_DATA,
+    System::Pipes::{
         GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId,
         GetNamedPipeServerSessionId, PIPE_READMODE_MESSAGE,
     },
@@ -244,7 +244,7 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
                 })
             }
         };
-        Ok(Self::new(FileHandle(handle), is_server))
+        Ok(Self::new(FileHandle::from(handle), is_server))
     }
 }
 
@@ -511,7 +511,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
         let handle = c_wrappers::duplicate_handle(self.as_handle())?;
         self.raw.needs_flush.on_clone();
         Ok(Self::new(RawPipeStream {
-            handle: Some(FileHandle(handle)),
+            handle: Some(FileHandle::from(handle)),
             is_server: self.is_server(),
             needs_flush: NeedsFlush::from(NeedsFlushVal::Always),
         }))

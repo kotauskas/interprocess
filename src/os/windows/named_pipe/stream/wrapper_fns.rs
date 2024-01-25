@@ -1,33 +1,31 @@
 use crate::os::windows::{named_pipe::PipeMode, winprelude::*, FileHandle};
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
-use winapi::{
-    shared::winerror::ERROR_PIPE_BUSY,
-    um::{
-        fileapi::{CreateFileW, OPEN_EXISTING},
-        handleapi::INVALID_HANDLE_VALUE,
-        namedpipeapi::{
-            GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState, WaitNamedPipeW,
-        },
-        winbase::{FILE_FLAG_OVERLAPPED, PIPE_NOWAIT},
-        winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, GENERIC_READ, GENERIC_WRITE},
+use windows::core::imp::BOOL;
+use windows_sys::Win32::{
+    Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+    Storage::FileSystem::{
+        CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
+    },
+    System::Pipes::{
+        GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState, WaitNamedPipeW, PIPE_NOWAIT,
     },
 };
 
-/// Helper for several functions that take a handle and a DWORD out-pointer.
+/// Helper for several functions that take a handle and a u32 out-pointer.
 pub(crate) unsafe fn hget(
     handle: BorrowedHandle<'_>,
-    f: unsafe extern "system" fn(HANDLE, *mut DWORD) -> BOOL,
-) -> io::Result<DWORD> {
+    f: unsafe extern "system" fn(HANDLE, *mut u32) -> BOOL,
+) -> io::Result<u32> {
     let mut x: u32 = 0;
-    let ok = unsafe { f(handle.as_raw_handle(), &mut x as *mut _) != 0 };
+    let ok = unsafe { f(handle.as_int_handle(), &mut x as *mut _) != 0 };
     ok_or_ret_errno!(ok => x)
 }
 
-pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<DWORD> {
+pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
     let mut flags: u32 = 0;
     let success = unsafe {
         GetNamedPipeInfo(
-            handle.as_raw_handle(),
+            handle.as_int_handle(),
             &mut flags as *mut _,
             ptr::null_mut(),
             ptr::null_mut(),
@@ -52,10 +50,10 @@ pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Res
 }
 #[allow(dead_code)] // TODO give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
-    let mut msglen: DWORD = 0;
+    let mut msglen: u32 = 0;
     let ok = unsafe {
         PeekNamedPipe(
-            handle.as_raw_handle(),
+            handle.as_int_handle(),
             ptr::null_mut(),
             0,
             ptr::null_mut(),
@@ -84,7 +82,7 @@ pub(crate) fn _connect(
     }
 }
 
-fn modes_to_access_flags(read: Option<PipeMode>, write: Option<PipeMode>) -> DWORD {
+fn modes_to_access_flags(read: Option<PipeMode>, write: Option<PipeMode>) -> u32 {
     let mut access_flags = 0;
     if read.is_some() {
         access_flags |= GENERIC_READ;
@@ -115,31 +113,31 @@ pub(crate) fn connect_without_waiting(
             ptr::null_mut(),
             OPEN_EXISTING,
             flags,
-            ptr::null_mut(),
+            0,
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };
     ok_or_ret_errno!(success => unsafe {
         // SAFETY: we just created this handle
-        FileHandle(OwnedHandle::from_raw_handle(handle))
+        FileHandle::from(OwnedHandle::from_raw_handle(handle as RawHandle))
     })
 }
 
 #[allow(dead_code)]
 pub(crate) fn get_named_pipe_handle_state(
     handle: BorrowedHandle<'_>,
-    mode: Option<&mut DWORD>,
-    cur_instances: Option<&mut DWORD>,
-    max_collection_count: Option<&mut DWORD>,
-    collect_data_timeout: Option<&mut DWORD>,
+    mode: Option<&mut u32>,
+    cur_instances: Option<&mut u32>,
+    max_collection_count: Option<&mut u32>,
+    collect_data_timeout: Option<&mut u32>,
     mut username: Option<&mut [MaybeUninit<u16>]>,
 ) -> io::Result<()> {
     // TODO expose the rest of the owl as public API
-    let toptr = |r: &mut DWORD| r as *mut DWORD;
+    let toptr = |r: &mut u32| r as *mut u32;
     let null = ptr::null_mut();
     let success = unsafe {
         GetNamedPipeHandleStateW(
-            handle.as_raw_handle(),
+            handle.as_int_handle(),
             mode.map(toptr).unwrap_or(null),
             cur_instances.map(toptr).unwrap_or(null),
             max_collection_count.map(toptr).unwrap_or(null),
@@ -149,7 +147,7 @@ pub(crate) fn get_named_pipe_handle_state(
                 .map(|s| s.as_mut_ptr().cast())
                 .unwrap_or(ptr::null_mut()),
             username
-                .map(|s| DWORD::try_from(s.len()).unwrap_or(DWORD::MAX))
+                .map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX))
                 .unwrap_or(0),
         ) != 0
     };
@@ -157,18 +155,18 @@ pub(crate) fn get_named_pipe_handle_state(
 }
 pub(crate) fn set_named_pipe_handle_state(
     handle: BorrowedHandle<'_>,
-    mode: Option<DWORD>,
-    max_collection_count: Option<DWORD>,
-    collect_data_timeout: Option<DWORD>,
+    mode: Option<u32>,
+    max_collection_count: Option<u32>,
+    collect_data_timeout: Option<u32>,
 ) -> io::Result<()> {
     let (mut mode_, has_mode) = (mode.unwrap_or_default(), mode.is_some());
     let (mut mcc, has_mcc) = (max_collection_count.unwrap_or_default(), max_collection_count.is_some());
     let (mut cdt, has_cdt) = (collect_data_timeout.unwrap_or_default(), collect_data_timeout.is_some());
-    let toptr = |r: &mut DWORD| r as *mut DWORD;
+    let toptr = |r: &mut u32| r as *mut u32;
     let null = ptr::null_mut();
     let success = unsafe {
         SetNamedPipeHandleState(
-            handle.as_raw_handle(),
+            handle.as_int_handle(),
             if has_mode { toptr(&mut mode_) } else { null },
             if has_mcc { toptr(&mut mcc) } else { null },
             if has_cdt { toptr(&mut cdt) } else { null },
@@ -191,7 +189,7 @@ pub(crate) fn set_nonblocking_given_readmode(
 }
 
 // TODO this should be public API
-#[repr(transparent)] // #[repr(DWORD)]
+#[repr(transparent)] // #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct WaitTimeout(u32);
 impl WaitTimeout {

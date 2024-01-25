@@ -30,7 +30,7 @@ use tokio::{
     io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf as TokioReadBuf},
     net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer},
 };
-use winapi::um::winbase::{
+use windows_sys::Win32::System::Pipes::{
     GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, GetNamedPipeServerProcessId, GetNamedPipeServerSessionId,
 };
 
@@ -97,7 +97,7 @@ impl RawPipeStream {
                 not_waiting => break not_waiting?,
             }
         };
-        let client = unsafe { TokioNPClient::from_raw_handle(client.0.into_raw_handle())? };
+        let client = unsafe { TokioNPClient::from_raw_handle(client.into_raw_handle())? };
         /* MESSAGE READING DISABLED
         if read == Some(PipeMode::Messages) {
             set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
@@ -291,6 +291,7 @@ impl AsHandle for InnerTokio {
         same_clsrv!(x in self => x.as_handle())
     }
 }
+derive_asraw!(InnerTokio);
 impl AsHandle for RawPipeStream {
     #[inline]
     fn as_handle(&self) -> BorrowedHandle<'_> {
@@ -466,7 +467,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
             return;
         }
 
-        let handle = AssertHandleSyncSend(self.as_raw_handle());
+        let handle = AssertHandleSyncSend(self.as_int_handle());
         let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl({ handle }.0));
 
         **slf_flush = Some(task);
