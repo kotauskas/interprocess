@@ -23,7 +23,7 @@ use winprelude::*;
 
 mod c_wrappers;
 
-/// Objects which own handles which can be shared with another processes.
+/// Objects which own handles which can be shared with other processes.
 ///
 /// On Windows, like with most other operating systems, handles belong to specific processes. You shouldn't just send
 /// the value of a handle to another process (with a named pipe, for example) and expect it to work on the other side.
