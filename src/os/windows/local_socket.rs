@@ -1,19 +1,22 @@
 //! Adapter module, implements local sockets under Windows.
 
+mod listener;
+mod stream;
+
+pub use {listener::*, stream::*};
+
+#[cfg(feature = "tokio")]
+pub mod tokio {
+    mod listener;
+    mod stream;
+    pub use {listener::*, stream::*};
+}
+
 use crate::local_socket::{LocalSocketName, NameTypeSupport};
 use std::{
     borrow::Cow,
     ffi::{OsStr, OsString},
 };
-
-#[cfg(feature = "tokio")]
-pub mod tokio;
-
-mod listener;
-pub use listener::*;
-
-mod stream;
-pub use stream::*;
 
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
 
