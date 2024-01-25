@@ -1,4 +1,5 @@
 use super::*;
+use crate::os::windows::downgrade_eof;
 use recvmsg::{prelude::*, NoAddrBuf, RecvMsg, RecvResult};
 use windows_sys::Win32::Foundation::ERROR_MORE_DATA;
 
@@ -13,27 +14,18 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 
 impl RawPipeStream {
     fn discard_msg(&self) -> io::Result<()> {
-        // TODO not delegate to recv_msg
-        use RecvResult::*;
-        let mut bufbak = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
-        let mut buf = MsgBuf::from(&mut bufbak[..]);
-        buf.quota = Some(0);
+        let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
+        let fh = self.file_handle();
         loop {
-            match self.recv_msg_impl(&mut buf, false)? {
-                EndOfStream | Fit => break,
-                QuotaExceeded(..) => {
-                    // Because discard = false makes sure that discard_msg() isn't recursed into,
-                    // we have to manually reset the buffer into a workable state – by discarding
-                    // the received data, that is.
-                    buf.set_fill(0);
-                }
-                Spilled => unreachable!(),
+            match downgrade_eof(fh.read(&mut buf)) {
+                Ok(..) => break Ok(()),
+                Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {}
+                Err(e) => break Err(e),
             }
         }
-        Ok(())
     }
 
-    fn recv_msg_impl(&self, buf: &mut MsgBuf<'_>, discard: bool) -> io::Result<RecvResult> {
+    fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
         buf.set_fill(0);
         buf.has_msg = false;
         let mut more_data = true;
@@ -51,7 +43,7 @@ impl RawPipeStream {
                         continue;
                     }
                     Err(e) => {
-                        if more_data && discard {
+                        if more_data {
                             // A partially successful partial read must result in the rest of the
                             // message being discarded.
                             let _ = self.discard_msg();
@@ -62,8 +54,8 @@ impl RawPipeStream {
             }
 
             let rslt = fh.read(slice);
-
             more_data = false;
+
             let incr = match decode_eof(rslt) {
                 Ok(incr) => incr,
                 Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
@@ -76,7 +68,7 @@ impl RawPipeStream {
                     return Ok(RecvResult::EndOfStream);
                 }
                 Err(e) => {
-                    if partial && discard {
+                    if partial {
                         // This is irrelevant to normal operation of downstream
                         // programs, but still makes them easier to debug.
                         let _ = self.discard_msg();
@@ -91,11 +83,6 @@ impl RawPipeStream {
         }
         buf.has_msg = true;
         Ok(if spilled { RecvResult::Spilled } else { RecvResult::Fit })
-    }
-
-    #[inline]
-    fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
-        self.recv_msg_impl(buf, true)
     }
 }
 
