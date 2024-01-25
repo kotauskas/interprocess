@@ -29,13 +29,12 @@ use std::{
 /// via [`.reunite()`](PipeStream::reunite).
 ///
 /// # Semantic peculiarities
-/// - [`BrokenPipe`](io::ErrorKind::BrokenPipe) errors from read methods are converted to EOF
-///   (`Ok(0)`)
-/// - Upon drop, streams that haven't been flushed since the last write are transparently sent to
+/// - [`BrokenPipe`](io::ErrorKind::BrokenPipe) errors in bytestreams are converted to EOF (`Ok(0)`)
+/// - Upon drop, streams that haven't been flushed since the last send are transparently sent to
 ///   **limbo** – a thread pool that ensures that the peer does not get a `BrokenPipe` (EOF if peer
 ///   also uses Interprocess) immediately after the server is done sending data, which would discard
 ///   everything
-///     - At the time of dropping, if the stream hasn't seen a single write since the last explicit
+///     - At the time of dropping, if the stream hasn't seen a single send since the last explicit
 ///       flush, it will evade limbo (can be overriden with
 ///       [`.mark_dirty()`](PipeStream::mark_dirty))
 /// - Flush elision, analogous to limbo elision but also happens on explicit flush (i.e. flushing
@@ -48,7 +47,7 @@ use std::{
 /// use interprocess::os::windows::named_pipe::*;
 /// use std::io::{BufReader, prelude::*};
 ///
-/// // Preemptively allocate a sizeable buffer for reading.
+/// // Preemptively allocate a sizeable buffer for receiving.
 /// // This size should be enough and should be easy to find for the allocator.
 /// let mut buffer = String::with_capacity(128);
 ///
@@ -57,15 +56,15 @@ use std::{
 /// // where connecting to a port that's not bound to any server will send a "connection refused"
 /// // response, but that will take twice the ping, the roundtrip time, to reach the client.
 /// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example")?;
-/// // Wrap it into a buffered reader right away so that we could read a single line out of it.
+/// // Wrap it into a buffered reader right away so that we could receive a single line out of it.
 /// let mut conn = BufReader::new(conn);
 ///
-/// // Write our message into the stream. This will finish either when the whole message has been
-/// // writen or if a write operation returns an error. (`.get_mut()` is to get the writer,
+/// // Send our message into the stream. This will finish either when the whole message has been
+/// // sent or if a send operation returns an error. (`.get_mut()` is to get the sender,
 /// // `BufReader` doesn't implement a pass-through `Write`.)
 /// conn.get_mut().write_all(b"Hello from client!\n")?;
 ///
-/// // We now employ the buffer we allocated prior and read a single line, interpreting a newline
+/// // We now employ the buffer we allocated prior and receive a single line, interpreting a newline
 /// // character as an end-of-file (because local sockets cannot be portably shut down), verifying
 /// // validity of UTF-8 on the fly.
 /// conn.read_line(&mut buffer)?;
@@ -80,7 +79,7 @@ use std::{
 /// use recvmsg::prelude::*;
 /// use interprocess::os::windows::named_pipe::*;
 ///
-/// // Preemptively allocate a sizeable buffer for reading. Keep in mind that this will depend on
+/// // Preemptively allocate a sizeable buffer for receiving. Keep in mind that this will depend on
 /// // the specifics of the protocol you're using.
 /// let mut buffer = MsgBuf::from(Vec::with_capacity(128));
 ///
@@ -100,7 +99,7 @@ use std::{
 /// // `reliable_recv_msg` module.
 /// conn.recv_msg(&mut buffer, None)?;
 ///
-/// // Convert the data that's been read into a string. This checks for UTF-8
+/// // Convert the data that's been received into a string. This checks for UTF-8
 /// // validity, and if invalid characters are found, a new buffer is
 /// // allocated to house a modified version of the received data, where
 /// // decoding errors are replaced with those diamond-shaped question mark
@@ -116,14 +115,14 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     _phantom: PhantomData<(Rm, Sm)>,
 }
 
-/// Type alias for a pipe stream with the same read mode and write mode.
+/// Type alias for a pipe stream with the same receive mode and send mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
 
-/// Type alias for a pipe stream with a read mode but no write mode.
+/// Type alias for a pipe stream with a receive mode but no send mode.
 ///
 /// This can be produced by the listener, by connecting, or by splitting.
 pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
-/// Type alias for a pipe stream with a write mode but no read mode.
+/// Type alias for a pipe stream with a send mode but no receive mode.
 ///
 /// This can be produced by the listener, by connecting, or by splitting.
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;

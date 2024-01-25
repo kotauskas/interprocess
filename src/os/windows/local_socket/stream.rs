@@ -6,8 +6,8 @@ use crate::{
 use std::{io, os::windows::prelude::*};
 
 type StreamImpl = DuplexPipeStream<Bytes>;
-type ReadHalfImpl = RecvPipeStream<Bytes>;
-type WriteHalfImpl = SendPipeStream<Bytes>;
+type RecvHalfImpl = RecvPipeStream<Bytes>;
+type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) StreamImpl);
@@ -22,24 +22,24 @@ impl LocalSocketStream {
         self.0.set_nonblocking(nonblocking)
     }
     #[inline]
-    pub fn split(self) -> (ReadHalf, WriteHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         let (r, w) = self.0.split();
-        (ReadHalf(r), WriteHalf(w))
+        (RecvHalf(r), SendHalf(w))
     }
     #[inline]
-    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+    pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
         StreamImpl::reunite(rh.0, sh.0)
             .map(Self)
             .map_err(|ReuniteError { rh, sh }| ReuniteError {
-                rh: ReadHalf(rh),
-                sh: WriteHalf(sh),
+                rh: RecvHalf(rh),
+                sh: SendHalf(sh),
             })
     }
 }
 
 impl From<LocalSocketStream> for OwnedHandle {
     fn from(s: LocalSocketStream) -> Self {
-        // The outer local socket interface has read and write halves and is always duplex in the
+        // The outer local socket interface has receive and send halves and is always duplex in the
         // unsplit type, so a split pipe stream can never appear here.
         s.0.try_into()
             .expect("split named pipe stream inside `LocalSocketStream`")
@@ -70,20 +70,20 @@ multimacro! {
 }
 
 #[derive(Debug)]
-pub struct ReadHalf(pub(super) ReadHalfImpl);
+pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
-    ReadHalf,
-    forward_rbv(ReadHalfImpl, &),
+    RecvHalf,
+    forward_rbv(RecvHalfImpl, &),
     forward_sync_ref_read,
     forward_as_handle,
     derive_sync_mut_read,
 }
 
 #[derive(Debug)]
-pub struct WriteHalf(pub(super) WriteHalfImpl);
+pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
-    WriteHalf,
-    forward_rbv(WriteHalfImpl, &),
+    SendHalf,
+    forward_rbv(SendHalfImpl, &),
     forward_sync_ref_write,
     forward_as_handle,
     derive_sync_mut_write,

@@ -25,24 +25,24 @@ impmod! {local_socket::tokio,
 /// // Describe the things we do when we've got a connection ready.
 /// async fn handle_conn(conn: LocalSocketStream) -> io::Result<()> {
 ///     // Split the connection into two halves to process
-///     // received and sent data concurrently.
-///     let (reader, mut writer) = conn.split();
-///     let mut reader = BufReader::new(reader);
+///     // received and sent data separately.
+///     let (recver, mut sender) = conn.split();
+///     let mut recver = BufReader::new(recver);
 ///
-///     // Allocate a sizeable buffer for reading.
-///     // This size should be enough and should be easy to find for the allocator.
+///     // Allocate a sizeable buffer for receiving.
+///     // This size should be big enough and easy to find for the allocator.
 ///     let mut buffer = String::with_capacity(128);
 ///
-///     // Describe the write operation as writing our whole message.
-///     let write = writer.write_all(b"Hello from server!\n");
-///     // Describe the read operation as reading into our big buffer.
-///     let read = reader.read_line(&mut buffer);
+///     // Describe the send operation as sending our whole message.
+///     let send = sender.write_all(b"Hello from server!\n");
+///     // Describe the receive operation as receiving a line into our big buffer.
+///     let recv = recver.read_line(&mut buffer);
 ///
 ///     // Run both operations concurrently.
-///     try_join!(read, write)?;
+///     try_join!(recv, send)?;
 ///
 ///     // Dispose of our connection right now and not a moment later because I want to!
-///     drop((reader, writer));
+///     drop((recver, sender));
 ///
 ///     // Produce our output!
 ///     println!("Client answered: {}", buffer.trim());

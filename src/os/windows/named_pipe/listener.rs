@@ -156,7 +156,7 @@ pub struct PipeListenerOptions<'a> {
     /// is not allowed because of Windows limitations.
     pub instance_limit: Option<NonZeroU8>,
     /// Enables write-through mode, which applies only to network connections to the pipe. If
-    /// enabled, writing to the pipe would always block until all data is delivered to the other end
+    /// enabled, sending to the pipe will always block until all data is delivered to the other end
     /// instead of piling up in the kernel's network buffer until a certain amount of data
     /// accamulates or a certain period of time passes, which is when the system actually sends the
     /// contents of the buffer over the network.
@@ -252,20 +252,20 @@ impl<'a> PipeListenerOptions<'a> {
         nonblocking: bool,
         overlapped: bool,
         role: PipeStreamRole,
-        read_mode: Option<PipeMode>,
+        recv_mode: Option<PipeMode>,
     ) -> io::Result<OwnedHandle> {
-        if read_mode == Some(PipeMode::Messages) && self.mode == PipeMode::Bytes {
+        if recv_mode == Some(PipeMode::Messages) && self.mode == PipeMode::Bytes {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "\
-cannot create pipe server that has byte type but reads messages – have you forgotten to set the \
+cannot create pipe server that has byte type but receives messages – have you forgotten to set the \
 `mode` field in `PipeListenerOptions`?",
             ));
         }
 
         let path = path_conversion::convert_and_encode_path(&self.name, None);
         let open_mode = self.open_mode(first, role, overlapped);
-        let pipe_mode = self.pipe_mode(read_mode, nonblocking);
+        let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 
         let mut sa = init_security_attributes();
         sa.bInheritHandle = 0;
@@ -335,12 +335,12 @@ cannot create pipe server that has byte type but reads messages – have you for
     fn _create(
         &self,
         role: PipeStreamRole,
-        read_mode: Option<PipeMode>,
+        recv_mode: Option<PipeMode>,
     ) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
         let owned_config = self.to_owned();
 
         let instance = self
-            .create_instance(true, self.nonblocking, false, role, read_mode)
+            .create_instance(true, self.nonblocking, false, role, recv_mode)
             .map(FileHandle::from)?;
         Ok((owned_config, instance))
     }
@@ -359,10 +359,10 @@ cannot create pipe server that has byte type but reads messages – have you for
         }
         open_mode
     }
-    fn pipe_mode(&self, read_mode: Option<PipeMode>, nonblocking: bool) -> u32 {
+    fn pipe_mode(&self, recv_mode: Option<PipeMode>, nonblocking: bool) -> u32 {
         let mut pipe_mode = 0_u32;
         pipe_mode |= self.mode.to_pipe_type();
-        pipe_mode |= read_mode.map_or(0, PipeMode::to_readmode);
+        pipe_mode |= recv_mode.map_or(0, PipeMode::to_readmode);
         if nonblocking {
             pipe_mode |= PIPE_NOWAIT;
         }

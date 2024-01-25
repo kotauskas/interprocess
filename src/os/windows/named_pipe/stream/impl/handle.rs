@@ -50,14 +50,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<PipeStream<Rm, Sm>> for OwnedHand
 /// type is wrong or trying to figure out whether it's wrong or not caused a system call error, the
 /// corresponding error condition is returned.
 ///
-/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side write-only
+/// For more on why this can fail, see [`FromHandleError`]. Most notably, server-side send-only
 /// pipes will cause "access denied" errors because they lack permissions to check whether it's a
 /// server-side pipe and whether it has message boundaries.
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
     type Error = FromHandleError;
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
         let raw = RawPipeStream::try_from(handle)?;
-        // If the wrapper type tries to read incoming data as messages, that might break if
+        // If the wrapper type tries to receive incoming data as messages, that might break if
         // the underlying pipe has no message boundaries. Let's check for that.
         if Rm::MODE == Some(PipeMode::Messages) {
             let msg_bnd = match has_msg_boundaries_from_sys(raw.as_handle()) {

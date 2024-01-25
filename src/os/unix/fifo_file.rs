@@ -8,16 +8,17 @@
 //! via [an implementation provided by the standard library](std::os::unix::net).
 //!
 //! On Unix, named pipes, referred to as "FIFO files" in this crate, are just files which can have
-//! a writer and a reader communicating with each other in one direction without message boundaries.
-//! If further readers try to open the file, they will simply read nothing at all; if further
-//! writers are connected, the data mixes in an unpredictable way, making it unusable. Therefore,
-//! FIFOs are to be used specifically to conveniently connect two applications through a known path
-//! which works like a pipe and nothing else.
+//! a sender and a receiver communicating with each other in one direction without message
+//! boundaries. If further receivers try to open the file, they will simply receive nothing at all;
+//! if further senders are connected, the data mixes in an unpredictable way, making it unusable.
+//! Therefore, FIFOs are to be used specifically to conveniently connect two applications through a
+//! known path which works like a pipe and nothing else.
 //!
 //! ## Usage
 //! The [`create_fifo()`] function serves for a FIFO file creation. Opening FIFO files works via the
-//! standard [`File`](std::fs::File)s, opened either only for writing or only for reading. Deleting
-//! works the same way as with any regular file, via [`remove_file()`](std::fs::remove_file).
+//! standard [`File`](std::fs::File)s, opened either only for sending or only for receiving.
+//! Deletion works the same way as with any regular file, via
+//! [`remove_file()`](std::fs::remove_file).
 
 use super::unixprelude::*;
 use std::{ffi::CString, io, path::Path};

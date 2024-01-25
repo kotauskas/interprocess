@@ -5,14 +5,14 @@ impl RawPipeStream {
     fn fill_fields<'a, 'b, 'c>(
         &self,
         dbst: &'a mut DebugStruct<'b, 'c>,
-        readmode: Option<PipeMode>,
-        writemode: Option<PipeMode>,
+        recv_mode: Option<PipeMode>,
+        send_mode: Option<PipeMode>,
     ) -> &'a mut DebugStruct<'b, 'c> {
-        if let Some(readmode) = readmode {
-            dbst.field("read_mode", &readmode);
+        if let Some(recv_mode) = recv_mode {
+            dbst.field("recv_mode", &recv_mode);
         }
-        if let Some(writemode) = writemode {
-            dbst.field("write_mode", &writemode);
+        if let Some(send_mode) = send_mode {
+            dbst.field("send_mode", &send_mode);
         }
         dbst.field("handle", &self.handle).field("is_server", &self.is_server)
     }

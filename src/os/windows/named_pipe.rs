@@ -16,7 +16,7 @@
 //! - Windows named pipes have a server and an arbitrary number of clients, meaning that the
 //!   separate processes connecting to a named pipe have separate connections to the server, while
 //!   Unix FIFO files don't have the notion of a server or client and thus mix all data written
-//!   into one sink from which the data is read by one process
+//!   into one sink from which the data is received by one process
 //! - Windows named pipes can be used over the network, while a Unix FIFO file is still local even
 //!   if created in a directory which is a mounted network filesystem
 //! - Windows named pipes can maintain datagram boundaries, allowing both sides of the connection
@@ -38,7 +38,7 @@
 //!     - Limbo – transparent flush-on-close thread pool to ensure that the peer does not get a
 //!       `BrokenPipe` (EOF if peer also uses Interprocess) immediately after the server is done
 //!       sending data, which would discard everything
-//!         - Limbo elision: any stream which, at the time of dropping, hasn't seen a single write
+//!         - Limbo elision: any stream which, at the time of dropping, hasn't seen a single send
 //!           since the last explicit flush, will evade limbo (can be overriden with
 //!           [`.mark_dirty()`](PipeStream::mark_dirty))
 //!     - Flush elision, analogous to limbo elision but also happens on explicit flush (i.e.
@@ -61,8 +61,8 @@ mod stream;
 /// Asynchronous named pipes which work with the Tokio runtime and event loop.
 ///
 /// The Tokio integration allows the named pipe streams and listeners to be notified by the OS
-/// kernel whenever they're ready to be read from of written to, instead of spawning threads just to
-/// put them in a wait state of blocking on the I/O.
+/// kernel whenever they're ready to be received from or sent to, instead of spawning threads just
+/// to put them in a wait state of blocking on the I/O.
 ///
 /// Types from this module will *not* work with other async runtimes, such as `async-std` or `smol`,
 /// since the Tokio types' methods will panic whenever they're called outside of a Tokio runtime

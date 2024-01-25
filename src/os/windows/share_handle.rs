@@ -30,5 +30,5 @@ pub trait ShareHandle: AsHandle {
         c_wrappers::duplicate_handle_to_foreign(self.as_handle(), receiver)
     }
 }
-impl ShareHandle for crate::unnamed_pipe::UnnamedPipeReader {}
-impl ShareHandle for crate::unnamed_pipe::UnnamedPipeWriter {}
+impl ShareHandle for crate::unnamed_pipe::UnnamedPipeRecver {}
+impl ShareHandle for crate::unnamed_pipe::UnnamedPipeSender {}

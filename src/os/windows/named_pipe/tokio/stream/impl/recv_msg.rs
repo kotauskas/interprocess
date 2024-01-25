@@ -68,8 +68,8 @@ impl RawPipeStream {
                             Err(e) => {
                                 let qer = Ok(RecvResult::QuotaExceeded(e));
                                 if more_data {
-                                    // A partially successful partial read must result in the rest of the
-                                    // message being discarded.
+                                    // A partially successful partial receive must result in the
+                                    // rest of the message being discarded.
                                     *state = RecvMsgState::Discarding { result: qer };
                                     return self.poll_recv_msg(cx, buf, Some(state));
                                 } else {

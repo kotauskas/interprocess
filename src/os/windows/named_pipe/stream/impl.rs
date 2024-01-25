@@ -93,9 +93,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 
     /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
     ///
-    /// In nonblocking mode, attempts to read from the pipe when there is no data available or to
-    /// write when the buffer has filled up because the receiving side did not read enough bytes in
-    /// time will never block like they normally do. Instead, a
+    /// In nonblocking mode, attempts to receive from the pipe when there is no data available or to
+    /// send when the buffer has filled up because the receiving side hasn't received enough bytes
+    /// in time never block like they normally do. Instead, a
     /// [`WouldBlock`](io::ErrorKind::WouldBlock) error is immediately returned, allowing the thread
     /// to perform useful actions in the meantime.
     ///

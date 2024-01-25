@@ -1,7 +1,6 @@
 use super::{AtomicEnum, ReprU8};
 use std::sync::atomic::Ordering::*;
 
-// TODO document needs-flush opt
 #[derive(Debug)]
 pub struct NeedsFlush(AtomicEnum<NeedsFlushVal>);
 impl NeedsFlush {

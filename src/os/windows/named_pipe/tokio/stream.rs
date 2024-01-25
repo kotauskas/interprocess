@@ -37,7 +37,7 @@ use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPip
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use tokio::{io::{AsyncReadExt, AsyncWriteExt, BufReader}, try_join};
+/// use tokio::{io::{AsyncReadExt, AsyncWriteExt}, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 ///
 /// // Await this here since we can't do a whole lot without a connection.
@@ -46,29 +46,29 @@ use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPip
 /// // This consumes our connection and splits it into two owned halves, so that we could
 /// // concurrently act on both. Take care not to use the .split() method from the futures crate's
 /// // AsyncReadExt.
-/// let (mut reader, mut writer) = conn.split();
+/// let (mut recver, mut sender) = conn.split();
 ///
-/// // Preemptively allocate a sizeable buffer for reading.
+/// // Preemptively allocate a sizeable buffer for receiving.
 /// // This size should be enough and should be easy to find for the allocator.
 /// let mut buffer = String::with_capacity(128);
 ///
-/// // Describe the write operation as writing our whole string, waiting for
-/// // that to complete, and then shutting down the write half, which sends
+/// // Describe the send operation as sending our whole string, waiting for
+/// // that to complete, and then shutting down the send half, which sends
 /// // an EOF to the other end to help it determine where the message ends.
-/// let write = async {
-///     writer.write_all(b"Hello from client!").await?;
-///     writer.shutdown().await?;
+/// let send = async {
+///     sender.write_all(b"Hello from client!").await?;
+///     sender.shutdown().await?;
 ///     Ok(())
 /// };
 ///
-/// // Describe the read operation as reading until EOF into our big buffer.
-/// let read = reader.read_to_string(&mut buffer);
+/// // Describe the read operation as receiving until EOF into our big buffer.
+/// let read = recver.read_to_string(&mut buffer);
 ///
-/// // Concurrently perform both operations: write-and-send-EOF and read.
-/// try_join!(write, read)?;
+/// // Concurrently perform both operations: send-and-invoke-EOF and receive.
+/// try_join!(send, recv)?;
 ///
-/// // Get rid of those here to close the read half too.
-/// drop((reader, writer));
+/// // Get rid of those here to close the receive half too.
+/// drop((recver, sender));
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
@@ -81,14 +81,14 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
 }
 type FlushJH = tokio::task::JoinHandle<io::Result<()>>;
 
-/// Type alias for a Tokio-based pipe stream with the same read mode and write mode.
+/// Type alias for a Tokio-based pipe stream with the same receive mode and send mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
 
-/// Type alias for a pipe stream with a read mode but no write mode.
+/// Type alias for a pipe stream with a receive mode but no send mode.
 ///
 /// This can be produced by the listener, by connecting, or by splitting.
 pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
-/// Type alias for a pipe stream with a write mode but no read mode.
+/// Type alias for a pipe stream with a send mode but no receive mode.
 ///
 /// This can be produced by the listener, by connecting, or by splitting.
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;

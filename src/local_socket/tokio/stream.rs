@@ -3,8 +3,8 @@ use std::io;
 
 impmod! {local_socket::tokio,
     LocalSocketStream as LocalSocketStreamImpl,
-    ReadHalf as ReadHalfImpl,
-    WriteHalf as WriteHalfImpl,
+    RecvHalf as RecvHalfImpl,
+    SendHalf as SendHalfImpl,
 }
 
 /// A Tokio-based local socket byte stream, obtained eiter from
@@ -37,24 +37,24 @@ impmod! {local_socket::tokio,
 /// let conn = LocalSocketStream::connect(name).await?;
 ///
 /// // This consumes our connection and splits it into two halves,
-/// // so that we could concurrently act on both.
-/// let (reader, mut writer) = conn.split();
-/// let mut reader = BufReader::new(reader);
+/// // so that we can concurrently use both.
+/// let (recver, mut sender) = conn.split();
+/// let mut recver = BufReader::new(recver);
 ///
-/// // Allocate a sizeable buffer for reading.
+/// // Allocate a sizeable buffer for receiving.
 /// // This size should be enough and should be easy to find for the allocator.
 /// let mut buffer = String::with_capacity(128);
 ///
-/// // Describe the write operation as writing our whole string.
-/// let write = writer.write_all(b"Hello from client!\n");
-/// // Describe the read operation as reading until a newline into our buffer.
-/// let read = reader.read_line(&mut buffer);
+/// // Describe the send operation as writing our whole string.
+/// let send = sender.write_all(b"Hello from client!\n");
+/// // Describe the receive operation as receiving until a newline into our buffer.
+/// let recv = recver.read_line(&mut buffer);
 ///
 /// // Concurrently perform both operations.
-/// try_join!(write, read)?;
+/// try_join!(send, recv)?;
 ///
 /// // Close the connection a bit earlier than you'd think we would. Nice practice!
-/// drop((reader, writer));
+/// drop((recver, sender));
 ///
 /// // Display the results when we're done!
 /// println!("Server answered: {}", buffer.trim());
@@ -69,12 +69,13 @@ impl LocalSocketStream {
             .await
             .map(Self::from)
     }
-    /// Splits a stream into a read half and a write half, which can be used to read and write the
-    /// stream concurrently from independently spawned tasks, entailing a memory allocation.
+    /// Splits a stream into a receive half and a send half, which can be used to receive data from
+    /// and send data to the stream concurrently from independently spawned tasks, entailing a
+    /// memory allocation.
     #[inline]
-    pub fn split(self) -> (ReadHalf, WriteHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         let (r, w) = self.0.split();
-        (ReadHalf(r), WriteHalf(w))
+        (RecvHalf(r), SendHalf(w))
     }
 }
 #[doc(hidden)]
@@ -97,32 +98,32 @@ multimacro! {
     derive_asraw,
 }
 
-/// A read half of a Tokio-based local socket stream, obtained by splitting a
-/// [`LocalSocketStream`](super::LocalSocketStream).
+/// A receive half of a Tokio-based local socket stream, obtained by splitting a
+/// [`LocalSocketStream`].
 ///
 /// # Examples
 // TODO
-pub struct ReadHalf(pub(super) ReadHalfImpl);
+pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
-    ReadHalf,
-    pinproj_for_unpin(ReadHalfImpl),
-    forward_rbv(ReadHalfImpl, &),
+    RecvHalf,
+    pinproj_for_unpin(RecvHalfImpl),
+    forward_rbv(RecvHalfImpl, &),
     forward_tokio_read,
     forward_tokio_ref_read,
     forward_as_handle,
     forward_debug,
     derive_asraw,
 }
-/// A write half of a Tokio-based local socket stream, obtained by splitting a
-/// [`LocalSocketStream`](super::LocalSocketStream).
+/// A send half of a Tokio-based local socket stream, obtained by splitting a
+/// [`LocalSocketStream`].
 ///
 /// # Examples
 // TODO
-pub struct WriteHalf(pub(super) WriteHalfImpl);
+pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
-    WriteHalf,
-    pinproj_for_unpin(WriteHalfImpl),
-    forward_rbv(WriteHalfImpl, &),
+    SendHalf,
+    pinproj_for_unpin(SendHalfImpl),
+    forward_rbv(SendHalfImpl, &),
     forward_tokio_write,
     forward_tokio_ref_write,
     forward_as_handle,

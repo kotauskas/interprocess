@@ -33,14 +33,14 @@ impl RawPipeStream {
     async fn connect(
         pipename: &OsStr,
         hostname: Option<&OsStr>,
-        read: Option<PipeMode>,
-        write: Option<PipeMode>,
+        recv: Option<PipeMode>,
+        send: Option<PipeMode>,
     ) -> io::Result<Self> {
         // FIXME should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
 
         let mut path = Some(path_conversion::convert_and_encode_path(pipename, hostname));
         let client = loop {
-            match connect_without_waiting(path.as_ref().unwrap(), read, write, true) {
+            match connect_without_waiting(path.as_ref().unwrap(), recv, send, true) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                     let path_take = Self::wait_for_server(path.take().unwrap()).await?;
                     path = Some(path_take);
@@ -50,7 +50,7 @@ impl RawPipeStream {
         };
         let client = unsafe { TokioNPClient::from_raw_handle(client.into_raw_handle())? };
         /* MESSAGE READING DISABLED
-        if read == Some(PipeMode::Messages) {
+        if recv == Some(PipeMode::Messages) {
             set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
         }
         */

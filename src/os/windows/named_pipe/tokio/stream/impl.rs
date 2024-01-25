@@ -37,7 +37,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         (
             RecvPipeStream {
                 raw: raw_a,
-                flush: None.into(), // PERF the mutex is unnecessary for readers
+                flush: None.into(), // PERF the mutex is unnecessary for receivers
                 _phantom: PhantomData,
             },
             SendPipeStream {

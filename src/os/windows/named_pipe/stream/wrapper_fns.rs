@@ -63,15 +63,15 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
     ok_or_ret_errno!(ok => msglen as usize)
 }
 
-fn modes_to_access_flags(read: Option<PipeMode>, write: Option<PipeMode>) -> u32 {
+fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {
     let mut access_flags = 0;
-    if read.is_some() {
+    if recv.is_some() {
         access_flags |= GENERIC_READ;
     }
-    if read == Some(PipeMode::Messages) {
+    if recv == Some(PipeMode::Messages) {
         access_flags |= FILE_WRITE_ATTRIBUTES;
     }
-    if write.is_some() {
+    if send.is_some() {
         access_flags |= GENERIC_WRITE;
     }
     access_flags
@@ -79,12 +79,12 @@ fn modes_to_access_flags(read: Option<PipeMode>, write: Option<PipeMode>) -> u32
 
 pub(crate) fn connect_without_waiting(
     path: &[u16],
-    read: Option<PipeMode>,
-    write: Option<PipeMode>,
+    recv: Option<PipeMode>,
+    send: Option<PipeMode>,
     overlapped: bool,
 ) -> io::Result<FileHandle> {
     assert_eq!(path[path.len() - 1], 0, "nul terminator not found");
-    let access_flags = modes_to_access_flags(read, write);
+    let access_flags = modes_to_access_flags(recv, send);
     let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
     let (success, handle) = unsafe {
         let handle = CreateFileW(
@@ -159,10 +159,10 @@ pub(crate) fn set_named_pipe_handle_state(
 pub(crate) fn set_nonblocking_given_readmode(
     handle: BorrowedHandle<'_>,
     nonblocking: bool,
-    read: Option<PipeMode>,
+    recv: Option<PipeMode>,
 ) -> io::Result<()> {
     // PIPE_READMODE_BYTE is the default
-    let mut mode = read.unwrap_or(PipeMode::Bytes).to_readmode();
+    let mut mode = recv.unwrap_or(PipeMode::Bytes).to_readmode();
     if nonblocking {
         mode |= PIPE_NOWAIT;
     }

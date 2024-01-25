@@ -44,7 +44,7 @@ impl RawPipeStream {
                     }
                     Err(e) => {
                         if more_data {
-                            // A partially successful partial read must result in the rest of the
+                            // A partially successful partial receive must result in the rest of the
                             // message being discarded.
                             let _ = self.discard_msg();
                         }

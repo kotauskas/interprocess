@@ -7,16 +7,17 @@ pub enum ImplType {
     /// Local sockets implemented on top of Unix-domain sockets (Unix domain sockets).
     ///
     /// ## Implementation behavior
-    /// - Closing the connection on one side does not immediately destroy buffers, allowing one side to read data sent
-    ///   by the other side after the latter drops its local socket stream object.
+    /// - Closing the connection on one side does not immediately destroy buffers, allowing one side
+    ///   to receive data sent by the other side after the latter drops its local socket stream
+    ///   object.
     /// - Vectored I/O is fully supported.
     UdSocket,
     /// Local sockets implemented on top of Windows named pipes.
     ///
     /// ## Implementation behavior
-    /// - Closing the connection destroys buffers immediately, erasing everything that's been sent by one side and not
-    ///   received by the other and inducing a "broken pipe" error (translated to an EOF condition by `interprocess`
-    ///   automatically) if a receive call is attempted.
+    /// - Closing the connection destroys buffers immediately, erasing everything that's been sent
+    ///   by one side and not received by the other and inducing a "broken pipe" error (translated
+    ///   to an EOF condition by `interprocess` automatically) if a receive call is attempted.
     /// - Vectored I/O is unsupported.
     WindowsNamedPipe,
 }
@@ -67,9 +68,10 @@ impl ImplProperties {
     pub const fn name_type_support(self) -> NameTypeSupport {
         self.name_type_support
     }
-    /// Returns `true` if the implementation retains data that has been sent by one side but not received by the other,
-    /// or `false` if it discards all in-flight data immediately when the sender drops their stream object, causing an
-    /// instant EOF for reads on the other side.
+    /// Returns `true` if the implementation retains data that has been sent by one side but not
+    /// received by the other, or `false` if it discards all in-flight data immediately when the
+    /// sender drops their stream object, causing an instant EOF in receive operations on the other
+    /// side.
     #[inline(always)]
     pub const fn are_buffers_retained(self) -> bool {
         self.buffer_retention

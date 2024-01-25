@@ -1,6 +1,6 @@
 use super::FdOps;
 use crate::{
-    unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter},
+    unnamed_pipe::{UnnamedPipeRecver as PubRecver, UnnamedPipeSender as PubSender},
     Sealed,
 };
 use libc::c_int;
@@ -13,7 +13,7 @@ use std::{
     },
 };
 
-pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
+pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
     let (success, fds) = unsafe {
         let mut fds: [c_int; 2] = [0; 2];
         let result = libc::pipe(fds.as_mut_ptr());
@@ -27,25 +27,25 @@ pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
             let r = OwnedFd::from_raw_fd(fds[0]);
             (w, r)
         };
-        let w = PubWriter(UnnamedPipeWriter(FdOps(w)));
-        let r = PubReader(UnnamedPipeReader(FdOps(r)));
+        let w = PubSender(UnnamedPipeSender(FdOps(w)));
+        let r = PubRecver(UnnamedPipeRecver(FdOps(r)));
         Ok((w, r))
     } else {
         Err(io::Error::last_os_error())
     }
 }
 
-pub(crate) struct UnnamedPipeReader(FdOps);
-impl Sealed for UnnamedPipeReader {}
-impl Debug for UnnamedPipeReader {
+pub(crate) struct UnnamedPipeRecver(FdOps);
+impl Sealed for UnnamedPipeRecver {}
+impl Debug for UnnamedPipeRecver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UnnamedPipeReader")
+        f.debug_struct("UnnamedPipeRecver")
             .field("fd", &self.0 .0.as_raw_fd())
             .finish()
     }
 }
 multimacro! {
-    UnnamedPipeReader,
+    UnnamedPipeRecver,
     forward_rbv(FdOps, &),
     forward_sync_ref_read,
     forward_try_clone,
@@ -53,18 +53,18 @@ multimacro! {
     derive_sync_mut_read,
 }
 
-pub(crate) struct UnnamedPipeWriter(FdOps);
-impl Sealed for UnnamedPipeWriter {}
-impl Debug for UnnamedPipeWriter {
+pub(crate) struct UnnamedPipeSender(FdOps);
+impl Sealed for UnnamedPipeSender {}
+impl Debug for UnnamedPipeSender {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UnnamedPipeWriter")
+        f.debug_struct("UnnamedPipeSender")
             .field("fd", &self.0 .0.as_raw_fd())
             .finish()
     }
 }
 
 multimacro! {
-    UnnamedPipeWriter,
+    UnnamedPipeSender,
     forward_rbv(FdOps, &),
     forward_sync_ref_write,
     forward_try_clone,

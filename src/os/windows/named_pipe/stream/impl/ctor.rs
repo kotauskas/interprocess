@@ -20,12 +20,12 @@ impl RawPipeStream {
     pub(super) fn connect(
         pipename: &OsStr,
         hostname: Option<&OsStr>,
-        read: Option<PipeMode>,
-        write: Option<PipeMode>,
+        recv: Option<PipeMode>,
+        send: Option<PipeMode>,
     ) -> io::Result<Self> {
         let path = path_conversion::convert_and_encode_path(pipename, hostname);
         let handle = loop {
-            match connect_without_waiting(&path, read, write, false) {
+            match connect_without_waiting(&path, recv, send, false) {
                 Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
                     block_for_server(&path, WaitTimeout::DEFAULT)?;
                     continue;
@@ -34,7 +34,7 @@ impl RawPipeStream {
             }
         }?;
 
-        if read == Some(PipeMode::Messages) {
+        if recv == Some(PipeMode::Messages) {
             set_named_pipe_handle_state(handle.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
         }
         Ok(Self::new_client(handle))

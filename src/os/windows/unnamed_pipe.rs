@@ -7,7 +7,7 @@
 
 use super::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
 use crate::{
-    unnamed_pipe::{UnnamedPipeReader as PubReader, UnnamedPipeWriter as PubWriter},
+    unnamed_pipe::{UnnamedPipeRecver as PubRecver, UnnamedPipeSender as PubSender},
     weaken_buf_init_mut,
 };
 use core::ffi::c_void;
@@ -87,13 +87,13 @@ impl UnnamedPipeCreationOptions {
         attrs
     }
 
-    /// Creates the pipe and returns its writing and reading ends, or the error if one
+    /// Creates the pipe and returns its sending and receiving ends, or the error if one
     /// occurred.
     ///
     /// This will fail if the [`security_descriptor`](Self.security_descriptor) field is non-null.
     /// See [`.build_with_security_descriptor()`](Self::build_with_security_descriptor) for an
     /// unsafe version that allows the pointer to be passed.
-    pub fn build(self) -> io::Result<(PubWriter, PubReader)> {
+    pub fn build(self) -> io::Result<(PubSender, PubRecver)> {
         if !self.security_descriptor.is_null() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -106,14 +106,14 @@ impl UnnamedPipeCreationOptions {
         }
     }
 
-    /// Creates the pipe and returns its writing and reading ends, or the error if one occurred.
+    /// Creates the pipe and returns its sending and receiving ends, or the error if one occurred.
     /// Allows for a security descriptor pointer to be passed.
     ///
     /// # Safety
     /// The [`security_descriptor`](Self.security_descriptor) field is passed directly to Win32
     /// which is then dereferenced there, resulting in undefined behavior if it was an invalid
     /// non-null pointer. For the default configuration, this should never be a concern.
-    pub unsafe fn build_with_security_descriptor(self) -> io::Result<(PubWriter, PubReader)> {
+    pub unsafe fn build_with_security_descriptor(self) -> io::Result<(PubSender, PubRecver)> {
         let hint_raw = match self.buffer_size_hint {
             Some(num) => num.get(),
             None => 0,
@@ -134,8 +134,8 @@ impl UnnamedPipeCreationOptions {
                 let r = OwnedHandle::from_raw_handle(r as RawHandle);
                 (w, r)
             };
-            let w = PubWriter(UnnamedPipeWriter(FileHandle::from(w)));
-            let r = PubReader(UnnamedPipeReader(FileHandle::from(r)));
+            let w = PubSender(UnnamedPipeSender(FileHandle::from(w)));
+            let r = PubRecver(UnnamedPipeRecver(FileHandle::from(r)));
             Ok((w, r))
         } else {
             Err(io::Error::last_os_error())
@@ -150,31 +150,31 @@ impl Default for UnnamedPipeCreationOptions {
 unsafe impl Send for UnnamedPipeCreationOptions {}
 unsafe impl Sync for UnnamedPipeCreationOptions {}
 
-pub(crate) fn pipe() -> io::Result<(PubWriter, PubReader)> {
+pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
     UnnamedPipeCreationOptions::default().build()
 }
 
-pub(crate) struct UnnamedPipeReader(FileHandle);
-impl Read for UnnamedPipeReader {
+pub(crate) struct UnnamedPipeRecver(FileHandle);
+impl Read for UnnamedPipeRecver {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.0.read(weaken_buf_init_mut(buf))
     }
 }
-impl Debug for UnnamedPipeReader {
+impl Debug for UnnamedPipeRecver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("UnnamedPipeReader")
+        f.debug_tuple("UnnamedPipeRecver")
             .field(&self.0.as_raw_handle())
             .finish()
     }
 }
 multimacro! {
-    UnnamedPipeReader,
+    UnnamedPipeRecver,
     forward_handle,
     forward_try_clone,
 }
 
-pub(crate) struct UnnamedPipeWriter(FileHandle);
-impl Write for UnnamedPipeWriter {
+pub(crate) struct UnnamedPipeSender(FileHandle);
+impl Write for UnnamedPipeSender {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf)
     }
@@ -182,15 +182,15 @@ impl Write for UnnamedPipeWriter {
         self.0.flush()
     }
 }
-impl Debug for UnnamedPipeWriter {
+impl Debug for UnnamedPipeSender {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("UnnamedPipeWriter")
+        f.debug_tuple("UnnamedPipeSender")
             .field(&self.0.as_raw_handle())
             .finish()
     }
 }
 multimacro! {
-    UnnamedPipeWriter,
+    UnnamedPipeSender,
     forward_handle,
     forward_try_clone,
 }

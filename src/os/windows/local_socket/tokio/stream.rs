@@ -9,8 +9,8 @@ use crate::{
 use std::{io, os::windows::prelude::*};
 
 type LocalSocketStreamImpl = DuplexPipeStream<Bytes>;
-type ReadHalfImpl = RecvPipeStream<Bytes>;
-type WriteHalfImpl = SendPipeStream<Bytes>;
+type RecvHalfImpl = RecvPipeStream<Bytes>;
+type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
@@ -21,17 +21,17 @@ impl LocalSocketStream {
         Ok(Self(inner))
     }
     #[inline]
-    pub fn split(self) -> (ReadHalf, WriteHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         let (r, w) = self.0.split();
-        (ReadHalf(r), WriteHalf(w))
+        (RecvHalf(r), SendHalf(w))
     }
     #[inline]
-    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+    pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
         LocalSocketStreamImpl::reunite(rh.0, sh.0)
             .map(Self)
             .map_err(|ReuniteError { rh, sh }| ReuniteError {
-                rh: ReadHalf(rh),
-                sh: WriteHalf(sh),
+                rh: RecvHalf(rh),
+                sh: SendHalf(sh),
             })
     }
 }
@@ -60,24 +60,24 @@ multimacro! {
     forward_as_handle,
 }
 
-pub struct ReadHalf(pub(super) ReadHalfImpl);
+pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
-    ReadHalf,
-    pinproj_for_unpin(ReadHalfImpl),
-    forward_rbv(ReadHalfImpl, &),
+    RecvHalf,
+    pinproj_for_unpin(RecvHalfImpl),
+    forward_rbv(RecvHalfImpl, &),
     forward_tokio_read,
     forward_tokio_ref_read,
     forward_as_handle,
-    forward_debug("local_socket::ReadHalf"),
+    forward_debug("local_socket::RecvHalf"),
 }
 
-pub struct WriteHalf(pub(super) WriteHalfImpl);
+pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
-    WriteHalf,
-    pinproj_for_unpin(WriteHalfImpl),
-    forward_rbv(WriteHalfImpl, &),
+    SendHalf,
+    pinproj_for_unpin(SendHalfImpl),
+    forward_rbv(SendHalfImpl, &),
     forward_tokio_write,
     forward_tokio_ref_write,
     forward_as_handle,
-    forward_debug("local_socket::WriteHalf"),
+    forward_debug("local_socket::SendHalf"),
 }

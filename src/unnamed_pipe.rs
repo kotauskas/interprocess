@@ -10,26 +10,27 @@
 //! connection. It just so happens that this crate supports all three.
 
 impmod! {unnamed_pipe,
-    UnnamedPipeReader as UnnamedPipeReaderImpl,
-    UnnamedPipeWriter as UnnamedPipeWriterImpl,
+    UnnamedPipeRecver as UnnamedPipeRecverImpl,
+    UnnamedPipeSender as UnnamedPipeSenderImpl,
     pipe as pipe_impl,
 }
 use std::io;
 
-/// Creates a new pipe with the default creation settings and returns the handles to its writing end and reading end.
+/// Creates a new pipe with the default creation settings and returns the handles to its sending end
+/// and receiving end.
 ///
-/// The platform-specific builders in the `os` module of the crate might be more helpful if a configuration process for
-/// the pipe is needed.
-pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
+/// The platform-specific builders in the `os` module of the crate might be more helpful if a
+/// configuration process for the pipe is needed.
+pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
     pipe_impl()
 }
 
-/// A handle to the reading end of an unnamed pipe, created by the [`pipe()`] function together with the
-/// [writing end](UnnamedPipeWriter).
+/// A handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together with
+/// the [sending end](UnnamedPipeSender).
 ///
-/// The core functionality is exposed in a file-like [`Read`](io::Read) interface. On Windows,
-/// the [`ShareHandle`](crate::os::windows::ShareHandle) and
-/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented, along with
+/// The core functionality is exposed in a [`Read`](io::Read) interface. On Windows, the
+/// [`ShareHandle`](crate::os::windows::ShareHandle) and
+/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented; same for
 /// [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
 ///
 /// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
@@ -39,9 +40,9 @@ pub fn pipe() -> io::Result<(UnnamedPipeWriter, UnnamedPipeReader)> {
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 // field is pub(crate) to allow the platform specific builders to create the public-facing pipe types
-pub struct UnnamedPipeReader(pub(crate) UnnamedPipeReaderImpl);
+pub struct UnnamedPipeRecver(pub(crate) UnnamedPipeRecverImpl);
 multimacro! {
-    UnnamedPipeReader,
+    UnnamedPipeRecver,
     forward_sync_read,
     forward_handle,
     forward_try_clone,
@@ -49,12 +50,12 @@ multimacro! {
     derive_raw,
 }
 
-/// A handle to the writing end of an unnamed pipe, created by the [`pipe()`] function together with the
-/// [reading end](UnnamedPipeReader).
+/// A handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
+/// the [receiving end](UnnamedPipeRecver).
 ///
-/// The core functionality is exposed in a file-like [`Write`](io::Write) interface. On Windows,
-/// the [`ShareHandle`](crate::os::windows::ShareHandle) and
-/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented, along with
+/// The core functionality is exposed in a [`Write`](io::Write) interface. On Windows, the
+/// [`ShareHandle`](crate::os::windows::ShareHandle) and
+/// [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also implemented; same for
 /// [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
 ///
 /// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
@@ -63,9 +64,9 @@ multimacro! {
 /// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
-pub struct UnnamedPipeWriter(pub(crate) UnnamedPipeWriterImpl);
+pub struct UnnamedPipeSender(pub(crate) UnnamedPipeSenderImpl);
 multimacro! {
-    UnnamedPipeWriter,
+    UnnamedPipeSender,
     forward_sync_write,
     forward_handle,
     forward_try_clone,

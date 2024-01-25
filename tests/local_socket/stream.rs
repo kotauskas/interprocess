@@ -20,10 +20,10 @@ pub fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced: bool)
 
     for _ in 0..num_clients {
         let mut conn = listener.accept().context("accept failed").map(BufReader::new)?;
-        read(&mut conn, msg(false, false), 0)?;
-        write(&mut conn, msg(true, false), 0)?;
-        read(&mut conn, msg(false, true), 0)?;
-        write(&mut conn, msg(true, true), 0)?;
+        recv(&mut conn, msg(false, false), 0)?;
+        send(&mut conn, msg(true, false), 0)?;
+        recv(&mut conn, msg(false, true), 0)?;
+        send(&mut conn, msg(true, true), 0)?;
     }
     Ok(())
 }
@@ -31,13 +31,13 @@ pub fn client(name: &str) -> TestResult {
     let mut conn = LocalSocketStream::connect(name)
         .context("connect failed")
         .map(BufReader::new)?;
-    write(&mut conn, msg(false, false), 0)?;
-    read(&mut conn, msg(true, false), 0)?;
-    write(&mut conn, msg(false, true), 0)?;
-    read(&mut conn, msg(true, true), 0)
+    send(&mut conn, msg(false, false), 0)?;
+    recv(&mut conn, msg(true, false), 0)?;
+    send(&mut conn, msg(false, true), 0)?;
+    recv(&mut conn, msg(true, true), 0)
 }
 
-fn read(conn: &mut BufReader<LocalSocketStream>, exp: impl AsRef<str>, nr: u8) -> TestResult {
+fn recv(conn: &mut BufReader<LocalSocketStream>, exp: impl AsRef<str>, nr: u8) -> TestResult {
     let exp_ = exp.as_ref();
     let term = *exp_.as_bytes().last().unwrap();
     let fs = ["first", "second"][nr as usize];
@@ -51,7 +51,7 @@ fn read(conn: &mut BufReader<LocalSocketStream>, exp: impl AsRef<str>, nr: u8) -
     );
     Ok(())
 }
-fn write(conn: &mut BufReader<LocalSocketStream>, msg: impl AsRef<str>, nr: u8) -> TestResult {
+fn send(conn: &mut BufReader<LocalSocketStream>, msg: impl AsRef<str>, nr: u8) -> TestResult {
     let fs = ["first", "second"][nr as usize];
     conn.get_mut()
         .write_all(msg.as_ref().as_bytes())

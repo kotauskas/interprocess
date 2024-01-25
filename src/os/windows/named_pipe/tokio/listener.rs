@@ -40,29 +40,29 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 /// async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
 ///     // Split the connection into two halves to process
 ///     // received and sent data concurrently.
-///     let (mut reader, mut writer) = conn.split();
+///     let (mut recver, mut sender) = conn.split();
 ///
-///     // Allocate a sizeable buffer for reading.
+///     // Allocate a sizeable buffer for receiving.
 ///     // This size should be enough and should be easy to find for the allocator.
 ///     let mut buffer = String::with_capacity(128);
 ///
-///     // Describe the write operation as first writing our whole message, and
-///     // then shutting down the write half to send an EOF to help the other
+///     // Describe the send operation as first sending our whole message, and
+///     // then shutting down the send half to send an EOF to help the other
 ///     // side determine the end of the transmission.
-///     let write = async {
-///         writer.write_all(b"Hello from server!").await?;
-///         writer.shutdown().await?;
+///     let send = async {
+///         sender.write_all(b"Hello from server!").await?;
+///         sender.shutdown().await?;
 ///         Ok(())
 ///     };
 ///
-///     // Describe the read operation as reading into our big buffer.
-///     let read = reader.read_to_string(&mut buffer);
+///     // Describe the receive operation as receiving into our big buffer.
+///     let recv = recver.read_to_string(&mut buffer);
 ///
-///     // Run both the write-and-send-EOF operation and the read operation concurrently.
-///     try_join!(read, write)?;
+///     // Run both the send-and-invoke-EOF operation and the receive operation concurrently.
+///     try_join!(recv, send)?;
 ///
 ///     // Dispose of our connection right now and not a moment later because I want to!
-///     drop((reader, writer));
+///     drop((recver, sender));
 ///
 ///     // Produce our output!
 ///     println!("Client answered: {}", buffer.trim());
@@ -178,7 +178,7 @@ impl Sealed for PipeListenerOptions<'_> {}
 fn _create_tokio(
     config: &PipeListenerOptions<'_>,
     role: PipeStreamRole,
-    read_mode: Option<PipeMode>,
+    recv_mode: Option<PipeMode>,
 ) -> io::Result<(PipeListenerOptions<'static>, TokioNPServer)> {
     // Shadow to avoid mixing them up.
     let mut config = config.to_owned();
@@ -187,7 +187,7 @@ fn _create_tokio(
     config.nonblocking = false;
 
     let instance = config
-        .create_instance(true, config.nonblocking, true, role, read_mode)
+        .create_instance(true, config.nonblocking, true, role, recv_mode)
         .and_then(npserver_from_handle)?;
 
     Ok((config, instance))

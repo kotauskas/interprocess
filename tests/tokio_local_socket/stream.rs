@@ -24,8 +24,8 @@ pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced:
         let stream = listener.accept().await.context("accept failed")?;
         tasks.push(task::spawn(async move {
             try_join!(
-                read(&stream, msg(false, false), msg(false, true)),
-                write(&stream, msg(true, false), msg(true, true)),
+                recv(&stream, msg(false, false), msg(false, true)),
+                send(&stream, msg(true, false), msg(true, true)),
             )
         }));
     }
@@ -39,22 +39,22 @@ pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced:
 pub async fn client(nm: Arc<str>) -> TestResult {
     let stream = LocalSocketStream::connect(&*nm).await.context("connect failed")?;
     try_join!(
-        read(&stream, msg(true, false), msg(true, true)),
-        write(&stream, msg(false, false), msg(false, true)),
+        recv(&stream, msg(true, false), msg(true, true)),
+        send(&stream, msg(false, false), msg(false, true)),
     )
     .map(|((), ())| ())
 }
 
-async fn read(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRef<str>) -> TestResult {
-    let mut reader = BufReader::new(stream);
+async fn recv(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRef<str>) -> TestResult {
+    let mut recver = BufReader::new(stream);
     let mut sbuffer = String::with_capacity(128);
 
-    reader.read_line(&mut sbuffer).await.context("first receive failed")?;
+    recver.read_line(&mut sbuffer).await.context("first receive failed")?;
     ensure_eq!(sbuffer, exp1.as_ref());
     sbuffer.clear();
     let mut buffer = sbuffer.into_bytes();
 
-    reader
+    recver
         .read_until(b'\0', &mut buffer)
         .await
         .context("second receive failed")?;
@@ -65,7 +65,7 @@ async fn read(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRe
 
     Ok(())
 }
-async fn write(mut stream: &LocalSocketStream, msg1: impl AsRef<str>, msg2: impl AsRef<str>) -> TestResult {
+async fn send(mut stream: &LocalSocketStream, msg1: impl AsRef<str>, msg2: impl AsRef<str>) -> TestResult {
     stream
         .write_all(msg1.as_ref().as_bytes())
         .await

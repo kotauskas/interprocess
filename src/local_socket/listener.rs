@@ -64,25 +64,25 @@ impmod! {local_socket,
 /// // The syncronization between the server and client, if any is used, goes here.
 /// eprintln!("Server running at {name}");
 ///
-/// // Preemptively allocate a sizeable buffer for reading at a later moment. This size should be
+/// // Preemptively allocate a sizeable buffer for receiving at a later moment. This size should be
 /// // enough and should be easy to find for the allocator. Since we only have one concurrent
 /// // client, there's no need to reallocate the buffer repeatedly.
 /// let mut buffer = String::with_capacity(128);
 ///
 /// for conn in listener.incoming().filter_map(handle_error) {
-///     // Wrap the connection into a buffered reader right away
-///     // so that we could read a single line out of it.
+///     // Wrap the connection into a buffered receiver right away
+///     // so that we could receive a single line from it.
 ///     let mut conn = BufReader::new(conn);
 ///     println!("Incoming connection!");
 ///
-///     // Since our client example writes first, the server should read a line and only then send a
-///     // response. Otherwise, because reading and writing on a connection cannot be simultaneous
-///     // without threads or async, we can deadlock the two processes by having both sides wait for
-///     // the write buffer to be emptied by the other.
+///     // Since our client example sends first, the server should receive a line and only then
+///     // send a response. Otherwise, because receiving from and sending to a connection cannot be
+///     // simultaneous without threads or async, we can deadlock the two processes by having both
+///     // sides wait for the send buffer to be emptied by the other.
 ///     conn.read_line(&mut buffer)?;
 ///
-///     // Now that the read has come through and the client is waiting on the server's write, do
-///     // it. (`.get_mut()` is to get the writer, `BufReader` doesn't implement a pass-through
+///     // Now that the receive has come through and the client is waiting on the server's send, do
+///     // it. (`.get_mut()` is to get the sender, `BufReader` doesn't implement a pass-through
 ///     // `Write`.)
 ///     conn.get_mut().write_all(b"Hello from server!\n")?;
 ///

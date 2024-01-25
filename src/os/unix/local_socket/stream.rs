@@ -16,12 +16,12 @@ impl LocalSocketStream {
         self.0.set_nonblocking(nonblocking)
     }
     #[inline]
-    pub fn split(self) -> (ReadHalf, WriteHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         let arc = Arc::new(self);
-        (ReadHalf(Arc::clone(&arc)), WriteHalf(arc))
+        (RecvHalf(Arc::clone(&arc)), SendHalf(arc))
     }
     #[inline]
-    pub fn reunite(rh: ReadHalf, sh: WriteHalf) -> Result<Self, ReuniteError<ReadHalf, WriteHalf>> {
+    pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
         if !Arc::ptr_eq(&rh.0, &sh.0) {
             return Err(ReuniteError { rh, sh });
         }
@@ -39,9 +39,9 @@ multimacro! {
 }
 
 #[derive(Debug)]
-pub struct ReadHalf(pub(super) Arc<LocalSocketStream>);
+pub struct RecvHalf(pub(super) Arc<LocalSocketStream>);
 multimacro! {
-    ReadHalf,
+    RecvHalf,
     forward_rbv(LocalSocketStream, *),
     forward_sync_ref_read,
     forward_as_handle,
@@ -49,9 +49,9 @@ multimacro! {
 }
 
 #[derive(Debug)]
-pub struct WriteHalf(pub(super) Arc<LocalSocketStream>);
+pub struct SendHalf(pub(super) Arc<LocalSocketStream>);
 multimacro! {
-    WriteHalf,
+    SendHalf,
     forward_rbv(LocalSocketStream, *),
     forward_sync_ref_write,
     forward_as_handle,
