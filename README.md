@@ -2,7 +2,7 @@
 [![Docs.rs](https://img.shields.io/badge/documentation-docs.rs-informational)](https://docs.rs/interprocess "interprocess on Docs.rs")
 [![Build Status](https://github.com/kotauskas/interprocess/workflows/Checks%20and%20tests/badge.svg)](https://github.com/kotauskas/interprocess/actions "GitHub Actions page for Interprocess")
 ![maintenance-status](https://img.shields.io/badge/maintenance-actively%20developed-brightgreen)
-[![Rust version: 1.70+](https://img.shields.io/badge/rust%20version-1.70+-orange)][blogpost]
+[![Rust version: 1.74+](https://img.shields.io/badge/rust%20version-1.74+-orange)][blogpost]
 
 Interprocess communication toolkit for Rust programs. This crate aims to expose as many platform-specific features as
 possible while maintaining a uniform interface for all platforms.
@@ -81,4 +81,4 @@ This crate, along with all community contributions made to it, is dual-licensed 
 
 [MIT license]: https://choosealicense.com/licenses/mit/
 [Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
-[blogpost]: https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html
+[blogpost]: https://blog.rust-lang.org/2023/11/16/Rust-1.74.0.html
