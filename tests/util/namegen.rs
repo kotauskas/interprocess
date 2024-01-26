@@ -11,7 +11,15 @@ impl NameGen {
         Self { rng: Xorshift32::from_id(id), namespaced }
     }
     fn next_path(&mut self) -> Arc<str> {
-        format!("/tmp/interprocess-test-{:08x}.sock", self.rng.next()).into()
+        let rn = self.rng.next();
+        if cfg!(windows) {
+            format!(r"\\.\pipe\interprocess-test-{rn:08x}.sock")
+        } else if cfg!(unix) {
+            format!("/tmp/interprocess-test-{rn:08x}.sock")
+        } else {
+            unreachable!()
+        }
+        .into()
     }
     fn next_namespaced(&mut self) -> Arc<str> {
         format!("@interprocess-test-{:08x}.sock", self.rng.next()).into()

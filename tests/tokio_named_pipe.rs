@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use color_eyre::eyre::Context;
-use std::{convert::TryInto, ffi::OsStr, future::Future, io, sync::Arc};
+use std::{convert::TryInto, future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
 
 #[tokio::test]
@@ -40,8 +40,8 @@ async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
     mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
     mut acceptfut: impl FnMut(Arc<L>) -> T,
 ) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut NameGen::new(id, true), |nm| {
-        createfn(PipeListenerOptions::new().name(nm.as_ref() as &OsStr)).map(Arc::new)
+    let (name, listener) = listen_and_pick_name(&mut NameGen::new(id, false), |nm| {
+        createfn(PipeListenerOptions::new().path(Path::new(nm))).map(Arc::new)
     })?;
 
     let _ = name_sender.send(name);

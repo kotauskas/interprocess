@@ -7,6 +7,8 @@ impmod! {local_socket,
     LocalSocketListener as LocalSocketListenerImpl
 }
 
+// TODO drop guard
+
 /// A local socket server, listening for connections.
 ///
 /// # Examples

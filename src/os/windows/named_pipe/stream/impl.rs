@@ -17,7 +17,6 @@ use crate::os::windows::{
     FileHandle,
 };
 use std::{
-    ffi::OsStr,
     io::{self, prelude::*},
     marker::PhantomData,
     mem::MaybeUninit,

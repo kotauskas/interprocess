@@ -1,5 +1,7 @@
+use std::{ffi::OsStr, path::Path};
+
 use super::*;
-use crate::os::windows::named_pipe::path_conversion;
+use crate::os::windows::named_pipe::path_conversion::*;
 use windows_sys::Win32::{Foundation::ERROR_PIPE_BUSY, System::Pipes::PIPE_READMODE_MESSAGE};
 
 impl RawPipeStream {
@@ -13,17 +15,24 @@ impl RawPipeStream {
         Self::new(handle, false)
     }
 
-    pub(super) fn connect(
+    fn connect(path: &Path, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
+        Self::_connect(&encode_to_utf16(path.as_os_str()), recv, send)
+    }
+
+    fn connect_with_prepend(
         pipename: &OsStr,
         hostname: Option<&OsStr>,
         recv: Option<PipeMode>,
         send: Option<PipeMode>,
     ) -> io::Result<Self> {
-        let path = path_conversion::convert_and_encode_path(pipename, hostname);
+        Self::_connect(&convert_and_encode_path(pipename, hostname), recv, send)
+    }
+
+    fn _connect(path: &[u16], recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
         let handle = loop {
-            match connect_without_waiting(&path, recv, send, false) {
+            match connect_without_waiting(path, recv, send, false) {
                 Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
-                    block_for_server(&path, WaitTimeout::DEFAULT)?;
+                    block_for_server(path, WaitTimeout::DEFAULT)?;
                     continue;
                 }
                 els => break els,
@@ -43,21 +52,19 @@ impl RawPipeStream {
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically),
-    /// blocking until a server instance is dispatched.
-    pub fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE, Sm::MODE)?;
-        Ok(Self::new(raw))
+    /// Connects to the specified named pipe at the specified path (the `\\<hostname>\pipe\` prefix
+    /// is not added automatically), blocking until a server instance is dispatched.
+    #[inline]
+    pub fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
+        RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE).map(Self::new)
     }
-    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix
-    /// is added automatically), blocking until a server instance is dispatched.
-    pub fn connect_to_remote(
-        pipename: impl AsRef<OsStr>,
-        hostname: impl AsRef<OsStr>,
+
+    #[inline]
+    pub(crate) fn connect_with_prepend(
+        pipename: &OsStr,
+        hostname: Option<&OsStr>,
     ) -> io::Result<Self> {
-        let raw =
-            RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE)?;
-        Ok(Self::new(raw))
+        RawPipeStream::connect_with_prepend(pipename, hostname, Rm::MODE, Sm::MODE).map(Self::new)
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the

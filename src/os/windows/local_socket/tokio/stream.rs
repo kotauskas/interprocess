@@ -8,17 +8,21 @@ use crate::{
 };
 use std::{io, os::windows::prelude::*};
 
-type LocalSocketStreamImpl = DuplexPipeStream<Bytes>;
+type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
+pub struct LocalSocketStream(pub(super) StreamImpl);
 impl LocalSocketStream {
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = LocalSocketStreamImpl::connect(name.inner()).await?;
-        Ok(Self(inner))
+        if name.is_namespaced() {
+            StreamImpl::connect_with_prepend(name.inner(), None).await
+        } else {
+            StreamImpl::connect(name.inner()).await
+        }
+        .map(Self)
     }
     #[inline]
     pub fn split(self) -> (RecvHalf, SendHalf) {
@@ -27,7 +31,7 @@ impl LocalSocketStream {
     }
     #[inline]
     pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
-        LocalSocketStreamImpl::reunite(rh.0, sh.0)
+        StreamImpl::reunite(rh.0, sh.0)
             .map(Self)
             .map_err(|ReuniteError { rh, sh }| ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) })
     }
@@ -37,7 +41,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
     type Error = FromHandleError;
 
     fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-        match LocalSocketStreamImpl::try_from(handle) {
+        match StreamImpl::try_from(handle) {
             Ok(s) => Ok(Self(s)),
             Err(e) => Err(FromHandleError {
                 details: Default::default(),
@@ -50,8 +54,8 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 
 multimacro! {
     LocalSocketStream,
-    pinproj_for_unpin(LocalSocketStreamImpl),
-    forward_rbv(LocalSocketStreamImpl, &),
+    pinproj_for_unpin(StreamImpl),
+    forward_rbv(StreamImpl, &),
     forward_tokio_rw,
     forward_tokio_ref_rw,
     forward_as_handle,

@@ -29,18 +29,3 @@ pub fn to_local_socket_name_osstr(osstr: &OsStr) -> LocalSocketName<'_> {
 pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'static> {
     LocalSocketName::from_raw_parts(Cow::Owned(osstring), true)
 }
-
-/*
-/// Helper function to check whether a series of UTF-16 bytes starts with `\\.\pipe\`.
-fn has_pipefs_prefix(val: impl IntoIterator<Item = u16>) -> bool {
-    const BKSLSH: u16 = '\\' as _;
-    const PERIOD: u16 = '.' as _;
-    const P: u16 = 'p' as _;
-    const I: u16 = 'i' as _;
-    const E: u16 = 'e' as _;
-    static PIPEFS_PREFIX: [u16; 9] = [BKSLSH, BKSLSH, PERIOD, BKSLSH, P, I, P, E, BKSLSH];
-    PIPEFS_PREFIX.iter().copied().eq(val)
-}*/
-
-// TODO add Path/PathBuf special-case for \\.\pipe\*
-// Maybe use namespaced = false to signify that \\.\pipe\ does not need to be prepended.

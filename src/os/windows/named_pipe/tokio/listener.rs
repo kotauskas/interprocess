@@ -35,7 +35,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use tokio::{io::{AsyncReadExt, AsyncWriteExt}, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
-/// use std::{ffi::OsStr, io};
+/// use std::{path::Path, io};
 ///
 /// // Describe the things we do when we've got a connection ready.
 /// async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
@@ -74,7 +74,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 ///
 /// // Create our listener.
 /// let listener = PipeListenerOptions::new()
-///     .name(OsStr::new(PIPE_NAME))
+///     .path(Path::new(PIPE_NAME))
 ///     .create_tokio_duplex::<pipe_mode::Bytes>()?;
 ///
 /// // The syncronization between the server and client, if any is used, goes here.

@@ -5,8 +5,8 @@ mod msg;
 
 use crate::{os::windows::named_pipe::PipeListenerOptions, testutil::*};
 use std::{
-    ffi::OsStr,
     io,
+    path::Path,
     sync::{mpsc::Sender, Arc},
 };
 
@@ -57,8 +57,8 @@ fn drive_server<L>(
     mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
 ) -> TestResult {
-    let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(id, true), |nm| {
-        createfn(PipeListenerOptions::new().name(nm.as_ref() as &OsStr))
+    let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(id, false), |nm| {
+        createfn(PipeListenerOptions::new().path(Path::new(nm)))
     })?;
 
     let _ = name_sender.send(name);

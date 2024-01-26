@@ -1,15 +1,15 @@
 use super::{
-    path_conversion, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
+    path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
 };
 use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
-    ffi::OsStr,
     fmt::{self, Debug, Formatter},
     io,
     marker::PhantomData,
     mem::replace,
     num::{NonZeroU32, NonZeroU8},
+    path::Path,
     ptr,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
@@ -24,6 +24,8 @@ use windows_sys::Win32::{
     },
     System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
 };
+
+// TODO split up
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
@@ -132,10 +134,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
-    /// Specifies the name for the named pipe. Since the name typically, but not always, is a string
-    /// literal, an owned string does not need to be provided.
-    // TODO turn to Path
-    pub name: Cow<'a, OsStr>,
+    /// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
+    /// automatically appended!
+    pub path: Cow<'a, Path>,
     /// Specifies how data is written into the data stream. This is required in all cases,
     /// regardless of whether the pipe is inbound, outbound or duplex, since this affects all data
     /// being written into the pipe, not just the data written by the server.
@@ -193,6 +194,7 @@ macro_rules! genset {
             ") parameter to the specified value."
         )]
         #[must_use = "builder setters take the entire structure and return the result"]
+        // FIXME this Into bound probably doesn't work all too well for `path`
         pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
             self.$name = $name.into();
             self
@@ -206,7 +208,7 @@ impl<'a> PipeListenerOptions<'a> {
     /// Creates a new builder with default options.
     pub fn new() -> Self {
         Self {
-            name: Cow::Borrowed(OsStr::new("")),
+            path: Cow::Borrowed(Path::new("")),
             mode: PipeMode::Bytes,
             nonblocking: false,
             instance_limit: None,
@@ -227,7 +229,7 @@ impl<'a> PipeListenerOptions<'a> {
         // to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
         // RFC for this, would be nice.
         PipeListenerOptions {
-            name: Cow::Owned(self.name.clone().into_owned()),
+            path: Cow::Owned(self.path.clone().into_owned()),
             mode: self.mode,
             nonblocking: self.nonblocking,
             instance_limit: self.instance_limit,
@@ -239,7 +241,7 @@ impl<'a> PipeListenerOptions<'a> {
         }
     }
     genset!(
-        name: Cow<'a, OsStr>,
+        path: Cow<'a, Path>,
         mode: PipeMode,
         nonblocking: bool,
         instance_limit: Option<NonZeroU8>,
@@ -268,7 +270,7 @@ cannot create pipe server that has byte type but receives messages – have you 
             ));
         }
 
-        let path = path_conversion::convert_and_encode_path(&self.name, None);
+        let path = encode_to_utf16(self.path.as_os_str());
         let open_mode = self.open_mode(first, role, overlapped);
         let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 

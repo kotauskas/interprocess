@@ -38,7 +38,6 @@ pub fn convert_and_encode_path(pipename: &OsStr, hostname: Option<&OsStr>) -> Ve
     path.push(0); // Don't forget the nul terminator!
     path
 }
-#[allow(dead_code)]
 pub fn encode_to_utf16(s: &OsStr) -> Vec<u16> {
     let mut path = s.encode_wide().collect::<Vec<u16>>();
     path.push(0);

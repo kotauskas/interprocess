@@ -1,10 +1,11 @@
 use super::*;
 use crate::os::windows::named_pipe::{
-    connect_without_waiting, path_conversion,
+    connect_without_waiting,
+    path_conversion::*,
     stream::{block_for_server, WaitTimeout},
     MaybeArc, NeedsFlushVal, PipeMode,
 };
-use std::ffi::OsStr;
+use std::{ffi::OsStr, path::Path};
 
 impl RawPipeStream {
     pub(super) fn new(inner: InnerTokio) -> Self {
@@ -31,14 +32,28 @@ impl RawPipeStream {
     }
 
     async fn connect(
+        path: &Path,
+        recv: Option<PipeMode>,
+        send: Option<PipeMode>,
+    ) -> io::Result<Self> {
+        Self::_connect(encode_to_utf16(path.as_os_str()), recv, send).await
+    }
+
+    async fn connect_with_prepend(
         pipename: &OsStr,
         hostname: Option<&OsStr>,
         recv: Option<PipeMode>,
         send: Option<PipeMode>,
     ) -> io::Result<Self> {
-        // FIXME should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
+        Self::_connect(convert_and_encode_path(pipename, hostname), recv, send).await
+    }
 
-        let mut path = Some(path_conversion::convert_and_encode_path(pipename, hostname));
+    async fn _connect(
+        path: Vec<u16>,
+        recv: Option<PipeMode>,
+        send: Option<PipeMode>,
+    ) -> io::Result<Self> {
+        let mut path = Some(path);
         let client = loop {
             match connect_without_waiting(path.as_ref().unwrap(), recv, send, true) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -50,6 +65,7 @@ impl RawPipeStream {
         };
         let client = unsafe { TokioNPClient::from_raw_handle(client.into_raw_handle())? };
         /* MESSAGE READING DISABLED
+        // FIXME should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
         if recv == Some(PipeMode::Messages) {
         set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
         }
@@ -59,26 +75,23 @@ impl RawPipeStream {
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Connects to the specified named pipe (the `\\.\pipe\` prefix is added automatically),
-    /// waiting until a server instance is dispatched.
-    pub async fn connect(pipename: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(pipename.as_ref(), None, Rm::MODE, Sm::MODE).await?;
-        Ok(Self::new(raw))
+    /// Connects to the specified named pipe at the specified path (the `\\<hostname>\pipe\` prefix
+    /// is not added automatically), waiting until a server instance is dispatched.
+    #[inline]
+    pub async fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
+        RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE).await.map(Self::new)
     }
-    /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix
-    /// is added automatically), blocking until a server instance is dispatched.
-    pub async fn connect_to_remote(
-        pipename: impl AsRef<OsStr>,
-        hostname: impl AsRef<OsStr>,
-    ) -> io::Result<Self> {
-        let raw =
-            RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE)
-                .await?;
-        Ok(Self::new(raw))
-    }
-}
 
-impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
+    #[inline]
+    pub(crate) async fn connect_with_prepend(
+        pipename: &OsStr,
+        hostname: Option<&OsStr>,
+    ) -> io::Result<Self> {
+        RawPipeStream::connect_with_prepend(pipename, hostname, Rm::MODE, Sm::MODE)
+            .await
+            .map(Self::new)
+    }
+
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the
     /// thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
