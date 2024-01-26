@@ -15,7 +15,8 @@ macro_rules! ensure_eq {
     ($left:expr, $right:expr $(,)?) => {
         match (&$left, &$right) {
             (left_val, right_val) => {
-                ::color_eyre::eyre::ensure!((left_val == right_val), r#"assertion failed: `(left == right)`
+                ::color_eyre::eyre::ensure!((left_val == right_val),
+                r#"assertion failed: `(left == right)`
   left: `{:?}`,
  right: `{:?}`"#, left_val, right_val);
             }
@@ -24,7 +25,8 @@ macro_rules! ensure_eq {
     ($left:expr, $right:expr, $($arg:tt)+) => {
         match (&$left, &$right) {
             (left_val, right_val) => {
-                ::color_eyre::eyre::ensure!((left_val == right_val), r#"assertion failed: `(left == right)`
+                ::color_eyre::eyre::ensure!((left_val == right_val),
+                r#"assertion failed: `(left == right)`
   left: `{:?}`,
  right: `{:?}`: {}"#, left_val, right_val, ::core::format_args!($($arg)+));
             }

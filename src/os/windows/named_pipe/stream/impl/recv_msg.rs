@@ -90,7 +90,11 @@ impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;
     #[inline]
-    fn recv_msg(&mut self, buf: &mut MsgBuf<'_>, _: Option<&mut NoAddrBuf>) -> io::Result<RecvResult> {
+    fn recv_msg(
+        &mut self,
+        buf: &mut MsgBuf<'_>,
+        _: Option<&mut NoAddrBuf>,
+    ) -> io::Result<RecvResult> {
         self.raw.recv_msg(buf)
     }
 }
@@ -98,7 +102,11 @@ impl<Sm: PipeModeTag> RecvMsg for PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;
     #[inline]
-    fn recv_msg(&mut self, buf: &mut MsgBuf<'_>, _: Option<&mut NoAddrBuf>) -> io::Result<RecvResult> {
+    fn recv_msg(
+        &mut self,
+        buf: &mut MsgBuf<'_>,
+        _: Option<&mut NoAddrBuf>,
+    ) -> io::Result<RecvResult> {
         (&*self).recv_msg(buf, None)
     }
 }

@@ -24,32 +24,32 @@ pub enum ImplType {
 impl ImplType {
     /// An array of all [`ImplType`]s, for convenient iteration.
     pub const ALL_TYPES: &[ImplType] = &[Self::UdSocket, Self::WindowsNamedPipe];
-    /// Returns the [`ImplProperties`] for this implementation type at the lowest guaranteed level on the target
-    /// platform, regardless of runtime circumstances (such as the OS version), or `None` if it is not guaranteed to be
-    /// supported.
+    /// Returns the [`ImplProperties`] for this implementation type at the lowest guaranteed level
+    /// on the target platform, regardless of runtime circumstances (such as the OS version), or
+    /// `None` if it is not guaranteed to be supported.
     ///
-    /// For example, querying this for `UdSocket` on Windows will always return `None`, since versions of Windows before
-    /// Windows 10 update 1803 do not support them.
+    /// For example, querying this for `UdSocket` on Windows will always return `None`, since
+    /// versions of Windows before Windows 10 update 1803 do not support them.
     pub const fn get_always_supported_properties(self) -> Option<ImplProperties> {
         todo!()
     }
-    /// Returns `true` if this implementation type is guaranteed to be supported on the target platform regardless of
-    /// runtime circumstances (such as the OS version), `false` otherwise.
+    /// Returns `true` if this implementation type is guaranteed to be supported on the target
+    /// platform regardless of runtime circumstances (such as the OS version), `false` otherwise.
     #[inline(always)]
     pub const fn is_always_supported(self) -> bool {
         self.get_always_supported_properties().is_some()
     }
-    /// Returns the [`ImplProperties`] for this implementation type in the current runtime circumstances, or `None` if
-    /// it is not supported.
+    /// Returns the [`ImplProperties`] for this implementation type in the current runtime
+    /// circumstances, or `None` if it is not supported.
     ///
-    /// For example, querying this for `UdSocket` on Windows will return `Some(...)` on Windows 10 update 1803 and
-    /// later, unlike [`get_always_supported_properties()`] which will err on the side of caution and state that not all
-    /// Windows systems support Unix-domain sockets.
+    /// For example, querying this for `UdSocket` on Windows will return `Some(...)` on Windows 10
+    /// update 1803 and later, unlike [`get_always_supported_properties()`] which will err on the
+    /// side of caution and state that not all Windows systems support Unix-domain sockets.
     pub fn get_properties(self) -> Option<ImplProperties> {
         todo!()
     }
-    /// Returns `true` if this implementation type is supported by the OS in the current runtime circumstances, `false`
-    /// otherwise.
+    /// Returns `true` if this implementation type is supported by the OS in the current runtime
+    /// circumstances, `false` otherwise.
     #[inline(always)]
     pub fn is_supported(self) -> bool {
         self.get_properties().is_some()

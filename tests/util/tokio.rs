@@ -9,8 +9,9 @@ use tokio::{
     task, try_join,
 };
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the
-/// follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure,
+/// then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting
+/// which side produced the error.
 pub async fn drive_pair<T, Ld, Ldf, Fl, Flf>(
     leader: Ld,
     leader_name: &str,
@@ -26,20 +27,19 @@ where
     let (sender, receiver) = channel();
 
     let leading_task = async {
-        leader(sender)
-            .await
-            .with_context(|| format!("{leader_name} exited early with error"))
+        leader(sender).await.with_context(|| format!("{leader_name} exited early with error"))
     };
     let following_task = async {
         let msg = receiver.await?;
-        follower(msg)
-            .await
-            .with_context(|| format!("{follower_name} exited early with error"))
+        follower(msg).await.with_context(|| format!("{follower_name} exited early with error"))
     };
     try_join!(leading_task, following_task).map(|((), ())| ())
 }
 
-pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(server: Srv, client: Clt) -> TestResult
+pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(
+    server: Srv,
+    client: Clt,
+) -> TestResult
 where
     T: Send + Sync + ?Sized + 'static,
     Srv: FnOnce(Sender<Arc<T>>, u32) -> Srvf + Send + 'static,

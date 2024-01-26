@@ -4,14 +4,13 @@ macro_rules! forward_sync_read {
         impl $(<$($lt)*>)? ::std::io::Read for $ty {
             $($(#[$a2])?)?
             #[inline(always)]
-            fn read(&mut self, buf: &mut [u8]) -> ::std::io::Result<usize> {
-                self.0.read(buf)
-            }
+            fn read(&mut self, buf: &mut [u8]) -> ::std::io::Result<usize> { self.0.read(buf) }
             $($($(#[$a3])?)?)?
             #[inline(always)]
-            fn read_vectored(&mut self, bufs: &mut [::std::io::IoSliceMut<'_>]) -> ::std::io::Result<usize> {
-                self.0.read_vectored(bufs)
-            }
+            fn read_vectored(
+                &mut self,
+                bufs: &mut [::std::io::IoSliceMut<'_>],
+            ) -> ::std::io::Result<usize> { self.0.read_vectored(bufs) }
             // read_to_end isn't here because this macro isn't supposed to be used on Chain-like
             // adapters
             // FUTURE is_read_vectored
@@ -20,31 +19,34 @@ macro_rules! forward_sync_read {
 }
 
 macro_rules! forward_sync_write {
-    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    (
+        $({$($lt:tt)*})? $ty:ty
+        $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?
+    ) => {
         $(#[$a1])?
         impl $(<$($lt)*>)? ::std::io::Write for $ty {
             $($(#[$a2])?)?
             #[inline(always)]
-            fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
-                self.0.write(buf)
-            }
+            fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> { self.0.write(buf) }
             $($(#[$a2])?)?
             #[inline(always)]
-            fn flush(&mut self) -> ::std::io::Result<()> {
-                self.0.flush()
-            }
+            fn flush(&mut self) -> ::std::io::Result<()> { self.0.flush() }
             $($($($(#[$a4])?)?)?)?
             #[inline(always)]
-            fn write_vectored(&mut self, bufs: &[::std::io::IoSlice<'_>]) -> ::std::io::Result<usize> {
-                self.0.write_vectored(bufs)
-            }
+            fn write_vectored(
+                &mut self,
+                bufs: &[::std::io::IoSlice<'_>],
+            ) -> ::std::io::Result<usize> { self.0.write_vectored(bufs) }
             // FUTURE is_write_vectored
         }
     };
 }
 
 macro_rules! forward_sync_rw {
-    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    (
+        $({$($lt:tt)*})? $ty:ty
+        $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?
+    ) => {
         forward_sync_read!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
         forward_sync_write!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
     };
@@ -61,42 +63,49 @@ macro_rules! forward_sync_ref_read {
             }
             $($($(#[$a3])?)?)?
             #[inline(always)]
-            fn read_vectored(&mut self, bufs: &mut [::std::io::IoSliceMut<'_>]) -> ::std::io::Result<usize> {
-                self.refwd().read_vectored(bufs)
-            }
+            fn read_vectored(
+                &mut self,
+                bufs: &mut [::std::io::IoSliceMut<'_>],
+            ) -> ::std::io::Result<usize> { self.refwd().read_vectored(bufs) }
             // FUTURE is_read_vectored
         }
     };
 }
 
 macro_rules! forward_sync_ref_write {
-    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    (
+        $({$($lt:tt)*})? $ty:ty
+        $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?
+    ) => {
         $(#[$a1])?
         impl $(<$($lt)*>)? ::std::io::Write for &$ty {
             $($(#[$a2])?)?
             #[inline(always)]
-            fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
-                self.refwd().write(buf)
-            }
+            fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> { self.refwd().write(buf) }
             $($($(#[$a3])?)?)?
             #[inline(always)]
-            fn flush(&mut self) -> ::std::io::Result<()> {
-                self.refwd().flush()
-            }
+            fn flush(&mut self) -> ::std::io::Result<()> { self.refwd().flush() }
             $($($($(#[$a4])?)?)?)?
             #[inline(always)]
-            fn write_vectored(&mut self, bufs: &[::std::io::IoSlice<'_>]) -> ::std::io::Result<usize> {
-                self.refwd().write_vectored(bufs)
-            }
+            fn write_vectored(
+                &mut self,
+                bufs: &[::std::io::IoSlice<'_>],
+            ) -> ::std::io::Result<usize> { self.refwd().write_vectored(bufs) }
             // FUTURE is_write_vectored
         }
     };
 }
 
 macro_rules! forward_sync_ref_rw {
-    ($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?) => {
+    (
+        $({$($lt:tt)*})? $ty:ty
+        $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta] $(, #[$a4:meta])?)?)?)?
+    ) => {
         forward_sync_ref_read!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3])?)?)?);
-        forward_sync_ref_write!($({$($lt)*})? $ty $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?);
+        forward_sync_ref_write!(
+            $({$($lt)*})? $ty
+            $(, #[$a1] $(, #[$a2] $(, #[$a3] $(, #[$a4])?)?)?)?
+        );
     };
 }
 

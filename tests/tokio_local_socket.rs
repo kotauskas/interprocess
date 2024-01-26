@@ -13,7 +13,8 @@ use crate::{
 async fn test_stream(nmspc: bool) -> TestResult {
     use stream::*;
     testinit();
-    testutil::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client).await
+    testutil::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client)
+        .await
 }
 
 #[tokio::test]

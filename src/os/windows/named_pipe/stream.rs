@@ -138,12 +138,14 @@ pub(crate) struct RawPipeStream {
 /// Not to be confused with the Tokio version.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FromHandleErrorKind {
-    /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a pipe client.
+    /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a
+    /// pipe client.
     IsServerCheckFailed,
-    /// The type being converted into has message semantics, but it wasn't possible to determine whether message
-    /// boundaries are preserved in the pipe.
+    /// The type being converted into has message semantics, but it wasn't possible to determine
+    /// whether message boundaries are preserved in the pipe.
     MessageBoundariesCheckFailed,
-    /// The type being converted into has message semantics, but message boundaries are not preserved in the pipe.
+    /// The type being converted into has message semantics, but message boundaries are not
+    /// preserved in the pipe.
     NoMessageBoundaries,
 }
 impl FromHandleErrorKind {
@@ -151,7 +153,9 @@ impl FromHandleErrorKind {
         use FromHandleErrorKind::*;
         match self {
             IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
-            MessageBoundariesCheckFailed => "failed to make sure that the pipe preserves message boundaries",
+            MessageBoundariesCheckFailed => {
+                "failed to make sure that the pipe preserves message boundaries"
+            }
             NoMessageBoundaries => "the pipe does not preserve message boundaries",
         }
     }

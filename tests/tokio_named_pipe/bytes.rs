@@ -2,7 +2,9 @@ use super::drive_server;
 use crate::{
     os::windows::named_pipe::{
         pipe_mode,
-        tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+        tokio::{
+            DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream,
+        },
     },
     testutil::{message, TestResult},
 };
@@ -49,17 +51,23 @@ pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> Test
     .await
 }
 
-async fn handle_conn_duplex(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>>) -> TestResult {
+async fn handle_conn_duplex(
+    listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>>,
+) -> TestResult {
     let (mut recver, mut sender) = listener.accept().await.context("accept failed")?.split();
     try_join!(recv(&mut recver, msg(false)), send(&mut sender, msg(true)))?;
     DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
     Ok(())
 }
-async fn handle_conn_cts(listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::None>>) -> TestResult {
+async fn handle_conn_cts(
+    listener: Arc<PipeListener<pipe_mode::Bytes, pipe_mode::None>>,
+) -> TestResult {
     let mut recver = listener.accept().await.context("accept failed")?;
     recv(&mut recver, msg(false)).await
 }
-async fn handle_conn_stc(listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Bytes>>) -> TestResult {
+async fn handle_conn_stc(
+    listener: Arc<PipeListener<pipe_mode::None, pipe_mode::Bytes>>,
+) -> TestResult {
     let mut sender = listener.accept().await.context("accept failed")?;
     send(&mut sender, msg(true)).await
 }
@@ -74,15 +82,13 @@ pub async fn client_duplex(name: Arc<str>) -> TestResult {
     Ok(())
 }
 pub async fn client_cts(name: Arc<str>) -> TestResult {
-    let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
-        .await
-        .context("connect failed")?;
+    let mut sender =
+        SendPipeStream::<pipe_mode::Bytes>::connect(&*name).await.context("connect failed")?;
     send(&mut sender, msg(false)).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
-    let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
-        .await
-        .context("connect failed")?;
+    let mut recver =
+        RecvPipeStream::<pipe_mode::Bytes>::connect(&*name).await.context("connect failed")?;
     recv(&mut recver, msg(true)).await
 }
 

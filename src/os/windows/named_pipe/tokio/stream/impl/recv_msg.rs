@@ -4,7 +4,11 @@ use super::*;
 use std::mem::MaybeUninit;
 
 impl RawPipeStream {
-    fn poll_read_uninit(&self, cx: &mut Context<'_>, buf: &mut [MaybeUninit<u8>]) -> Poll<io::Result<usize>> {
+    fn poll_read_uninit(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut [MaybeUninit<u8>],
+    ) -> Poll<io::Result<usize>> {
         let mut readbuf = ReadBuf::uninit(buf);
         ready!(self.poll_read_readbuf(cx, &mut readbuf).map(downgrade_eof))?;
         Poll::Ready(Ok(readbuf.filled().len()))
@@ -39,7 +43,9 @@ impl RawPipeStream {
             None,
             None,
         )) {
-            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => return Poll::Ready(Ok(RecvResult::EndOfStream)),
+            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
+                return Poll::Ready(Ok(RecvResult::EndOfStream))
+            }
             els => els,
         }?;
         eprintln!("DBG mode {:#x}", mode);
@@ -49,10 +55,7 @@ impl RawPipeStream {
             RecvMsgState::NotRecving => {
                 buf.set_fill(0);
                 buf.has_msg = false;
-                *state = RecvMsgState::Looping {
-                    spilled: false,
-                    partial: false,
-                };
+                *state = RecvMsgState::Looping { spilled: false, partial: false };
                 self.poll_recv_msg(cx, buf, Some(state))
             }
             RecvMsgState::Looping { spilled, partial } => {

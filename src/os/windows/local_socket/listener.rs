@@ -1,7 +1,9 @@
 use super::LocalSocketStream;
 use crate::{
     local_socket::ToLocalSocketName,
-    os::windows::named_pipe::{pipe_mode::Bytes, PipeListener as GenericPipeListener, PipeListenerOptions, PipeMode},
+    os::windows::named_pipe::{
+        pipe_mode::Bytes, PipeListener as GenericPipeListener, PipeListenerOptions, PipeMode,
+    },
 };
 use std::io;
 
@@ -12,10 +14,8 @@ pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
-        let inner = PipeListenerOptions::new()
-            .name(name.into_inner())
-            .mode(PipeMode::Bytes)
-            .create()?;
+        let inner =
+            PipeListenerOptions::new().name(name.into_inner()).mode(PipeMode::Bytes).create()?;
         Ok(Self(inner))
     }
     pub fn accept(&self) -> io::Result<LocalSocketStream> {

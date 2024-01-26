@@ -84,10 +84,7 @@ impl<'a> ToLocalSocketName<'a> for &'a Path {
 /// Converts an owned [`PathBuf`] to an owned file-type [`LocalSocketName`].
 impl ToLocalSocketName<'static> for PathBuf {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Owned(self.into_os_string()),
-            false,
-        ))
+        Ok(LocalSocketName::from_raw_parts(Cow::Owned(self.into_os_string()), false))
     }
 }
 /// Converts a borrowed [`OsStr`] to a borrowed [`LocalSocketName`] with the same lifetime. On

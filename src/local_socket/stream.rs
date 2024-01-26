@@ -7,8 +7,9 @@ impmod! {local_socket,
     SendHalf as SendHalfImpl,
 }
 
-/// A local socket byte stream, obtained eiter from [`LocalSocketListener`](super::LocalSocketListener) or by connecting
-/// to an existing local socket.
+/// A local socket byte stream, obtained eiter from
+/// [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local
+/// socket.
 ///
 /// # Examples
 ///
@@ -86,12 +87,12 @@ impl LocalSocketStream {
     /// this method on streams that haven't been split to begin with).
     #[inline]
     pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
-        LocalSocketStreamImpl::reunite(rh.0, sh.0)
-            .map(Self)
-            .map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+        LocalSocketStreamImpl::reunite(rh.0, sh.0).map(Self).map_err(
+            |crate::error::ReuniteError { rh, sh }| ReuniteError {
                 rh: RecvHalf(rh),
                 sh: SendHalf(sh),
-            })
+            },
+        )
     }
 }
 multimacro! {

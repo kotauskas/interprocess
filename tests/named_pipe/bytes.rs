@@ -1,6 +1,8 @@
 use super::drive_server;
 use crate::{
-    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream},
+    os::windows::named_pipe::{
+        pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream,
+    },
     testutil::*,
 };
 use color_eyre::eyre::Context;
@@ -13,7 +15,9 @@ fn msg(server: bool) -> Box<str> {
     message(None, server, Some('\n'))
 }
 
-fn handle_conn_duplex(listener: &mut PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>) -> TestResult {
+fn handle_conn_duplex(
+    listener: &mut PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>,
+) -> TestResult {
     let (mut recver, mut sender) = listener.accept().context("accept failed")?.split();
     recv(&mut recver, msg(false))?;
     send(&mut sender, msg(true))?;
@@ -58,9 +62,8 @@ pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
 }
 
 pub fn client_duplex(name: &str) -> TestResult {
-    let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Bytes>::connect(name)
-        .context("connect failed")?
-        .split();
+    let (mut recver, mut sender) =
+        DuplexPipeStream::<pipe_mode::Bytes>::connect(name).context("connect failed")?.split();
     send(&mut sender, msg(false))?;
     recv(&mut recver, msg(true))?;
     DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;

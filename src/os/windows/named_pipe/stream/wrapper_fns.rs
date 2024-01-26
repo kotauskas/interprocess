@@ -3,10 +3,12 @@ use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use windows_sys::Win32::{
     Foundation::{GENERIC_READ, GENERIC_WRITE},
     Storage::FileSystem::{
-        CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
+        CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
     },
     System::Pipes::{
-        GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState, WaitNamedPipeW, PIPE_NOWAIT,
+        GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState,
+        WaitNamedPipeW, PIPE_NOWAIT,
     },
 };
 
@@ -123,13 +125,8 @@ pub(crate) fn get_named_pipe_handle_state(
             cur_instances.map(toptr).unwrap_or(null),
             max_collection_count.map(toptr).unwrap_or(null),
             collect_data_timeout.map(toptr).unwrap_or(null),
-            username
-                .as_deref_mut()
-                .map(|s| s.as_mut_ptr().cast())
-                .unwrap_or(ptr::null_mut()),
-            username
-                .map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX))
-                .unwrap_or(0),
+            username.as_deref_mut().map(|s| s.as_mut_ptr().cast()).unwrap_or(ptr::null_mut()),
+            username.map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX)).unwrap_or(0),
         ) != 0
     };
     ok_or_ret_errno!(success => ())
@@ -141,8 +138,10 @@ pub(crate) fn set_named_pipe_handle_state(
     collect_data_timeout: Option<u32>,
 ) -> io::Result<()> {
     let (mut mode_, has_mode) = (mode.unwrap_or_default(), mode.is_some());
-    let (mut mcc, has_mcc) = (max_collection_count.unwrap_or_default(), max_collection_count.is_some());
-    let (mut cdt, has_cdt) = (collect_data_timeout.unwrap_or_default(), collect_data_timeout.is_some());
+    let (mut mcc, has_mcc) =
+        (max_collection_count.unwrap_or_default(), max_collection_count.is_some());
+    let (mut cdt, has_cdt) =
+        (collect_data_timeout.unwrap_or_default(), collect_data_timeout.is_some());
     let toptr = |r: &mut u32| r as *mut u32;
     let null = ptr::null_mut();
     let success = unsafe {

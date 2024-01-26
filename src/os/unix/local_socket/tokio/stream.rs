@@ -80,13 +80,21 @@ multimacro! {
 }
 impl AsyncRead for &LocalSocketStream {
     #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         ioloop(|| self.0.try_read_buf(buf), || self.0.poll_read_ready(cx)).map(|e| e.map(|_| ()))
     }
 }
 impl AsyncWrite for &LocalSocketStream {
     #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
         ioloop(|| self.0.try_write(buf), || self.0.poll_write_ready(cx))
     }
     #[inline]
@@ -134,8 +142,13 @@ multimacro! {
 }
 impl AsyncRead for &ReadHalf {
     #[inline]
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        ioloop(|| self.0.try_read_buf(buf), || self.0.as_ref().poll_read_ready(cx)).map(|e| e.map(|_| ()))
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        ioloop(|| self.0.try_read_buf(buf), || self.0.as_ref().poll_read_ready(cx))
+            .map(|e| e.map(|_| ()))
     }
 }
 impl AsFd for ReadHalf {
@@ -155,7 +168,11 @@ multimacro! {
 }
 impl AsyncWrite for &WriteHalf {
     #[inline]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
         ioloop(|| self.0.try_write(buf), || self.0.as_ref().poll_write_ready(cx))
     }
     #[inline]
@@ -164,10 +181,7 @@ impl AsyncWrite for &WriteHalf {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        ioloop(
-            || self.0.try_write_vectored(bufs),
-            || self.0.as_ref().poll_write_ready(cx),
-        )
+        ioloop(|| self.0.try_write_vectored(bufs), || self.0.as_ref().poll_write_ready(cx))
     }
     #[inline]
     fn is_write_vectored(&self) -> bool {

@@ -1,5 +1,5 @@
-//! Forwarding macros that implement safe handle manipulation in terms of a field's implementations. Usually followed up
-//! by one of the derives from `derive_raw`.
+//! Forwarding macros that implement safe handle manipulation in terms of a field's implementations.
+//! Usually followed up by one of the derives from `derive_raw`.
 
 macro_rules! forward_as_handle {
     (@impl $({$($lt:tt)*})? $ty:ty, $hty:ident, $trt:ident, $mtd:ident, $cfg:ident) => {
@@ -100,8 +100,8 @@ macro_rules! forward_handle {
 // TODO deal with this documentation mess (also allow replacing that Error signature with a name)
 macro_rules! forward_try_into_handle {
     (@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
-        /// Releases ownership of the handle/file descriptor, detaches the object from the async runtime and returns the
-        /// handle/file descriptor as an owned object.
+        /// Releases ownership of the handle/file descriptor, detaches the object from the async
+        /// runtime and returns the handle/file descriptor as an owned object.
         ///
         /// # Errors
         /// If called outside the async runtime that corresponds to this type.
@@ -128,8 +128,8 @@ macro_rules! forward_try_into_handle {
 
 macro_rules! forward_try_from_handle {
     (@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
-        /// Creates an async object from a given owned handle/file descriptor. This will also attach the object to the
-        /// async runtime this function is called in.
+        /// Creates an async object from a given owned handle/file descriptor. This will also attach
+        /// the object to the async runtime this function is called in.
         ///
         /// # Errors
         /// If called outside the async runtime that corresponds to this type.

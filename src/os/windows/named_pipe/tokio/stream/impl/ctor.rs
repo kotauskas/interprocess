@@ -51,7 +51,7 @@ impl RawPipeStream {
         let client = unsafe { TokioNPClient::from_raw_handle(client.into_raw_handle())? };
         /* MESSAGE READING DISABLED
         if recv == Some(PipeMode::Messages) {
-            set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
+        set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
         }
         */
         Ok(Self::new_client(client))
@@ -67,20 +67,21 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     }
     /// Connects to the specified named pipe at a remote computer (the `\\<hostname>\pipe\` prefix
     /// is added automatically), blocking until a server instance is dispatched.
-    pub async fn connect_to_remote(pipename: impl AsRef<OsStr>, hostname: impl AsRef<OsStr>) -> io::Result<Self> {
-        let raw = RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE).await?;
+    pub async fn connect_to_remote(
+        pipename: impl AsRef<OsStr>,
+        hostname: impl AsRef<OsStr>,
+    ) -> io::Result<Self> {
+        let raw =
+            RawPipeStream::connect(pipename.as_ref(), Some(hostname.as_ref()), Rm::MODE, Sm::MODE)
+                .await?;
         Ok(Self::new(raw))
     }
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the thing from the wrong
-    /// kind of thing, but that never ever happens, to the best of my ability.
+    /// Internal constructor used by the listener. It's a logic error, but not UB, to create the
+    /// thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
-        Self {
-            raw: MaybeArc::Inline(raw),
-            flush: Mutex::new(None),
-            _phantom: PhantomData,
-        }
+        Self { raw: MaybeArc::Inline(raw), flush: Mutex::new(None), _phantom: PhantomData }
     }
 }

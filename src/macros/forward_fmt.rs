@@ -1,5 +1,9 @@
 use std::fmt::{self, Debug, Formatter};
-pub(crate) fn debug_forward_with_custom_name(nm: &str, fld: &dyn Debug, f: &mut Formatter<'_>) -> fmt::Result {
+pub(crate) fn debug_forward_with_custom_name(
+    nm: &str,
+    fld: &dyn Debug,
+    f: &mut Formatter<'_>,
+) -> fmt::Result {
     f.debug_tuple(nm).field(fld).finish()
 }
 

@@ -1,4 +1,5 @@
-//! Derive macros that implement raw handle manipulation in terms of safe handle manipulation from Rust 1.63+.
+//! Derive macros that implement raw handle manipulation in terms of safe handle manipulation from
+//! Rust 1.63+.
 
 macro_rules! derive_asraw {
     (@impl

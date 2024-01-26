@@ -13,7 +13,8 @@ impl LocalSocketListener {
     }
     #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
-        self.0.accept().map(|(s, _)| LocalSocketStream(s)) // TODO make use of the second return value
+        // TODO make use of the second return value
+        self.0.accept().map(|(s, _)| LocalSocketStream(s))
     }
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
@@ -22,9 +23,7 @@ impl LocalSocketListener {
 }
 impl Debug for LocalSocketListener {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalSocketListener")
-            .field("fd", &self.0.as_raw_fd())
-            .finish()
+        f.debug_struct("LocalSocketListener").field("fd", &self.0.as_raw_fd()).finish()
     }
 }
 multimacro! { LocalSocketListener,

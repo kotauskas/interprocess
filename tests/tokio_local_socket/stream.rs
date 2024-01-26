@@ -14,7 +14,11 @@ fn msg(server: bool, nts: bool) -> Box<str> {
     message(None, server, Some(['\n', '\0'][nts as usize]))
 }
 
-pub async fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced: bool) -> TestResult {
+pub async fn server(
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    namespaced: bool,
+) -> TestResult {
     let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), namespaced), |nm| {
         LocalSocketListener::bind(nm)
     })?;
@@ -47,7 +51,11 @@ pub async fn client(nm: Arc<str>) -> TestResult {
     .map(|((), ())| ())
 }
 
-async fn recv(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRef<str>) -> TestResult {
+async fn recv(
+    stream: &LocalSocketStream,
+    exp1: impl AsRef<str>,
+    exp2: impl AsRef<str>,
+) -> TestResult {
     let mut recver = BufReader::new(stream);
     let mut sbuffer = String::with_capacity(128);
 
@@ -56,10 +64,7 @@ async fn recv(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRe
     sbuffer.clear();
     let mut buffer = sbuffer.into_bytes();
 
-    recver
-        .read_until(b'\0', &mut buffer)
-        .await
-        .context("second receive failed")?;
+    recver.read_until(b'\0', &mut buffer).await.context("second receive failed")?;
     ensure_eq!(
         str::from_utf8(&buffer).context("second received message was not valid UTF-8")?,
         exp2.as_ref(),
@@ -67,14 +72,12 @@ async fn recv(stream: &LocalSocketStream, exp1: impl AsRef<str>, exp2: impl AsRe
 
     Ok(())
 }
-async fn send(mut stream: &LocalSocketStream, msg1: impl AsRef<str>, msg2: impl AsRef<str>) -> TestResult {
-    stream
-        .write_all(msg1.as_ref().as_bytes())
-        .await
-        .context("first send failed")?;
-    stream
-        .write_all(msg2.as_ref().as_bytes())
-        .await
-        .context("second send failed")?;
+async fn send(
+    mut stream: &LocalSocketStream,
+    msg1: impl AsRef<str>,
+    msg2: impl AsRef<str>,
+) -> TestResult {
+    stream.write_all(msg1.as_ref().as_bytes()).await.context("first send failed")?;
+    stream.write_all(msg2.as_ref().as_bytes()).await.context("second send failed")?;
     Ok(())
 }

@@ -30,9 +30,8 @@ pub fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced: bool)
     Ok(())
 }
 pub fn client(name: &str) -> TestResult {
-    let mut conn = LocalSocketStream::connect(name)
-        .context("connect failed")
-        .map(BufReader::new)?;
+    let mut conn =
+        LocalSocketStream::connect(name).context("connect failed").map(BufReader::new)?;
     send(&mut conn, msg(false, false), 0)?;
     recv(&mut conn, msg(true, false), 0)?;
     send(&mut conn, msg(false, true), 0)?;
@@ -45,8 +44,7 @@ fn recv(conn: &mut BufReader<LocalSocketStream>, exp: impl AsRef<str>, nr: u8) -
     let fs = ["first", "second"][nr as usize];
 
     let mut buffer = Vec::with_capacity(exp_.len());
-    conn.read_until(term, &mut buffer)
-        .with_context(|| format!("{} receive failed", fs))?;
+    conn.read_until(term, &mut buffer).with_context(|| format!("{} receive failed", fs))?;
     ensure_eq!(
         str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
         exp_,

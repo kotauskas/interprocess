@@ -19,7 +19,13 @@ impl<E: ReprU8> AtomicEnum<E> {
         self.0.store(val.to_u8(), ordering)
     }
     #[inline]
-    pub fn compare_exchange(&self, current: E, new: E, success: Ordering, failure: Ordering) -> Result<E, E> {
+    pub fn compare_exchange(
+        &self,
+        current: E,
+        new: E,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<E, E> {
         let unwr = |v: u8| unsafe { E::from_u8(v) };
         self.0
             .compare_exchange(current.to_u8(), new.to_u8(), success, failure)

@@ -1,13 +1,14 @@
 //! Creation and usage of unnamed pipes.
 //!
-//! The distinction between named and unnamed pipes is very clear given their names: named pipes have names in their
-//! special named pipe filesystem, while unnamed pipes only have handles. This can both be useful or problematic,
-//! depending on the use case. Unnamed pipes work best when a child process is used. With the fork model on Unix-like
-//! systems, the handle can be transferred to the child process thanks to the cloned address space; on Windows,
-//! inheritable handles (the default for unnamed pipes in this crate) can be used.
+//! The distinction between named and unnamed pipes is very clear given their names: named pipes
+//! have names in their special named pipe filesystem, while unnamed pipes only have handles. This
+//! can both be useful or problematic, depending on the use case. Unnamed pipes work best when a
+//! child process is used. With the fork model on Unix-like systems, the handle can be transferred
+//! to the child process thanks to the cloned address space; on Windows, inheritable handles (the
+//! default for unnamed pipes in this crate) can be used.
 //!
-//! Another way to use unnamed pipes is to use a named pipe or a Unix domain socket to establish an unnamed pipe
-//! connection. It just so happens that this crate supports all three.
+//! Another way to use unnamed pipes is to use a named pipe or a Unix domain socket to establish an
+//! unnamed pipe connection. It just so happens that this crate supports all three.
 
 impmod! {unnamed_pipe,
     UnnamedPipeRecver as UnnamedPipeRecverImpl,
@@ -25,8 +26,8 @@ pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
     pipe_impl()
 }
 
-/// A handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together with
-/// the [sending end](UnnamedPipeSender).
+/// A handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
+/// with the [sending end](UnnamedPipeSender).
 ///
 /// The core functionality is exposed in a [`Read`](io::Read) interface. On Windows, the
 /// [`ShareHandle`](crate::os::windows::ShareHandle) and
@@ -39,7 +40,7 @@ pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
 /// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
-// field is pub(crate) to allow the platform specific builders to create the public-facing pipe types
+// field is pub(crate) to allow platform builders to create the public-facing pipe types
 pub struct UnnamedPipeRecver(pub(crate) UnnamedPipeRecverImpl);
 multimacro! {
     UnnamedPipeRecver,

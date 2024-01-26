@@ -31,14 +31,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
         let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
         (
-            RecvPipeStream {
-                raw: raw_a,
-                _phantom: PhantomData,
-            },
-            SendPipeStream {
-                raw: raw_ac,
-                _phantom: PhantomData,
-            },
+            RecvPipeStream { raw: raw_a, _phantom: PhantomData },
+            SendPipeStream { raw: raw_ac, _phantom: PhantomData },
         )
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
@@ -51,10 +45,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         let mut raw = sh.raw;
         drop(rh);
         raw.try_make_owned();
-        Ok(PipeStream {
-            raw,
-            _phantom: PhantomData,
-        })
+        Ok(PipeStream { raw, _phantom: PhantomData })
     }
 
     /// Retrieves the process identifier of the client side of the named pipe connection.
@@ -91,7 +82,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         !self.raw.is_server
     }
 
-    /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is disabled.
+    /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is
+    /// disabled.
     ///
     /// In nonblocking mode, attempts to receive from the pipe when there is no data available or to
     /// send when the buffer has filled up because the receiving side hasn't received enough bytes

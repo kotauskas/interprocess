@@ -18,13 +18,14 @@ use std::{
 };
 use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mutex};
 
-/// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing
-/// asynchronous pipe streams.
+/// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients
+/// and producing asynchronous pipe streams.
 ///
 /// Note that this type does not correspond to any Tokio object, and is an invention of Interprocess
 /// in its entirety.
 ///
-/// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
+/// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
+/// for more.
 ///
 /// # Examples
 ///
@@ -112,8 +113,8 @@ pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
 
-    /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to communicate with the
-    /// pipe.
+    /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to
+    /// communicate with the pipe.
     pub async fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().await;
@@ -148,25 +149,33 @@ pub trait PipeListenerOptionsExt: Sealed {
     ///
     /// The `nonblocking` parameter is ignored and forced to be enabled.
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>>;
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with the same `Rm` and `Sm`.
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with the same `Rm` and
+    /// `Sm`.
     #[inline]
     fn create_tokio_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
         self.create_tokio::<M, M>()
     }
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Sm` of [`pipe_mode::None`].
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Sm` of
+    /// [`pipe_mode::None`].
     #[inline]
-    fn create_tokio_recv_only<Rm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+    fn create_tokio_recv_only<Rm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
         self.create_tokio::<Rm, pipe_mode::None>()
     }
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Rm` of [`pipe_mode::None`].
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Rm` of
+    /// [`pipe_mode::None`].
     #[inline]
-    fn create_tokio_send_only<Sm: PipeModeTag>(&self) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+    fn create_tokio_send_only<Sm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
         self.create_tokio::<pipe_mode::None, Sm>()
     }
 }
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
-        let (owned_config, instance) = _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
+        let (owned_config, instance) =
+            _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         Ok(PipeListener {
             config: owned_config,
             stored_instance: Mutex::new(instance),

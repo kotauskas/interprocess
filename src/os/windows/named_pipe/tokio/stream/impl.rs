@@ -26,12 +26,15 @@ use std::{
     pin::Pin,
     task::{ready, Context, Poll},
 };
-use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer};
+use tokio::net::windows::named_pipe::{
+    NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
+};
 use windows_sys::Win32::System::Pipes;
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
-    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is closed when both are
-    /// dropped, kind of like an `Arc` (which is how it's implemented under the hood).
+    /// Splits the pipe stream by value, returning a receive half and a send half. The stream is
+    /// closed when both are dropped, kind of like an `Arc` (which is how it's implemented under the
+    /// hood).
     pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
         let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
         (
@@ -40,11 +43,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
                 flush: None.into(), // PERF the mutex is unnecessary for receivers
                 _phantom: PhantomData,
             },
-            SendPipeStream {
-                raw: raw_ac,
-                flush: self.flush,
-                _phantom: PhantomData,
-            },
+            SendPipeStream { raw: raw_ac, flush: self.flush, _phantom: PhantomData },
         )
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
@@ -57,11 +56,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         let PipeStream { mut raw, flush, .. } = sh;
         drop(rh);
         raw.try_make_owned();
-        Ok(PipeStream {
-            raw,
-            flush,
-            _phantom: PhantomData,
-        })
+        Ok(PipeStream { raw, flush, _phantom: PhantomData })
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]
@@ -83,14 +78,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub fn server_session_id(&self) -> io::Result<u32> {
         unsafe { hget(self.as_handle(), Pipes::GetNamedPipeServerSessionId) }
     }
-    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was created by connecting to
-    /// a server (server-side).
+    /// Returns `true` if the stream was created by a listener (server-side), `false` if it was
+    /// created by connecting to a server (server-side).
     #[inline]
     pub fn is_server(&self) -> bool {
         matches!(self.raw.inner(), &InnerTokio::Server(..))
     }
-    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if it was created by a
-    /// listener (server-side).
+    /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if
+    /// it was created by a listener (server-side).
     #[inline]
     pub fn is_client(&self) -> bool {
         !self.is_server()

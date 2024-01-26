@@ -29,10 +29,7 @@ impl LocalSocketStream {
     pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
         LocalSocketStreamImpl::reunite(rh.0, sh.0)
             .map(Self)
-            .map_err(|ReuniteError { rh, sh }| ReuniteError {
-                rh: RecvHalf(rh),
-                sh: SendHalf(sh),
-            })
+            .map_err(|ReuniteError { rh, sh }| ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) })
     }
 }
 

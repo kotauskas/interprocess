@@ -1,20 +1,22 @@
-use std::borrow::Borrow;
-
 use super::{choke::*, TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
 use color_eyre::eyre::{bail, Context};
-use {
-    std::{
-        io,
-        sync::mpsc::{channel, /*Receiver,*/ Sender},
-        thread,
-    },
-    to_method::*,
+use std::{
+    borrow::Borrow,
+    io,
+    sync::mpsc::{channel, /*Receiver,*/ Sender},
+    thread,
 };
+use to_method::*;
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the
-/// follower. Captures Eyre errors on both sides and bubbles them up if they occur, reporting which side produced the
-/// error.
-pub fn drive_pair<T, Ld, Fl>(leader: Ld, leader_name: &str, follower: Fl, follower_name: &str) -> TestResult
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure,
+/// then runs the follower. Captures Eyre errors on both sides and bubbles them up if they occur,
+/// reporting which side produced the error.
+pub fn drive_pair<T, Ld, Fl>(
+    leader: Ld,
+    leader_name: &str,
+    follower: Fl,
+    follower_name: &str,
+) -> TestResult
 where
     T: Send,
     Ld: FnOnce(Sender<T>) -> TestResult + Send,
@@ -32,7 +34,8 @@ where
         if let Ok(msg) = receiver.recv() {
             // If the leader reached the send point, proceed with the follower code
             let rslt = follower(msg);
-            exclude_deadconn(rslt).with_context(|| format!("{follower_name} exited early with error"))?;
+            exclude_deadconn(rslt)
+                .with_context(|| format!("{follower_name} exited early with error"))?;
         }
         let Ok(rslt) = leading_thread.join() else {
             bail!("{leader_name} panicked");
@@ -41,7 +44,8 @@ where
     })
 }
 
-/// Filters errors that have to do with the other side returning an error and not bubbling it up in time.
+/// Filters errors that have to do with the other side returning an error and not bubbling it up in
+/// time.
 #[rustfmt::skip] // oh FUCK OFF
 fn exclude_deadconn(r: TestResult) -> TestResult {
     use io::ErrorKind::*;
@@ -84,7 +88,8 @@ where
                 let jhndl = thread::Builder::new()
                     .name(tname.clone())
                     .spawn_scoped(scope, move || {
-                        let _cg = choke_guard; // Has to use move to send to other thread to drop when client finishes
+                        // Has to use move to send to other thread to drop when client finishes
+                        let _cg = choke_guard;
                         bclient(bmsg)
                     })
                     .with_context(|| format!("{tname} thread launch failed"))?;

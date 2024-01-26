@@ -4,7 +4,10 @@ use std::{
     os::windows::ffi::OsStrExt,
 };
 
-pub fn pathcvt<'a>(pipe_name: &'a OsStr, hostname: Option<&'a OsStr>) -> (impl Iterator<Item = &'a OsStr>, usize) {
+pub fn pathcvt<'a>(
+    pipe_name: &'a OsStr,
+    hostname: Option<&'a OsStr>,
+) -> (impl Iterator<Item = &'a OsStr>, usize) {
     use iter::once as i;
 
     static PREFIX_LITERAL: &str = r"\\";
@@ -17,7 +20,8 @@ pub fn pathcvt<'a>(pipe_name: &'a OsStr, hostname: Option<&'a OsStr>) -> (impl I
         .chain(i(hostname))
         .chain(i(OsStr::new(PIPEFS_LITERAL)))
         .chain(i(pipe_name));
-    let capacity_hint = PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len();
+    let capacity_hint =
+        PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len();
     (iterator, capacity_hint)
 }
 #[allow(dead_code)]

@@ -1,4 +1,6 @@
-use super::{path_conversion, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
+use super::{
+    path_conversion, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
+};
 use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
@@ -17,7 +19,9 @@ use std::{
 use to_method::To;
 use windows_sys::Win32::{
     Foundation::ERROR_PIPE_CONNECTED,
-    Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH},
+    Storage::FileSystem::{
+        FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
+    },
     System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
 };
 
@@ -59,7 +63,8 @@ impl<'a, Rm: PipeModeTag, Sm: PipeModeTag> IntoIterator for &'a PipeListener<Rm,
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
 
-    /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
+    /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with
+    /// the pipe.
     ///
     /// See `incoming` for an iterator version of this.
     pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
@@ -272,12 +277,10 @@ cannot create pipe server that has byte type but receives messages – have you 
         // TODO security descriptor
 
         let max_instances = match self.instance_limit.map(NonZeroU8::get) {
-            Some(255) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
-                ))
-            }
+            Some(255) => return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
+            )),
             Some(x) => x.to::<u32>(),
             None => 255,
         };
@@ -308,7 +311,8 @@ cannot create pipe server that has byte type but receives messages – have you 
     /// In addition to regular OS errors, an error will be returned if the given `Rm` is
     /// [`pipe_mode::Messages`], but the `mode` field isn't also [`pipe_mode::Messages`].
     pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
-        let (owned_config, instance) = self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
+        let (owned_config, instance) =
+            self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         let nonblocking = owned_config.nonblocking.into();
         Ok(PipeListener {
             config: owned_config,
@@ -324,12 +328,16 @@ cannot create pipe server that has byte type but receives messages – have you 
     }
     /// Alias for [`.create()`](Self::create) with an `Sm` of [`pipe_mode::None`].
     #[inline]
-    pub fn create_recv_only<Rm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+    pub fn create_recv_only<Rm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
         self.create::<Rm, pipe_mode::None>()
     }
     /// Alias for [`.create()`](Self::create) with an `Rm` of [`pipe_mode::None`].
     #[inline]
-    pub fn create_send_only<Sm: PipeModeTag>(&self) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+    pub fn create_send_only<Sm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
         self.create::<pipe_mode::None, Sm>()
     }
     fn _create(

@@ -13,7 +13,8 @@ impl Read for &FdOps {
         let length_to_read = buf.len();
 
         let (success, bytes_read) = unsafe {
-            let size_or_err = libc::read(self.0.as_raw_fd(), buf.as_mut_ptr().cast(), length_to_read);
+            let size_or_err =
+                libc::read(self.0.as_raw_fd(), buf.as_mut_ptr().cast(), length_to_read);
             (size_or_err >= 0, size_or_err as usize)
         };
         ok_or_ret_errno!(success => bytes_read)

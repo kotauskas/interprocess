@@ -18,7 +18,9 @@ impl<T: AsRawHandle + ?Sized> AsRawHandleExt for T {}
 pub(super) fn decode_eof<T>(r: io::Result<T>) -> io::Result<T> {
     use windows_sys::Win32::Foundation::ERROR_PIPE_NOT_CONNECTED;
     match r {
-        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _) => Err(io::Error::from(BrokenPipe)),
+        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_NOT_CONNECTED as _) => {
+            Err(io::Error::from(BrokenPipe))
+        }
         els => els,
     }
 }

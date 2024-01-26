@@ -65,9 +65,7 @@ impl LocalSocketStream {
     /// Connects to a remote local socket server.
     #[inline]
     pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketStreamImpl::connect(name.to_local_socket_name()?)
-            .await
-            .map(Self::from)
+        LocalSocketStreamImpl::connect(name.to_local_socket_name()?).await.map(Self::from)
     }
     /// Splits a stream into a receive half and a send half, which can be used to receive data from
     /// and send data to the stream concurrently from independently spawned tasks, entailing a
