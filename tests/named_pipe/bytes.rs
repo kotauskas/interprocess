@@ -3,7 +3,7 @@ use crate::{
     os::windows::named_pipe::{
         pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream,
     },
-    testutil::*,
+    tests::util::*,
 };
 use color_eyre::eyre::Context;
 use std::{

@@ -57,11 +57,6 @@ pub mod os {
     pub mod windows;
 }
 
-#[cfg(any(doc, test))]
-#[path = "../tests/util/mod.rs"]
-#[macro_use]
-mod testutil;
-
 #[cfg(test)]
 #[path = "../tests/index.rs"]
 mod tests;

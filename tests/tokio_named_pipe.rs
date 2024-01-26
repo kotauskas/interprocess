@@ -4,7 +4,7 @@ mod bytes;
 
 use crate::{
     os::windows::named_pipe::PipeListenerOptions,
-    testutil::{
+    tests::util::{
         listen_and_pick_name, testinit, tokio::drive_server_and_multiple_clients, NameGen,
         TestResult,
     },

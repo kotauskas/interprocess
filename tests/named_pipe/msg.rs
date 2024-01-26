@@ -3,7 +3,7 @@ use crate::{
     os::windows::named_pipe::{
         pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream,
     },
-    testutil::*,
+    tests::util::*,
 };
 use color_eyre::eyre::{ensure, Context};
 use recvmsg::{MsgBuf, RecvMsg, RecvResult};

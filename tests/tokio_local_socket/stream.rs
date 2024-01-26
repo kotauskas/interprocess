@@ -1,6 +1,6 @@
 use crate::{
     local_socket::tokio::{LocalSocketListener, LocalSocketStream},
-    testutil::*,
+    tests::util::*,
 };
 use ::tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},

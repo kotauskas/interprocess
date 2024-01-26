@@ -3,7 +3,7 @@
 mod bytes;
 mod msg;
 
-use crate::{os::windows::named_pipe::PipeListenerOptions, testutil::*};
+use crate::{os::windows::named_pipe::PipeListenerOptions, tests::util::*};
 use std::{
     io,
     path::Path,

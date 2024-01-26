@@ -4,7 +4,7 @@
 mod no_server;
 mod stream;
 
-use crate::{local_socket::NameTypeSupport, testutil::*};
+use crate::{local_socket::NameTypeSupport, tests::util::*};
 
 fn test_stream(nmspc: bool) -> TestResult {
     use stream::*;

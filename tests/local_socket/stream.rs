@@ -1,6 +1,6 @@
 use crate::{
     local_socket::{LocalSocketListener, LocalSocketStream},
-    testutil::*,
+    tests::util::*,
 };
 use color_eyre::eyre::Context;
 use std::{

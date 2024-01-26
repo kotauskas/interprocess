@@ -6,7 +6,7 @@ use crate::{
             DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream,
         },
     },
-    testutil::{message, TestResult},
+    tests::util::{message, TestResult},
 };
 use color_eyre::eyre::Context;
 use std::sync::Arc;
