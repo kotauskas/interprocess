@@ -1,17 +1,16 @@
-use {
-    super::LocalSocketName,
-    std::{
-        borrow::Cow,
-        ffi::{CStr, CString, OsStr, OsString},
-        io,
-        path::{Path, PathBuf},
-        str,
-    },
+use super::LocalSocketName;
+use std::{
+    borrow::Cow,
+    ffi::{CStr, CString, OsStr, OsString},
+    io,
+    path::{Path, PathBuf},
+    str,
 };
+use to_method::To;
 
 impmod! {local_socket,
-    to_local_socket_name_osstr,
-    to_local_socket_name_osstring,
+    cstr_to_osstr,
+    cstring_to_osstring,
 }
 
 /// Types which can be converted to a local socket name.
@@ -92,8 +91,14 @@ impl ToLocalSocketName<'static> for PathBuf {
 /// platforms that do, prefixing the name with the `@` character will trim it away and yield a
 /// namespaced name instead. See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a OsStr {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(to_local_socket_name_osstr(self))
+    fn to_local_socket_name(mut self) -> io::Result<LocalSocketName<'a>> {
+        let mut namespaced = false;
+        let bytes = self.as_encoded_bytes();
+        if bytes.first() == Some(&b'@') {
+            self = unsafe { OsStr::from_encoded_bytes_unchecked(&bytes[1..]) };
+            namespaced = true;
+        }
+        Ok(LocalSocketName::from_raw_parts(Cow::Borrowed(self), namespaced))
     }
 }
 /// Converts an owned [`OsString`] to an owned [`LocalSocketName`]. On platforms which don't support
@@ -101,8 +106,15 @@ impl<'a> ToLocalSocketName<'a> for &'a OsStr {
 /// the name with the `@` character will trim it away and yield a namespaced name instead. See the
 /// trait-level documentation for more.
 impl ToLocalSocketName<'static> for OsString {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        Ok(to_local_socket_name_osstring(self))
+    fn to_local_socket_name(mut self) -> io::Result<LocalSocketName<'static>> {
+        let mut namespaced = false;
+        let mut bytes = self.into_encoded_bytes().to::<Vec<_>>();
+        if bytes.first() == Some(&b'@') {
+            bytes.remove(0);
+            namespaced = true;
+        }
+        self = unsafe { OsString::from_encoded_bytes_unchecked(bytes) };
+        Ok(LocalSocketName::from_raw_parts(Cow::Owned(self), namespaced))
     }
 }
 /// Converts a borrowed [`str`](prim@str) to a borrowed [`LocalSocketName`] with the same lifetime.
@@ -110,6 +122,7 @@ impl ToLocalSocketName<'static> for OsString {
 /// on platforms that do, prefixing the name with the `@` character will trim it away and yield a
 /// namespaced name instead. See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a str {
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
         OsStr::new(self).to_local_socket_name()
     }
@@ -119,6 +132,7 @@ impl<'a> ToLocalSocketName<'a> for &'a str {
 /// the name with the `@` character will trim it away and yield a namespaced name instead. See the
 /// trait-level documentation for more.
 impl ToLocalSocketName<'static> for String {
+    #[inline]
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
         OsString::from(self).to_local_socket_name()
     }
@@ -130,9 +144,7 @@ impl ToLocalSocketName<'static> for String {
 /// See the trait-level documentation for more.
 impl<'a> ToLocalSocketName<'a> for &'a CStr {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        str::from_utf8(self.to_bytes())
-            .map(|x| to_local_socket_name_osstr(OsStr::new(x)))
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        cstr_to_osstr(self).and_then(<&OsStr>::to_local_socket_name)
     }
 }
 /// Converts an owned [`CString`] to an owned [`LocalSocketName`]. **UTF-8 is assumed and the nul
@@ -142,8 +154,6 @@ impl<'a> ToLocalSocketName<'a> for &'a CStr {
 /// documentation for more.
 impl ToLocalSocketName<'static> for CString {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        String::from_utf8(self.into_bytes_with_nul())
-            .map(|x| to_local_socket_name_osstring(OsString::from(x)))
-            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        cstring_to_osstring(self).and_then(OsString::to_local_socket_name)
     }
 }

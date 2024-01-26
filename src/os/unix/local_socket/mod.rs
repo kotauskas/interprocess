@@ -10,12 +10,11 @@ pub use listener::*;
 mod stream;
 pub use stream::*;
 
-use crate::local_socket::{LocalSocketName, NameTypeSupport};
+use crate::local_socket::NameTypeSupport;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::linux::net::SocketAddrExt;
 use std::{
-    borrow::Cow,
-    ffi::{OsStr, OsString},
+    ffi::{CStr, CString, OsStr, OsString},
     io,
     os::unix::{
         ffi::{OsStrExt, OsStringExt},
@@ -42,28 +41,12 @@ pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::Both;
 #[cfg(not(uds_linux_namespace))]
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyPaths;
 
-pub fn to_local_socket_name_osstr(mut val: &OsStr) -> LocalSocketName<'_> {
-    let mut namespaced = false;
-    if let Some(b'@') = val.as_bytes().first().copied() {
-        if val.len() >= 2 {
-            val = OsStr::from_bytes(&val.as_bytes()[1..]);
-        } else {
-            val = OsStr::from_bytes(&[]);
-        }
-        namespaced = true;
-    }
-    LocalSocketName::from_raw_parts(Cow::Borrowed(val), namespaced)
+#[inline]
+pub fn cstr_to_osstr(cstr: &CStr) -> io::Result<&OsStr> {
+    OsStr::from_bytes(cstr.to_bytes())
 }
-pub fn to_local_socket_name_osstring(mut val: OsString) -> LocalSocketName<'static> {
-    let mut namespaced = false;
-    if let Some(b'@') = val.as_bytes().first().copied() {
-        let new_val = {
-            let mut vec = val.into_vec();
-            vec.remove(0);
-            OsString::from_vec(vec)
-        };
-        val = new_val;
-        namespaced = true;
-    }
-    LocalSocketName::from_raw_parts(Cow::Owned(val), namespaced)
+
+#[inline]
+pub fn cstring_to_osstring(cstring: CString) -> io::Result<OsString> {
+    OsString::from_vec(cstring.into_bytes())
 }

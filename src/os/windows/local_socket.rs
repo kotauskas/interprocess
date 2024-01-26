@@ -12,10 +12,10 @@ pub mod tokio {
     pub use {listener::*, stream::*};
 }
 
-use crate::local_socket::{LocalSocketName, NameTypeSupport};
+use crate::local_socket::NameTypeSupport;
 use std::{
-    borrow::Cow,
-    ffi::{OsStr, OsString},
+    ffi::{CStr, CString, OsStr, OsString},
+    io, str,
 };
 
 pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNamespaced;
@@ -23,9 +23,15 @@ pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyNam
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }
-pub fn to_local_socket_name_osstr(osstr: &OsStr) -> LocalSocketName<'_> {
-    LocalSocketName::from_raw_parts(Cow::Borrowed(osstr), true)
+
+pub fn cstr_to_osstr(cstr: &CStr) -> io::Result<&OsStr> {
+    str::from_utf8(cstr.to_bytes())
+        .map(OsStr::new)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
-pub fn to_local_socket_name_osstring(osstring: OsString) -> LocalSocketName<'static> {
-    LocalSocketName::from_raw_parts(Cow::Owned(osstring), true)
+
+pub fn cstring_to_osstring(cstring: CString) -> io::Result<OsString> {
+    String::from_utf8(cstring.into_bytes())
+        .map(OsString::from)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
