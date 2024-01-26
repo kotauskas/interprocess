@@ -101,6 +101,7 @@ multimacro! {
     forward_sync_ref_rw,
     forward_asinto_handle,
     forward_debug,
+    forward_try_clone,
     forward_try_from_handle(LocalSocketStreamImpl),
     derive_sync_mut_rw,
     derive_asintoraw,

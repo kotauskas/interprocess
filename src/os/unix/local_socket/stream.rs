@@ -1,5 +1,5 @@
 use super::name_to_addr;
-use crate::{error::ReuniteError, local_socket::LocalSocketName};
+use crate::{error::ReuniteError, local_socket::LocalSocketName, TryClone};
 use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]
@@ -27,6 +27,14 @@ impl LocalSocketStream {
         Ok(Self(inner))
     }
 }
+
+impl TryClone for LocalSocketStream {
+    #[inline]
+    fn try_clone(&self) -> std::io::Result<Self> {
+        self.0.try_clone().map(Self)
+    }
+}
+
 multimacro! {
     LocalSocketStream,
     forward_rbv(UnixStream, &),
