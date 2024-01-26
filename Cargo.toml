@@ -1,5 +1,3 @@
-# https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package]
 name = "interprocess"
 version = "2.0.0"
@@ -9,12 +7,11 @@ rust-version = "1.70"
 resolver = "2"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/interprocess"
 repository = "https://github.com/kotauskas/interprocess"
 
 description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
-keywords = ["ipc", "pipe", "unix_domain_socket"]
+keywords = ["ipc", "pipe"]
 
 autotests = false
 
