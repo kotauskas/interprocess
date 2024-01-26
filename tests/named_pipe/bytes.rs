@@ -1,8 +1,9 @@
-use super::{drive_server, util::*};
-use color_eyre::eyre::Context;
-use interprocess::os::windows::named_pipe::{
-    pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream,
+use super::drive_server;
+use crate::{
+    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream},
+    testutil::*,
 };
+use color_eyre::eyre::Context;
 use std::{
     io::{prelude::*, BufReader},
     sync::{mpsc::Sender, Arc},

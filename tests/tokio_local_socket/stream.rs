@@ -1,11 +1,13 @@
-use super::util::*;
+use crate::{
+    local_socket::tokio::{LocalSocketListener, LocalSocketStream},
+    testutil::*,
+};
 use ::tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     sync::oneshot::Sender,
     task, try_join,
 };
 use color_eyre::eyre::Context;
-use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
 use std::{convert::TryInto, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {

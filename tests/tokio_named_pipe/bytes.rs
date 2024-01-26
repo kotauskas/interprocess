@@ -1,12 +1,12 @@
-use super::{
-    drive_server,
-    util::{message, TestResult},
+use super::drive_server;
+use crate::{
+    os::windows::named_pipe::{
+        pipe_mode,
+        tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
+    },
+    testutil::{message, TestResult},
 };
 use color_eyre::eyre::Context;
-use interprocess::os::windows::named_pipe::{
-    pipe_mode,
-    tokio::{DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream, SendPipeStream},
-};
 use std::sync::Arc;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},

@@ -1,6 +1,8 @@
-use super::{util::*, NameGen};
+use crate::{
+    local_socket::{LocalSocketListener, LocalSocketStream},
+    testutil::*,
+};
 use color_eyre::eyre::Context;
-use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
 use std::{
     io::{BufRead, BufReader, Write},
     str,

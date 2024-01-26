@@ -16,6 +16,8 @@ description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
 keywords = ["ipc", "pipe", "unix_domain_socket"]
 
+autotests = false
+
 exclude = [
     "/.github/",
     "/README.tpl",

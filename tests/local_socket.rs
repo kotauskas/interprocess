@@ -1,39 +1,35 @@
 // TODO test various error conditions
 // TODO test reunite in some shape or form
-#[path = "../util/mod.rs"]
-#[macro_use]
-mod util;
-use util::*;
 
 mod no_server;
 mod stream;
 
-use interprocess::local_socket::NameTypeSupport;
+use crate::{local_socket::NameTypeSupport, testutil::*};
 
-fn local_socket_stream(nmspc: bool) -> TestResult {
+fn test_stream(nmspc: bool) -> TestResult {
     use stream::*;
     testinit();
-    util::drive_server_and_multiple_clients(|s, n| server(s, n, nmspc), client)?;
+    drive_server_and_multiple_clients(|s, n| server(s, n, nmspc), client)?;
     Ok(())
 }
 
 #[test]
-fn local_socket_stream_file() -> TestResult {
+fn stream_file() -> TestResult {
     if NameTypeSupport::query().paths_supported() {
-        local_socket_stream(false)?;
+        test_stream(false)?;
     }
     Ok(())
 }
 #[test]
-fn local_socket_stream_namespaced() -> TestResult {
+fn stream_namespaced() -> TestResult {
     if NameTypeSupport::query().namespace_supported() {
-        local_socket_stream(true)?;
+        test_stream(true)?;
     }
     Ok(())
 }
 
 #[test]
-fn local_socket_no_server_file() -> TestResult {
+fn no_server_file() -> TestResult {
     testinit();
     if NameTypeSupport::query().paths_supported() {
         no_server::run_and_verify_error(false)?;
@@ -41,7 +37,7 @@ fn local_socket_no_server_file() -> TestResult {
     Ok(())
 }
 #[test]
-fn local_socket_no_server_namespaced() -> TestResult {
+fn no_server_namespaced() -> TestResult {
     testinit();
     if NameTypeSupport::query().paths_supported() {
         no_server::run_and_verify_error(true)?;

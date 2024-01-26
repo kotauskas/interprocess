@@ -1,8 +1,9 @@
-use super::{drive_server, util::*};
-use color_eyre::eyre::{ensure, Context};
-use interprocess::os::windows::named_pipe::{
-    pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream,
+use super::drive_server;
+use crate::{
+    os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream},
+    testutil::*,
 };
+use color_eyre::eyre::{ensure, Context};
 use recvmsg::{MsgBuf, RecvMsg, RecvResult};
 use std::{
     str,

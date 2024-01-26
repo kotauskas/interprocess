@@ -56,3 +56,12 @@ pub mod os {
     #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
     pub mod windows;
 }
+
+#[cfg(any(doc, test))]
+#[path = "../tests/util/mod.rs"]
+#[macro_use]
+mod testutil;
+
+#[cfg(test)]
+#[path = "../tests/index.rs"]
+mod tests;

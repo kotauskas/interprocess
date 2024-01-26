@@ -1,13 +1,9 @@
 #![cfg(windows)]
-#[path = "../util/mod.rs"]
-#[macro_use]
-mod util;
-use util::*;
 
 mod bytes;
 mod msg;
 
-use interprocess::os::windows::named_pipe::PipeListenerOptions;
+use crate::{os::windows::named_pipe::PipeListenerOptions, testutil::*};
 use std::{
     ffi::OsStr,
     io,
@@ -15,40 +11,40 @@ use std::{
 };
 
 #[test]
-fn named_pipe_bytes_bidir() -> TestResult {
+fn bytes_bidir() -> TestResult {
     use bytes::*;
     testinit();
     drive_server_and_multiple_clients(server_duplex, client_duplex)
 }
 
 #[test]
-fn named_pipe_bytes_unidir_client_to_server() -> TestResult {
+fn bytes_unidir_client_to_server() -> TestResult {
     use bytes::*;
     testinit();
     drive_server_and_multiple_clients(server_cts, client_cts)
 }
 #[test]
-fn named_pipe_bytes_unidir_server_to_client() -> TestResult {
+fn bytes_unidir_server_to_client() -> TestResult {
     use bytes::*;
     testinit();
     drive_server_and_multiple_clients(server_stc, client_stc)
 }
 
 #[test]
-fn named_pipe_msg_bidir() -> TestResult {
+fn msg_bidir() -> TestResult {
     use msg::*;
     testinit();
     drive_server_and_multiple_clients(server_duplex, client_duplex)
 }
 
 #[test]
-fn named_pipe_msg_unidir_client_to_server() -> TestResult {
+fn msg_unidir_client_to_server() -> TestResult {
     use msg::*;
     testinit();
     drive_server_and_multiple_clients(server_cts, client_cts)
 }
 #[test]
-fn named_pipe_msg_unidir_server_to_client() -> TestResult {
+fn msg_unidir_server_to_client() -> TestResult {
     use msg::*;
     testinit();
     drive_server_and_multiple_clients(server_stc, client_stc)
@@ -58,7 +54,7 @@ fn drive_server<L>(
     id: &'static str,
     name_sender: Sender<Arc<str>>,
     num_clients: u32,
-    mut createfn: impl (FnMut(PipeListenerOptions) -> io::Result<L>),
+    mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
 ) -> TestResult {
     let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(id, true), |nm| {

@@ -1,8 +1,7 @@
 //! Tests what happens when a client attempts to connect to a local socket that doesn't exist.
 
-use super::util::*;
+use crate::{local_socket::LocalSocketStream, testutil::*};
 use color_eyre::eyre::{bail, ensure};
-use interprocess::local_socket::LocalSocketStream;
 use std::io;
 
 pub fn run_and_verify_error(namespaced: bool) -> TestResult {
