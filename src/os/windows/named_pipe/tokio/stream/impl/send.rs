@@ -23,17 +23,12 @@ impl RawPipeStream {
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     fn ensure_flush_start(&self, slf_flush: &mut MutexGuard<'_, Option<FlushJH>>) {
-        #[repr(transparent)]
-        struct AssertHandleSyncSend(HANDLE);
-        unsafe impl Sync for AssertHandleSyncSend {}
-        unsafe impl Send for AssertHandleSyncSend {}
-
         if slf_flush.is_some() {
             return;
         }
 
-        let handle = AssertHandleSyncSend(self.as_int_handle());
-        let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl({ handle }.0));
+        let handle = self.as_int_handle();
+        let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl(handle));
 
         **slf_flush = Some(task);
     }

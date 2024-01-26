@@ -17,5 +17,3 @@ mod misc;
 
 pub(crate) use file_handle::*;
 use misc::*;
-
-// TODO resolve the HANDLE-RawHandle debacle

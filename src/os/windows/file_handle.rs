@@ -3,7 +3,7 @@ use crate::TryClone;
 use std::{io, mem::MaybeUninit, ptr};
 use windows_sys::Win32::Storage::FileSystem::{FlushFileBuffers, ReadFile, WriteFile};
 
-/// Newtype wrapper which defines file I/O operations on a `HANDLE` to a file.
+/// Newtype wrapper which defines file I/O operations on a handle to a file.
 #[repr(transparent)]
 pub(crate) struct FileHandle(OwnedHandle);
 impl FileHandle {
