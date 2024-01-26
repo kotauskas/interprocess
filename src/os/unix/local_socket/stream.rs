@@ -1,8 +1,5 @@
 use super::name_to_addr;
-use crate::{
-    error::{FromHandleError, ReuniteError},
-    local_socket::LocalSocketName,
-};
+use crate::{error::ReuniteError, local_socket::LocalSocketName};
 use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]

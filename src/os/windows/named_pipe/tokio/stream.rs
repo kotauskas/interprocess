@@ -61,8 +61,8 @@ use tokio::net::windows::named_pipe::{NamedPipeClient as TokioNPClient, NamedPip
 ///     Ok(())
 /// };
 ///
-/// // Describe the read operation as receiving until EOF into our big buffer.
-/// let read = recver.read_to_string(&mut buffer);
+/// // Describe the receive operation as receiving until EOF into our big buffer.
+/// let recv = recver.read_to_string(&mut buffer);
 ///
 /// // Concurrently perform both operations: send-and-invoke-EOF and receive.
 /// try_join!(send, recv)?;
