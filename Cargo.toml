@@ -1,5 +1,3 @@
-# https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package]
 name = "interprocess"
 version = "2.0.0"
@@ -9,12 +7,13 @@ rust-version = "1.70"
 resolver = "2"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/interprocess"
 repository = "https://github.com/kotauskas/interprocess"
 
 description = "Interprocess communication toolkit"
 categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
-keywords = ["ipc", "shared_memory", "pipe", "unix_domain_socket"]
+keywords = ["ipc", "pipe"]
+
+autotests = false
 
 exclude = [
     "/.github/",
@@ -26,26 +25,36 @@ exclude = [
 
 [features]
 default = []
-async = ["futures-core", "futures-io", "futures-util"]
+async = []
 tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
 [dependencies]
-tokio = { version = "1.28.0", features = [
+winapi = { version = "0.3.9", features = ["winnt"] }
+parking_lot = "0.12.1"
+tokio = { version = "1.32.0", features = [
     "sync",
     "rt-multi-thread",
     "net",
     "time",
     "io-util",
 ], optional = true }
-futures-core = { version = "0.3.28", optional = true }
-futures-io = { version = "0.3.28", optional = true }
-futures-util = { version = "0.3.28", features = ["io"], optional = true }
 to_method = "1.1"
 cfg-if = "1.0.0"
 
-[build-dependencies]
-rustc_version = "0.4"
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.48.0", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+recvmsg = "1.0.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [dev-dependencies]
 tokio = { version = "1.28.0", features = [
@@ -54,22 +63,7 @@ tokio = { version = "1.28.0", features = [
     "sync",
     "macros",
 ] }
-futures = "0.3.28"
 color-eyre = "0.6.2"
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = [
-    "std",
-    "winbase",
-    "winerror",
-    "processthreadsapi",
-    "fileapi",
-    "handleapi",
-    "namedpipeapi",
-] }
-
-[target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]

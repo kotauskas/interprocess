@@ -1,14 +1,11 @@
-use {
-    super::{super::ToLocalSocketName, LocalSocketStream},
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-    },
-};
+use super::{super::ToLocalSocketName, LocalSocketStream};
+use std::io;
 
 impmod! {local_socket::tokio,
     LocalSocketListener as LocalSocketListenerImpl
 }
+
+// TODO borrowed split in examples
 
 /// A Tokio-based local socket server, listening for connections.
 ///
@@ -18,37 +15,34 @@ impmod! {local_socket::tokio,
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{
-///     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-///     try_join,
-/// };
 /// use interprocess::local_socket::{
 ///     tokio::{LocalSocketListener, LocalSocketStream},
 ///     NameTypeSupport,
 /// };
+/// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 /// use std::io;
 ///
 /// // Describe the things we do when we've got a connection ready.
 /// async fn handle_conn(conn: LocalSocketStream) -> io::Result<()> {
 ///     // Split the connection into two halves to process
-///     // received and sent data concurrently.
-///     let (reader, mut writer) = conn.split();
-///     let mut reader = BufReader::new(reader);
+///     // received and sent data separately.
+///     let (recver, mut sender) = conn.split();
+///     let mut recver = BufReader::new(recver);
 ///
-///     // Allocate a sizeable buffer for reading.
-///     // This size should be enough and should be easy to find for the allocator.
+///     // Allocate a sizeable buffer for receiving.
+///     // This size should be big enough and easy to find for the allocator.
 ///     let mut buffer = String::with_capacity(128);
 ///
-///     // Describe the write operation as writing our whole message.
-///     let write = writer.write_all(b"Hello from server!\n");
-///     // Describe the read operation as reading into our big buffer.
-///     let read = reader.read_line(&mut buffer);
+///     // Describe the send operation as sending our whole message.
+///     let send = sender.write_all(b"Hello from server!\n");
+///     // Describe the receive operation as receiving a line into our big buffer.
+///     let recv = recver.read_line(&mut buffer);
 ///
 ///     // Run both operations concurrently.
-///     try_join!(read, write)?;
+///     try_join!(recv, send)?;
 ///
 ///     // Dispose of our connection right now and not a moment later because I want to!
-///     drop((reader, writer));
+///     drop((recver, sender));
 ///
 ///     // Produce our output!
 ///     println!("Client answered: {}", buffer.trim());
@@ -105,9 +99,10 @@ impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     #[inline]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name).map(Self::from)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self::from)
     }
-    /// Listens for incoming connections to the socket, asynchronously waiting until a client is connected.
+    /// Listens for incoming connections to the socket, asynchronously waiting until a client is
+    /// connected.
     #[inline]
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
         Ok(LocalSocketStream(self.0.accept().await?))
@@ -120,13 +115,11 @@ impl From<LocalSocketListenerImpl> for LocalSocketListener {
         Self(inner)
     }
 }
-impl Debug for LocalSocketListener {
-    #[inline]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+multimacro! {
+    LocalSocketListener,
+    forward_as_handle(unix),
+    forward_try_handle(LocalSocketListenerImpl, unix),
+    forward_debug,
+    derive_asraw(unix),
 }
-forward_as_handle!(unix: LocalSocketListener);
-derive_asraw!(unix: LocalSocketListener);
-forward_try_handle!(unix: LocalSocketListener, LocalSocketListenerImpl);
 // TODO: incoming

@@ -1,5 +1,5 @@
 use super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{bail, Context};
 use std::{convert::TryInto, future::Future, sync::Arc};
 use tokio::{
     sync::{
@@ -9,8 +9,9 @@ use tokio::{
     task, try_join,
 };
 
-/// Waits for the leader closure to reach a point where it sends a message for the follower closure, then runs the
-/// follower. Captures Eyre errors on both sides and panics if any occur, reporting which side produced the error.
+/// Waits for the leader closure to reach a point where it sends a message for the follower closure,
+/// then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting
+/// which side produced the error.
 pub async fn drive_pair<T, Ld, Ldf, Fl, Flf>(
     leader: Ld,
     leader_name: &str,
@@ -26,32 +27,30 @@ where
     let (sender, receiver) = channel();
 
     let leading_task = async {
-        leader(sender)
-            .await
-            .with_context(|| format!("{leader_name} exited early with error"))
+        leader(sender).await.with_context(|| format!("{leader_name} exited early with error"))
     };
     let following_task = async {
         let msg = receiver.await?;
-        follower(msg)
-            .await
-            .with_context(|| format!("{follower_name} exited early with error"))
+        follower(msg).await.with_context(|| format!("{follower_name} exited early with error"))
     };
     try_join!(leading_task, following_task).map(|((), ())| ())
 }
 
-pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(server: Srv, client: Clt) -> TestResult
+pub async fn drive_server_and_multiple_clients<T, Srv, Srvf, Clt, Cltf>(
+    server: Srv,
+    client: Clt,
+) -> TestResult
 where
-    T: Send + Sync + 'static,
-    Srv: FnOnce(Sender<T>, u32) -> Srvf + Send + 'static,
+    T: Send + Sync + ?Sized + 'static,
+    Srv: FnOnce(Sender<Arc<T>>, u32) -> Srvf + Send + 'static,
     Srvf: Future<Output = TestResult>,
     Clt: Fn(Arc<T>) -> Cltf + Send + Sync + 'static,
     Cltf: Future<Output = TestResult> + Send,
 {
-    let client_wrapper = move |msg| async {
+    let client_wrapper = |msg| async move {
         let client = Arc::new(client);
         let choke = Arc::new(Semaphore::new(NUM_CONCURRENT_CLIENTS.try_into().unwrap()));
 
-        let msg = Arc::new(msg);
         let mut client_tasks = Vec::with_capacity(NUM_CLIENTS.try_into().unwrap());
         for _ in 0..NUM_CLIENTS {
             let permit = Arc::clone(&choke).acquire_owned().await.unwrap();
@@ -64,11 +63,14 @@ where
             client_tasks.push(jhndl);
         }
         for client in client_tasks {
-            client.await.expect("Client panicked")?; // Early-return the first error
+            let Ok(rslt) = client.await else {
+                bail!("client task panicked");
+            };
+            rslt?; // Early-return the first error; context not necessary as drive_pair does it
         }
         Ok::<(), color_eyre::eyre::Error>(())
     };
-    let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
+    let server_wrapper = move |sender: Sender<Arc<T>>| server(sender, NUM_CLIENTS);
 
-    drive_pair(server_wrapper, "Server", client_wrapper, "Client").await
+    drive_pair(server_wrapper, "server", client_wrapper, "client").await
 }

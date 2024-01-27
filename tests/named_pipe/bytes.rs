@@ -1,66 +1,92 @@
-use super::util::*;
+use super::drive_server;
+use crate::{
+    os::windows::named_pipe::{
+        pipe_mode, DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream,
+    },
+    testutil::*,
+};
 use color_eyre::eyre::Context;
-use interprocess::os::windows::named_pipe::{pipe_mode, DuplexPipeStream, PipeListenerOptions};
 use std::{
-    ffi::OsStr,
-    io::{self, prelude::*, BufReader},
+    io::{prelude::*, BufReader},
     sync::{mpsc::Sender, Arc},
 };
 
-pub fn server(name_sender: Sender<String>, num_clients: u32) -> TestResult {
-    let (name, listener) = NameGen::new(make_id!(), true)
-        .find_map(|nm| {
-            let rnm: &OsStr = nm.as_ref();
-            let l = match PipeListenerOptions::new().name(rnm).create_duplex::<pipe_mode::Bytes>() {
-                Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(Ok((nm, l)))
-        })
-        .unwrap()
-        .context("Listener bind failed")?;
+fn msg(server: bool) -> Box<str> {
+    message(None, server, Some('\n'))
+}
 
-    let _ = name_sender.send(name);
-
-    let mut buffer = String::with_capacity(128);
-
-    for _ in 0..num_clients {
-        let mut conn = match listener.accept() {
-            Ok(c) => BufReader::new(c),
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                continue;
-            }
-        };
-
-        let expected = message(false, Some('\n'));
-        conn.read_line(&mut buffer).context("Pipe receive failed")?;
-        assert_eq!(buffer, expected);
-        buffer.clear();
-
-        let msg = message(true, Some('\n'));
-        conn.get_mut().write_all(msg.as_bytes()).context("Pipe send failed")?;
-        conn.get_mut().flush().context("Pipe flush failed")?;
-    }
-
+fn handle_conn_duplex(
+    listener: &mut PipeListener<pipe_mode::Bytes, pipe_mode::Bytes>,
+) -> TestResult {
+    let (mut recver, mut sender) = listener.accept().context("accept failed")?.split();
+    recv(&mut recver, msg(false))?;
+    send(&mut sender, msg(true))?;
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
-    let mut buffer = String::with_capacity(128);
+fn handle_conn_cts(listener: &mut PipeListener<pipe_mode::Bytes, pipe_mode::None>) -> TestResult {
+    let mut recver = listener.accept().context("accept failed")?;
+    recv(&mut recver, msg(false))
+}
+fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Bytes>) -> TestResult {
+    let mut sender = listener.accept().context("accept failed")?;
+    send(&mut sender, msg(true))
+}
 
-    let mut conn = DuplexPipeStream::<pipe_mode::Bytes>::connect(name.as_str())
-        .context("Connect failed")
-        .map(BufReader::new)?;
+pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        make_id!(),
+        name_sender,
+        num_clients,
+        |plo| plo.create_duplex::<pipe_mode::Bytes>(),
+        handle_conn_duplex,
+    )
+}
+pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        make_id!(),
+        name_sender,
+        num_clients,
+        |plo| plo.create_recv_only::<pipe_mode::Bytes>(),
+        handle_conn_cts,
+    )
+}
+pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+    drive_server(
+        make_id!(),
+        name_sender,
+        num_clients,
+        |plo| plo.create_send_only::<pipe_mode::Bytes>(),
+        handle_conn_stc,
+    )
+}
 
-    let msg = message(false, Some('\n'));
-    conn.get_mut().write_all(msg.as_bytes()).context("Pipe send failed")?;
-
-    let expected = message(true, Some('\n'));
-    conn.read_line(&mut buffer).context("Pipe receive failed")?;
-    assert_eq!(buffer, expected);
-
-    conn.get_mut().flush().context("Pipe flush failed")?;
-
+pub fn client_duplex(name: &str) -> TestResult {
+    let (mut recver, mut sender) =
+        DuplexPipeStream::<pipe_mode::Bytes>::connect(name).context("connect failed")?.split();
+    send(&mut sender, msg(false))?;
+    recv(&mut recver, msg(true))?;
+    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
     Ok(())
+}
+pub fn client_cts(name: &str) -> TestResult {
+    let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect(name).context("connect failed")?;
+    send(&mut sender, msg(false))
+}
+pub fn client_stc(name: &str) -> TestResult {
+    let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect(name).context("connect failed")?;
+    recv(&mut recver, msg(true))
+}
+
+fn recv(conn: &mut RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
+    let mut conn = BufReader::new(conn);
+    let exp_ = exp.as_ref();
+    let mut buf = String::with_capacity(exp_.len());
+    conn.read_line(&mut buf).context("receive failed")?;
+    ensure_eq!(buf, exp_);
+    Ok(())
+}
+fn send(conn: &mut SendPipeStream<pipe_mode::Bytes>, msg: impl AsRef<str>) -> TestResult {
+    conn.write_all(msg.as_ref().as_bytes()).context("send failed")?;
+    conn.flush().context("flush failed")
 }

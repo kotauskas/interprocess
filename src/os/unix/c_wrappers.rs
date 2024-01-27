@@ -1,12 +1,8 @@
 use super::unixprelude::*;
-use std::io;
+use std::{io, net::Shutdown};
 
 pub(super) unsafe fn fcntl_int(fd: BorrowedFd<'_>, cmd: c_int, val: c_int) -> io::Result<c_int> {
     let val = unsafe { libc::fcntl(fd.as_raw_fd(), cmd, val) };
-    ok_or_ret_errno!(val != -1 => val)
-}
-pub(super) unsafe fn fcntl_noarg(fd: BorrowedFd<'_>, cmd: c_int) -> io::Result<c_int> {
-    let val = unsafe { libc::fcntl(fd.as_raw_fd(), cmd) };
     ok_or_ret_errno!(val != -1 => val)
 }
 
@@ -28,43 +24,32 @@ pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
     }
 }
 
-pub(super) fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<i32> {
+#[cfg(not(target_os = "linux"))]
+fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<i32> {
     let (val, success) = unsafe {
         let ret = libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0);
         (ret, ret != -1)
     };
     ok_or_ret_errno!(success => val)
 }
-pub(super) fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
+#[cfg(not(target_os = "linux"))]
+fn set_fdflags(fd: BorrowedFd<'_>, flags: i32) -> io::Result<()> {
     let success = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, flags) != -1 };
     ok_or_ret_errno!(success => ())
 }
-pub(super) fn set_cloexec(fd: BorrowedFd<'_>) -> io::Result<()> {
+#[cfg(not(target_os = "linux"))]
+fn set_cloexec(fd: BorrowedFd<'_>) -> io::Result<()> {
     set_fdflags(fd, get_fdflags(fd)? | libc::FD_CLOEXEC)?;
     Ok(())
 }
 
-#[cfg(uds_ucred)]
-pub(super) fn get_uid(ruid: bool) -> uid_t {
-    unsafe {
-        if ruid {
-            libc::getuid()
-        } else {
-            libc::geteuid()
-        }
-    }
-}
-#[cfg(uds_ucred)]
-pub(super) fn get_gid(rgid: bool) -> gid_t {
-    unsafe {
-        if rgid {
-            libc::getgid() // more like git gud am i right
-        } else {
-            libc::getegid()
-        }
-    }
-}
-#[cfg(uds_ucred)]
-pub(super) fn get_pid() -> pid_t {
-    unsafe { libc::getpid() }
+#[cfg(feature = "tokio")]
+pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
+    let how = match how {
+        Shutdown::Read => libc::SHUT_RD,
+        Shutdown::Write => libc::SHUT_WR,
+        Shutdown::Both => libc::SHUT_RDWR,
+    };
+    let success = unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 };
+    ok_or_ret_errno!(success => ())
 }

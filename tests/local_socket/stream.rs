@@ -1,98 +1,59 @@
-use super::{util::*, NameGen};
-use color_eyre::eyre::{bail, Context};
-use interprocess::local_socket::{LocalSocketListener, LocalSocketStream};
+use crate::{
+    local_socket::{LocalSocketListener, LocalSocketStream},
+    testutil::*,
+};
+use color_eyre::eyre::Context;
 use std::{
-    io::{self, BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Write},
     str,
     sync::{mpsc::Sender, Arc},
 };
 
-pub fn server(name_sender: Sender<String>, num_clients: u32, prefer_namespaced: bool) -> TestResult {
-    let (name, listener) = NameGen::new_auto(make_id!(), prefer_namespaced)
-        .find_map(|nm| {
-            let l = match LocalSocketListener::bind(&*nm) {
-                Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
-                Err(e) => return Some(Err(e)),
-            };
-            Some(Ok((nm, l)))
-        })
-        .unwrap()
-        .context("Listener bind failed")?;
+fn msg(server: bool, nts: bool) -> Box<str> {
+    message(None, server, Some(['\n', '\0'][nts as usize]))
+}
+
+pub fn server(name_sender: Sender<Arc<str>>, num_clients: u32, namespaced: bool) -> TestResult {
+    let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), namespaced), |nm| {
+        LocalSocketListener::bind(nm)
+    })?;
 
     let _ = name_sender.send(name);
 
-    let mut buffer = Vec::with_capacity(128);
-
     for _ in 0..num_clients {
-        let mut conn = match listener.accept() {
-            Ok(c) => BufReader::new(c),
-            Err(e) => bail!("Incoming connection failed: {e}"),
-        };
-
-        let expected = message(false, Some('\n'));
-        conn.read_until(b'\n', &mut buffer)
-            .context("First socket receive failed")?;
-        assert_eq!(
-            str::from_utf8(&buffer).context("First socket receive wasn't valid UTF-8")?,
-            expected
-        );
-        buffer.clear();
-
-        let msg = message(true, Some('\n'));
-        conn.get_mut()
-            .write_all(msg.as_bytes())
-            .context("First socket send failed")?;
-
-        let expected = message(false, Some('\0'));
-        conn.read_until(b'\0', &mut buffer)
-            .context("Second socket receive failed")?;
-        assert_eq!(
-            str::from_utf8(&buffer).context("Second socket receive wasn't valid UTF-8")?,
-            expected
-        );
-        buffer.clear();
-
-        let msg = message(true, Some('\0'));
-        conn.get_mut()
-            .write_all(msg.as_bytes())
-            .context("Second socket send failed")?;
+        let mut conn = listener.accept().context("accept failed").map(BufReader::new)?;
+        recv(&mut conn, msg(false, false), 0)?;
+        send(&mut conn, msg(true, false), 0)?;
+        recv(&mut conn, msg(false, true), 0)?;
+        send(&mut conn, msg(true, true), 0)?;
     }
     Ok(())
 }
-pub fn client(name: Arc<String>) -> TestResult {
-    let mut buffer = Vec::with_capacity(128);
+pub fn client(name: &str) -> TestResult {
+    let mut conn =
+        LocalSocketStream::connect(name).context("connect failed").map(BufReader::new)?;
+    send(&mut conn, msg(false, false), 0)?;
+    recv(&mut conn, msg(true, false), 0)?;
+    send(&mut conn, msg(false, true), 0)?;
+    recv(&mut conn, msg(true, true), 0)
+}
 
-    let mut conn = LocalSocketStream::connect(name.as_str())
-        .context("Connect failed")
-        .map(BufReader::new)?;
+fn recv(conn: &mut BufReader<LocalSocketStream>, exp: impl AsRef<str>, nr: u8) -> TestResult {
+    let exp_ = exp.as_ref();
+    let term = *exp_.as_bytes().last().unwrap();
+    let fs = ["first", "second"][nr as usize];
 
-    let msg = message(false, Some('\n'));
-    conn.get_mut()
-        .write_all(msg.as_bytes())
-        .context("First socket send failed")?;
-
-    let expected = message(true, Some('\n'));
-    conn.read_until(b'\n', &mut buffer)
-        .context("First socket receive failed")?;
-    assert_eq!(
-        str::from_utf8(&buffer).context("First socket receive wasn't valid UTF-8")?,
-        expected
+    let mut buffer = Vec::with_capacity(exp_.len());
+    conn.read_until(term, &mut buffer).with_context(|| format!("{} receive failed", fs))?;
+    ensure_eq!(
+        str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
+        exp_,
     );
-    buffer.clear();
-
-    let msg = message(false, Some('\0'));
-    conn.get_mut()
-        .write_all(msg.as_bytes())
-        .context("Second socket send failed")?;
-
-    let expected = message(true, Some('\0'));
-    conn.read_until(b'\0', &mut buffer)
-        .context("Second socket receive failed")?;
-    assert_eq!(
-        str::from_utf8(&buffer).context("Second socket receive wasn't valid UTF-8")?,
-        expected
-    );
-
     Ok(())
+}
+fn send(conn: &mut BufReader<LocalSocketStream>, msg: impl AsRef<str>, nr: u8) -> TestResult {
+    let fs = ["first", "second"][nr as usize];
+    conn.get_mut()
+        .write_all(msg.as_ref().as_bytes())
+        .with_context(|| format!("{} socket send failed", fs))
 }

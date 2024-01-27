@@ -18,9 +18,14 @@ use std::{
 };
 use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mutex};
 
-/// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients and producing asynchronous pipe streams.
+/// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients
+/// and producing asynchronous pipe streams.
 ///
-/// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation for more.
+/// Note that this type does not correspond to any Tokio object, and is an invention of Interprocess
+/// in its entirety.
+///
+/// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
+/// for more.
 ///
 /// # Examples
 ///
@@ -28,37 +33,37 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use futures::{prelude::*, try_join};
+/// use tokio::{io::{AsyncReadExt, AsyncWriteExt}, try_join};
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*, PipeListenerOptions};
-/// use std::{ffi::OsStr, io};
+/// use std::{path::Path, io};
 ///
 /// // Describe the things we do when we've got a connection ready.
 /// async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
 ///     // Split the connection into two halves to process
 ///     // received and sent data concurrently.
-///     let (mut reader, mut writer) = conn.split();
+///     let (mut recver, mut sender) = conn.split();
 ///
-///     // Allocate a sizeable buffer for reading.
+///     // Allocate a sizeable buffer for receiving.
 ///     // This size should be enough and should be easy to find for the allocator.
 ///     let mut buffer = String::with_capacity(128);
 ///
-///     // Describe the write operation as first writing our whole message, and
-///     // then shutting down the write half to send an EOF to help the other
+///     // Describe the send operation as first sending our whole message, and
+///     // then shutting down the send half to send an EOF to help the other
 ///     // side determine the end of the transmission.
-///     let write = async {
-///         writer.write_all(b"Hello from server!").await?;
-///         writer.close().await?;
+///     let send = async {
+///         sender.write_all(b"Hello from server!").await?;
+///         sender.shutdown().await?;
 ///         Ok(())
 ///     };
 ///
-///     // Describe the read operation as reading into our big buffer.
-///     let read = reader.read_to_string(&mut buffer);
+///     // Describe the receive operation as receiving into our big buffer.
+///     let recv = recver.read_to_string(&mut buffer);
 ///
-///     // Run both the write-and-send-EOF operation and the read operation concurrently.
-///     try_join!(read, write)?;
+///     // Run both the send-and-invoke-EOF operation and the receive operation concurrently.
+///     try_join!(recv, send)?;
 ///
 ///     // Dispose of our connection right now and not a moment later because I want to!
-///     drop((reader, writer));
+///     drop((recver, sender));
 ///
 ///     // Produce our output!
 ///     println!("Client answered: {}", buffer.trim());
@@ -69,7 +74,7 @@ use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mu
 ///
 /// // Create our listener.
 /// let listener = PipeListenerOptions::new()
-///     .name(OsStr::new(PIPE_NAME))
+///     .path(Path::new(PIPE_NAME))
 ///     .create_tokio_duplex::<pipe_mode::Bytes>()?;
 ///
 /// // The syncronization between the server and client, if any is used, goes here.
@@ -108,7 +113,8 @@ pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
 
-    /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to communicate with the pipe.
+    /// Asynchronously waits until a client connects to the named pipe, creating a `Stream` to
+    /// communicate with the pipe.
     pub async fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().await;
@@ -138,29 +144,38 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 
 /// Extends [`PipeListenerOptions`] with a constructor method for the Tokio [`PipeListener`].
 pub trait PipeListenerOptionsExt: Sealed {
-    /// Creates a Tokio pipe listener from the builder. See the [non-async `create` method on `PipeListenerOptions`](PipeListenerOptions::create) for more.
+    /// Creates a Tokio pipe listener from the builder. See the
+    /// [non-async `create` method on `PipeListenerOptions`](PipeListenerOptions::create) for more.
     ///
     /// The `nonblocking` parameter is ignored and forced to be enabled.
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>>;
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with the same `Rm` and `Sm`.
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with the same `Rm` and
+    /// `Sm`.
     #[inline]
     fn create_tokio_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
         self.create_tokio::<M, M>()
     }
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Sm` of [`pipe_mode::None`].
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Sm` of
+    /// [`pipe_mode::None`].
     #[inline]
-    fn create_tokio_recv_only<Rm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+    fn create_tokio_recv_only<Rm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
         self.create_tokio::<Rm, pipe_mode::None>()
     }
-    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Rm` of [`pipe_mode::None`].
+    /// Alias for [`.create_tokio()`](PipeListenerOptionsExt::create_tokio) with an `Rm` of
+    /// [`pipe_mode::None`].
     #[inline]
-    fn create_tokio_send_only<Sm: PipeModeTag>(&self) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+    fn create_tokio_send_only<Sm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
         self.create_tokio::<pipe_mode::None, Sm>()
     }
 }
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
-        let (owned_config, instance) = _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
+        let (owned_config, instance) =
+            _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
         Ok(PipeListener {
             config: owned_config,
             stored_instance: Mutex::new(instance),
@@ -172,7 +187,7 @@ impl Sealed for PipeListenerOptions<'_> {}
 fn _create_tokio(
     config: &PipeListenerOptions<'_>,
     role: PipeStreamRole,
-    read_mode: Option<PipeMode>,
+    recv_mode: Option<PipeMode>,
 ) -> io::Result<(PipeListenerOptions<'static>, TokioNPServer)> {
     // Shadow to avoid mixing them up.
     let mut config = config.to_owned();
@@ -181,7 +196,7 @@ fn _create_tokio(
     config.nonblocking = false;
 
     let instance = config
-        .create_instance(true, config.nonblocking, true, role, read_mode)
+        .create_instance(true, config.nonblocking, true, role, recv_mode)
         .and_then(npserver_from_handle)?;
 
     Ok((config, instance))
