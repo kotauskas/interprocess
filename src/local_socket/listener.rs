@@ -106,7 +106,12 @@ pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, None).map(Self)
+    }
+    /// Creates a socket server with the specified local socket name.
+    #[cfg(target_os = "windows")]
+    pub fn bind_unsafe<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
+        LocalSocketListenerImpl::bind(name, Some(crate::os::windows::security_descriptor::SecurityAttributes::default().any_user())).map(Self)
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///

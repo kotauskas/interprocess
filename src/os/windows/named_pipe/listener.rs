@@ -1,7 +1,7 @@
 use super::{
     path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
 };
-use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
+use crate::os::windows::{security_descriptor::init_security_attributes, winprelude::*, FileHandle};
 use std::{
     borrow::Cow,
     fmt::{self, Debug, Formatter},
@@ -16,13 +16,16 @@ use std::{
         Mutex,
     },
 };
+use crate::os::windows::security_descriptor::{init_security_description,SecurityAttributes};
 use to_method::To;
+
 use windows_sys::Win32::{
     Foundation::ERROR_PIPE_CONNECTED,
     Storage::FileSystem::{
         FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
     },
     System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
+    Security::SECURITY_DESCRIPTOR
 };
 
 // TODO split up
@@ -184,6 +187,12 @@ pub struct PipeListenerOptions<'a> {
     /// when waiting by a client.
     // TODO use WaitTimeout struct
     pub wait_timeout: NonZeroU32,
+    /// Optional security attributes to apply to the named pipe.
+    /// This can be used to specify the security descriptor for the pipe and
+    /// to control whether the returned handle can be inherited by child processes.
+    /// If `None`, the pipe is created with a default security descriptor
+    /// and the handle cannot be inherited.
+    pub security_attributes: Option<SecurityAttributes>,
 }
 macro_rules! genset {
     ($name:ident : $ty:ty) => {
@@ -217,6 +226,7 @@ impl<'a> PipeListenerOptions<'a> {
             input_buffer_size_hint: 512,
             output_buffer_size_hint: 512,
             wait_timeout: NonZeroU32::new(50).unwrap(),
+            security_attributes: Some(SecurityAttributes::default()),
         }
     }
     /// Clones configuration options which are not owned by value and returns a copy of the original
@@ -238,6 +248,7 @@ impl<'a> PipeListenerOptions<'a> {
             input_buffer_size_hint: self.input_buffer_size_hint,
             output_buffer_size_hint: self.output_buffer_size_hint,
             wait_timeout: self.wait_timeout,
+            security_attributes: self.security_attributes.clone(),
         }
     }
     genset!(
@@ -250,6 +261,7 @@ impl<'a> PipeListenerOptions<'a> {
         input_buffer_size_hint: u32,
         output_buffer_size_hint: u32,
         wait_timeout: NonZeroU32,
+        security_attributes: Option<SecurityAttributes>
     );
     /// Creates an instance of a pipe for a listener with the specified stream type and with the
     /// first-instance flag set to the specified value.
@@ -273,9 +285,24 @@ cannot create pipe server that has byte type but receives messages – have you 
         let path = encode_to_utf16(self.path.as_os_str());
         let open_mode = self.open_mode(first, role, overlapped);
         let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
-
         let mut sa = init_security_attributes();
         sa.bInheritHandle = 0;
+        if let Some(security_atributes) = &<Option<SecurityAttributes> as Clone>::clone(&self.security_attributes){
+            if let Some(_) = security_atributes.attributes {
+                match init_security_description() {
+                    Ok(security_descriptor) => {
+                        unsafe{
+                            (*(security_descriptor as *mut SECURITY_DESCRIPTOR)).Control = winapi::um::winnt::SE_DACL_PRESENT;
+                        }
+                        sa.lpSecurityDescriptor = security_descriptor;
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+
+            }
+        }
         // TODO security descriptor
 
         let max_instances = match self.instance_limit.map(NonZeroU8::get) {

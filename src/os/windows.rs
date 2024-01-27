@@ -11,6 +11,7 @@ mod share_handle;
 pub use share_handle::*;
 
 mod c_wrappers;
+pub mod security_descriptor;
 mod file_handle;
 pub(crate) mod local_socket;
 mod misc;
