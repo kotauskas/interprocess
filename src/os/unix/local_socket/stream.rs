@@ -1,51 +1,64 @@
-use {
-    super::local_socket_name_to_ud_socket_path,
-    crate::{
-        local_socket::ToLocalSocketName,
-        os::unix::udsocket::{UdSocket, UdStream},
-    },
-    std::{
-        fmt::{self, Debug, Formatter},
-        io::{self, prelude::*, IoSlice, IoSliceMut},
-        os::unix::io::AsRawFd,
-    },
-};
+use super::name_to_addr;
+use crate::{error::ReuniteError, local_socket::LocalSocketName, TryClone};
+use std::{io, os::unix::net::UnixStream, sync::Arc};
 
-pub struct LocalSocketStream(pub(super) UdStream);
+#[derive(Debug)]
+pub struct LocalSocketStream(pub(super) UnixStream);
 impl LocalSocketStream {
-    pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let path = local_socket_name_to_ud_socket_path(name.to_local_socket_name()?)?;
-        let inner = UdStream::connect(path)?;
-        Ok(Self(inner))
+    pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+        UnixStream::connect_addr(&name_to_addr(name)?).map(Self)
     }
+    #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
-}
-impl Read for LocalSocketStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+    #[inline]
+    pub fn split(self) -> (RecvHalf, SendHalf) {
+        let arc = Arc::new(self);
+        (RecvHalf(Arc::clone(&arc)), SendHalf(arc))
     }
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        self.0.read_vectored(bufs)
-    }
-}
-impl Write for LocalSocketStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
-    }
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        self.0.write_vectored(bufs)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
+    #[inline]
+    pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
+        if !Arc::ptr_eq(&rh.0, &sh.0) {
+            return Err(ReuniteError { rh, sh });
+        }
+        let inner = Arc::into_inner(sh.0).unwrap();
+        drop(rh);
+        Ok(Self(inner))
     }
 }
-impl Debug for LocalSocketStream {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalSocketStream")
-            .field("fd", &self.0.as_raw_fd())
-            .finish()
+
+impl TryClone for LocalSocketStream {
+    #[inline]
+    fn try_clone(&self) -> std::io::Result<Self> {
+        self.0.try_clone().map(Self)
     }
 }
-forward_handle!(unix: LocalSocketStream);
+
+multimacro! {
+    LocalSocketStream,
+    forward_rbv(UnixStream, &),
+    forward_sync_ref_rw,
+    forward_handle(unix),
+    derive_sync_mut_rw,
+}
+
+#[derive(Debug)]
+pub struct RecvHalf(pub(super) Arc<LocalSocketStream>);
+multimacro! {
+    RecvHalf,
+    forward_rbv(LocalSocketStream, *),
+    forward_sync_ref_read,
+    forward_as_handle,
+    derive_sync_mut_read,
+}
+
+#[derive(Debug)]
+pub struct SendHalf(pub(super) Arc<LocalSocketStream>);
+multimacro! {
+    SendHalf,
+    forward_rbv(LocalSocketStream, *),
+    forward_sync_ref_write,
+    forward_as_handle,
+    derive_sync_mut_write,
+}

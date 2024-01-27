@@ -34,14 +34,18 @@ fn static_runtime_handle() -> &'static RuntimeHandle {
                 .thread_name("Tokio limbo dispatcher")
                 .thread_stack_size(1024 * 1024)
                 .build()
-                .expect("failed to build Tokio limbo helper (only necessary if the first named pipe to be dropped happens to go out of scope outside of another Tokio runtime)")
+                .expect(
+                    "\
+failed to build Tokio limbo helper (only necessary if the first named pipe to be dropped happens \
+to go out of scope outside of another Tokio runtime)",
+                )
         })
         .handle()
 }
 
 fn bury(c: Corpse) {
     task::spawn_blocking(move || {
-        let handle = c.0.as_handle().as_raw_handle();
+        let handle = c.0.as_int_handle();
         FileHandle::flush_hndl(handle).debug_expect("limbo flush failed");
     });
 }

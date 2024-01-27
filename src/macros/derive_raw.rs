@@ -1,4 +1,5 @@
-//! Derive macros that implement raw handle manipulation in terms of safe handle manipulation from Rust 1.63+.
+//! Derive macros that implement raw handle manipulation in terms of safe handle manipulation from
+//! Rust 1.63+.
 
 macro_rules! derive_asraw {
     (@impl
@@ -15,14 +16,14 @@ macro_rules! derive_asraw {
             }
         }
     };
-    (windows: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, windows) => {
         derive_asraw!(
             @impl
             $({$($forcl)*})? $ty,
             RawHandle, AsRawHandle, as_raw_handle,
             AsHandle, as_handle, windows);
     };
-    (unix: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, unix) => {
         derive_asraw!(
             @impl
             $({$($forcl)*})? $ty,
@@ -30,8 +31,8 @@ macro_rules! derive_asraw {
             AsFd, as_fd, unix);
     };
     ($({$($forcl:tt)*})? $ty:ty) => {
-        derive_asraw!(windows: $({$($forcl)*})? $ty);
-        derive_asraw!(unix: $({$($forcl)*})? $ty);
+        derive_asraw!($({$($forcl)*})? $ty, windows);
+        derive_asraw!($({$($forcl)*})? $ty, unix);
     };
 }
 
@@ -50,14 +51,14 @@ macro_rules! derive_intoraw {
             }
         }
     };
-    (windows: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, windows) => {
         derive_intoraw!(
             @impl
             $({$($forcl)*})? $ty,
             RawHandle, OwnedHandle,
             IntoRawHandle, into_raw_handle, windows);
     };
-    (unix: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, unix) => {
         derive_intoraw!(
             @impl
             $({$($forcl)*})? $ty,
@@ -65,23 +66,23 @@ macro_rules! derive_intoraw {
             IntoRawFd, into_raw_fd, unix);
     };
     ($({$($forcl:tt)*})? $ty:ty) => {
-        derive_intoraw!(windows: $({$($forcl)*})? $ty);
-        derive_intoraw!(unix: $({$($forcl)*})? $ty);
+        derive_intoraw!($({$($forcl)*})? $ty, windows);
+        derive_intoraw!($({$($forcl)*})? $ty, unix);
     };
 }
 
 macro_rules! derive_asintoraw {
-    (windows: $({$($forcl:tt)*})? $ty:ty) => {
-        derive_asraw!(windows: $({$($forcl)*})? $ty);
-        derive_intoraw!(windows: $({$($forcl)*})? $ty);
+    ($({$($forcl:tt)*})? $ty:ty, windows) => {
+        derive_asraw!($({$($forcl)*})? $ty, windows);
+        derive_intoraw!($({$($forcl)*})? $ty, windows);
     };
-    (unix: $({$($forcl:tt)*})? $ty:ty) => {
-        derive_asraw!(unix: $({$($forcl)*})? $ty);
-        derive_intoraw!(unix: $({$($forcl)*})? $ty);
+    ($({$($forcl:tt)*})? $ty:ty, unix) => {
+        derive_asraw!($({$($forcl)*})? $ty, unix);
+        derive_intoraw!($({$($forcl)*})? $ty, unix);
     };
     ($({$($forcl:tt)*})? $ty:ty) => {
-        derive_asintoraw!(windows: $({$($forcl)*})? $ty);
-        derive_asintoraw!(unix: $({$($forcl)*})? $ty);
+        derive_asintoraw!($({$($forcl)*})? $ty, windows);
+        derive_asintoraw!($({$($forcl)*})? $ty, unix);
     };
 }
 
@@ -100,14 +101,14 @@ macro_rules! derive_fromraw {
             }
         }
     };
-    (windows: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, windows) => {
         derive_fromraw!(
             @impl
             $({$($forcl)*})? $ty,
             RawHandle, OwnedHandle,
             FromRawHandle, from_raw_handle, windows);
     };
-    (unix: $({$($forcl:tt)*})? $ty:ty) => {
+    ($({$($forcl:tt)*})? $ty:ty, unix) => {
         derive_fromraw!(
             @impl
             $({$($forcl)*})? $ty,
@@ -115,19 +116,19 @@ macro_rules! derive_fromraw {
             FromRawFd, from_raw_fd, unix);
     };
     ($({$($forcl:tt)*})? $ty:ty) => {
-        derive_fromraw!(windows: $({$($forcl)*})? $ty);
-        derive_fromraw!(unix: $({$($forcl)*})? $ty);
+        derive_fromraw!($({$($forcl)*})? $ty, windows);
+        derive_fromraw!($({$($forcl)*})? $ty, unix);
     };
 }
 
 macro_rules! derive_raw {
-    (windows: $({$($forcl:tt)*})? $ty:ty) => {
-        derive_asintoraw!(windows: $({$($forcl)*})? $ty);
-        derive_fromraw!(windows: $({$($forcl)*})? $ty);
+    ($({$($forcl:tt)*})? $ty:ty, windows) => {
+        derive_asintoraw!($({$($forcl)*})? $ty, windows);
+        derive_fromraw!($({$($forcl)*})? $ty, windows);
     };
-    (unix: $({$($forcl:tt)*})? $ty:ty) => {
-        derive_asintoraw!(unix: $({$($forcl)*})? $ty);
-        derive_fromraw!(unix: $({$($forcl)*})? $ty);
+    ($({$($forcl:tt)*})? $ty:ty, unix) => {
+        derive_asintoraw!($({$($forcl)*})? $ty, unix);
+        derive_fromraw!($({$($forcl)*})? $ty, unix);
     };
     ($({$($forcl:tt)*})? $ty:ty) => {
         derive_asintoraw!($({$($forcl)*})? $ty);

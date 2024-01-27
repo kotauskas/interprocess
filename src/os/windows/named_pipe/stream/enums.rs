@@ -1,16 +1,17 @@
-use super::super::PipeMode;
+use super::super::*;
 
-/// Tags for [`PipeStream`]'s generic arguments that specify the directionality of the stream and how it receives and/or sends data (as bytes or as messages).
+/// Tags for [`PipeStream`]'s generic arguments that specify the directionality of the stream and
+/// how it receives and/or sends data (as bytes or as messages).
 ///
-/// This is a sort of const-generic incarnation of the [`PipeMode`] enumeration that allows `PipeStream` to be consolidated into a single struct with generic parameters that decide which traits are implemented on it.
+/// This is a sort of const-generic incarnation of the [`PipeMode`] enumeration that allows
+/// `PipeStream` to be consolidated into a single struct with generic parameters that decide which
+/// traits are implemented on it.
 ///
 /// Some examples of how different `PipeStream` signatures would look:
-/// - **`PipeStream<Bytes, Bytes>`** (or, thanks to default generic arguments, simply `PipeStream`) is a duplex stream that receives and sends bytes.
+/// - **`PipeStream<Bytes, Bytes>`** (or, thanks to default generic arguments, simply `PipeStream`)
+///   is a duplex stream that receives and sends bytes.
 /// - **`PipeStream<Messages, ()>`** is a receive-only message stream.
 /// - **`PipeStream<Bytes, Messages>`** is a duplex stream that receives bytes but sends messages.
-///
-/// [`PipeStream`]: super::PipeStream
-/// [`PipeMode`]: super::super::super::PipeMode
 pub mod pipe_mode {
     use super::*;
 

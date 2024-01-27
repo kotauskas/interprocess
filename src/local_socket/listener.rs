@@ -1,15 +1,13 @@
 use {
     super::{LocalSocketStream, ToLocalSocketName},
-    std::{
-        fmt::{self, Debug, Formatter},
-        io,
-        iter::FusedIterator,
-    },
+    std::{io, iter::FusedIterator},
 };
 
 impmod! {local_socket,
     LocalSocketListener as LocalSocketListenerImpl
 }
+
+// TODO drop guard
 
 /// A local socket server, listening for connections.
 ///
@@ -31,7 +29,7 @@ impmod! {local_socket,
 ///         }
 ///     }
 /// }
-//// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
+/// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.
 /// let name = {
 ///     // This scoping trick allows us to nicely contain the import inside the `match`, so that if
@@ -68,25 +66,25 @@ impmod! {local_socket,
 /// // The syncronization between the server and client, if any is used, goes here.
 /// eprintln!("Server running at {name}");
 ///
-/// // Preemptively allocate a sizeable buffer for reading at a later moment. This size should be
+/// // Preemptively allocate a sizeable buffer for receiving at a later moment. This size should be
 /// // enough and should be easy to find for the allocator. Since we only have one concurrent
 /// // client, there's no need to reallocate the buffer repeatedly.
 /// let mut buffer = String::with_capacity(128);
 ///
 /// for conn in listener.incoming().filter_map(handle_error) {
-///     // Wrap the connection into a buffered reader right away
-///     // so that we could read a single line out of it.
+///     // Wrap the connection into a buffered receiver right away
+///     // so that we could receive a single line from it.
 ///     let mut conn = BufReader::new(conn);
 ///     println!("Incoming connection!");
 ///
-///     // Since our client example writes first, the server should read a line and only then send a
-///     // response. Otherwise, because reading and writing on a connection cannot be simultaneous
-///     // without threads or async, we can deadlock the two processes by having both sides wait for
-///     // the write buffer to be emptied by the other.
+///     // Since our client example sends first, the server should receive a line and only then
+///     // send a response. Otherwise, because receiving from and sending to a connection cannot be
+///     // simultaneous without threads or async, we can deadlock the two processes by having both
+///     // sides wait for the send buffer to be emptied by the other.
 ///     conn.read_line(&mut buffer)?;
 ///
-///     // Now that the read has come through and the client is waiting on the server's write, do
-///     // it. (`.get_mut()` is to get the writer, `BufReader` doesn't implement a pass-through
+///     // Now that the receive has come through and the client is waiting on the server's send, do
+///     // it. (`.get_mut()` is to get the sender, `BufReader` doesn't implement a pass-through
 ///     // `Write`.)
 ///     conn.get_mut().write_all(b"Hello from server!\n")?;
 ///
@@ -108,52 +106,57 @@ pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name).map(Self)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, None).map(Self)
+    }
+    /// Creates a socket server with the specified local socket name.
+    #[cfg(target_os = "windows")]
+    pub fn bind_unsafe<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
+        LocalSocketListenerImpl::bind(name, Some(crate::os::windows::security_descriptor::SecurityAttributes::default().any_user())).map(Self)
     }
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///
-    /// See [`incoming`] for a convenient way to create a main loop for a server.
-    ///
-    /// [`incoming`]: #method.incoming " "
+    /// See [`.incoming()`](Self::incoming) for a convenient way to create a main loop for a server.
     #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         self.0.accept().map(LocalSocketStream)
     }
-    /// Creates an infinite iterator which calls `accept()` with each iteration. Used together with `for` loops to conveniently create a main loop for a socket server.
+    /// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
+    /// Used together with `for` loops to conveniently create a main loop for a socket server.
     #[inline]
     pub fn incoming(&self) -> Incoming<'_> {
         Incoming::from(self)
     }
     /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
     ///
-    /// In nonblocking mode, calling [`accept`] and iterating through [`incoming`] will immediately return a [`WouldBlock`] error if there is no client attempting to connect at the moment instead of blocking until one arrives.
+    /// In nonblocking mode, calling [`.accept()`] and iterating through [`.incoming()`] will
+    /// immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error if there is no client
+    /// attempting to connect at the moment instead of blocking until one arrives.
     ///
     /// # Platform-specific behavior
     /// ## Windows
-    /// The nonblocking mode will be also be set for the streams produced by [`accept`] and [`incoming`], both existing and new ones.
+    /// The nonblocking mode will be also be set for the streams produced by [`.accept()`] and
+    /// [`.incoming()`], both existing and new ones.
     ///
-    /// [`WouldBlock`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock " "
-    /// [`accept`]: #method.accept " "
-    /// [`incoming`]: #method.incoming " "
+    /// [`.accept()`]: Self::accept
+    /// [`.incoming()`]: Self::incoming
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
 }
-impl Debug for LocalSocketListener {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
-    }
+multimacro! {
+    LocalSocketListener,
+    forward_debug,
+    forward_into_handle,
+    forward_as_handle(unix),
+    forward_from_handle(unix),
+    derive_raw(unix),
 }
-forward_handle!(unix: LocalSocketListener);
-derive_raw!(unix: LocalSocketListener);
 
 /// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
 ///
-/// This iterator is created by the [`incoming`] method on [`LocalSocketListener`] – see its documentation for more.
-///
-/// [`LocalSocketListener`]: struct.LocalSocketListener.html " "
-/// [`incoming`]: struct.LocalSocketListener.html#method.incoming " "
+/// This iterator is created by the [`incoming()`](LocalSocketListener::incoming) method on
+/// [`LocalSocketListener`] – see its documentation for more.
 #[derive(Debug)]
 pub struct Incoming<'a> {
     listener: &'a LocalSocketListener,
