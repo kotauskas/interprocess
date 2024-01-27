@@ -30,6 +30,7 @@ tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
 [dependencies]
+winapi = { version = "0.3.9", features = ["winnt"] }
 tokio = { version = "1.32.0", features = [
     "sync",
     "rt-multi-thread",
