@@ -10,44 +10,26 @@ use std::{
     sync::{mpsc::Sender, Arc},
 };
 
-#[test]
-fn bytes_bidir() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_duplex, client_duplex)
+macro_rules! matrix {
+    (@dir_s duplex) => {server_duplex}; (@dir_s stc) => {server_stc}; (@dir_s cts) => {server_cts};
+    (@dir_c duplex) => {client_duplex}; (@dir_c stc) => {client_stc}; (@dir_c cts) => {client_cts};
+    ($($mod:ident $ty:ident $nm:ident)+) => {$(
+        #[test]
+        fn $nm() -> TestResult {
+            use $mod::*;
+            testinit();
+            drive_server_and_multiple_clients(matrix!(@dir_s $ty), matrix!(@dir_c $ty))
+        }
+    )+};
 }
 
-#[test]
-fn bytes_unidir_client_to_server() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_cts, client_cts)
-}
-#[test]
-fn bytes_unidir_server_to_client() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_stc, client_stc)
-}
-
-#[test]
-fn msg_bidir() -> TestResult {
-    use msg::*;
-    testinit();
-    drive_server_and_multiple_clients(server_duplex, client_duplex)
-}
-
-#[test]
-fn msg_unidir_client_to_server() -> TestResult {
-    use msg::*;
-    testinit();
-    drive_server_and_multiple_clients(server_cts, client_cts)
-}
-#[test]
-fn msg_unidir_server_to_client() -> TestResult {
-    use msg::*;
-    testinit();
-    drive_server_and_multiple_clients(server_stc, client_stc)
+matrix! {
+    bytes duplex bytes_bidir
+    bytes cts    bytes_unidir_client_to_server
+    bytes stc    bytes_unidir_server_to_client
+    msg   duplex msg_bidir
+    msg   cts    msg_unidir_client_to_server
+    msg   stc    msg_unidir_server_to_client
 }
 
 fn drive_server<L>(
