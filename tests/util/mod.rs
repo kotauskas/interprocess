@@ -41,11 +41,12 @@ pub fn listen_and_pick_name<T>(
     namegen: &mut NameGen,
     mut bindfn: impl FnMut(&str) -> io::Result<T>,
 ) -> TestResult<(Arc<str>, T)> {
+    use std::io::ErrorKind::*;
     namegen
         .find_map(|nm| {
             let l = match bindfn(&nm) {
                 Ok(l) => l,
-                Err(e) if e.kind() == io::ErrorKind::AddrInUse => return None,
+                Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied) => return None,
                 Err(e) => return Some(Err(e)),
             };
             Some(Ok((nm, l)))
