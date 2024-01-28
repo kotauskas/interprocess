@@ -28,7 +28,7 @@ macro_rules! matrix {
     (@querymethod false $e:expr) => { NameTypeSupport::paths_supported($e) };
     (@body $split:ident $nmspc:ident) => {{
         if matrix!(@querymethod $nmspc NameTypeSupport::query()) {
-            test_stream(true, $nmspc)?;
+            test_stream($split, $nmspc)?;
         }
         Ok(())
     }};
