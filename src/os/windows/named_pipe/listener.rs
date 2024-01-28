@@ -1,7 +1,7 @@
 use super::{
     path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
 };
-use crate::os::windows::{c_wrappers::init_security_attributes, winprelude::*, FileHandle};
+use crate::os::windows::{winprelude::*, FileHandle, SecurityDescriptor};
 use std::{
     borrow::Cow,
     fmt::{self, Debug, Formatter},
@@ -9,7 +9,7 @@ use std::{
     marker::PhantomData,
     mem::replace,
     num::{NonZeroU32, NonZeroU8},
-    path::Path,
+    path::{Path, PathBuf},
     ptr,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
@@ -19,6 +19,7 @@ use std::{
 use to_method::To;
 use windows_sys::Win32::{
     Foundation::ERROR_PIPE_CONNECTED,
+    Security::SECURITY_ATTRIBUTES,
     Storage::FileSystem::{
         FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
     },
@@ -134,7 +135,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
 }
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
     /// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
@@ -187,6 +188,12 @@ pub struct PipeListenerOptions<'a> {
     /// when waiting by a client.
     // TODO use WaitTimeout struct
     pub wait_timeout: NonZeroU32,
+    /// The security descriptor to create the named pipe server with.
+    pub security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+    /// Whether the resulting handle is to be inheritable by child processes or not.
+    ///
+    /// There is little to no reason for this to ever be `true`.
+    pub inheritable: bool,
 }
 macro_rules! genset {
     ($name:ident : $ty:ty) => {
@@ -220,6 +227,8 @@ impl<'a> PipeListenerOptions<'a> {
             input_buffer_size_hint: 512,
             output_buffer_size_hint: 512,
             wait_timeout: NonZeroU32::new(50).unwrap(),
+            security_descriptor: None,
+            inheritable: false,
         }
     }
     /// Clones configuration options which are not owned by value and returns a copy of the original
@@ -241,10 +250,29 @@ impl<'a> PipeListenerOptions<'a> {
             input_buffer_size_hint: self.input_buffer_size_hint,
             output_buffer_size_hint: self.output_buffer_size_hint,
             wait_timeout: self.wait_timeout,
+            security_descriptor: match self.security_descriptor {
+                Some(Cow::Owned(o)) => Some(Cow::Owned(o)),
+                Some(Cow::Borrowed(b)) => Some(Cow::Owned(*b)),
+                None => None,
+            },
+            inheritable: self.inheritable,
         }
     }
-    genset!(
-        path: Cow<'a, Path>,
+
+    /// Sets the [`path`](#structfield.path) parameter to the specified value.
+    #[inline]
+    pub fn path<T: ?Sized>(mut self, path: impl Into<Cow<'a, T>>) -> Self
+    where
+        T: AsRef<Path> + ToOwned + 'a,
+        T::Owned: Into<PathBuf>,
+    {
+        self.path = match path.into() {
+            Cow::Borrowed(b) => Cow::Borrowed(b.as_ref()),
+            Cow::Owned(o) => Cow::Owned(o.into()),
+        };
+        self
+    }
+    genset! {
         mode: PipeMode,
         nonblocking: bool,
         instance_limit: Option<NonZeroU8>,
@@ -253,7 +281,10 @@ impl<'a> PipeListenerOptions<'a> {
         input_buffer_size_hint: u32,
         output_buffer_size_hint: u32,
         wait_timeout: NonZeroU32,
-    );
+        security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+        inheritable: bool,
+    }
+
     /// Creates an instance of a pipe for a listener with the specified stream type and with the
     /// first-instance flag set to the specified value.
     pub(super) fn create_instance(
@@ -277,9 +308,10 @@ cannot create pipe server that has byte type but receives messages – have you 
         let open_mode = self.open_mode(first, role, overlapped);
         let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 
-        let mut sa = init_security_attributes();
-        sa.bInheritHandle = 0;
-        // TODO security descriptor
+        let sa = SecurityDescriptor::create_security_attributes(
+            self.security_descriptor.as_deref(),
+            self.inheritable,
+        );
 
         let max_instances = match self.instance_limit.map(NonZeroU8::get) {
             Some(255) => return Err(io::Error::new(
@@ -299,7 +331,7 @@ cannot create pipe server that has byte type but receives messages – have you 
                 self.output_buffer_size_hint,
                 self.input_buffer_size_hint,
                 self.wait_timeout.get(),
-                &mut sa as *mut _,
+                (&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
             );
             (handle, handle != INVALID_HANDLE_VALUE)
         };

@@ -6,14 +6,16 @@ pub mod named_pipe;
 pub mod unnamed_pipe;
 //pub mod mailslot;
 
+mod security_descriptor;
 mod share_handle;
+pub use {security_descriptor::*, share_handle::*};
 
-pub use share_handle::*;
-
-mod c_wrappers;
 mod file_handle;
 pub(crate) mod local_socket;
-mod misc;
 
 pub(crate) use file_handle::*;
+
+mod c_wrappers;
+mod misc;
+
 use misc::*;

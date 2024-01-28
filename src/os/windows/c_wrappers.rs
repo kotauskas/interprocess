@@ -1,11 +1,7 @@
 use super::winprelude::*;
-use std::{
-    io,
-    mem::{size_of, zeroed},
-};
+use std::io;
 use windows_sys::Win32::{
     Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS},
-    Security::SECURITY_ATTRIBUTES,
     System::Threading::GetCurrentProcess,
 };
 
@@ -38,10 +34,4 @@ fn duplicate_handle_inner(
         ) != 0
     };
     ok_or_ret_errno!(success => new_handle as _)
-}
-
-pub fn init_security_attributes() -> SECURITY_ATTRIBUTES {
-    let mut a: SECURITY_ATTRIBUTES = unsafe { zeroed() };
-    a.nLength = size_of::<SECURITY_ATTRIBUTES>() as _;
-    a
 }
