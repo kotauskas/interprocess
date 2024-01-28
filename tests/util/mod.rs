@@ -20,7 +20,7 @@ pub mod tokio;
 const NUM_CLIENTS: u32 = 80;
 const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
-use color_eyre::eyre::Context;
+use color_eyre::eyre::WrapErr;
 use std::{fmt::Arguments, io, sync::Arc};
 
 pub fn testinit() {

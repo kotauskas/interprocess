@@ -7,7 +7,7 @@ use ::tokio::{
     sync::oneshot::Sender,
     task, try_join,
 };
-use color_eyre::eyre::Context;
+use color_eyre::eyre::WrapErr;
 use std::{convert::TryInto, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {
@@ -27,7 +27,7 @@ pub async fn server(
 
     let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
     for _ in 0..num_clients {
-        let stream = listener.accept().await.context("accept failed")?;
+        let stream = listener.accept().await.opname("accept")?;
         tasks.push(task::spawn(async move {
             try_join!(
                 recv(&stream, msg(false, false), msg(false, true)),
@@ -43,9 +43,7 @@ pub async fn server(
     Ok(())
 }
 pub async fn client(nm: Arc<str>) -> TestResult {
-    let stream = LocalSocketStream::connect(&*nm)
-        .await
-        .context("connect failed")?;
+    let stream = LocalSocketStream::connect(&*nm).await.opname("connect")?;
     try_join!(
         recv(&stream, msg(true, false), msg(true, true)),
         send(&stream, msg(false, false), msg(false, true)),

@@ -9,28 +9,27 @@ use crate::{
         TestResult,
     },
 };
-use color_eyre::eyre::Context;
+use color_eyre::eyre::WrapErr;
 use std::{convert::TryInto, future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
 
-#[tokio::test]
-async fn bytes_bidir() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_duplex, client_duplex).await
+macro_rules! matrix {
+    (@dir_s duplex) => {server_duplex}; (@dir_s stc) => {server_stc}; (@dir_s cts) => {server_cts};
+    (@dir_c duplex) => {client_duplex}; (@dir_c stc) => {client_stc}; (@dir_c cts) => {client_cts};
+    ($($mod:ident $ty:ident $nm:ident)+) => {$(
+        #[tokio::test]
+        async fn $nm() -> TestResult {
+            use $mod::*;
+            testinit();
+            drive_server_and_multiple_clients(matrix!(@dir_s $ty), matrix!(@dir_c $ty)).await
+        }
+    )+};
 }
 
-#[tokio::test]
-async fn bytes_unidir_client_to_server() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_cts, client_cts).await
-}
-#[tokio::test]
-async fn bytes_unidir_server_to_client() -> TestResult {
-    use bytes::*;
-    testinit();
-    drive_server_and_multiple_clients(server_stc, client_stc).await
+matrix! {
+    bytes duplex bytes_bidir
+    bytes cts    bytes_unidir_client_to_server
+    bytes stc    bytes_unidir_server_to_client
 }
 
 async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
@@ -53,8 +52,8 @@ async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
     }
     for task in tasks {
         task.await
-            .context("server task panicked")?
-            .context("server task returned early with error")?;
+            .wrap_err("server task panicked")?
+            .wrap_err("server task returned early with error")?;
     }
 
     Ok(())

@@ -2,7 +2,7 @@ use crate::{
     local_socket::{LocalSocketListener, LocalSocketStream},
     tests::util::*,
 };
-use color_eyre::eyre::Context;
+use color_eyre::eyre::WrapErr;
 use std::{
     io::{BufRead, BufReader, Write},
     str,
@@ -27,7 +27,7 @@ pub fn server(
     listener
         .incoming()
         .take(num_clients.try_into().unwrap())
-        .try_for_each(|conn| handle_client(conn.context("accept failed")?))
+        .try_for_each(|conn| handle_client(conn.opname("accept")?))
 }
 
 pub fn handle_client_nosplit(conn: LocalSocketStream) -> TestResult {
@@ -56,13 +56,13 @@ pub fn handle_client_split(conn: LocalSocketStream) -> TestResult {
 
     let recver = recv.join().unwrap()?;
     let sender = send.join().unwrap()?;
-    LocalSocketStream::reunite(recver, sender).context("reunite failed")?;
+    LocalSocketStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
 
 pub fn client_nosplit(name: &str) -> TestResult {
     let mut conn = LocalSocketStream::connect(name)
-        .context("connect failed")
+        .opname("connect")
         .map(BufReader::new)?;
     send(conn.get_mut(), &msg(false, false), 0)?;
     recv(&mut conn, &msg(true, false), 0)?;
@@ -71,9 +71,7 @@ pub fn client_nosplit(name: &str) -> TestResult {
 }
 
 pub fn client_split(name: &str) -> TestResult {
-    let (recver, sender) = LocalSocketStream::connect(name)
-        .context("connect failed")?
-        .split();
+    let (recver, sender) = LocalSocketStream::connect(name).opname("connect")?.split();
 
     let recv = thread::spawn(move || {
         let mut recver = BufReader::new(recver);
@@ -90,7 +88,7 @@ pub fn client_split(name: &str) -> TestResult {
 
     let recver = recv.join().unwrap()?;
     let sender = send.join().unwrap()?;
-    LocalSocketStream::reunite(recver, sender).context("reunite failed")?;
+    LocalSocketStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
 
@@ -100,7 +98,7 @@ fn recv(conn: &mut dyn BufRead, exp: &str, nr: u8) -> TestResult {
 
     let mut buffer = Vec::with_capacity(exp.len());
     conn.read_until(term, &mut buffer)
-        .with_context(|| format!("{} receive failed", fs))?;
+        .wrap_err_with(|| format!("{} receive failed", fs))?;
     ensure_eq!(
         str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
         exp,

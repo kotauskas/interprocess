@@ -10,25 +10,33 @@ use crate::{
     tests::util::{self, testinit, TestResult},
 };
 
-async fn test_stream(nmspc: bool) -> TestResult {
+async fn test_stream(_split: bool, nmspc: bool) -> TestResult {
     use stream::*;
     testinit();
     util::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client).await
 }
 
-#[tokio::test]
-async fn stream_file() -> TestResult {
-    if NameTypeSupport::query().paths_supported() {
-        test_stream(false).await?;
-    }
-    Ok(())
+macro_rules! matrix {
+    (@querymethod true $e:expr) => { NameTypeSupport::namespace_supported($e) };
+    (@querymethod false $e:expr) => { NameTypeSupport::paths_supported($e) };
+    (@body $split:ident $nmspc:ident) => {{
+        if matrix!(@querymethod $nmspc NameTypeSupport::query()) {
+            test_stream($split, $nmspc).await?;
+        }
+        Ok(())
+    }};
+    ($nm:ident $split:ident $nmspc:ident) => {
+        #[tokio::test]
+        async fn $nm() -> TestResult { matrix!(@body $split $nmspc) }
+    };
+    ($($nm:ident $split:ident $nmspc:ident)+) => { $(matrix!($nm $split $nmspc);)+ };
 }
-#[tokio::test]
-async fn stream_namespaced() -> TestResult {
-    if NameTypeSupport::query().namespace_supported() {
-        test_stream(true).await?;
-    }
-    Ok(())
+
+matrix! {
+    stream_file_nosplit       false false
+    stream_file_split          true false
+    stream_namespaced_nosplit false  true
+    stream_namespaced_split    true  true
 }
 
 #[tokio::test]

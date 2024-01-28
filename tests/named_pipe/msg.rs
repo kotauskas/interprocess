@@ -5,7 +5,7 @@ use crate::{
     },
     tests::util::*,
 };
-use color_eyre::eyre::{ensure, Context};
+use color_eyre::eyre::{ensure, WrapErr};
 use recvmsg::{MsgBuf, RecvMsg, RecvResult};
 use std::{
     str,
@@ -25,7 +25,7 @@ fn futf8(m: &[u8]) -> TestResult<&str> {
 fn handle_conn_duplex(
     listener: &mut PipeListener<pipe_mode::Messages, pipe_mode::Messages>,
 ) -> TestResult {
-    let (mut recver, mut sender) = listener.accept().context("accept failed")?.split();
+    let (mut recver, mut sender) = listener.accept().opname("accept")?.split();
 
     let [msg1, msg2] = msgs(false);
     recv(&mut recver, msg1, 0)?;
@@ -35,13 +35,13 @@ fn handle_conn_duplex(
     send(&mut sender, msg1, 0)?;
     send(&mut sender, msg2, 1)?;
 
-    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    DuplexPipeStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
 fn handle_conn_cts(
     listener: &mut PipeListener<pipe_mode::Messages, pipe_mode::None>,
 ) -> TestResult {
-    let mut recver = listener.accept().context("accept failed")?;
+    let mut recver = listener.accept().opname("accept")?;
     let [msg1, msg2] = msgs(false);
     recv(&mut recver, msg1, 0)?;
     recv(&mut recver, msg2, 1)
@@ -49,7 +49,7 @@ fn handle_conn_cts(
 fn handle_conn_stc(
     listener: &mut PipeListener<pipe_mode::None, pipe_mode::Messages>,
 ) -> TestResult {
-    let mut sender = listener.accept().context("accept failed")?;
+    let mut sender = listener.accept().opname("accept")?;
     let [msg1, msg2] = msgs(true);
     send(&mut sender, msg1, 0)?;
     send(&mut sender, msg2, 1)
@@ -94,7 +94,7 @@ pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
 
 pub fn client_duplex(name: &str) -> TestResult {
     let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Messages>::connect(name)
-        .context("connect failed")?
+        .opname("connect")?
         .split();
 
     let [msg1, msg2] = msgs(false);
@@ -105,19 +105,17 @@ pub fn client_duplex(name: &str) -> TestResult {
     recv(&mut recver, msg1, 0)?;
     recv(&mut recver, msg2, 1)?;
 
-    DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
+    DuplexPipeStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
 pub fn client_cts(name: &str) -> TestResult {
-    let mut sender =
-        SendPipeStream::<pipe_mode::Messages>::connect(name).context("connect failed")?;
+    let mut sender = SendPipeStream::<pipe_mode::Messages>::connect(name).opname("connect")?;
     let [msg1, msg2] = msgs(false);
     send(&mut sender, msg1, 0)?;
     send(&mut sender, msg2, 1)
 }
 pub fn client_stc(name: &str) -> TestResult {
-    let mut recver =
-        RecvPipeStream::<pipe_mode::Messages>::connect(name).context("connect failed")?;
+    let mut recver = RecvPipeStream::<pipe_mode::Messages>::connect(name).opname("connect")?;
     let [msg1, msg2] = msgs(true);
     recv(&mut recver, msg1, 0)?;
     recv(&mut recver, msg2, 1)
@@ -159,7 +157,7 @@ fn send(
 
     let sent = conn
         .send(msg_.as_bytes())
-        .with_context(|| format!("{} send failed", fs))?;
+        .wrap_err_with(|| format!("{} send failed", fs))?;
 
     ensure_eq!(sent, msg_.len());
     Ok(())

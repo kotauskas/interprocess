@@ -1,6 +1,7 @@
+use color_eyre::eyre::{self, WrapErr};
 use std::sync::Mutex;
 
-pub type TestResult<T = ()> = color_eyre::eyre::Result<T>;
+pub type TestResult<T = ()> = eyre::Result<T>;
 
 static COLOR_EYRE_INSTALLED: Mutex<bool> = Mutex::new(false);
 pub(super) fn install() {
@@ -33,3 +34,10 @@ macro_rules! ensure_eq {
         }
     };
 }
+
+pub trait WrapErrExt<T, E>: WrapErr<T, E> + Sized {
+    fn opname(self, loc: &str) -> eyre::Result<T> {
+        self.wrap_err_with(|| format!("{loc} failed"))
+    }
+}
+impl<T, E, WE: WrapErr<T, E>> WrapErrExt<T, E> for WE {}
