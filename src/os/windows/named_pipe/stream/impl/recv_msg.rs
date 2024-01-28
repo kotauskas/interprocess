@@ -13,6 +13,7 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 };
 
 impl RawPipeStream {
+    #[track_caller]
     fn discard_msg(&self) -> io::Result<()> {
         let _guard = self.concurrency_detector.lock();
 
@@ -27,6 +28,7 @@ impl RawPipeStream {
         }
     }
 
+    #[track_caller]
     fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
         let _guard = self.concurrency_detector.lock();
 

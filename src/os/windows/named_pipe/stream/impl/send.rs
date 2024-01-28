@@ -1,6 +1,7 @@
 use super::*;
 
 impl RawPipeStream {
+    #[track_caller]
     fn send(&self, buf: &[u8]) -> io::Result<usize> {
         let r = {
             let _guard = self.concurrency_detector.lock();
@@ -12,6 +13,7 @@ impl RawPipeStream {
         r
     }
 
+    #[track_caller]
     fn flush(&self) -> io::Result<()> {
         if self.needs_flush.on_flush() {
             let r = self.file_handle().flush();
