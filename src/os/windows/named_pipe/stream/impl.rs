@@ -30,8 +30,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
         let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
         (
-            RecvPipeStream { raw: raw_a, _phantom: PhantomData },
-            SendPipeStream { raw: raw_ac, _phantom: PhantomData },
+            RecvPipeStream {
+                raw: raw_a,
+                _phantom: PhantomData,
+            },
+            SendPipeStream {
+                raw: raw_ac,
+                _phantom: PhantomData,
+            },
         )
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
@@ -44,7 +50,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         let mut raw = sh.raw;
         drop(rh);
         raw.try_make_owned();
-        Ok(PipeStream { raw, _phantom: PhantomData })
+        Ok(PipeStream {
+            raw,
+            _phantom: PhantomData,
+        })
     }
 
     /// Retrieves the process identifier of the client side of the named pipe connection.

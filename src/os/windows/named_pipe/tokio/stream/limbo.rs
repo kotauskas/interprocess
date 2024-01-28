@@ -16,7 +16,9 @@ pub(super) struct Corpse(pub InnerTokio);
 impl Drop for Corpse {
     fn drop(&mut self) {
         if let InnerTokio::Server(server) = &self.0 {
-            server.disconnect().debug_expect("named pipe server disconnect failed");
+            server
+                .disconnect()
+                .debug_expect("named pipe server disconnect failed");
         }
     }
 }

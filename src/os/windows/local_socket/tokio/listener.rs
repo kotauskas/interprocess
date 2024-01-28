@@ -22,7 +22,10 @@ impl LocalSocketListener {
         let mut options = PipeListenerOptions::new();
         options.path = if name.is_namespaced() {
             // PERF this allocates twice
-            [Path::new(r"\\.\pipe\"), path].iter().collect::<PathBuf>().into()
+            [Path::new(r"\\.\pipe\"), path]
+                .iter()
+                .collect::<PathBuf>()
+                .into()
         } else {
             path.into()
         };

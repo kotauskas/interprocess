@@ -5,7 +5,11 @@ use std::sync::{Arc, Condvar, Mutex, Weak};
 pub struct Choke(Arc<ChokeInner>);
 impl Choke {
     pub fn new(limit: u32) -> Self {
-        let inner = ChokeInner { count: Mutex::new(0), limit, condvar: Condvar::new() };
+        let inner = ChokeInner {
+            count: Mutex::new(0),
+            limit,
+            condvar: Condvar::new(),
+        };
         Self(Arc::new(inner))
     }
     pub fn take(&self) -> ChokeGuard {

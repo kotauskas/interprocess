@@ -16,8 +16,10 @@ impl RawPipeStream {
 
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
-        let corpse =
-            Corpse { handle: self.handle.take().expect(REBURY_ERR), is_server: self.is_server };
+        let corpse = Corpse {
+            handle: self.handle.take().expect(REBURY_ERR),
+            is_server: self.is_server,
+        };
         if self.needs_flush.get() {
             send_off(corpse);
         }

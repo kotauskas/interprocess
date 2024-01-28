@@ -33,7 +33,9 @@ impl From<UnixListener> for LocalSocketListener {
 }
 impl Debug for LocalSocketListener {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalSocketListener").field("fd", &self.0.as_raw_fd()).finish()
+        f.debug_struct("LocalSocketListener")
+            .field("fd", &self.0.as_raw_fd())
+            .finish()
     }
 }
 multimacro! {

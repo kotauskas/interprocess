@@ -33,7 +33,10 @@ impl LocalSocketStream {
     pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
         StreamImpl::reunite(rh.0, sh.0)
             .map(Self)
-            .map_err(|ReuniteError { rh, sh }| ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) })
+            .map_err(|ReuniteError { rh, sh }| ReuniteError {
+                rh: RecvHalf(rh),
+                sh: SendHalf(sh),
+            })
     }
 }
 
@@ -41,7 +44,8 @@ impl From<LocalSocketStream> for OwnedHandle {
     fn from(s: LocalSocketStream) -> Self {
         // The outer local socket interface has receive and send halves and is always duplex in the
         // unsplit type, so a split pipe stream can never appear here.
-        s.0.try_into().expect("split named pipe stream inside `LocalSocketStream`")
+        s.0.try_into()
+            .expect("split named pipe stream inside `LocalSocketStream`")
     }
 }
 impl TryFrom<OwnedHandle> for LocalSocketStream {

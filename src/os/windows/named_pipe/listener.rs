@@ -126,7 +126,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandle {
     fn from(p: PipeListener<Rm, Sm>) -> Self {
-        p.stored_instance.into_inner().expect("unexpected lock poison").into()
+        p.stored_instance
+            .into_inner()
+            .expect("unexpected lock poison")
+            .into()
     }
 }
 

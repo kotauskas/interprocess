@@ -43,7 +43,9 @@ pub async fn server(
     Ok(())
 }
 pub async fn client(nm: Arc<str>) -> TestResult {
-    let stream = LocalSocketStream::connect(&*nm).await.context("connect failed")?;
+    let stream = LocalSocketStream::connect(&*nm)
+        .await
+        .context("connect failed")?;
     try_join!(
         recv(&stream, msg(true, false), msg(true, true)),
         send(&stream, msg(false, false), msg(false, true)),
@@ -59,12 +61,18 @@ async fn recv(
     let mut recver = BufReader::new(stream);
     let mut sbuffer = String::with_capacity(128);
 
-    recver.read_line(&mut sbuffer).await.context("first receive failed")?;
+    recver
+        .read_line(&mut sbuffer)
+        .await
+        .context("first receive failed")?;
     ensure_eq!(sbuffer, exp1.as_ref());
     sbuffer.clear();
     let mut buffer = sbuffer.into_bytes();
 
-    recver.read_until(b'\0', &mut buffer).await.context("second receive failed")?;
+    recver
+        .read_until(b'\0', &mut buffer)
+        .await
+        .context("second receive failed")?;
     ensure_eq!(
         str::from_utf8(&buffer).context("second received message was not valid UTF-8")?,
         exp2.as_ref(),
@@ -77,7 +85,13 @@ async fn send(
     msg1: impl AsRef<str>,
     msg2: impl AsRef<str>,
 ) -> TestResult {
-    stream.write_all(msg1.as_ref().as_bytes()).await.context("first send failed")?;
-    stream.write_all(msg2.as_ref().as_bytes()).await.context("second send failed")?;
+    stream
+        .write_all(msg1.as_ref().as_bytes())
+        .await
+        .context("first send failed")?;
+    stream
+        .write_all(msg2.as_ref().as_bytes())
+        .await
+        .context("second send failed")?;
     Ok(())
 }

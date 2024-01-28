@@ -103,7 +103,10 @@ impl AsyncWrite for &LocalSocketStream {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        ioloop(|| self.0.try_write_vectored(bufs), || self.0.poll_write_ready(cx))
+        ioloop(
+            || self.0.try_write_vectored(bufs),
+            || self.0.poll_write_ready(cx),
+        )
     }
     #[inline]
     fn is_write_vectored(&self) -> bool {
@@ -147,8 +150,11 @@ impl AsyncRead for &ReadHalf {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ioloop(|| self.0.try_read_buf(buf), || self.0.as_ref().poll_read_ready(cx))
-            .map(|e| e.map(|_| ()))
+        ioloop(
+            || self.0.try_read_buf(buf),
+            || self.0.as_ref().poll_read_ready(cx),
+        )
+        .map(|e| e.map(|_| ()))
     }
 }
 impl AsFd for ReadHalf {
@@ -173,7 +179,10 @@ impl AsyncWrite for &WriteHalf {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ioloop(|| self.0.try_write(buf), || self.0.as_ref().poll_write_ready(cx))
+        ioloop(
+            || self.0.try_write(buf),
+            || self.0.as_ref().poll_write_ready(cx),
+        )
     }
     #[inline]
     fn poll_write_vectored(
@@ -181,7 +190,10 @@ impl AsyncWrite for &WriteHalf {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
-        ioloop(|| self.0.try_write_vectored(bufs), || self.0.as_ref().poll_write_ready(cx))
+        ioloop(
+            || self.0.try_write_vectored(bufs),
+            || self.0.as_ref().poll_write_ready(cx),
+        )
     }
     #[inline]
     fn is_write_vectored(&self) -> bool {

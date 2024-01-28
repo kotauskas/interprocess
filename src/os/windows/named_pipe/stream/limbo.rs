@@ -30,7 +30,8 @@ impl Corpse {
 impl Drop for Corpse {
     fn drop(&mut self) {
         if self.is_server {
-            self.disconnect().debug_expect("named pipe server disconnect failed");
+            self.disconnect()
+                .debug_expect("named pipe server disconnect failed");
         }
     }
 }
@@ -58,7 +59,8 @@ pub(super) fn send_off(c: Corpse) {
                 }
             })
             .debug_expect("failed to spawn newcomer to limbo pool");
-        tx.try_send(c).debug_expect("newcomer to limbo pool already failed");
+        tx.try_send(c)
+            .debug_expect("newcomer to limbo pool already failed");
         tx
     }
     fn fullf(idx: usize, c: Corpse) {

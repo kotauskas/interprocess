@@ -43,7 +43,11 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
                 flush: None.into(), // PERF the mutex is unnecessary for receivers
                 _phantom: PhantomData,
             },
-            SendPipeStream { raw: raw_ac, flush: self.flush, _phantom: PhantomData },
+            SendPipeStream {
+                raw: raw_ac,
+                flush: self.flush,
+                _phantom: PhantomData,
+            },
         )
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
@@ -56,7 +60,11 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
         let PipeStream { mut raw, flush, .. } = sh;
         drop(rh);
         raw.try_make_owned();
-        Ok(PipeStream { raw, flush, _phantom: PhantomData })
+        Ok(PipeStream {
+            raw,
+            flush,
+            _phantom: PhantomData,
+        })
     }
     /// Retrieves the process identifier of the client side of the named pipe connection.
     #[inline]

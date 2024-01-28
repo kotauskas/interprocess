@@ -20,7 +20,10 @@ impl NeedsFlush {
     #[inline]
     pub fn on_flush(&self) -> bool {
         // TODO verify necessity of orderings
-        match self.0.compare_exchange(NeedsFlushVal::Once, NeedsFlushVal::No, AcqRel, Acquire) {
+        match self
+            .0
+            .compare_exchange(NeedsFlushVal::Once, NeedsFlushVal::No, AcqRel, Acquire)
+        {
             Ok(..) => true,
             Err(NeedsFlushVal::Always) => true,
             Err(.. /* NeedsFlushVal::No */) => false,
@@ -28,7 +31,10 @@ impl NeedsFlush {
     }
     #[inline]
     pub fn get(&mut self) -> bool {
-        matches!(self.0.get_mut(), NeedsFlushVal::Once | NeedsFlushVal::Always)
+        matches!(
+            self.0.get_mut(),
+            NeedsFlushVal::Once | NeedsFlushVal::Always
+        )
     }
 }
 impl From<NeedsFlushVal> for NeedsFlush {

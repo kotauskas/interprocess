@@ -79,13 +79,19 @@ impl<'a> ToLocalSocketName<'a> for LocalSocketName<'a> {
 /// Converts a borrowed [`Path`] to a borrowed file-type [`LocalSocketName`] with the same lifetime.
 impl<'a> ToLocalSocketName<'a> for &'a Path {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(LocalSocketName::from_raw_parts(Cow::Borrowed(self.as_os_str()), false))
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Borrowed(self.as_os_str()),
+            false,
+        ))
     }
 }
 /// Converts an owned [`PathBuf`] to an owned file-type [`LocalSocketName`].
 impl ToLocalSocketName<'static> for PathBuf {
     fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        Ok(LocalSocketName::from_raw_parts(Cow::Owned(self.into_os_string()), false))
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Owned(self.into_os_string()),
+            false,
+        ))
     }
 }
 /// Converts a borrowed [`OsStr`] to a borrowed [`LocalSocketName`] with the same lifetime. On
@@ -100,7 +106,10 @@ impl<'a> ToLocalSocketName<'a> for &'a OsStr {
             self = unsafe { OsStr::from_encoded_bytes_unchecked(&bytes[1..]) };
             namespaced = true;
         }
-        Ok(LocalSocketName::from_raw_parts(Cow::Borrowed(self), namespaced))
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Borrowed(self),
+            namespaced,
+        ))
     }
 }
 /// Converts an owned [`OsString`] to an owned [`LocalSocketName`]. On platforms which don't support
@@ -116,7 +125,10 @@ impl ToLocalSocketName<'static> for OsString {
             namespaced = true;
         }
         self = unsafe { OsString::from_encoded_bytes_unchecked(bytes) };
-        Ok(LocalSocketName::from_raw_parts(Cow::Owned(self), namespaced))
+        Ok(LocalSocketName::from_raw_parts(
+            Cow::Owned(self),
+            namespaced,
+        ))
     }
 }
 /// Converts a borrowed [`str`](prim@str) to a borrowed [`LocalSocketName`] with the same lifetime.

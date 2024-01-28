@@ -8,7 +8,11 @@ use crate::{local_socket::NameTypeSupport, tests::util::*};
 fn test_stream(split: bool, nmspc: bool) -> TestResult {
     use stream::*;
     testinit();
-    let hcl = if split { handle_client_split as _ } else { handle_client_nosplit as _ };
+    let hcl = if split {
+        handle_client_split as _
+    } else {
+        handle_client_nosplit as _
+    };
     let scl = |s, n| server(hcl, s, n, nmspc);
     // I love the Rust typesystem
     if split {

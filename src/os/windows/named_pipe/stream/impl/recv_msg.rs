@@ -86,7 +86,11 @@ impl RawPipeStream {
             };
         }
         buf.has_msg = true;
-        Ok(if spilled { RecvResult::Spilled } else { RecvResult::Fit })
+        Ok(if spilled {
+            RecvResult::Spilled
+        } else {
+            RecvResult::Fit
+        })
     }
 }
 

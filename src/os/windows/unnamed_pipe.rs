@@ -45,7 +45,11 @@ pub struct UnnamedPipeCreationOptions {
 impl UnnamedPipeCreationOptions {
     /// Starts with the default parameters for the pipe. Identical to `Default::default()`.
     pub const fn new() -> Self {
-        Self { inheritable: false, security_descriptor: ptr::null_mut(), buffer_size_hint: None }
+        Self {
+            inheritable: false,
+            security_descriptor: ptr::null_mut(),
+            buffer_size_hint: None,
+        }
     }
     /// Specifies whether the resulting pipe can be inherited by child processes.
     ///
@@ -158,7 +162,9 @@ impl Read for UnnamedPipeRecver {
 }
 impl Debug for UnnamedPipeRecver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("UnnamedPipeRecver").field(&self.0.as_raw_handle()).finish()
+        f.debug_tuple("UnnamedPipeRecver")
+            .field(&self.0.as_raw_handle())
+            .finish()
     }
 }
 multimacro! {
@@ -178,7 +184,9 @@ impl Write for UnnamedPipeSender {
 }
 impl Debug for UnnamedPipeSender {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("UnnamedPipeSender").field(&self.0.as_raw_handle()).finish()
+        f.debug_tuple("UnnamedPipeSender")
+            .field(&self.0.as_raw_handle())
+            .finish()
     }
 }
 multimacro! {

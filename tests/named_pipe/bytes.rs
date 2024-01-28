@@ -62,8 +62,9 @@ pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
 }
 
 pub fn client_duplex(name: &str) -> TestResult {
-    let (mut recver, mut sender) =
-        DuplexPipeStream::<pipe_mode::Bytes>::connect(name).context("connect failed")?.split();
+    let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Bytes>::connect(name)
+        .context("connect failed")?
+        .split();
     send(&mut sender, msg(false))?;
     recv(&mut recver, msg(true))?;
     DuplexPipeStream::reunite(recver, sender).context("reunite failed")?;
@@ -87,6 +88,7 @@ fn recv(conn: &mut RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> Te
     Ok(())
 }
 fn send(conn: &mut SendPipeStream<pipe_mode::Bytes>, msg: impl AsRef<str>) -> TestResult {
-    conn.write_all(msg.as_ref().as_bytes()).context("send failed")?;
+    conn.write_all(msg.as_ref().as_bytes())
+        .context("send failed")?;
     conn.flush().context("flush failed")
 }

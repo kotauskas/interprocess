@@ -39,7 +39,9 @@ pub(crate) struct UnnamedPipeRecver(FdOps);
 impl Sealed for UnnamedPipeRecver {}
 impl Debug for UnnamedPipeRecver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UnnamedPipeRecver").field("fd", &self.0 .0.as_raw_fd()).finish()
+        f.debug_struct("UnnamedPipeRecver")
+            .field("fd", &self.0 .0.as_raw_fd())
+            .finish()
     }
 }
 multimacro! {
@@ -55,7 +57,9 @@ pub(crate) struct UnnamedPipeSender(FdOps);
 impl Sealed for UnnamedPipeSender {}
 impl Debug for UnnamedPipeSender {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UnnamedPipeSender").field("fd", &self.0 .0.as_raw_fd()).finish()
+        f.debug_struct("UnnamedPipeSender")
+            .field("fd", &self.0 .0.as_raw_fd())
+            .finish()
     }
 }
 

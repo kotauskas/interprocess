@@ -18,7 +18,8 @@ impl RawPipeStream {
         if let Some(send_mode) = send_mode {
             dbst.field("send_mode", &send_mode);
         }
-        dbst.field("tokio_object", tokio_object).field("is_server", &is_server)
+        dbst.field("tokio_object", tokio_object)
+            .field("is_server", &is_server)
     }
 }
 

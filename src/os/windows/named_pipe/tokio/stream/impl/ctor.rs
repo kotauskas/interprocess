@@ -79,7 +79,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// is not added automatically), waiting until a server instance is dispatched.
     #[inline]
     pub async fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
-        RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE).await.map(Self::new)
+        RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE)
+            .await
+            .map(Self::new)
     }
 
     #[inline]
@@ -95,6 +97,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the
     /// thing from the wrong kind of thing, but that never ever happens, to the best of my ability.
     pub(crate) fn new(raw: RawPipeStream) -> Self {
-        Self { raw: MaybeArc::Inline(raw), flush: Mutex::new(None), _phantom: PhantomData }
+        Self {
+            raw: MaybeArc::Inline(raw),
+            flush: Mutex::new(None),
+            _phantom: PhantomData,
+        }
     }
 }

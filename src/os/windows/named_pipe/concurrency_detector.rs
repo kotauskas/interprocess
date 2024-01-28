@@ -8,7 +8,11 @@ impl ConcurrencyDetector {
     }
     #[track_caller]
     pub fn lock(&self) -> LockDetectorGuard<'_> {
-        if self.0.compare_exchange(false, true, Acquire, Relaxed).is_err() {
+        if self
+            .0
+            .compare_exchange(false, true, Acquire, Relaxed)
+            .is_err()
+        {
             panic!(
                 "\
 concurrent I/O on a Windows named pipe attempted – this leads to deadlocks due to the underlying \

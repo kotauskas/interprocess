@@ -14,7 +14,8 @@ impl RawPipeStream {
         if let Some(send_mode) = send_mode {
             dbst.field("send_mode", &send_mode);
         }
-        dbst.field("handle", &self.handle).field("is_server", &self.is_server)
+        dbst.field("handle", &self.handle)
+            .field("is_server", &self.is_server)
     }
 }
 

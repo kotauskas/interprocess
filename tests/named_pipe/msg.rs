@@ -60,7 +60,10 @@ pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestRes
         make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.mode(PipeMode::Messages).create_duplex::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_duplex::<pipe_mode::Messages>()
+        },
         handle_conn_duplex,
     )
 }
@@ -69,7 +72,10 @@ pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
         make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.mode(PipeMode::Messages).create_recv_only::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_recv_only::<pipe_mode::Messages>()
+        },
         handle_conn_cts,
     )
 }
@@ -78,14 +84,18 @@ pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
         make_id!(),
         name_sender,
         num_clients,
-        |plo| plo.mode(PipeMode::Messages).create_send_only::<pipe_mode::Messages>(),
+        |plo| {
+            plo.mode(PipeMode::Messages)
+                .create_send_only::<pipe_mode::Messages>()
+        },
         handle_conn_stc,
     )
 }
 
 pub fn client_duplex(name: &str) -> TestResult {
-    let (mut recver, mut sender) =
-        DuplexPipeStream::<pipe_mode::Messages>::connect(name).context("connect failed")?.split();
+    let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Messages>::connect(name)
+        .context("connect failed")?
+        .split();
 
     let [msg1, msg2] = msgs(false);
     send(&mut sender, msg1, 0)?;
@@ -126,7 +136,9 @@ fn recv(
     }
     let mut buf = MsgBuf::from(Vec::with_capacity(len));
 
-    let rslt = conn.recv_msg(&mut buf, None).with_context(|| format!("{} receive failed", fs))?;
+    let rslt = conn
+        .recv_msg(&mut buf, None)
+        .with_context(|| format!("{} receive failed", fs))?;
 
     ensure_eq!(futf8(buf.filled_part())?, exp_);
     if nr == 2 {
@@ -145,7 +157,9 @@ fn send(
     let msg_ = msg.as_ref();
     let fs = ["first", "second"][nr as usize];
 
-    let sent = conn.send(msg_.as_bytes()).with_context(|| format!("{} send failed", fs))?;
+    let sent = conn
+        .send(msg_.as_bytes())
+        .with_context(|| format!("{} send failed", fs))?;
 
     ensure_eq!(sent, msg_.len());
     Ok(())

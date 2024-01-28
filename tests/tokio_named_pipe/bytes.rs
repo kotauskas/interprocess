@@ -82,23 +82,31 @@ pub async fn client_duplex(name: Arc<str>) -> TestResult {
     Ok(())
 }
 pub async fn client_cts(name: Arc<str>) -> TestResult {
-    let mut sender =
-        SendPipeStream::<pipe_mode::Bytes>::connect(&*name).await.context("connect failed")?;
+    let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
+        .await
+        .context("connect failed")?;
     send(&mut sender, msg(false)).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
-    let mut recver =
-        RecvPipeStream::<pipe_mode::Bytes>::connect(&*name).await.context("connect failed")?;
+    let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
+        .await
+        .context("connect failed")?;
     recv(&mut recver, msg(true)).await
 }
 
 async fn recv(recver: &mut RecvPipeStream<pipe_mode::Bytes>, exp: impl AsRef<str>) -> TestResult {
     let mut buffer = String::with_capacity(128);
     let mut recver = BufReader::new(recver);
-    recver.read_line(&mut buffer).await.context("receive failed")?;
+    recver
+        .read_line(&mut buffer)
+        .await
+        .context("receive failed")?;
     ensure_eq!(buffer, exp.as_ref());
     Ok(())
 }
 async fn send(sender: &mut SendPipeStream<pipe_mode::Bytes>, snd: impl AsRef<str>) -> TestResult {
-    sender.write_all(snd.as_ref().as_bytes()).await.context("send failed")
+    sender
+        .write_all(snd.as_ref().as_bytes())
+        .await
+        .context("send failed")
 }

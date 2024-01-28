@@ -8,7 +8,10 @@ pub struct NameGen {
 }
 impl NameGen {
     pub fn new(id: &'static str, namespaced: bool) -> Self {
-        Self { rng: Xorshift32::from_id(id), namespaced }
+        Self {
+            rng: Xorshift32::from_id(id),
+            namespaced,
+        }
     }
     fn next_path(&mut self) -> Arc<str> {
         let rn = self.rng.next();
