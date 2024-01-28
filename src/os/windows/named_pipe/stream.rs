@@ -127,7 +127,6 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: MaybeArc<RawPipeStream>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
-// TODO maybe Tokio also needs deadlock detection
 
 /// Type alias for a pipe stream with the same receive mode and send mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
