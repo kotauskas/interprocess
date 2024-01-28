@@ -63,6 +63,14 @@ tokio = { version = "1.28.0", features = [
 ] }
 color-eyre = "0.6.2"
 
+[lints.rust]
+unsafe_op_in_unsafe_fn = "forbid"
+rust_2018_idioms = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+#nonstandard_macro_braces = "allow"
+
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]
 targets = [
