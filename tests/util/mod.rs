@@ -17,8 +17,8 @@ pub use {drive::*, eyre::*, namegen::*, xorshift::*};
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
-const NUM_CLIENTS: u32 = 2;
-const NUM_CONCURRENT_CLIENTS: u32 = 1;
+const NUM_CLIENTS: u32 = 80;
+const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
 use color_eyre::eyre::Context;
 use std::{fmt::Arguments, io, sync::Arc};

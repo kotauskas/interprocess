@@ -2,7 +2,7 @@ use std::{ffi::OsStr, path::Path};
 
 use super::*;
 use crate::os::windows::named_pipe::path_conversion::*;
-use windows_sys::Win32::{Foundation::ERROR_PIPE_BUSY, System::Pipes::PIPE_READMODE_MESSAGE};
+use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
 impl RawPipeStream {
     pub(super) fn new(handle: FileHandle, is_server: bool) -> Self {
@@ -36,7 +36,7 @@ impl RawPipeStream {
     fn _connect(path: &[u16], recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
         let handle = loop {
             match connect_without_waiting(path, recv, send, false) {
-                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                     block_for_server(path, WaitTimeout::DEFAULT)?;
                     continue;
                 }

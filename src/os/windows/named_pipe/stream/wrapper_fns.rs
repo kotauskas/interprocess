@@ -1,7 +1,7 @@
 use crate::os::windows::{named_pipe::PipeMode, winprelude::*, FileHandle};
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use windows_sys::Win32::{
-    Foundation::{GENERIC_READ, GENERIC_WRITE},
+    Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},
     Storage::FileSystem::{
         CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
         FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
@@ -100,10 +100,15 @@ pub(crate) fn connect_without_waiting(
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };
-    ok_or_ret_errno!(success => unsafe {
+    match ok_or_ret_errno!(success => unsafe {
         // SAFETY: we just created this handle
         FileHandle::from(OwnedHandle::from_raw_handle(handle as RawHandle))
-    })
+    }) {
+        Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
+            Err(io::ErrorKind::WouldBlock.into())
+        }
+        els => els,
+    }
 }
 
 #[allow(dead_code)]
