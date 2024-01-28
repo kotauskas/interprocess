@@ -16,7 +16,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{
-        unix::{OwnedRecvHalf as RecvHalfImpl, OwnedSendHalf as SendHalfImpl},
+        unix::{OwnedReadHalf as RecvHalfImpl, OwnedWriteHalf as SendHalfImpl},
         UnixStream,
     },
 };

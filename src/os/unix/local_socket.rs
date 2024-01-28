@@ -1,16 +1,17 @@
 //! Adapter module, implements local sockets under Unix.
 
-#[cfg(feature = "tokio")]
-pub mod tokio;
-
 mod listener;
-
-pub use listener::*;
-
 mod stream;
-pub use stream::*;
+pub use {listener::*, stream::*};
 
-use crate::local_socket::NameTypeSupport;
+#[cfg(feature = "tokio")]
+pub mod tokio {
+    mod listener;
+    mod stream;
+    pub use {listener::*, stream::*};
+}
+
+use crate::local_socket::{LocalSocketName, NameTypeSupport};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::linux::net::SocketAddrExt;
 use std::{
