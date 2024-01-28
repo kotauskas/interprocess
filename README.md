@@ -79,6 +79,6 @@ public APIs because they behave here identically to how they do on an OS with a 
 This crate, along with all community contributions made to it, is dual-licensed under [MIT] and
 [Apache 2.0].
 
-[MIT license]: https://choosealicense.com/licenses/mit/
-[Apache 2.0 license]: https://choosealicense.com/licenses/apache-2.0/
+[MIT]: https://choosealicense.com/licenses/mit/
+[Apache 2.0]: https://choosealicense.com/licenses/apache-2.0/
 [blogpost]: https://blog.rust-lang.org/2023/11/16/Rust-1.74.0.html
