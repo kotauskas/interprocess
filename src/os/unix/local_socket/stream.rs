@@ -22,8 +22,8 @@ impl LocalSocketStream {
         if !Arc::ptr_eq(&rh.0, &sh.0) {
             return Err(ReuniteError { rh, sh });
         }
-        let inner = Arc::into_inner(sh.0).unwrap();
         drop(rh);
+        let inner = Arc::into_inner(sh.0).unwrap();
         Ok(inner)
     }
 }
