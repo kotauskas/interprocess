@@ -43,10 +43,10 @@ pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyPat
 
 #[inline]
 pub fn cstr_to_osstr(cstr: &CStr) -> io::Result<&OsStr> {
-    OsStr::from_bytes(cstr.to_bytes())
+    Ok(OsStr::from_bytes(cstr.to_bytes()))
 }
 
 #[inline]
 pub fn cstring_to_osstring(cstring: CString) -> io::Result<OsString> {
-    OsString::from_vec(cstring.into_bytes())
+    Ok(OsString::from_vec(cstring.into_bytes()))
 }

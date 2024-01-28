@@ -24,7 +24,7 @@ impl LocalSocketStream {
         }
         let inner = Arc::into_inner(sh.0).unwrap();
         drop(rh);
-        Ok(Self(inner))
+        Ok(inner)
     }
 }
 

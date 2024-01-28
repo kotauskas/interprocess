@@ -16,7 +16,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{
-        unix::{OwnedReadHalf as ReadHalfImpl, OwnedWriteHalf as WriteHalfImpl},
+        unix::{OwnedRecvHalf as RecvHalfImpl, OwnedSendHalf as SendHalfImpl},
         UnixStream,
     },
 };
@@ -47,9 +47,9 @@ impl LocalSocketStream {
         }
         UnixStream::connect(addr.as_pathname().unwrap()).await
     }
-    pub fn split(self) -> (ReadHalf, WriteHalf) {
+    pub fn split(self) -> (RecvHalf, SendHalf) {
         let (r, w) = self.0.into_split();
-        (ReadHalf(r), WriteHalf(w))
+        (RecvHalf(r), SendHalf(w))
     }
 }
 impl From<UnixStream> for LocalSocketStream {
@@ -136,14 +136,14 @@ impl TryFrom<OwnedFd> for LocalSocketStream {
     }
 }
 
-pub struct ReadHalf(ReadHalfImpl);
+pub struct RecvHalf(RecvHalfImpl);
 multimacro! {
-    ReadHalf,
-    pinproj_for_unpin(ReadHalfImpl),
-    forward_debug("local_socket::ReadHalf"),
+    RecvHalf,
+    pinproj_for_unpin(RecvHalfImpl),
+    forward_debug("local_socket::RecvHalf"),
     forward_tokio_read,
 }
-impl AsyncRead for &ReadHalf {
+impl AsyncRead for &RecvHalf {
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
@@ -157,22 +157,22 @@ impl AsyncRead for &ReadHalf {
         .map(|e| e.map(|_| ()))
     }
 }
-impl AsFd for ReadHalf {
+impl AsFd for RecvHalf {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.0.as_ref().as_fd()
     }
 }
 
-pub struct WriteHalf(WriteHalfImpl);
+pub struct SendHalf(SendHalfImpl);
 multimacro! {
-    WriteHalf,
-    pinproj_for_unpin(WriteHalfImpl),
-    forward_rbv(WriteHalfImpl, &),
-    forward_debug("local_socket::WriteHalf"),
+    SendHalf,
+    pinproj_for_unpin(SendHalfImpl),
+    forward_rbv(SendHalfImpl, &),
+    forward_debug("local_socket::SendHalf"),
     forward_tokio_write,
 }
-impl AsyncWrite for &WriteHalf {
+impl AsyncWrite for &SendHalf {
     #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
@@ -208,7 +208,7 @@ impl AsyncWrite for &WriteHalf {
         shutdown(self.get_mut())
     }
 }
-impl AsFd for WriteHalf {
+impl AsFd for SendHalf {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.0.as_ref().as_fd()
