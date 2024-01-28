@@ -14,6 +14,8 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 
 impl RawPipeStream {
     fn discard_msg(&self) -> io::Result<()> {
+        let _guard = self.concurrency_detector.lock();
+
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         let fh = self.file_handle();
         loop {
@@ -26,6 +28,8 @@ impl RawPipeStream {
     }
 
     fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
+        let _guard = self.concurrency_detector.lock();
+
         buf.set_fill(0);
         buf.has_msg = false;
         let mut more_data = true;
@@ -86,6 +90,7 @@ impl RawPipeStream {
     }
 }
 
+/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;
@@ -98,6 +103,7 @@ impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
         self.raw.recv_msg(buf)
     }
 }
+/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> RecvMsg for PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;

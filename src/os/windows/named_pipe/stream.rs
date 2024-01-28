@@ -1,5 +1,6 @@
 mod enums;
-pub use enums::*;
+mod error;
+pub use {enums::*, error::*};
 
 mod r#impl;
 mod limbo;
@@ -7,14 +8,9 @@ mod wrapper_fns;
 pub(super) use r#impl::*;
 pub(crate) use wrapper_fns::*;
 
-use super::{MaybeArc, NeedsFlush};
-use crate::{error::ConversionError, os::windows::FileHandle};
-use std::{
-    fmt::{self, Debug, Display, Formatter},
-    io,
-    marker::PhantomData,
-    os::windows::prelude::*,
-};
+use super::{ConcurrencyDetector, MaybeArc, NeedsFlush};
+use crate::os::windows::FileHandle;
+use std::{marker::PhantomData, os::windows::prelude::*};
 
 /// A named pipe stream, created by a server-side listener or by connecting to a server.
 ///
@@ -28,17 +24,34 @@ use std::{
 /// [`.split()`](Self::split) method, producing a receive half and a send half, and can be reverted
 /// via [`.reunite()`](PipeStream::reunite).
 ///
-/// # Semantic peculiarities
-/// - [`BrokenPipe`](io::ErrorKind::BrokenPipe) errors in bytestreams are converted to EOF (`Ok(0)`)
-/// - Upon drop, streams that haven't been flushed since the last send are transparently sent to
-///   **limbo** – a thread pool that ensures that the peer does not get a `BrokenPipe` (EOF if peer
-///   also uses Interprocess) immediately after the server is done sending data, which would discard
-///   everything
-///     - At the time of dropping, if the stream hasn't seen a single send since the last explicit
-///       flush, it will evade limbo (can be overriden with
-///       [`.mark_dirty()`](PipeStream::mark_dirty))
-/// - Flush elision, analogous to limbo elision but also happens on explicit flush (i.e. flushing
-///   two times in a row only makes one system call)
+/// # Additional features
+/// This section documents behavior introduced by this named pipe implementation which is not
+/// present in the underlying Windows API.
+///
+/// ## Connection termination condition thunking
+/// `ERROR_PIPE_NOT_CONNECTED` and [`BrokenPipe`](std::io::ErrorKind::BrokenPipe) errors are
+/// translated to EOF (`Ok(0)`) for bytestreams and `RecvResult::EndOfStream` for message streams.
+///
+/// ## Flushing behavior
+/// Upon being dropped, streams that haven't been flushed since the last send are transparently sent
+/// to **limbo** – a thread pool that ensures that the peer does not get `BrokenPipe`/EOF
+/// immediately after all data has been sent, which would otherwise discard everything. Named pipe
+/// handles on this thread pool are flushed first and only then closed, ensuring that they are only
+/// destroyed when the peer is done reading them.
+///
+/// If a stream hasn't seen a single send since the last explicit flush by the time it is dropped,
+/// it will evade limbo. This can be overriden with [`.mark_dirty()`](PipeStream::mark_dirty).
+///
+/// Similarly to limbo elision, explicit flushes are elided on streams that haven't sent anything
+/// since the last flush – thus, the second of any two consecutive `.flush()` calls is a no-op that
+/// returns immediately and cannot fail. This can also be overridden in the same manner.
+///
+/// ## Concurrency prevention
+/// Multiple I/O operations [cannot be performed on the same named pipe concurrently][ms], and
+/// attempts to do so will be caught by the concurrency detector in order to avoid deadlocks and
+/// other unexpected, chaotic behavior.
+///
+/// [ms]: https://learn.microsoft.com/en-nz/windows/win32/ipc/named-pipe-server-using-overlapped-i-o
 ///
 /// # Examples
 ///
@@ -114,6 +127,7 @@ pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: MaybeArc<RawPipeStream>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
+// TODO maybe Tokio also needs deadlock detection
 
 /// Type alias for a pipe stream with the same receive mode and send mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;
@@ -131,53 +145,5 @@ pub(crate) struct RawPipeStream {
     handle: Option<FileHandle>,
     is_server: bool,
     needs_flush: NeedsFlush,
+    concurrency_detector: ConcurrencyDetector,
 }
-
-/// Additional contextual information for conversions from a raw handle to a named pipe stream.
-///
-/// Not to be confused with the Tokio version.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum FromHandleErrorKind {
-    /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a
-    /// pipe client.
-    IsServerCheckFailed,
-    /// The type being converted into has message semantics, but it wasn't possible to determine
-    /// whether message boundaries are preserved in the pipe.
-    MessageBoundariesCheckFailed,
-    /// The type being converted into has message semantics, but message boundaries are not
-    /// preserved in the pipe.
-    NoMessageBoundaries,
-}
-impl FromHandleErrorKind {
-    const fn msg(self) -> &'static str {
-        use FromHandleErrorKind::*;
-        match self {
-            IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
-            MessageBoundariesCheckFailed => {
-                "failed to make sure that the pipe preserves message boundaries"
-            }
-            NoMessageBoundaries => "the pipe does not preserve message boundaries",
-        }
-    }
-}
-impl From<FromHandleErrorKind> for io::Error {
-    fn from(e: FromHandleErrorKind) -> Self {
-        io::Error::new(io::ErrorKind::Other, e.msg())
-    }
-}
-impl Display for FromHandleErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.msg())
-    }
-}
-
-/// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.
-///
-/// Not to be confused with the Tokio version.
-pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
-
-/// [`ReuniteError`](crate::error::ReuniteError) for sync named pipe streams.
-pub type ReuniteError<Rm, Sm> = crate::error::ReuniteError<RecvPipeStream<Rm>, SendPipeStream<Sm>>;
-
-/// Result type for [`PipeStream::reunite()`].
-pub type ReuniteResult<Rm, Sm> = Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>>;

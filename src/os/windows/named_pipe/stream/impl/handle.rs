@@ -86,11 +86,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
     fn try_clone(&self) -> io::Result<Self> {
         let handle = c_wrappers::duplicate_handle(self.as_handle())?;
         self.raw.needs_flush.on_clone();
-        Ok(Self::new(RawPipeStream {
-            handle: Some(FileHandle::from(handle)),
-            is_server: self.is_server(),
-            needs_flush: NeedsFlush::from(NeedsFlushVal::Always),
-        }))
+        let mut new = RawPipeStream::new(handle.into(), self.is_server());
+        new.needs_flush = NeedsFlushVal::Always.into();
+        Ok(Self::new(new))
     }
 }
 

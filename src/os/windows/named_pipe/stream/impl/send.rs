@@ -2,7 +2,10 @@ use super::*;
 
 impl RawPipeStream {
     fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        let r = self.file_handle().write(buf);
+        let r = {
+            let _guard = self.concurrency_detector.lock();
+            self.file_handle().write(buf)
+        };
         if r.is_ok() {
             self.needs_flush.mark_dirty();
         }
@@ -55,12 +58,15 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
 impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
     /// Sends a message into the pipe, returning how many bytes were successfully sent (typically
     /// equal to the size of what was requested to be sent).
+    ///
+    /// Interacts with [concurrency prevention](#concurrency-prevention).
     #[inline]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.raw.send(buf)
     }
 }
 
+/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -71,6 +77,7 @@ impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
         self.raw.flush()
     }
 }
+/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
     #[inline(always)]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

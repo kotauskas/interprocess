@@ -29,27 +29,13 @@
 //!
 //! # Semantic peculiarities
 //! Methods and I/O trait implementations on types presented in this module do not exactly map 1:1
-//! to Windows API system calls. Below is a list of types with significant additional behavior.
-//! - [`PipeStream`] and its async counterpart
-// TODO make plural when introducing async-std
-//!     - Conversion of [`BrokenPipe`](std::io::ErrorKind::BrokenPipe) reads to EOF (`Ok(0)`) for
-//!       byte streams
-//!         - Additionally, `ERROR_PIPE_NOT_CONNECTED` is converted to `BrokenPipe`
-//!     - Limbo – transparent flush-on-close thread pool to ensure that the peer does not get a
-//!       `BrokenPipe` (EOF if peer also uses Interprocess) immediately after the server is done
-//!       sending data, which would discard everything
-//!         - Limbo elision: any stream which, at the time of dropping, hasn't seen a single send
-//!           since the last explicit flush, will evade limbo (can be overriden with
-//!           [`.mark_dirty()`](PipeStream::mark_dirty))
-//!     - Flush elision, analogous to limbo elision but also happens on explicit flush (i.e.
-//!       flushing two times in a row only makes one system call)
-//! - [`PipeListener`]
-//!     - Is not a Win32-level concept, works by creating new instances right before returning from
-//!       `.accept()`
+//! to Windows API system calls. [`PipeStream`] and [`PipeListener`], together with their async
+//! counterparts, list important behavior implemented by Interprocess in their item-level
+//! documentation.
 
 // TODO improve docs
 // TODO add examples
-// TODO document limbo
+// TODO document limbo further
 // TODO client impersonation
 // TODO raw instance functionality
 // TODO transactions
@@ -78,9 +64,10 @@ pub mod tokio {
 pub use {enums::*, listener::*, stream::*};
 
 mod atomic_enum;
+mod concurrency_detector;
 mod limbo_pool;
 mod maybe_arc;
 mod needs_flush;
 mod path_conversion;
 
-use {atomic_enum::*, maybe_arc::*, needs_flush::*};
+use {atomic_enum::*, concurrency_detector::*, maybe_arc::*, needs_flush::*};

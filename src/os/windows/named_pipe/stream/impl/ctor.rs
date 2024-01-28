@@ -6,7 +6,12 @@ use windows_sys::Win32::{Foundation::ERROR_PIPE_BUSY, System::Pipes::PIPE_READMO
 
 impl RawPipeStream {
     pub(super) fn new(handle: FileHandle, is_server: bool) -> Self {
-        Self { handle: Some(handle), is_server, needs_flush: NeedsFlush::from(NeedsFlushVal::No) }
+        Self {
+            handle: Some(handle),
+            is_server,
+            needs_flush: NeedsFlush::from(NeedsFlushVal::No),
+            concurrency_detector: ConcurrencyDetector::new(),
+        }
     }
     pub(crate) fn new_server(handle: FileHandle) -> Self {
         Self::new(handle, true)
