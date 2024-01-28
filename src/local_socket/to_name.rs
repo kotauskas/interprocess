@@ -61,6 +61,8 @@ impmod! {local_socket,
 ///
 /// None of the above conversions perform memory allocations – the only expensive one is
 /// [`CStr`]/[`CString`] which performs a check for valid UTF-8.
+///
+/// [`str`]: prim@str
 pub trait ToLocalSocketName<'a> {
     /// Performs the conversion to a local socket name.
     #[allow(clippy::wrong_self_convention)] // shut the fuck up
