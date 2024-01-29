@@ -15,7 +15,7 @@ type PipeListener = GenericPipeListener<Bytes, Bytes>;
 #[derive(Debug)]
 pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
-    pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
+    pub fn bind<'a>(name: impl ToLocalSocketName<'a>, _: bool) -> io::Result<Self> {
         let name = name.to_local_socket_name()?;
         let path = Path::new(name.inner());
         let mut options = PipeListenerOptions::new();
@@ -37,5 +37,6 @@ impl LocalSocketListener {
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
+    pub fn do_not_reclaim_name_on_drop(&mut self) {}
 }
 forward_into_handle!(LocalSocketListener);

@@ -9,6 +9,9 @@ impmod! {local_socket::tokio,
 
 /// A Tokio-based local socket server, listening for connections.
 ///
+/// [Name reclamation](super::super::LocalSocketStream#name-reclamation) is performed by default on
+/// backends that necessitate it.
+///
 /// # Examples
 ///
 /// ## Basic server
@@ -99,13 +102,26 @@ impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
     #[inline]
     pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name.to_local_socket_name()?).map(Self::from)
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, true).map(Self::from)
     }
+    /// Like [`bind()`](Self::bind) followed by
+    /// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
+    /// allocation.
+    pub fn bind_without_name_reclamation<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
+        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, false).map(Self)
+    }
+
     /// Listens for incoming connections to the socket, asynchronously waiting until a client is
     /// connected.
     #[inline]
     pub async fn accept(&self) -> io::Result<LocalSocketStream> {
         Ok(LocalSocketStream(self.0.accept().await?))
+    }
+
+    /// Disables [name reclamation](super::super::LocalSocketStream#name-reclamation) on the listener.
+    #[inline]
+    pub fn do_not_reclaim_name_on_drop(&mut self) {
+        self.0.do_not_reclaim_name_on_drop();
     }
 }
 #[doc(hidden)]

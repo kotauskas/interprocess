@@ -34,6 +34,29 @@ fn name_to_addr(name: LocalSocketName<'_>) -> io::Result<SocketAddr> {
     SocketAddr::from_pathname(Path::new(&name))
 }
 
+#[derive(Clone, Debug, Default)]
+struct ReclaimGuard(Option<LocalSocketName<'static>>);
+impl ReclaimGuard {
+    fn new(name: LocalSocketName<'static>) -> Self {
+        Self(if name.is_path() { Some(name) } else { None })
+    }
+    fn take(&mut self) -> Self {
+        Self(self.0.take())
+    }
+    fn forget(&mut self) {
+        self.0 = None;
+    }
+}
+impl Drop for ReclaimGuard {
+    fn drop(&mut self) {
+        if let Self(Some(name)) = self {
+            if name.is_namespaced() {
+                let _ = std::fs::remove_file(name.inner());
+            }
+        }
+    }
+}
+
 pub fn name_type_support_query() -> NameTypeSupport {
     NAME_TYPE_ALWAYS_SUPPORTED
 }

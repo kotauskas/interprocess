@@ -17,7 +17,7 @@ type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 #[derive(Debug)]
 pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
-    pub fn bind(name: LocalSocketName<'_>) -> io::Result<Self> {
+    pub fn bind(name: LocalSocketName<'_>, _: bool) -> io::Result<Self> {
         let path = Path::new(name.inner());
         let mut options = PipeListenerOptions::new();
         options.path = if name.is_namespaced() {
@@ -35,4 +35,5 @@ impl LocalSocketListener {
         let inner = self.0.accept().await?;
         Ok(LocalSocketStream(inner))
     }
+    pub fn do_not_reclaim_name_on_drop(&mut self) {}
 }

@@ -19,7 +19,7 @@ use {
 /// A separate trait is used to create names from basic strings:
 /// [`ToLocalSocketName`](super::ToLocalSocketName). Aside from being conveniently implemented on
 /// every single string type in the standard library, it also provides some special processing.
-/// Please read its documentation if you haven't already – the rest of this page assumes you did.
+/// Please read its documentation if you haven't already – the rest of this page assumes you have.
 ///
 /// # Validity
 /// As mentioned in the [module-level documentation](super), not all platforms support all types of
@@ -66,14 +66,18 @@ impl<'a> LocalSocketName<'a> {
         (self.is_namespaced() && nts.namespace_supported())
             || (self.is_path() && nts.paths_supported())
     }
+
     /// Returns `true` if the value is a namespaced name, `false` otherwise.
+    #[inline]
     pub const fn is_namespaced(&self) -> bool {
         self.namespaced
     }
     /// Returns `true` if the value is a filesystem path, `false` otherwise.
+    #[inline]
     pub const fn is_path(&self) -> bool {
         !self.namespaced
     }
+
     /// Returns the name as an `OsStr`. The returned value does not retain the type of the name
     /// (whether it was a filesystem path or a namespaced name).
     ///
@@ -89,6 +93,7 @@ impl<'a> LocalSocketName<'a> {
     pub fn into_inner(self) -> OsString {
         self.inner.into_owned()
     }
+
     /// Returns the name as a *borrowed* `Cow<'_, OsStr>`. The returned value does not retain
     /// thetype of the name (whether it was a filesystem path or a namespaced name).
     ///
@@ -107,6 +112,22 @@ impl<'a> LocalSocketName<'a> {
     pub fn into_inner_cow(self) -> Cow<'a, OsStr> {
         self.inner
     }
+
+    /// Produces a `LocalSocketName` that borrows from `self`.
+    pub fn borrow(&self) -> LocalSocketName<'_> {
+        LocalSocketName {
+            inner: Cow::Borrowed(&self.inner),
+            namespaced: self.namespaced,
+        }
+    }
+    /// Extends the lifetime to `'static`, cloning if necessary.
+    pub fn into_owned(self) -> LocalSocketName<'static> {
+        LocalSocketName {
+            inner: Cow::Owned(self.inner.into_owned()),
+            namespaced: self.namespaced,
+        }
+    }
+
     pub(crate) const fn from_raw_parts(inner: Cow<'a, OsStr>, namespaced: bool) -> Self {
         Self { inner, namespaced }
     }
