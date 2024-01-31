@@ -46,9 +46,7 @@ pub fn listen_and_pick_name<T>(
         .find_map(|nm| {
             let l = match bindfn(&nm) {
                 Ok(l) => l,
-                Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied | AlreadyExists) => {
-                    return None
-                }
+                Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied) => return None,
                 Err(e) => return Some(Err(e)),
             };
             Some(Ok((nm, l)))

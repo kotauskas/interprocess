@@ -16,13 +16,22 @@ pub struct LocalSocketListener {
 impl LocalSocketListener {
     pub fn bind(name: LocalSocketName<'_>, keep_name: bool) -> io::Result<Self> {
         Ok(Self {
-            listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)?,
+            listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)
+                .map_err(Self::decode_listen_error)?,
             reclaim: keep_name
                 .then_some(name.into_owned())
                 .map(ReclaimGuard::new)
                 .unwrap_or_default(),
         })
     }
+
+    fn decode_listen_error(error: io::Error) -> io::Error {
+        io::Error::from(match error.kind() {
+            io::ErrorKind::AlreadyExists => io::ErrorKind::AddrInUse,
+            _ => return error,
+        })
+    }
+
     #[inline]
     pub fn accept(&self) -> io::Result<LocalSocketStream> {
         // TODO make use of the second return value
