@@ -24,7 +24,7 @@ impl Corpse {
     #[inline]
     pub fn disconnect(&self) -> io::Result<()> {
         let success = unsafe { DisconnectNamedPipe(self.handle.as_int_handle()) != 0 };
-        ok_or_ret_errno!(success => ())
+        ok_or_errno!(success => ())
     }
 }
 impl Drop for Corpse {

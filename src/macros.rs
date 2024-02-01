@@ -9,7 +9,7 @@ macro_rules! impmod {
     };
 }
 
-macro_rules! ok_or_ret_errno {
+macro_rules! ok_or_errno {
     ($success:expr => $($scb:tt)+) => {
         if $success {
             Ok($($scb)+)

@@ -21,7 +21,7 @@ impl FileHandle {
             );
             (result != 0, num_bytes_read as usize)
         };
-        ok_or_ret_errno!(success => num_bytes_read)
+        ok_or_errno!(success => num_bytes_read)
     }
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
@@ -37,7 +37,7 @@ impl FileHandle {
             );
             (result != 0, bytes_written as usize)
         };
-        ok_or_ret_errno!(success => bytes_written)
+        ok_or_errno!(success => bytes_written)
     }
     #[inline(always)]
     pub fn flush(&self) -> io::Result<()> {
@@ -46,7 +46,7 @@ impl FileHandle {
     #[inline]
     pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
         let success = unsafe { FlushFileBuffers(handle) != 0 };
-        downgrade_eof(ok_or_ret_errno!(success => ()))
+        downgrade_eof(ok_or_errno!(success => ()))
     }
 }
 impl TryClone for FileHandle {

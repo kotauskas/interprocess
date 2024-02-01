@@ -19,7 +19,7 @@ pub(crate) unsafe fn hget(
 ) -> io::Result<u32> {
     let mut x: u32 = 0;
     let ok = unsafe { f(handle.as_int_handle(), &mut x as *mut _) != 0 };
-    ok_or_ret_errno!(ok => x)
+    ok_or_errno!(ok => x)
 }
 
 pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
@@ -33,7 +33,7 @@ pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
             ptr::null_mut(),
         ) != 0
     };
-    ok_or_ret_errno!(success => flags)
+    ok_or_errno!(success => flags)
 }
 pub(crate) fn is_server_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
     // Source: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
@@ -62,7 +62,7 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
             &mut msglen as *mut _,
         ) != 0
     };
-    ok_or_ret_errno!(ok => msglen as usize)
+    ok_or_errno!(ok => msglen as usize)
 }
 
 fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {
@@ -100,7 +100,7 @@ pub(crate) fn connect_without_waiting(
         );
         (handle != INVALID_HANDLE_VALUE, handle)
     };
-    match ok_or_ret_errno!(success => unsafe {
+    match ok_or_errno!(success => unsafe {
         // SAFETY: we just created this handle
         FileHandle::from(OwnedHandle::from_raw_handle(handle as RawHandle))
     }) {
@@ -139,7 +139,7 @@ pub(crate) fn get_named_pipe_handle_state(
                 .unwrap_or(0),
         ) != 0
     };
-    ok_or_ret_errno!(success => ())
+    ok_or_errno!(success => ())
 }
 pub(crate) fn set_named_pipe_handle_state(
     handle: BorrowedHandle<'_>,
@@ -166,7 +166,7 @@ pub(crate) fn set_named_pipe_handle_state(
             if has_cdt { toptr(&mut cdt) } else { null },
         ) != 0
     };
-    ok_or_ret_errno!(success => ())
+    ok_or_errno!(success => ())
 }
 
 pub(crate) fn set_nonblocking_given_readmode(
@@ -203,5 +203,5 @@ impl Default for WaitTimeout {
 pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
     assert_eq!(path[path.len() - 1], 0, "nul terminator not found");
     let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
-    ok_or_ret_errno!(success => ())
+    ok_or_errno!(success => ())
 }

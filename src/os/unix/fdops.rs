@@ -16,7 +16,7 @@ impl Read for &FdOps {
                 libc::read(self.0.as_raw_fd(), buf.as_mut_ptr().cast(), length_to_read);
             (size_or_err >= 0, size_or_err as usize)
         };
-        ok_or_ret_errno!(success => bytes_read)
+        ok_or_errno!(success => bytes_read)
     }
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let num_bufs = c_int::try_from(bufs.len()).unwrap_or(c_int::MAX);
@@ -25,7 +25,7 @@ impl Read for &FdOps {
             let size_or_err = libc::readv(self.0.as_raw_fd(), bufs.as_ptr().cast(), num_bufs);
             (size_or_err >= 0, size_or_err as usize)
         };
-        ok_or_ret_errno!(success => bytes_read)
+        ok_or_errno!(success => bytes_read)
     }
     // FUTURE can_vector
 }
@@ -37,7 +37,7 @@ impl Write for &FdOps {
             let size_or_err = libc::write(self.0.as_raw_fd(), buf.as_ptr().cast(), length_to_write);
             (size_or_err >= 0, size_or_err as usize)
         };
-        ok_or_ret_errno!(success => bytes_written)
+        ok_or_errno!(success => bytes_written)
     }
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
         let num_bufs = c_int::try_from(bufs.len()).unwrap_or(c_int::MAX);
@@ -46,12 +46,12 @@ impl Write for &FdOps {
             let size_or_err = libc::writev(self.0.as_raw_fd(), bufs.as_ptr().cast(), num_bufs);
             (size_or_err >= 0, size_or_err as usize)
         };
-        ok_or_ret_errno!(success => bytes_written)
+        ok_or_errno!(success => bytes_written)
     }
     // FUTURE can_vector
     fn flush(&mut self) -> io::Result<()> {
         let success = unsafe { libc::fsync(self.0.as_raw_fd()) >= 0 };
-        ok_or_ret_errno!(success => ())
+        ok_or_errno!(success => ())
     }
 }
 

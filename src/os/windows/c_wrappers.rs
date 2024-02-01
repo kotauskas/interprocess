@@ -33,5 +33,5 @@ fn duplicate_handle_inner(
             DUPLICATE_SAME_ACCESS,
         ) != 0
     };
-    ok_or_ret_errno!(success => new_handle as _)
+    ok_or_errno!(success => new_handle as _)
 }

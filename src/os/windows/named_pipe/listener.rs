@@ -334,7 +334,7 @@ cannot create pipe server that has byte type but receives messages – have you 
             );
             (handle, handle != INVALID_HANDLE_VALUE)
         };
-        ok_or_ret_errno!(success => unsafe {
+        ok_or_errno!(success => unsafe {
             // SAFETY: we just made it and received ownership
             OwnedHandle::from_raw_handle(handle as RawHandle)
         })
