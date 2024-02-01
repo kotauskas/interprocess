@@ -4,7 +4,6 @@ use std::{
     io::{self, prelude::*, IoSlice, IoSliceMut},
     os::fd::OwnedFd,
 };
-use to_method::To;
 
 #[repr(transparent)]
 pub(super) struct FdOps(pub(super) OwnedFd);
@@ -20,7 +19,7 @@ impl Read for &FdOps {
         ok_or_ret_errno!(success => bytes_read)
     }
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        let num_bufs = bufs.len().try_to::<c_int>().unwrap_or(c_int::MAX);
+        let num_bufs = c_int::try_from(bufs.len()).unwrap_or(c_int::MAX);
 
         let (success, bytes_read) = unsafe {
             let size_or_err = libc::readv(self.0.as_raw_fd(), bufs.as_ptr().cast(), num_bufs);
@@ -41,7 +40,7 @@ impl Write for &FdOps {
         ok_or_ret_errno!(success => bytes_written)
     }
     fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        let num_bufs = bufs.len().try_to::<c_int>().unwrap_or(c_int::MAX);
+        let num_bufs = c_int::try_from(bufs.len()).unwrap_or(c_int::MAX);
 
         let (success, bytes_written) = unsafe {
             let size_or_err = libc::writev(self.0.as_raw_fd(), bufs.as_ptr().cast(), num_bufs);

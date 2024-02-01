@@ -6,7 +6,6 @@ use std::{
     sync::mpsc::{channel, /*Receiver,*/ Sender},
     thread,
 };
-use to_method::*;
 
 /// Waits for the leader closure to reach a point where it sends a message for the follower closure,
 /// then runs the follower. Captures Eyre errors on both sides and bubbles them up if they occur,
@@ -78,7 +77,7 @@ where
 
     let client_wrapper = |msg: T| {
         thread::scope(|scope| {
-            let mut client_threads = Vec::with_capacity(NUM_CLIENTS.try_to().unwrap());
+            let mut client_threads = Vec::with_capacity(usize::try_from(NUM_CLIENTS).unwrap());
             for n in 1..=NUM_CLIENTS {
                 let tname = format!("client {n}");
 

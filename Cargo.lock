@@ -116,7 +116,6 @@ dependencies = [
  "color-eyre",
  "libc",
  "recvmsg",
- "to_method",
  "tokio",
  "windows-sys",
 ]
@@ -265,12 +264,6 @@ dependencies = [
  "cfg-if",
  "once_cell",
 ]
-
-[[package]]
-name = "to_method"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c4ceeeca15c8384bbc3e011dbd8fccb7f068a440b752b7d9b32ceb0ca0e2e8"
 
 [[package]]
 name = "tokio"

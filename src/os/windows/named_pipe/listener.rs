@@ -16,7 +16,6 @@ use std::{
         Mutex,
     },
 };
-use to_method::To;
 use windows_sys::Win32::{
     Foundation::ERROR_PIPE_CONNECTED,
     Security::SECURITY_ATTRIBUTES,
@@ -318,7 +317,7 @@ cannot create pipe server that has byte type but receives messages – have you 
                 io::ErrorKind::InvalidInput,
                 "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
             )),
-            Some(x) => x.to::<u32>(),
+            Some(x) => x.into(),
             None => 255,
         };
 
@@ -392,7 +391,7 @@ cannot create pipe server that has byte type but receives messages – have you 
 
     fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> u32 {
         let mut open_mode = 0_u32;
-        open_mode |= role.direction_as_server().to::<u32>();
+        open_mode |= u32::from(role.direction_as_server());
         if first {
             open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
         }

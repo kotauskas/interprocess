@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     str,
 };
-use to_method::To;
 
 impmod! {local_socket,
     cstr_to_osstr,
@@ -119,7 +118,7 @@ impl<'a> ToLocalSocketName<'a> for &'a OsStr {
 impl ToLocalSocketName<'static> for OsString {
     fn to_local_socket_name(mut self) -> io::Result<LocalSocketName<'static>> {
         let mut namespaced = false;
-        let mut bytes = self.into_encoded_bytes().to::<Vec<_>>();
+        let mut bytes = self.into_encoded_bytes();
         if bytes.first() == Some(&b'@') {
             bytes.remove(0);
             namespaced = true;
