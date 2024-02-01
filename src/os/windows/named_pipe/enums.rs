@@ -79,9 +79,12 @@ impl TryFrom<u32> for PipeDirection {
     /// # Errors
     /// Returns `Err` if the value is not a valid pipe direction constant.
     fn try_from(op: u32) -> Result<Self, ()> {
-        assert!((1..=3).contains(&op));
-        // See the comment block above for why this is safe.
-        unsafe { mem::transmute(op) }
+        Ok(match op {
+            PIPE_ACCESS_INBOUND => Self::ClientToServer,
+            PIPE_ACCESS_OUTBOUND => Self::ServerToClient,
+            PIPE_ACCESS_DUPLEX => Self::Duplex,
+            _ => return Err(()),
+        })
     }
 }
 impl From<PipeDirection> for u32 {
