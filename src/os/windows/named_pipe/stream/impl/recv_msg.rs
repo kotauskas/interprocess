@@ -45,7 +45,10 @@ impl RawPipeStream {
                 match buf.grow() {
                     Ok(()) => {
                         spilled = true;
-                        debug_assert!(!buf.unfilled_part().is_empty());
+                        debug_assert!(
+                            !buf.unfilled_part().is_empty(),
+                            "successful buffer growth did not yield additional capacity"
+                        );
                         continue;
                     }
                     Err(e) => {
@@ -82,6 +85,7 @@ impl RawPipeStream {
                     return Err(e);
                 }
             };
+            #[allow(clippy::arithmetic_side_effects)] // this cannot panic due to the isize limit
             unsafe {
                 // SAFETY: this one is on Windows
                 buf.advance_init_and_set_fill(buf.len_filled() + incr)

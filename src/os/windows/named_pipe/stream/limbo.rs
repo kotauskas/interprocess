@@ -4,7 +4,7 @@ use crate::{
         winprelude::*,
         FileHandle,
     },
-    DebugExpectExt,
+    DebugExpectExt, LOCK_POISON,
 };
 use std::{
     io,
@@ -39,6 +39,13 @@ impl Drop for Corpse {
 type Limbo = LimboPool<SyncSender<Corpse>>;
 static LIMBO: OnceLock<Mutex<Limbo>> = OnceLock::new();
 
+fn limbo_keeper_name(idx: usize) -> String {
+    match idx {
+        usize::MAX => "limbo keeper".to_string(),
+        x => format!("limbo keeper {}", x.wrapping_add(1)),
+    }
+}
+
 pub(super) fn send_off(c: Corpse) {
     fn bury(c: Corpse) {
         c.handle.flush().debug_expect("limbo flush failed");
@@ -52,7 +59,7 @@ pub(super) fn send_off(c: Corpse) {
     fn createf(idx: usize, c: Corpse) -> SyncSender<Corpse> {
         let (tx, rx) = sync_channel::<Corpse>(1);
         thread::Builder::new()
-            .name(format!("limbo keeper {}", idx + 1))
+            .name(limbo_keeper_name(idx))
             .spawn(move || {
                 while let Ok(h) = rx.recv() {
                     bury(h);
@@ -64,13 +71,8 @@ pub(super) fn send_off(c: Corpse) {
         tx
     }
     fn fullf(idx: usize, c: Corpse) {
-        let idx = idx.checked_add(1);
-        let name = match idx {
-            Some(idx) => format!("limbo keeper {}", idx + 1),
-            None => "limbo keeper".to_string(),
-        };
         thread::Builder::new()
-            .name(name)
+            .name(limbo_keeper_name(idx))
             .spawn(move || {
                 bury(c);
             })
@@ -78,7 +80,7 @@ pub(super) fn send_off(c: Corpse) {
     }
 
     let mutex = LIMBO.get_or_init(Default::default);
-    let mut limbo = mutex.lock().unwrap();
+    let mut limbo = mutex.lock().expect(LOCK_POISON);
 
     limbo.linear_try_or_create(c, tryf, createf, fullf);
 }

@@ -1,39 +1,30 @@
-use std::{
-    ffi::{OsStr, OsString},
-    iter,
-    os::windows::ffi::OsStrExt,
-};
+use std::{ffi::OsStr, num::Saturating, os::windows::ffi::OsStrExt};
+
+use crate::NumExt;
 
 pub fn pathcvt<'a>(
     pipe_name: &'a OsStr,
     hostname: Option<&'a OsStr>,
 ) -> (impl Iterator<Item = &'a OsStr>, usize) {
-    use iter::once as i;
-
-    static PREFIX_LITERAL: &str = r"\\";
-    static PIPEFS_LITERAL: &str = r"\pipe\";
-    static LOCAL_HOSTNAME: &str = ".";
+    const PREFIX_LITERAL: &str = r"\\";
+    const PIPEFS_LITERAL: &str = r"\pipe\";
+    const LOCAL_HOSTNAME: &str = ".";
+    const BASE_LEN: Saturating<usize> = Saturating(PREFIX_LITERAL.len() + PIPEFS_LITERAL.len());
 
     let hostname = hostname.unwrap_or_else(|| OsStr::new(LOCAL_HOSTNAME));
 
-    let iterator = i(OsStr::new(PREFIX_LITERAL))
-        .chain(i(hostname))
-        .chain(i(OsStr::new(PIPEFS_LITERAL)))
-        .chain(i(pipe_name));
-    let capacity_hint =
-        PREFIX_LITERAL.len() + hostname.len() + PIPEFS_LITERAL.len() + pipe_name.len();
-    (iterator, capacity_hint)
-}
-#[allow(dead_code)]
-pub fn convert_path(pipename: &OsStr, hostname: Option<&OsStr>) -> OsString {
-    let (i, cap) = pathcvt(pipename, hostname);
-    let mut path = OsString::with_capacity(cap);
-    i.for_each(|c| path.push(c));
-    path
+    let components = [
+        OsStr::new(PREFIX_LITERAL),
+        hostname,
+        OsStr::new(PIPEFS_LITERAL),
+        pipe_name,
+    ];
+    let userlen = hostname.len().saturate() + pipe_name.len().saturate();
+    (components.into_iter(), (BASE_LEN + userlen).0)
 }
 pub fn convert_and_encode_path(pipename: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
     let (i, cap) = pathcvt(pipename, hostname);
-    let mut path = Vec::with_capacity(cap + 1);
+    let mut path = Vec::with_capacity((cap.saturate() + 1.saturate()).0);
     i.for_each(|c| path.extend(c.encode_wide()));
     path.push(0); // Don't forget the nul terminator!
     path

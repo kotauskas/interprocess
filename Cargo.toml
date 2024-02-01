@@ -68,7 +68,14 @@ rust_2018_idioms = "deny"
 missing_docs = "warn"
 
 [lints.clippy]
-#nonstandard_macro_braces = "allow"
+exit = "forbid"
+get_unwrap = "deny"
+arithmetic_side_effects = "warn"
+indexing_slicing = "warn"
+missing_assert_message = "warn"
+panic_in_result_fn = "warn"
+unwrap_used = "warn"
+unwrap_in_result = "warn"
 
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]

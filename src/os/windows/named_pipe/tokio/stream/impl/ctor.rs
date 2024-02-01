@@ -5,7 +5,7 @@ use crate::os::windows::named_pipe::{
     stream::{block_for_server, WaitTimeout},
     MaybeArc, NeedsFlushVal, PipeMode,
 };
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, mem::take, path::Path};
 
 impl RawPipeStream {
     pub(super) fn new(inner: InnerTokio) -> Self {
@@ -49,16 +49,15 @@ impl RawPipeStream {
     }
 
     async fn _connect(
-        path: Vec<u16>,
+        mut path: Vec<u16>,
         recv: Option<PipeMode>,
         send: Option<PipeMode>,
     ) -> io::Result<Self> {
-        let mut path = Some(path);
         let client = loop {
-            match connect_without_waiting(path.as_ref().unwrap(), recv, send, true) {
+            match connect_without_waiting(&path, recv, send, true) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    let path_take = Self::wait_for_server(path.take().unwrap()).await?;
-                    path = Some(path_take);
+                    let path_take = Self::wait_for_server(take(&mut path)).await?;
+                    path = path_take;
                 }
                 not_waiting => break not_waiting?,
             }

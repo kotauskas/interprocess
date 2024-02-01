@@ -3,7 +3,7 @@
 use super::*;
 use crate::{
     os::windows::{winprelude::*, FileHandle},
-    DebugExpectExt,
+    DebugExpectExt, LOCK_POISON,
 };
 use std::sync::{Mutex, OnceLock};
 use tokio::{
@@ -70,7 +70,7 @@ fn create_limbo() -> Limbo {
 
 pub(super) fn send_off(c: Corpse) {
     let mutex = LIMBO.get_or_init(|| Mutex::new(create_limbo()));
-    let mut limbo = mutex.lock().unwrap();
+    let mut limbo = mutex.lock().expect(LOCK_POISON);
     if let Err(c) = limbo.send(c) {
         *limbo = create_limbo();
         limbo

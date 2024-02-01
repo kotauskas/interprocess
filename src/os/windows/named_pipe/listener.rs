@@ -1,7 +1,10 @@
 use super::{
     path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
 };
-use crate::os::windows::{winprelude::*, FileHandle, SecurityDescriptor};
+use crate::{
+    os::windows::{winprelude::*, FileHandle, SecurityDescriptor},
+    poison_error, LOCK_POISON,
+};
 use std::{
     borrow::Cow,
     fmt::{self, Debug, Formatter},
@@ -71,7 +74,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     /// See `incoming` for an iterator version of this.
     pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
-            let mut stored_instance = self.stored_instance.lock().expect("unexpected lock poison");
+            let mut stored_instance = self.stored_instance.lock().map_err(poison_error)?;
             // Doesn't actually even need to be atomic to begin with, but it's simpler and more
             // convenient to do this instead. The mutex takes care of ordering.
             let nonblocking = self.nonblocking.load(Relaxed);
@@ -99,7 +102,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     /// See the documentation of the aforementioned field for the exact effects of enabling this
     /// mode.
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        let instance = self.stored_instance.lock().expect("unexpected lock poison");
+        let instance = self.stored_instance.lock().map_err(poison_error)?;
         // Doesn't actually even need to be atomic to begin with, but it's simpler and more
         // convenient to do this instead. The mutex takes care of ordering.
         self.nonblocking.store(nonblocking, Relaxed);
@@ -126,10 +129,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandle {
     fn from(p: PipeListener<Rm, Sm>) -> Self {
-        p.stored_instance
-            .into_inner()
-            .expect("unexpected lock poison")
-            .into()
+        p.stored_instance.into_inner().expect(LOCK_POISON).into()
     }
 }
 
@@ -216,6 +216,10 @@ macro_rules! genset {
 impl<'a> PipeListenerOptions<'a> {
     /// Creates a new builder with default options.
     pub fn new() -> Self {
+        const DEFAULT_WAIT_TIMEOUT: NonZeroU32 = match NonZeroU32::new(50) {
+            Some(v) => v,
+            None => unreachable!(),
+        };
         Self {
             path: Cow::Borrowed(Path::new("")),
             mode: PipeMode::Bytes,
@@ -225,7 +229,7 @@ impl<'a> PipeListenerOptions<'a> {
             accept_remote: false,
             input_buffer_size_hint: 512,
             output_buffer_size_hint: 512,
-            wait_timeout: NonZeroU32::new(50).unwrap(),
+            wait_timeout: DEFAULT_WAIT_TIMEOUT,
             security_descriptor: None,
             inheritable: false,
         }

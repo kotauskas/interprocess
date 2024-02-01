@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     os::windows::{named_pipe::PmtNotNone, winprelude::*, FileHandle},
-    UnpinExt,
+    UnpinExt, LOCK_POISON,
 };
 use std::sync::MutexGuard;
 use tokio::io::AsyncWrite;
@@ -48,7 +48,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
             return Poll::Ready(Ok(()));
         }
 
-        let mut flush = self.flush.lock().unwrap();
+        let mut flush = self.flush.lock().expect(LOCK_POISON);
         let rslt = loop {
             match flush.as_mut() {
                 Some(fl) => break ready!(fl.pin().poll(cx)).unwrap(),

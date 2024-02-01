@@ -22,7 +22,10 @@ impl SecurityDescriptor {
     pub unsafe fn from_ref(r: &SECURITY_DESCRIPTOR) -> &Self {
         unsafe {
             let ret = std::mem::transmute::<_, &Self>(r);
-            debug_assert!(IsValidSecurityDescriptor(ret.as_ptr()) == 1);
+            debug_assert!(
+                IsValidSecurityDescriptor(ret.as_ptr()) == 1,
+                "invalid security descriptor"
+            );
             ret
         }
     }

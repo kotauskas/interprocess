@@ -85,7 +85,7 @@ pub(crate) fn connect_without_waiting(
     send: Option<PipeMode>,
     overlapped: bool,
 ) -> io::Result<FileHandle> {
-    assert_eq!(path[path.len() - 1], 0, "nul terminator not found");
+    assert_nts(path)?;
     let access_flags = modes_to_access_flags(recv, send);
     let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
     let (success, handle) = unsafe {
@@ -201,7 +201,15 @@ impl Default for WaitTimeout {
     }
 }
 pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
-    assert_eq!(path[path.len() - 1], 0, "nul terminator not found");
+    assert_nts(path)?;
     let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
     ok_or_errno!(success => ())
+}
+
+fn assert_nts(s: &[u16]) -> io::Result<()> {
+    if s.last() != Some(&0) {
+        Err(io::Error::other("nul terminator not found"))
+    } else {
+        Ok(())
+    }
 }

@@ -39,4 +39,9 @@ pub(crate) use misc::*;
 
 #[cfg(test)]
 #[path = "../tests/index.rs"]
+#[allow(
+    clippy::unwrap_used,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing
+)]
 mod tests;
