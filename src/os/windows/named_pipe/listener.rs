@@ -16,7 +16,6 @@ use std::{
         Mutex,
     },
 };
-use to_method::To;
 use windows_sys::Win32::{
     Foundation::ERROR_PIPE_CONNECTED,
     Security::SECURITY_ATTRIBUTES,
