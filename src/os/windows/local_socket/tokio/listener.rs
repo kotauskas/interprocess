@@ -18,7 +18,7 @@ type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
     pub fn bind(name: LocalSocketName<'_>, _: bool) -> io::Result<Self> {
-        let path = Path::new(name.inner());
+        let path = Path::new(name.raw());
         let mut options = PipeListenerOptions::new();
         options.path = if name.is_namespaced() {
             // PERF this allocates twice

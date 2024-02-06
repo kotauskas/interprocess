@@ -32,27 +32,31 @@ fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Bytes
     send(&mut sender, msg(true))
 }
 
-pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_duplex(
+    id: &'static str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_duplex::<pipe_mode::Bytes>(),
         handle_conn_duplex,
     )
 }
-pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_cts(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_recv_only::<pipe_mode::Bytes>(),
         handle_conn_cts,
     )
 }
-pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_stc(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_send_only::<pipe_mode::Bytes>(),

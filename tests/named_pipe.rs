@@ -18,7 +18,11 @@ macro_rules! matrix {
         fn $nm() -> TestResult {
             use $mod::*;
             testinit();
-            drive_server_and_multiple_clients(matrix!(@dir_s $ty), matrix!(@dir_c $ty))
+            let server = matrix!(@dir_s $ty);
+            drive_server_and_multiple_clients(
+                |ns, nc| server(make_id!(), ns, nc),
+                matrix!(@dir_c $ty),
+            )
         }
     )+};
 }
@@ -39,7 +43,7 @@ fn drive_server<L>(
     mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
 ) -> TestResult {
-    let (name, mut listener) = listen_and_pick_name(&mut NameGen::new(id, false), |nm| {
+    let (name, mut listener) = listen_and_pick_name(&mut namegen_named_pipe(id), |nm| {
         createfn(PipeListenerOptions::new().path(Path::new(nm)))
     })?;
 

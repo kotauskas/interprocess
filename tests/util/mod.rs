@@ -37,13 +37,17 @@ pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char
     msg.into()
 }
 
-pub fn listen_and_pick_name<T>(
-    namegen: &mut NameGen,
-    mut bindfn: impl FnMut(&str) -> io::Result<T>,
-) -> TestResult<(Arc<str>, T)> {
+pub fn listen_and_pick_name<L, N: ?Sized, F: FnMut(u32) -> NameResult<N>>(
+    namegen: &mut NameGen<N, F>,
+    mut bindfn: impl FnMut(&N) -> io::Result<L>,
+) -> TestResult<(Arc<N>, L)> {
     use std::io::ErrorKind::*;
     namegen
         .find_map(|nm| {
+            let nm = match nm {
+                Ok(ok) => ok,
+                Err(e) => return Some(Err(e)),
+            };
             let l = match bindfn(&nm) {
                 Ok(l) => l,
                 Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied) => return None,

@@ -1,6 +1,6 @@
 use crate::{
     error::{FromHandleError, ReuniteError},
-    local_socket::ToLocalSocketName,
+    local_socket::LocalSocketName,
     os::windows::named_pipe::{
         pipe_mode::Bytes,
         tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
@@ -15,12 +15,11 @@ type SendHalfImpl = SendPipeStream<Bytes>;
 #[derive(Debug)]
 pub struct LocalSocketStream(pub(super) StreamImpl);
 impl LocalSocketStream {
-    pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        let name = name.to_local_socket_name()?;
+    pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
         if name.is_namespaced() {
-            StreamImpl::connect_with_prepend(name.inner(), None).await
+            StreamImpl::connect_with_prepend(name.raw(), None).await
         } else {
-            StreamImpl::connect(name.inner()).await
+            StreamImpl::connect(name.raw()).await
         }
         .map(Self)
     }

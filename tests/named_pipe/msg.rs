@@ -55,9 +55,13 @@ fn handle_conn_stc(
     send(&mut sender, msg2, 1)
 }
 
-pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_duplex(
+    id: &'static str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| {
@@ -67,9 +71,9 @@ pub fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestRes
         handle_conn_duplex,
     )
 }
-pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_cts(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| {
@@ -79,9 +83,9 @@ pub fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult
         handle_conn_cts,
     )
 }
-pub fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_stc(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| {

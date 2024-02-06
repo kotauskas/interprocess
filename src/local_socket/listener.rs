@@ -1,4 +1,4 @@
-use super::{LocalSocketStream, ToLocalSocketName};
+use super::{LocalSocketName, LocalSocketStream};
 use std::{io, iter::FusedIterator};
 
 impmod! {local_socket,
@@ -38,7 +38,10 @@ impmod! {local_socket,
 ///
 /// ## Basic server
 /// ```no_run
-/// use interprocess::local_socket::{LocalSocketListener, LocalSocketStream, NameTypeSupport};
+/// use interprocess::local_socket::{
+///     LocalSocketListener, LocalSocketStream,
+///     NameTypeSupport, ToFsName, ToNsName,
+/// };
 /// use std::io::{self, prelude::*, BufReader};
 ///
 /// // Define a function that checks for errors in incoming connections. We'll use this to filter
@@ -54,20 +57,27 @@ impmod! {local_socket,
 /// }
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.
-/// let name = {
+/// let (name, printname) = {
 ///     // This scoping trick allows us to nicely contain the import inside the `match`, so that if
 ///     // any imports of variants named `Both` happen down the line, they won't collide with the
 ///     // enum we're working with here. Maybe someone should make a macro for this.
 ///     use NameTypeSupport::*;
 ///     match NameTypeSupport::query() {
-///         OnlyPaths => "/tmp/example.sock",
-///         OnlyNamespaced | Both => "@example.sock",
+///         OnlyFs => {
+///             let pn = "/tmp/example.sock";
+///             (pn.to_fs_name()?, pn)
+///         },
+///         OnlyNs | Both => {
+///             let pn = "@example.sock";
+///             (pn.to_ns_name()?, pn)
+///         },
 ///     }
 /// };
 ///
 /// // Bind our listener.
 /// let listener = match LocalSocketListener::bind(name) {
 ///     Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
+///         // TODO update this
 ///         // One important problem that is easy to handle improperly (or not at all) is the
 ///         // "corpse sockets" that are left when a program that uses a file-type socket name
 ///         // terminates its socket server without deleting the file. There's no single strategy
@@ -78,8 +88,8 @@ impmod! {local_socket,
 ///         // that.
 ///         eprintln!(
 ///             "\
-///Error: could not start server because the socket file is occupied. Please check if {name} is in \
-///use by another process and try again."
+///Error: could not start server because the socket file is occupied. Please check if {printname} \
+///is in use by another process and try again."
 ///         );
 ///         return Err(e.into());
 ///     }
@@ -87,7 +97,7 @@ impmod! {local_socket,
 /// };
 ///
 /// // The syncronization between the server and client, if any is used, goes here.
-/// eprintln!("Server running at {name}");
+/// eprintln!("Server running at {printname}");
 ///
 /// // Preemptively allocate a sizeable buffer for receiving at a later moment. This size should be
 /// // enough and should be easy to find for the allocator. Since we only have one concurrent
@@ -128,14 +138,16 @@ impmod! {local_socket,
 pub struct LocalSocketListener(LocalSocketListenerImpl);
 impl LocalSocketListener {
     /// Creates a socket server with the specified local socket name.
-    pub fn bind<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, true).map(Self)
+    #[inline]
+    pub fn bind(name: LocalSocketName<'_>) -> io::Result<Self> {
+        LocalSocketListenerImpl::bind(name, true).map(Self)
     }
     /// Like [`bind()`](Self::bind) followed by
     /// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
     /// allocation.
-    pub fn bind_without_name_reclamation<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketListenerImpl::bind(name.to_local_socket_name()?, false).map(Self)
+    #[inline]
+    pub fn bind_without_name_reclamation(name: LocalSocketName<'_>) -> io::Result<Self> {
+        LocalSocketListenerImpl::bind(name, false).map(Self)
     }
 
     /// Listens for incoming connections to the socket, blocking until a client is connected.

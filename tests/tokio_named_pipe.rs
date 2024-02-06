@@ -5,13 +5,14 @@ mod bytes;
 use crate::{
     os::windows::named_pipe::PipeListenerOptions,
     tests::util::{
-        listen_and_pick_name, testinit, tokio::drive_server_and_multiple_clients, NameGen,
-        TestResult,
+        listen_and_pick_name, testinit, tokio::drive_server_and_multiple_clients, TestResult,
     },
 };
 use color_eyre::eyre::WrapErr;
 use std::{convert::TryInto, future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
+
+use super::util::namegen_named_pipe;
 
 macro_rules! matrix {
     (@dir_s duplex) => {server_duplex}; (@dir_s stc) => {server_stc}; (@dir_s cts) => {server_cts};
@@ -21,7 +22,11 @@ macro_rules! matrix {
         async fn $nm() -> TestResult {
             use $mod::*;
             testinit();
-            drive_server_and_multiple_clients(matrix!(@dir_s $ty), matrix!(@dir_c $ty)).await
+            let server = matrix!(@dir_s $ty);
+            drive_server_and_multiple_clients(
+                move |ns, nc| server(make_id!(), ns, nc),
+                matrix!(@dir_c $ty),
+            ).await
         }
     )+};
 }
@@ -39,7 +44,7 @@ async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
     mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
     mut acceptfut: impl FnMut(Arc<L>) -> T,
 ) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut NameGen::new(id, false), |nm| {
+    let (name, listener) = listen_and_pick_name(&mut namegen_named_pipe(id), |nm| {
         createfn(PipeListenerOptions::new().path(Path::new(nm))).map(Arc::new)
     })?;
 

@@ -1,13 +1,18 @@
-// TODO LocalSocketNameBuf
-
-use {
-    super::NameTypeSupport,
-    std::{
-        borrow::Cow,
-        ffi::{OsStr, OsString},
-    },
+use std::{
+    borrow::Cow,
+    ffi::{OsStr, OsString},
+    fmt::Debug,
 };
 
+impmod! {
+    local_socket,
+    is_namespaced,
+}
+
+// TODO maybe emulate NS on FS-only via tmpfs?
+// TODO better PartialEq
+
+// TODO adjust docs
 /// A name for a local socket.
 ///
 /// Due to vast differences between platforms in terms of how local sockets are named, there needs
@@ -16,119 +21,99 @@ use {
 /// correctness.
 ///
 /// # Creation
-/// A separate trait is used to create names from basic strings:
-/// [`ToLocalSocketName`](super::ToLocalSocketName). Aside from being conveniently implemented on
-/// every single string type in the standard library, it also provides some special processing.
-/// Please read its documentation if you haven't already – the rest of this page assumes you have.
+/// Two traits are used to create names from basic strings: [`ToFsName`](super::ToFsName) and
+/// [`ToNsName`](super::ToNsName).
 ///
 /// # Validity
 /// As mentioned in the [module-level documentation](super), not all platforms support all types of
-/// local socket names. A name pointing to a filesystem location is only supported on Unix-like
+/// local socket names. Names pointing to filesystem locations are only supported on Unix-like
 /// systems, and names pointing to an abstract namespace reserved specifically for local sockets are
-/// only available on Linux and Windows. Due to the diversity of those differences,
-/// `LocalSocketName` does not provide any forced validation by itself – the
-/// [`is_supported`](LocalSocketName::is_supported) and
-/// [`is_always_supported`](LocalSocketName::is_always_supported) checks are not enforced to
-/// succeed. Instead, they are intended as helpers for the process of user input validation, if any
-/// local socket names are ever read from environment variables, configuration files or other
-/// methods of user input.
-///
-/// If an invalid local socket name is used to create a local socket or connect to it, the
-/// creation/connection method will fail.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LocalSocketName<'a> {
-    inner: Cow<'a, OsStr>,
-    namespaced: bool,
+/// only available on Linux and Windows.
+// TODO document automatic checks
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalSocketName<'s> {
+    raw: Cow<'s, OsStr>,
+    path: bool,
 }
-impl<'a> LocalSocketName<'a> {
-    /// Returns `true` if the type of the name is supported by the OS, `false` otherwise.
-    ///
-    /// The check is performed at runtime. For a conservative compile-time check, see
-    /// [`.is_always_supported`](Self::is_always_supported).
-    pub fn is_supported(&self) -> bool {
-        self.is_supported_in_nts_type(NameTypeSupport::query())
-    }
-    /// Returns `true` if the type of the name is supported by the OS, `false` otherwise.
-    ///
-    /// The check is performed at compile-time. For a check which might return a more permissive
-    /// result on certain platforms by checking for support at runtime, see
-    /// [`.is_supported()`](Self::is_supported).
-    pub const fn is_always_supported(&self) -> bool {
-        self.is_supported_in_nts_type(NameTypeSupport::ALWAYS_AVAILABLE)
-    }
-    /// Returns `true` if the type of the name is supported by an OS with the specified name type
-    /// support class, `false` otherwise.
-    ///
-    /// This is mainly a helper function for [`.is_supported()`](Self::is_supported) and
-    /// [`.is_always_supported()`](Self::is_always_supported), but there's no good reason not to
-    /// expose it as a public method, so why not?
-    pub const fn is_supported_in_nts_type(&self, nts: NameTypeSupport) -> bool {
-        (self.is_namespaced() && nts.namespace_supported())
-            || (self.is_path() && nts.paths_supported())
+impl<'s> LocalSocketName<'s> {
+    // TODO get rid of those
+
+    /// Returns `true` if the name points to the dedicated local socket namespace, `false`
+    /// otherwise.
+    #[inline]
+    pub fn is_namespaced(&self) -> bool {
+        is_namespaced(self)
     }
 
-    /// Returns `true` if the value is a namespaced name, `false` otherwise.
-    #[inline]
-    pub const fn is_namespaced(&self) -> bool {
-        self.namespaced
-    }
-    /// Returns `true` if the value is a filesystem path, `false` otherwise.
+    /// Returns `true` if the name is stored as a filesystem path, `false` otherwise.
+    ///
+    /// Note that it is possible for [`.is_namespaced()`](Self::is_namespaced) and `.is_path()` to
+    /// return `true` simultaneously:
+    /// ```
+    /// # #[cfg(windows)] {
+    /// # use interprocess::local_socket::{LocalSocketName, ToFsName, ToNsName};
+    /// let name = r"\\.\pipe\example".to_fs_name().unwrap();
+    /// assert!(name.is_namespaced()); // \\.\pipe\ is a namespace
+    /// assert!(name.is_path());       // \\.\pipe\example is a path
+    /// }
+    /// ```
     #[inline]
     pub const fn is_path(&self) -> bool {
-        !self.namespaced
+        self.path
     }
 
-    /// Returns the name as an `OsStr`. The returned value does not retain the type of the name
-    /// (whether it was a filesystem path or a namespaced name).
+    /// Returns the `OsStr` part of the name's internal representation.
     ///
-    /// If you need the value as an owned `OsString` instead, see
-    /// [`.into_inner()`](Self::into_inner).
-    pub fn inner(&'a self) -> &'a OsStr {
-        &self.inner
-    }
-    /// Returns the name as an `OsString`. The returned value does not retain the type of the name
-    /// (whether it was a filesystem path or a namespaced name).
+    /// The returned value might reflect the type of the name (whether it was a filesystem path or a
+    /// namespaced name) in some situations on some platforms, namely on Linux, or it might not.
+    /// Additionally, two equal `LocalSocketName`s may or may not have their outputs of `.raw()`
+    /// compare equal, and vice versa.
     ///
-    /// If you need the value as a borrowed `OsStr` instead, see [`.inner()`](Self::inner()).
-    pub fn into_inner(self) -> OsString {
-        self.inner.into_owned()
+    /// If you need the value as an owned `OsString` instead, use [`.into_raw()`](Self::into_raw).
+    #[inline]
+    pub fn raw(&'s self) -> &'s OsStr {
+        &self.raw
     }
 
-    /// Returns the name as a *borrowed* `Cow<'_, OsStr>`. The returned value does not retain
-    /// thetype of the name (whether it was a filesystem path or a namespaced name).
-    ///
-    /// If you need the value as a borrowed `OsStr`, see [`.inner()`](Self::inner()); if you need
-    /// the value as an owned `OsString`, see [`.into_inner()`](Self::into_inner). If you need to
-    /// take ownership of the `Cow`, see [`.into_inner_cow()`](Self::into_inner_cow).
-    pub const fn inner_cow(&'a self) -> &'a Cow<'a, OsStr> {
-        &self.inner
+    /// Returns the `OsStr` part of the name's internal representation as an `OsString`, cloning if
+    /// necessary. See [`.raw()`](Self::raw()).
+    #[inline]
+    pub fn into_raw(self) -> OsString {
+        self.raw.into_owned()
     }
-    /// Returns the name as a `Cow<'_, OsStr>`. The returned value does not retain the type of the
-    /// name (whether it was a filesystem path or a namespaced name).
-    ///
-    /// If you need the value as a borrowed `OsStr`, see [`.inner()`](Self::inner()); if you need
-    /// the value as an owned `OsString`, see [`.into_inner()`](Self::into_inner). If you don't need
-    /// to take ownership of the `Cow`, see [`.inner_cow()`](Self::inner_cow).
-    pub fn into_inner_cow(self) -> Cow<'a, OsStr> {
-        self.inner
+
+    /// Returns the `OsStr` part of the name's internal representation as a *borrowed*
+    /// `Cow<'_, OsStr>`. See [`.raw()`](Self::raw()).
+    #[inline]
+    pub const fn raw_cow(&'s self) -> &'s Cow<'s, OsStr> {
+        &self.raw
+    }
+
+    /// Consumes `self` and returns the `OsStr` part of the name's internal representation as a
+    /// `Cow<'_,OsStr>` without cloning. See [`.raw()`](Self::raw()).
+    #[inline]
+    pub fn into_raw_cow(self) -> Cow<'s, OsStr> {
+        self.raw
     }
 
     /// Produces a `LocalSocketName` that borrows from `self`.
+    #[inline]
     pub fn borrow(&self) -> LocalSocketName<'_> {
         LocalSocketName {
-            inner: Cow::Borrowed(&self.inner),
-            namespaced: self.namespaced,
-        }
-    }
-    /// Extends the lifetime to `'static`, cloning if necessary.
-    pub fn into_owned(self) -> LocalSocketName<'static> {
-        LocalSocketName {
-            inner: Cow::Owned(self.inner.into_owned()),
-            namespaced: self.namespaced,
+            raw: Cow::Borrowed(&self.raw),
+            path: self.path,
         }
     }
 
-    pub(crate) const fn from_raw_parts(inner: Cow<'a, OsStr>, namespaced: bool) -> Self {
-        Self { inner, namespaced }
+    /// Extends the lifetime to `'static`, cloning if necessary.
+    pub fn into_owned(self) -> LocalSocketName<'static> {
+        LocalSocketName {
+            raw: Cow::Owned(self.raw.into_owned()),
+            path: self.path,
+        }
+    }
+
+    pub(crate) const fn new(raw: Cow<'s, OsStr>, path: bool) -> Self {
+        Self { raw, path }
     }
 }

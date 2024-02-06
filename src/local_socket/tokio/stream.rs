@@ -1,4 +1,4 @@
-use super::super::ToLocalSocketName;
+use super::super::LocalSocketName;
 use std::io;
 
 impmod! {local_socket::tokio,
@@ -17,7 +17,7 @@ impmod! {local_socket::tokio,
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use interprocess::local_socket::{tokio::LocalSocketStream, NameTypeSupport};
+/// use interprocess::local_socket::{tokio::LocalSocketStream, NameTypeSupport, ToFsName, ToNsName};
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
@@ -28,8 +28,8 @@ impmod! {local_socket::tokio,
 ///     // enum we're working with here. Maybe someone should make a macro for this.
 ///     use NameTypeSupport::*;
 ///     match NameTypeSupport::query() {
-///         OnlyPaths => "/tmp/example.sock",
-///         OnlyNamespaced | Both => "@example.sock",
+///         OnlyFs => "/tmp/example.sock".to_fs_name()?,
+///         OnlyNs | Both => "@example.sock".to_ns_name()?,
 ///     }
 /// };
 ///
@@ -64,10 +64,8 @@ pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
     #[inline]
-    pub async fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketStreamImpl::connect(name.to_local_socket_name()?)
-            .await
-            .map(Self::from)
+    pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+        LocalSocketStreamImpl::connect(name).await.map(Self::from)
     }
     /// Splits a stream into a receive half and a send half, which can be used to receive data from
     /// and send data to the stream concurrently from independently spawned tasks, entailing a

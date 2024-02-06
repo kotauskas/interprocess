@@ -1,4 +1,4 @@
-use super::ToLocalSocketName;
+use super::LocalSocketName;
 use std::io;
 
 impmod! {local_socket,
@@ -6,6 +6,8 @@ impmod! {local_socket,
     RecvHalf as RecvHalfImpl,
     SendHalf as SendHalfImpl,
 }
+
+// TODO concurrency prevention on all platforms
 
 /// A local socket byte stream, obtained eiter from
 /// [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local
@@ -15,7 +17,7 @@ impmod! {local_socket,
 ///
 /// ## Basic client
 /// ```no_run
-/// use interprocess::local_socket::{LocalSocketStream, NameTypeSupport};
+/// use interprocess::local_socket::{LocalSocketStream, NameTypeSupport, ToFsName, ToNsName};
 /// use std::io::{prelude::*, BufReader};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
@@ -26,8 +28,8 @@ impmod! {local_socket,
 ///     // enum we're working with here. Maybe someone should make a macro for this.
 ///     use NameTypeSupport::*;
 ///     match NameTypeSupport::query() {
-///         OnlyPaths => "/tmp/example.sock",
-///         OnlyNamespaced | Both => "@example.sock",
+///         OnlyFs => "/tmp/example.sock".to_fs_name()?,
+///         OnlyNs | Both => "@example.sock".to_ns_name()?,
 ///     }
 /// };
 ///
@@ -60,8 +62,9 @@ impmod! {local_socket,
 pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
     /// Connects to a remote local socket server.
-    pub fn connect<'a>(name: impl ToLocalSocketName<'a>) -> io::Result<Self> {
-        LocalSocketStreamImpl::connect(name.to_local_socket_name()?).map(Self)
+    #[inline]
+    pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+        LocalSocketStreamImpl::connect(name).map(Self)
     }
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///

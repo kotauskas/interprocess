@@ -1,6 +1,6 @@
-use super::LocalSocketStream;
+use super::stream::LocalSocketStream;
 use crate::{
-    local_socket::ToLocalSocketName,
+    local_socket::LocalSocketName,
     os::windows::named_pipe::{
         pipe_mode::Bytes, PipeListener as GenericPipeListener, PipeListenerOptions,
     },
@@ -15,9 +15,8 @@ type PipeListener = GenericPipeListener<Bytes, Bytes>;
 #[derive(Debug)]
 pub struct LocalSocketListener(PipeListener);
 impl LocalSocketListener {
-    pub fn bind<'a>(name: impl ToLocalSocketName<'a>, _: bool) -> io::Result<Self> {
-        let name = name.to_local_socket_name()?;
-        let path = Path::new(name.inner());
+    pub fn bind(name: LocalSocketName<'_>, _: bool) -> io::Result<Self> {
+        let path = Path::new(name.raw());
         let mut options = PipeListenerOptions::new();
         options.path = if name.is_namespaced() {
             // PERF this allocates twice

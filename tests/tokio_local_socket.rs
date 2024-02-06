@@ -10,18 +10,19 @@ use crate::{
     tests::util::{self, testinit, TestResult},
 };
 
-async fn test_stream(_split: bool, nmspc: bool) -> TestResult {
+async fn test_stream(id: &'static str, split: bool, nmspc: bool) -> TestResult {
     use stream::*;
     testinit();
-    util::tokio::drive_server_and_multiple_clients(move |s, n| server(s, n, nmspc), client).await
+    util::tokio::drive_server_and_multiple_clients(move |s, n| server(id, s, n, nmspc), client)
+        .await
 }
 
 macro_rules! matrix {
-    (@querymethod true $e:expr) => { NameTypeSupport::namespace_supported($e) };
-    (@querymethod false $e:expr) => { NameTypeSupport::paths_supported($e) };
+    (@querymethod true $e:expr) => { NameTypeSupport::ns_supported($e) };
+    (@querymethod false $e:expr) => { NameTypeSupport::fs_supported($e) };
     (@body $split:ident $nmspc:ident) => {{
         if matrix!(@querymethod $nmspc NameTypeSupport::query()) {
-            test_stream($split, $nmspc).await?;
+            test_stream(make_id!(), $split, $nmspc).await?;
         }
         Ok(())
     }};
@@ -42,7 +43,7 @@ matrix! {
 #[tokio::test]
 async fn no_server_file() -> TestResult {
     testinit();
-    if NameTypeSupport::query().paths_supported() {
+    if NameTypeSupport::query().fs_supported() {
         no_server::run_and_verify_error(false).await?;
     }
     Ok(())
@@ -50,7 +51,7 @@ async fn no_server_file() -> TestResult {
 #[tokio::test]
 async fn no_server_namespaced() -> TestResult {
     testinit();
-    if NameTypeSupport::query().namespace_supported() {
+    if NameTypeSupport::query().ns_supported() {
         no_server::run_and_verify_error(true).await?;
     }
     Ok(())

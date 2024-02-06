@@ -1,5 +1,8 @@
 use crate::{
-    local_socket::tokio::{LocalSocketListener, LocalSocketStream},
+    local_socket::{
+        tokio::{LocalSocketListener, LocalSocketStream},
+        LocalSocketName,
+    },
     tests::util::*,
 };
 use ::tokio::{
@@ -15,12 +18,13 @@ fn msg(server: bool, nts: bool) -> Box<str> {
 }
 
 pub async fn server(
-    name_sender: Sender<Arc<str>>,
+    id: &'static str,
+    name_sender: Sender<Arc<LocalSocketName<'static>>>,
     num_clients: u32,
     namespaced: bool,
 ) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), namespaced), |nm| {
-        LocalSocketListener::bind(nm)
+    let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
+        LocalSocketListener::bind(nm.borrow())
     })?;
 
     let _ = name_sender.send(name);
@@ -42,8 +46,10 @@ pub async fn server(
     }
     Ok(())
 }
-pub async fn client(nm: Arc<str>) -> TestResult {
-    let stream = LocalSocketStream::connect(&*nm).await.opname("connect")?;
+pub async fn client(nm: Arc<LocalSocketName<'static>>) -> TestResult {
+    let stream = LocalSocketStream::connect(nm.borrow())
+        .await
+        .opname("connect")?;
     try_join!(
         recv(&stream, msg(true, false), msg(true, true)),
         send(&stream, msg(false, false), msg(false, true)),

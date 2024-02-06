@@ -1,5 +1,5 @@
 use crate::{
-    local_socket::{LocalSocketListener, LocalSocketStream},
+    local_socket::{LocalSocketListener, LocalSocketName, LocalSocketStream},
     tests::util::*,
 };
 use color_eyre::eyre::WrapErr;
@@ -15,13 +15,14 @@ fn msg(server: bool, nts: bool) -> Box<str> {
 }
 
 pub fn server(
+    id: &'static str,
     handle_client: fn(LocalSocketStream) -> TestResult,
-    name_sender: Sender<Arc<str>>,
+    name_sender: Sender<Arc<LocalSocketName<'static>>>,
     num_clients: u32,
     namespaced: bool,
 ) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut NameGen::new(make_id!(), namespaced), |nm| {
-        LocalSocketListener::bind(nm)
+    let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
+        LocalSocketListener::bind(nm.borrow())
     })?;
     let _ = name_sender.send(name);
     listener
@@ -60,8 +61,8 @@ pub fn handle_client_split(conn: LocalSocketStream) -> TestResult {
     Ok(())
 }
 
-pub fn client_nosplit(name: &str) -> TestResult {
-    let mut conn = LocalSocketStream::connect(name)
+pub fn client_nosplit(name: &LocalSocketName<'_>) -> TestResult {
+    let mut conn = LocalSocketStream::connect(name.borrow())
         .opname("connect")
         .map(BufReader::new)?;
     send(conn.get_mut(), &msg(false, false), 0)?;
@@ -70,8 +71,10 @@ pub fn client_nosplit(name: &str) -> TestResult {
     recv(&mut conn, &msg(true, true), 1)
 }
 
-pub fn client_split(name: &str) -> TestResult {
-    let (recver, sender) = LocalSocketStream::connect(name).opname("connect")?.split();
+pub fn client_split(name: &LocalSocketName<'_>) -> TestResult {
+    let (recver, sender) = LocalSocketStream::connect(name.borrow())
+        .opname("connect")?
+        .split();
 
     let recv = thread::spawn(move || {
         let mut recver = BufReader::new(recver);

@@ -19,9 +19,13 @@ fn msg(server: bool) -> Box<str> {
     message(None, server, Some('\n'))
 }
 
-pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub async fn server_duplex(
+    id: &'static str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_tokio_duplex::<pipe_mode::Bytes>(),
@@ -29,9 +33,13 @@ pub async fn server_duplex(name_sender: Sender<Arc<str>>, num_clients: u32) -> T
     )
     .await
 }
-pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub async fn server_cts(
+    id: &'static str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_tokio_recv_only::<pipe_mode::Bytes>(),
@@ -39,9 +47,13 @@ pub async fn server_cts(name_sender: Sender<Arc<str>>, num_clients: u32) -> Test
     )
     .await
 }
-pub async fn server_stc(name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub async fn server_stc(
+    id: &'static str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+) -> TestResult {
     drive_server(
-        make_id!(),
+        id,
         name_sender,
         num_clients,
         |plo| plo.create_tokio_send_only::<pipe_mode::Bytes>(),

@@ -3,18 +3,19 @@ impmod! {local_socket,
     NAME_TYPE_ALWAYS_SUPPORTED as NAME_TYPE_ALWAYS_SUPPORTED_REAL,
 }
 
-/// Represents which kinds of identifiers can be used for a local socket's name on the current
-/// platform.
+// TODO revamp to bitflags..?
+/// The ways a local socket's name can be specified on the current platform.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum NameTypeSupport {
-    /// Only filesystem paths can be used.
+    /// Most filesystem locations can be used, but there is no non-file-like dedicated namespace.
     ///
-    /// This is true for all Unix/POSIX and Unix-like systems other than Linux.
-    OnlyPaths,
-    /// Only names in an dedicated namespace can be used.
+    /// This is true for all Unix-like systems other than Linux.
+    OnlyFs,
+    /// Only names in a dedicated namespace can be used. This dedicated namespace may or may not be
+    /// a special directory/drive/section on the filesystem.
     ///
     /// This is true only for Windows.
-    OnlyNamespaced,
+    OnlyNs,
     /// Both of the above options are available.
     ///
     /// This is true only for Linux.
@@ -48,12 +49,12 @@ impl NameTypeSupport {
 
     /// Returns `true` if, according to `self`, filesystem-based local sockets are supported;
     /// `false` otherwise.
-    pub const fn paths_supported(self) -> bool {
-        matches!(self, Self::OnlyPaths | Self::Both)
+    pub const fn fs_supported(self) -> bool {
+        matches!(self, Self::OnlyFs | Self::Both)
     }
     /// Returns `true` if, according to `self`, namespaced local socket names are supported; `false`
     /// otherwise.
-    pub const fn namespace_supported(self) -> bool {
-        matches!(self, Self::OnlyNamespaced | Self::Both)
+    pub const fn ns_supported(self) -> bool {
+        matches!(self, Self::OnlyNs | Self::Both)
     }
 }

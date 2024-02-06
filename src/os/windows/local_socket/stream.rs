@@ -14,9 +14,9 @@ pub struct LocalSocketStream(pub(super) StreamImpl);
 impl LocalSocketStream {
     pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
         if name.is_namespaced() {
-            StreamImpl::connect_with_prepend(name.inner(), None)
+            StreamImpl::connect_with_prepend(name.raw(), None)
         } else {
-            StreamImpl::connect(name.inner())
+            StreamImpl::connect(name.raw())
         }
         .map(Self)
     }

@@ -7,166 +7,132 @@ use std::{
     str,
 };
 
-impmod! {local_socket,
+impmod! {local_socket::to_name,
     cstr_to_osstr,
     cstring_to_osstring,
+    is_supported,
 }
 
-/// Types which can be converted to a local socket name.
-///
-/// The difference between this trait and [`TryInto`]`<`[`LocalSocketName`]`>` is that the latter
-/// does not constrain the error type to be [`io::Error`] and thus is not compatible with many types
-/// from the standard library which are widely expected to be convertible to Unix domain socket
-/// paths. Additionally, this makes the special syntax for namespaced sockets possible (see below).
-///
-/// ## `@` syntax for namespaced paths
-/// As mentioned in the [`LocalSocketName` documentation][`LocalSocketName`], there are two types of
-/// which local socket names can be: filesystem paths and namespaced names. Those are isolated from
-/// each other – there's no portable way to represent one using another, though certain OSes might
-/// provide ways to do so – Windows does, for example. To be able to represent both in a
-/// platform-independent fashion, a special syntax was implemented in implementations of this trait
-/// on types from the standard library: "@ syntax".
-///
-/// The feature, in its core, is extremely simple: if the first character in a string is the @
-/// character, the value of the string is interpreted and stored as a namespaced name (otherwise,
-/// it's treated as a filesystem path); the @ character is then removed from the string (by taking a
-/// subslice which dosen't include it if a string slice is being used; for owned strings, it's
-/// simply removed from the string by shifting the entire string towards the beginning). **[`Path`]
-/// and [`PathBuf`] are not affected at all – those have explicit path semantics and therefore
-/// cannot logically represent namespaced names.**
-///
-/// This feature is extremely useful both when using hardcoded literals and accepting user input for
-/// the path, but sometimes you might want to prevent this behavior. In such a case, you have the
-/// following possible approaches:
-/// - If the string is a [`OsStr`]/[`OsString`], it can be cheaply converted to a
-///   [`Path`]/[`PathBuf`], which do not support the @ syntax
-/// - If the string is a [`str`]/[`String`], it can be cheaply converted to [`OsStr`]/[`OsString`];
-///   then the above method can be applied
-/// - If the string is a [`CStr`]/[`CString`], it can be converted to [`str`]/[`String`] using the
-///   following code:
-/// ```no_run
-/// # use std::{
-/// #     str::Utf8Error,
-/// #     ffi::{CStr, CString},
-/// # };
-/// fn cstr_to_str(val: &CStr) -> Result<&str, Utf8Error> {
-///     std::str::from_utf8(val.to_bytes_with_nul())
-/// }
-/// fn cstring_to_string(val: CString) -> String {
-///     String::from_utf8_lossy(&val.into_bytes_with_nul()).into()
-/// }
-/// ```
-/// Then, the method for [`str`]/[`String`] can be applied.
-///
-/// None of the above conversions perform memory allocations – the only expensive one is
-/// [`CStr`]/[`CString`] which performs a check for valid UTF-8.
-///
-/// [`str`]: prim@str
-pub trait ToLocalSocketName<'a> {
-    /// Performs the conversion to a local socket name.
-    #[allow(clippy::wrong_self_convention)] // shut the fuck up
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>>;
-}
-
-/// Returns self.
-impl<'a> ToLocalSocketName<'a> for LocalSocketName<'a> {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(self)
-    }
-}
-
-/// Converts a borrowed [`Path`] to a borrowed file-type [`LocalSocketName`] with the same lifetime.
-impl<'a> ToLocalSocketName<'a> for &'a Path {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Borrowed(self.as_os_str()),
-            false,
-        ))
-    }
-}
-/// Converts an owned [`PathBuf`] to an owned file-type [`LocalSocketName`].
-impl ToLocalSocketName<'static> for PathBuf {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Owned(self.into_os_string()),
-            false,
-        ))
-    }
-}
-/// Converts a borrowed [`OsStr`] to a borrowed [`LocalSocketName`] with the same lifetime. On
-/// platforms which don't support namespaced socket names, the result is always a file-type name; on
-/// platforms that do, prefixing the name with the `@` character will trim it away and yield a
-/// namespaced name instead. See the trait-level documentation for more.
-impl<'a> ToLocalSocketName<'a> for &'a OsStr {
-    fn to_local_socket_name(mut self) -> io::Result<LocalSocketName<'a>> {
-        let mut namespaced = false;
-        let bytes = self.as_encoded_bytes();
-        if bytes.first() == Some(&b'@') {
-            self = unsafe { OsStr::from_encoded_bytes_unchecked(&bytes[1..]) };
-            namespaced = true;
+macro_rules! trivial_string_impl {
+    ($trait:ident $mtd:ident for $($tgt:ty => $via:ident :: $ctor:ident),+ $(,)?) => {$(
+        impl<'s> $trait<'s> for $tgt {
+            #[inline]
+            fn $mtd(self) -> io::Result<LocalSocketName<'s>> {
+                $via::$ctor(self).$mtd()
+            }
         }
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Borrowed(self),
-            namespaced,
-        ))
+    )+};
+}
+
+/// Conversion to a filesystem-type local socket name.
+pub trait ToFsName<'s> {
+    /// Performs the conversion to a filesystem-type name.
+    ///
+    /// Fails if the resulting name isn't supported by the platform.
+    fn to_fs_name(self) -> io::Result<LocalSocketName<'s>>;
+}
+
+/// Conversion to a namespaced local socket name.
+pub trait ToNsName<'s> {
+    /// Performs the conversion to a namespaced name.
+    ///
+    /// Fails if the resulting name isn't supported by the platform.
+    fn to_ns_name(self) -> io::Result<LocalSocketName<'s>>;
+}
+
+fn err(s: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::Unsupported, s)
+}
+fn err_fs() -> io::Error {
+    #[cfg(windows)]
+    {
+        err("filesystem local sockets are not available on this platform")
+    }
+    #[cfg(not(windows))]
+    {
+        unreachable!()
     }
 }
-/// Converts an owned [`OsString`] to an owned [`LocalSocketName`]. On platforms which don't support
-/// namespaced socket names, the result is always a file-type name; on platforms that do, prefixing
-/// the name with the `@` character will trim it away and yield a namespaced name instead. See the
-/// trait-level documentation for more.
-impl ToLocalSocketName<'static> for OsString {
-    fn to_local_socket_name(mut self) -> io::Result<LocalSocketName<'static>> {
-        let mut namespaced = false;
-        let mut bytes = self.into_encoded_bytes();
-        if bytes.first() == Some(&b'@') {
-            bytes.remove(0);
-            namespaced = true;
-        }
-        self = unsafe { OsString::from_encoded_bytes_unchecked(bytes) };
-        Ok(LocalSocketName::from_raw_parts(
-            Cow::Owned(self),
-            namespaced,
-        ))
+fn err_ns() -> io::Error {
+    #[cfg(all(unix, not(target_os = "linux")))]
+    {
+        err("namespaced local sockets are not available on this platform")
+    }
+    #[cfg(any(not(unix), target_os = "linux"))]
+    {
+        unreachable!()
     }
 }
-/// Converts a borrowed [`str`](prim@str) to a borrowed [`LocalSocketName`] with the same lifetime.
-/// On platforms which don't support namespaced socket names, the result is always a file-type name;
-/// on platforms that do, prefixing the name with the `@` character will trim it away and yield a
-/// namespaced name instead. See the trait-level documentation for more.
-impl<'a> ToLocalSocketName<'a> for &'a str {
+
+fn from_osstr(osstr: &OsStr, path: bool) -> io::Result<LocalSocketName<'_>> {
+    is_supported(dbg!(osstr), path)
+        .then(|| LocalSocketName::new(Cow::Borrowed(osstr), path))
+        .ok_or_else(if path { err_fs } else { err_ns })
+}
+fn from_osstring(osstring: OsString, path: bool) -> io::Result<LocalSocketName<'static>> {
+    is_supported(dbg!(&osstring), path)
+        .then(|| LocalSocketName::new(Cow::Owned(osstring), path))
+        .ok_or_else(if path { err_fs } else { err_ns })
+}
+
+impl<'s> ToFsName<'s> for &'s Path {
     #[inline]
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        OsStr::new(self).to_local_socket_name()
+    fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+        from_osstr(self.as_os_str(), true)
     }
 }
-/// Converts an owned [`String`] to an owned [`LocalSocketName`]. On platforms which don't support
-/// namespaced socket names, the result is always a file-type name; on platforms that do, prefixing
-/// the name with the `@` character will trim it away and yield a namespaced name instead. See the
-/// trait-level documentation for more.
-impl ToLocalSocketName<'static> for String {
+impl<'s> ToFsName<'s> for PathBuf {
     #[inline]
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        OsString::from(self).to_local_socket_name()
+    fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+        from_osstring(self.into_os_string(), true)
     }
 }
-/// Converts a borrowed [`CStr`] to a borrowed [`LocalSocketName`] with the same lifetime. **UTF-8
-/// is assumed and the nul terminator is preserved during conversion**. On platforms which don't
-/// support namespaced socket names, the result is always a file-type name; on platforms that do,
-/// prefixing the name with the `@` character will trim it away and yield a namespaced name instead.
-/// See the trait-level documentation for more.
-impl<'a> ToLocalSocketName<'a> for &'a CStr {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'a>> {
-        cstr_to_osstr(self).and_then(<&OsStr>::to_local_socket_name)
+trivial_string_impl! { ToFsName to_fs_name for
+    &'s str   => Path   ::new ,
+    String    => PathBuf::from,
+    &'s OsStr => Path   ::new ,
+    OsString  => PathBuf::from,
+}
+
+/// Will fail on Windows if the string isn't valid UTF-8.
+impl<'s> ToFsName<'s> for &'s CStr {
+    fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+        cstr_to_osstr(self).and_then(<&OsStr>::to_fs_name)
     }
 }
-/// Converts an owned [`CString`] to an owned [`LocalSocketName`]. **UTF-8 is assumed and the nul
-/// terminator is preserved during conversion**. On platforms which don't support namespaced socket
-/// names, the result is always a file-type name; on platforms that do, prefixing the name with the
-/// `@` character will trim it away and yield a namespaced name instead. See the trait-level
-/// documentation for more.
-impl ToLocalSocketName<'static> for CString {
-    fn to_local_socket_name(self) -> io::Result<LocalSocketName<'static>> {
-        cstring_to_osstring(self).and_then(OsString::to_local_socket_name)
+/// Will fail on Windows if the string isn't valid UTF-8.
+impl<'s> ToFsName<'s> for CString {
+    fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+        cstring_to_osstring(self).and_then(OsString::to_fs_name)
+    }
+}
+
+impl<'s> ToNsName<'s> for &'s OsStr {
+    #[inline]
+    fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+        from_osstr(self, false)
+    }
+}
+impl<'s> ToNsName<'s> for OsString {
+    #[inline]
+    fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+        from_osstring(self, false)
+    }
+}
+trivial_string_impl! { ToNsName to_ns_name for
+    &'s str => OsStr   ::new ,
+    String  => OsString::from,
+}
+
+/// Will fail on Windows if the string isn't valid UTF-8.
+impl<'s> ToNsName<'s> for &'s CStr {
+    fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+        cstr_to_osstr(self).and_then(<&OsStr>::to_ns_name)
+    }
+}
+/// Will fail on Windows if the string isn't valid UTF-8.
+impl<'s> ToNsName<'s> for CString {
+    fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+        cstring_to_osstring(self).and_then(OsString::to_ns_name)
     }
 }

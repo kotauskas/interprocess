@@ -18,7 +18,7 @@ pub fn run_and_verify_error(namespaced: bool) -> TestResult {
     Ok(())
 }
 fn client(namespaced: bool) -> io::Result<()> {
-    let name = NameGen::new(make_id!(), namespaced).next().unwrap();
-    LocalSocketStream::connect(&*name)?;
+    let name = namegen_local_socket(make_id!(), namespaced).next().unwrap();
+    LocalSocketStream::connect(name?.borrow())?;
     Ok(())
 }
