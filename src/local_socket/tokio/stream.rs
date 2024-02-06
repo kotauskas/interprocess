@@ -2,9 +2,9 @@ use super::super::LocalSocketName;
 use std::io;
 
 impmod! {local_socket::tokio,
-    LocalSocketStream as LocalSocketStreamImpl,
-    RecvHalf as RecvHalfImpl,
-    SendHalf as SendHalfImpl,
+	LocalSocketStream as LocalSocketStreamImpl,
+	RecvHalf as RecvHalfImpl,
+	SendHalf as SendHalfImpl,
 }
 
 /// A Tokio-based local socket byte stream, obtained eiter from
@@ -23,14 +23,14 @@ impmod! {local_socket::tokio,
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.
 /// let name = {
-///     // This scoping trick allows us to nicely contain the import inside the `match`, so that if
-///     // any imports of variants named `Both` happen down the line, they won't collide with the
-///     // enum we're working with here. Maybe someone should make a macro for this.
-///     use NameTypeSupport::*;
-///     match NameTypeSupport::query() {
-///         OnlyFs => "/tmp/example.sock".to_fs_name()?,
-///         OnlyNs | Both => "@example.sock".to_ns_name()?,
-///     }
+/// 	// This scoping trick allows us to nicely contain the import inside the `match`, so that if
+/// 	// any imports of variants named `Both` happen down the line, they won't collide with the
+/// 	// enum we're working with here. Maybe someone should make a macro for this.
+/// 	use NameTypeSupport::*;
+/// 	match NameTypeSupport::query() {
+/// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
+/// 		OnlyNs | Both => "@example.sock".to_ns_name()?,
+/// 	}
 /// };
 ///
 /// // Await this here since we can't do a whole lot without a connection.
@@ -62,38 +62,38 @@ impmod! {local_socket::tokio,
 /// ```
 pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
-    /// Connects to a remote local socket server.
-    #[inline]
-    pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
-        LocalSocketStreamImpl::connect(name).await.map(Self::from)
-    }
-    /// Splits a stream into a receive half and a send half, which can be used to receive data from
-    /// and send data to the stream concurrently from independently spawned tasks, entailing a
-    /// memory allocation.
-    #[inline]
-    pub fn split(self) -> (RecvHalf, SendHalf) {
-        let (r, w) = self.0.split();
-        (RecvHalf(r), SendHalf(w))
-    }
+	/// Connects to a remote local socket server.
+	#[inline]
+	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+		LocalSocketStreamImpl::connect(name).await.map(Self::from)
+	}
+	/// Splits a stream into a receive half and a send half, which can be used to receive data from
+	/// and send data to the stream concurrently from independently spawned tasks, entailing a
+	/// memory allocation.
+	#[inline]
+	pub fn split(self) -> (RecvHalf, SendHalf) {
+		let (r, w) = self.0.split();
+		(RecvHalf(r), SendHalf(w))
+	}
 }
 #[doc(hidden)]
 impl From<LocalSocketStreamImpl> for LocalSocketStream {
-    #[inline]
-    fn from(inner: LocalSocketStreamImpl) -> Self {
-        Self(inner)
-    }
+	#[inline]
+	fn from(inner: LocalSocketStreamImpl) -> Self {
+		Self(inner)
+	}
 }
 
 multimacro! {
-    LocalSocketStream,
-    pinproj_for_unpin(LocalSocketStreamImpl),
-    forward_rbv(LocalSocketStreamImpl, &),
-    forward_tokio_rw,
-    forward_tokio_ref_rw,
-    forward_as_handle,
-    forward_try_from_handle(LocalSocketStreamImpl),
-    forward_debug,
-    derive_asraw,
+	LocalSocketStream,
+	pinproj_for_unpin(LocalSocketStreamImpl),
+	forward_rbv(LocalSocketStreamImpl, &),
+	forward_tokio_rw,
+	forward_tokio_ref_rw,
+	forward_as_handle,
+	forward_try_from_handle(LocalSocketStreamImpl),
+	forward_debug,
+	derive_asraw,
 }
 
 /// A receive half of a Tokio-based local socket stream, obtained by splitting a
@@ -103,14 +103,14 @@ multimacro! {
 // TODO
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
-    RecvHalf,
-    pinproj_for_unpin(RecvHalfImpl),
-    forward_rbv(RecvHalfImpl, &),
-    forward_tokio_read,
-    forward_tokio_ref_read,
-    forward_as_handle,
-    forward_debug,
-    derive_asraw,
+	RecvHalf,
+	pinproj_for_unpin(RecvHalfImpl),
+	forward_rbv(RecvHalfImpl, &),
+	forward_tokio_read,
+	forward_tokio_ref_read,
+	forward_as_handle,
+	forward_debug,
+	derive_asraw,
 }
 /// A send half of a Tokio-based local socket stream, obtained by splitting a
 /// [`LocalSocketStream`].
@@ -119,12 +119,12 @@ multimacro! {
 // TODO
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
-    SendHalf,
-    pinproj_for_unpin(SendHalfImpl),
-    forward_rbv(SendHalfImpl, &),
-    forward_tokio_write,
-    forward_tokio_ref_write,
-    forward_as_handle,
-    forward_debug,
-    derive_asraw,
+	SendHalf,
+	pinproj_for_unpin(SendHalfImpl),
+	forward_rbv(SendHalfImpl, &),
+	forward_tokio_write,
+	forward_tokio_ref_write,
+	forward_as_handle,
+	forward_debug,
+	derive_asraw,
 }

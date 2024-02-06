@@ -2,9 +2,9 @@ use super::LocalSocketName;
 use std::io;
 
 impmod! {local_socket,
-    LocalSocketStream as LocalSocketStreamImpl,
-    RecvHalf as RecvHalfImpl,
-    SendHalf as SendHalfImpl,
+	LocalSocketStream as LocalSocketStreamImpl,
+	RecvHalf as RecvHalfImpl,
+	SendHalf as SendHalfImpl,
 }
 
 // TODO concurrency prevention on all platforms
@@ -23,14 +23,14 @@ impmod! {local_socket,
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
 /// // in Rust, `match` is your concise, readable and expressive decision making construct.
 /// let name = {
-///     // This scoping trick allows us to nicely contain the import inside the `match`, so that if
-///     // any imports of variants named `Both` happen down the line, they won't collide with the
-///     // enum we're working with here. Maybe someone should make a macro for this.
-///     use NameTypeSupport::*;
-///     match NameTypeSupport::query() {
-///         OnlyFs => "/tmp/example.sock".to_fs_name()?,
-///         OnlyNs | Both => "@example.sock".to_ns_name()?,
-///     }
+/// 	// This scoping trick allows us to nicely contain the import inside the `match`, so that if
+/// 	// any imports of variants named `Both` happen down the line, they won't collide with the
+/// 	// enum we're working with here. Maybe someone should make a macro for this.
+/// 	use NameTypeSupport::*;
+/// 	match NameTypeSupport::query() {
+/// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
+/// 		OnlyNs | Both => "@example.sock".to_ns_name()?,
+/// 	}
 /// };
 ///
 /// // Preemptively allocate a sizeable buffer for receiving.
@@ -61,78 +61,78 @@ impmod! {local_socket,
 /// ```
 pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
 impl LocalSocketStream {
-    /// Connects to a remote local socket server.
-    #[inline]
-    pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
-        LocalSocketStreamImpl::connect(name).map(Self)
-    }
-    /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
-    ///
-    /// In nonblocking mode, receiving and sending immediately returns with the
-    /// [`WouldBlock`](io::ErrorKind::WouldBlock) error in situations when they would normally block
-    /// for an uncontrolled amount of time. The specific situations are:
-    /// - When receiving is attempted and there is no new data available;
-    /// - When sending is attempted and the buffer is full due to the other side not yet having
-    ///   received previously sent data.
-    #[inline]
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
-    }
-    /// Splits a stream into a receive half and a send half, which can be used to receive from and
-    /// send to the stream concurrently from different threads, entailing a memory allocation.
-    #[inline]
-    pub fn split(self) -> (RecvHalf, SendHalf) {
-        let (r, w) = self.0.split();
-        (RecvHalf(r), SendHalf(w))
-    }
-    /// Attempts to reunite a receive half with a send half to yield the original stream back,
-    /// returning both halves as an error if they belong to different streams (or when using
-    /// this method on streams that haven't been split to begin with).
-    #[inline]
-    pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
-        LocalSocketStreamImpl::reunite(rh.0, sh.0)
-            .map(Self)
-            .map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
-                rh: RecvHalf(rh),
-                sh: SendHalf(sh),
-            })
-    }
+	/// Connects to a remote local socket server.
+	#[inline]
+	pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+		LocalSocketStreamImpl::connect(name).map(Self)
+	}
+	/// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
+	///
+	/// In nonblocking mode, receiving and sending immediately returns with the
+	/// [`WouldBlock`](io::ErrorKind::WouldBlock) error in situations when they would normally block
+	/// for an uncontrolled amount of time. The specific situations are:
+	/// -	When receiving is attempted and there is no new data available;
+	/// -	When sending is attempted and the buffer is full due to the other side not yet having
+	/// 	received previously sent data.
+	#[inline]
+	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+		self.0.set_nonblocking(nonblocking)
+	}
+	/// Splits a stream into a receive half and a send half, which can be used to receive from and
+	/// send to the stream concurrently from different threads, entailing a memory allocation.
+	#[inline]
+	pub fn split(self) -> (RecvHalf, SendHalf) {
+		let (r, w) = self.0.split();
+		(RecvHalf(r), SendHalf(w))
+	}
+	/// Attempts to reunite a receive half with a send half to yield the original stream back,
+	/// returning both halves as an error if they belong to different streams (or when using
+	/// this method on streams that haven't been split to begin with).
+	#[inline]
+	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
+		LocalSocketStreamImpl::reunite(rh.0, sh.0)
+			.map(Self)
+			.map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+				rh: RecvHalf(rh),
+				sh: SendHalf(sh),
+			})
+	}
 }
 multimacro! {
-    LocalSocketStream,
-    forward_rbv(LocalSocketStreamImpl, &),
-    forward_sync_ref_rw,
-    forward_asinto_handle,
-    forward_debug,
-    forward_try_clone,
-    forward_try_from_handle(LocalSocketStreamImpl),
-    derive_sync_mut_rw,
-    derive_asintoraw,
+	LocalSocketStream,
+	forward_rbv(LocalSocketStreamImpl, &),
+	forward_sync_ref_rw,
+	forward_asinto_handle,
+	forward_debug,
+	forward_try_clone,
+	forward_try_from_handle(LocalSocketStreamImpl),
+	derive_sync_mut_rw,
+	derive_asintoraw,
 }
 
 /// A receive half of a local socket stream, obtained by splitting a [`LocalSocketStream`].
 // TODO example
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
-    RecvHalf,
-    forward_rbv(RecvHalfImpl, &),
-    forward_sync_ref_read,
-    forward_as_handle,
-    forward_debug,
-    derive_sync_mut_read,
-    derive_asraw,
+	RecvHalf,
+	forward_rbv(RecvHalfImpl, &),
+	forward_sync_ref_read,
+	forward_as_handle,
+	forward_debug,
+	derive_sync_mut_read,
+	derive_asraw,
 }
 
 /// A send half of a local socket stream, obtained by splitting a [`LocalSocketStream`].
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
-    SendHalf,
-    forward_rbv(SendHalfImpl, &),
-    forward_sync_ref_write,
-    forward_as_handle,
-    forward_debug,
-    derive_sync_mut_write,
-    derive_asraw,
+	SendHalf,
+	forward_rbv(SendHalfImpl, &),
+	forward_sync_ref_write,
+	forward_as_handle,
+	forward_debug,
+	derive_sync_mut_write,
+	derive_asraw,
 }
 
 /// [`ReuniteError`](crate::error::ReuniteError) for sync local socket streams.

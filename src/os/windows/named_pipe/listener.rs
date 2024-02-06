@@ -1,31 +1,31 @@
 use super::{
-    path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
+	path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
 };
 use crate::{
-    os::windows::{winprelude::*, FileHandle, SecurityDescriptor},
-    poison_error, LOCK_POISON,
+	os::windows::{winprelude::*, FileHandle, SecurityDescriptor},
+	poison_error, LOCK_POISON,
 };
 use std::{
-    borrow::Cow,
-    fmt::{self, Debug, Formatter},
-    io,
-    marker::PhantomData,
-    mem::replace,
-    num::{NonZeroU32, NonZeroU8},
-    path::{Path, PathBuf},
-    ptr,
-    sync::{
-        atomic::{AtomicBool, Ordering::Relaxed},
-        Mutex,
-    },
+	borrow::Cow,
+	fmt::{self, Debug, Formatter},
+	io,
+	marker::PhantomData,
+	mem::replace,
+	num::{NonZeroU32, NonZeroU8},
+	path::{Path, PathBuf},
+	ptr,
+	sync::{
+		atomic::{AtomicBool, Ordering::Relaxed},
+		Mutex,
+	},
 };
 use windows_sys::Win32::{
-    Foundation::ERROR_PIPE_CONNECTED,
-    Security::SECURITY_ATTRIBUTES,
-    Storage::FileSystem::{
-        FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
-    },
-    System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
+	Foundation::ERROR_PIPE_CONNECTED,
+	Security::SECURITY_ATTRIBUTES,
+	Storage::FileSystem::{
+		FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
+	},
+	System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS},
 };
 
 // TODO split up
@@ -39,10 +39,10 @@ use windows_sys::Win32::{
 /// for more.
 // TODO examples
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
-    config: PipeListenerOptions<'static>, // We need the options to create new instances
-    nonblocking: AtomicBool,
-    stored_instance: Mutex<FileHandle>,
-    _phantom: PhantomData<(Rm, Sm)>,
+	config: PipeListenerOptions<'static>, // We need the options to create new instances
+	nonblocking: AtomicBool,
+	stored_instance: Mutex<FileHandle>,
+	_phantom: PhantomData<(Rm, Sm)>,
 }
 /// An iterator that infinitely [`.accept`](PipeListener::accept)s connections on a
 /// [`PipeListener`].
@@ -50,393 +50,393 @@ pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 /// This iterator is created by the [`.incoming()`](PipeListener::incoming) method on
 /// [`PipeListener`]. See its documentation for more.
 pub struct Incoming<'a, Rm: PipeModeTag, Sm: PipeModeTag> {
-    listener: &'a PipeListener<Rm, Sm>,
+	listener: &'a PipeListener<Rm, Sm>,
 }
 impl<'a, Rm: PipeModeTag, Sm: PipeModeTag> Iterator for Incoming<'a, Rm, Sm> {
-    type Item = io::Result<PipeStream<Rm, Sm>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(self.listener.accept())
-    }
+	type Item = io::Result<PipeStream<Rm, Sm>>;
+	fn next(&mut self) -> Option<Self::Item> {
+		Some(self.listener.accept())
+	}
 }
 impl<'a, Rm: PipeModeTag, Sm: PipeModeTag> IntoIterator for &'a PipeListener<Rm, Sm> {
-    type IntoIter = Incoming<'a, Rm, Sm>;
-    type Item = <Incoming<'a, Rm, Sm> as Iterator>::Item;
-    fn into_iter(self) -> Self::IntoIter {
-        self.incoming()
-    }
+	type IntoIter = Incoming<'a, Rm, Sm>;
+	type Item = <Incoming<'a, Rm, Sm> as Iterator>::Item;
+	fn into_iter(self) -> Self::IntoIter {
+		self.incoming()
+	}
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
-    const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
+	const STREAM_ROLE: PipeStreamRole = PipeStreamRole::get_for_rm_sm::<Rm, Sm>();
 
-    /// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with
-    /// the pipe.
-    ///
-    /// See `incoming` for an iterator version of this.
-    pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
-        let instance_to_hand_out = {
-            let mut stored_instance = self.stored_instance.lock().map_err(poison_error)?;
-            // Doesn't actually even need to be atomic to begin with, but it's simpler and more
-            // convenient to do this instead. The mutex takes care of ordering.
-            let nonblocking = self.nonblocking.load(Relaxed);
-            block_on_connect(stored_instance.as_handle())?;
-            let new_instance = self.create_instance(nonblocking)?;
-            replace(&mut *stored_instance, new_instance)
-        };
+	/// Blocks until a client connects to the named pipe, creating a `Stream` to communicate with
+	/// the pipe.
+	///
+	/// See `incoming` for an iterator version of this.
+	pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
+		let instance_to_hand_out = {
+			let mut stored_instance = self.stored_instance.lock().map_err(poison_error)?;
+			// Doesn't actually even need to be atomic to begin with, but it's simpler and more
+			// convenient to do this instead. The mutex takes care of ordering.
+			let nonblocking = self.nonblocking.load(Relaxed);
+			block_on_connect(stored_instance.as_handle())?;
+			let new_instance = self.create_instance(nonblocking)?;
+			replace(&mut *stored_instance, new_instance)
+		};
 
-        let raw = RawPipeStream::new_server(instance_to_hand_out);
+		let raw = RawPipeStream::new_server(instance_to_hand_out);
 
-        Ok(PipeStream::new(raw))
-    }
-    /// Creates an iterator which accepts connections from clients, blocking each time `next()` is
-    /// called until one connects.
-    pub fn incoming(&self) -> Incoming<'_, Rm, Sm> {
-        Incoming { listener: self }
-    }
-    /// Enables or disables the nonblocking mode for all existing instances of the listener and
-    /// future ones. By default, it is disabled.
-    ///
-    /// This should generally be done during creation, using the
-    /// [`nonblocking` field](PipeListenerOptions::nonblocking) of the creation options (unless
-    /// there's a good reason not to), which allows making one less system call during creation.
-    ///
-    /// See the documentation of the aforementioned field for the exact effects of enabling this
-    /// mode.
-    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        let instance = self.stored_instance.lock().map_err(poison_error)?;
-        // Doesn't actually even need to be atomic to begin with, but it's simpler and more
-        // convenient to do this instead. The mutex takes care of ordering.
-        self.nonblocking.store(nonblocking, Relaxed);
-        super::set_nonblocking_given_readmode(instance.as_handle(), nonblocking, Rm::MODE)?;
-        // Make it clear that the lock survives until this moment.
-        drop(instance);
-        Ok(())
-    }
+		Ok(PipeStream::new(raw))
+	}
+	/// Creates an iterator which accepts connections from clients, blocking each time `next()` is
+	/// called until one connects.
+	pub fn incoming(&self) -> Incoming<'_, Rm, Sm> {
+		Incoming { listener: self }
+	}
+	/// Enables or disables the nonblocking mode for all existing instances of the listener and
+	/// future ones. By default, it is disabled.
+	///
+	/// This should generally be done during creation, using the
+	/// [`nonblocking` field](PipeListenerOptions::nonblocking) of the creation options (unless
+	/// there's a good reason not to), which allows making one less system call during creation.
+	///
+	/// See the documentation of the aforementioned field for the exact effects of enabling this
+	/// mode.
+	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+		let instance = self.stored_instance.lock().map_err(poison_error)?;
+		// Doesn't actually even need to be atomic to begin with, but it's simpler and more
+		// convenient to do this instead. The mutex takes care of ordering.
+		self.nonblocking.store(nonblocking, Relaxed);
+		super::set_nonblocking_given_readmode(instance.as_handle(), nonblocking, Rm::MODE)?;
+		// Make it clear that the lock survives until this moment.
+		drop(instance);
+		Ok(())
+	}
 
-    fn create_instance(&self, nonblocking: bool) -> io::Result<FileHandle> {
-        self.config
-            .create_instance(false, nonblocking, false, Self::STREAM_ROLE, Rm::MODE)
-            .map(FileHandle::from)
-    }
+	fn create_instance(&self, nonblocking: bool) -> io::Result<FileHandle> {
+		self.config
+			.create_instance(false, nonblocking, false, Self::STREAM_ROLE, Rm::MODE)
+			.map(FileHandle::from)
+	}
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PipeListener")
-            .field("config", &self.config)
-            .field("instance", &self.stored_instance)
-            .field("nonblocking", &self.nonblocking.load(Relaxed))
-            .finish()
-    }
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_struct("PipeListener")
+			.field("config", &self.config)
+			.field("instance", &self.stored_instance)
+			.field("nonblocking", &self.nonblocking.load(Relaxed))
+			.finish()
+	}
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandle {
-    fn from(p: PipeListener<Rm, Sm>) -> Self {
-        p.stored_instance.into_inner().expect(LOCK_POISON).into()
-    }
+	fn from(p: PipeListener<Rm, Sm>) -> Self {
+		p.stored_instance.into_inner().expect(LOCK_POISON).into()
+	}
 }
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
-    /// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
-    /// automatically appended!
-    pub path: Cow<'a, Path>,
-    /// Specifies how data is written into the data stream. This is required in all cases,
-    /// regardless of whether the pipe is inbound, outbound or duplex, since this affects all data
-    /// being written into the pipe, not just the data written by the server.
-    pub mode: PipeMode,
-    /// Specifies whether nonblocking mode will be enabled for all stream instances upon creation.
-    /// By default, it is disabled.
-    ///
-    /// There are two ways in which the listener is affected by nonblocking mode:
-    /// - Whenever [`accept()`] is called or [`incoming()`] is being iterated through, if there is
-    ///   no client currently attempting to connect to the named pipe server, the method will return
-    ///   immediately with the [`WouldBlock`](io::ErrorKind::WouldBlock) error instead of blocking
-    ///   until one arrives.
-    /// - The streams created by [`accept()`] and [`incoming()`] behave similarly to how client-side
-    ///   streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an
-    ///   explanation of the exact effects.
-    ///
-    /// [`accept()`]: PipeListener::accept
-    /// [`incoming()`]: PipeListener::incoming
-    pub nonblocking: bool,
-    /// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many
-    /// clients can be communicated with at once. If set to 1, trying to create multiple instances
-    /// at the same time will return an error. If set to `None`, no limit is applied. The value 255
-    /// is not allowed because of Windows limitations.
-    pub instance_limit: Option<NonZeroU8>,
-    /// Enables write-through mode, which applies only to network connections to the pipe. If
-    /// enabled, sending to the pipe will always block until all data is delivered to the other end
-    /// instead of piling up in the kernel's network buffer until a certain amount of data
-    /// accamulates or a certain period of time passes, which is when the system actually sends the
-    /// contents of the buffer over the network.
-    ///
-    /// Not required for pipes which are restricted to local connections only. If debug assertions
-    /// are enabled, setting this parameter on a local-only pipe will cause a panic when the pipe is
-    /// created; in release builds, creation will successfully complete without any errors and the
-    /// flag will be completely ignored.
-    pub write_through: bool,
-    /// Enables remote machines to connect to the named pipe over the network.
-    pub accept_remote: bool,
-    /// Specifies how big the input buffer should be. The system will automatically adjust this size
-    /// to align it as required or clip it by the minimum or maximum buffer size.
-    pub input_buffer_size_hint: u32,
-    /// Specifies how big the output buffer should be. The system will automatically adjust this
-    /// size to align it as required or clip it by the minimum or maximum buffer size.
-    pub output_buffer_size_hint: u32,
-    /// The default timeout clients use when connecting. Used unless another timeout is specified
-    /// when waiting by a client.
-    // TODO use WaitTimeout struct
-    pub wait_timeout: NonZeroU32,
-    /// The security descriptor to create the named pipe server with.
-    pub security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
-    /// Whether the resulting handle is to be inheritable by child processes or not.
-    ///
-    /// There is little to no reason for this to ever be `true`.
-    pub inheritable: bool,
+	/// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
+	/// automatically appended!
+	pub path: Cow<'a, Path>,
+	/// Specifies how data is written into the data stream. This is required in all cases,
+	/// regardless of whether the pipe is inbound, outbound or duplex, since this affects all data
+	/// being written into the pipe, not just the data written by the server.
+	pub mode: PipeMode,
+	/// Specifies whether nonblocking mode will be enabled for all stream instances upon creation.
+	/// By default, it is disabled.
+	///
+	/// There are two ways in which the listener is affected by nonblocking mode:
+	/// -	Whenever [`accept()`] is called or [`incoming()`] is being iterated through, if there is
+	/// 	no client currently attempting to connect to the named pipe server, the method will return
+	/// 	immediately with the [`WouldBlock`](io::ErrorKind::WouldBlock) error instead of blocking
+	/// 	until one arrives.
+	/// -	The streams created by [`accept()`] and [`incoming()`] behave similarly to how client-side
+	/// 	streams behave in nonblocking mode. See the documentation for `set_nonblocking` for an
+	/// 	explanation of the exact effects.
+	///
+	/// [`accept()`]: PipeListener::accept
+	/// [`incoming()`]: PipeListener::incoming
+	pub nonblocking: bool,
+	/// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many
+	/// clients can be communicated with at once. If set to 1, trying to create multiple instances
+	/// at the same time will return an error. If set to `None`, no limit is applied. The value 255
+	/// is not allowed because of Windows limitations.
+	pub instance_limit: Option<NonZeroU8>,
+	/// Enables write-through mode, which applies only to network connections to the pipe. If
+	/// enabled, sending to the pipe will always block until all data is delivered to the other end
+	/// instead of piling up in the kernel's network buffer until a certain amount of data
+	/// accamulates or a certain period of time passes, which is when the system actually sends the
+	/// contents of the buffer over the network.
+	///
+	/// Not required for pipes which are restricted to local connections only. If debug assertions
+	/// are enabled, setting this parameter on a local-only pipe will cause a panic when the pipe is
+	/// created; in release builds, creation will successfully complete without any errors and the
+	/// flag will be completely ignored.
+	pub write_through: bool,
+	/// Enables remote machines to connect to the named pipe over the network.
+	pub accept_remote: bool,
+	/// Specifies how big the input buffer should be. The system will automatically adjust this size
+	/// to align it as required or clip it by the minimum or maximum buffer size.
+	pub input_buffer_size_hint: u32,
+	/// Specifies how big the output buffer should be. The system will automatically adjust this
+	/// size to align it as required or clip it by the minimum or maximum buffer size.
+	pub output_buffer_size_hint: u32,
+	/// The default timeout clients use when connecting. Used unless another timeout is specified
+	/// when waiting by a client.
+	// TODO use WaitTimeout struct
+	pub wait_timeout: NonZeroU32,
+	/// The security descriptor to create the named pipe server with.
+	pub security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+	/// Whether the resulting handle is to be inheritable by child processes or not.
+	///
+	/// There is little to no reason for this to ever be `true`.
+	pub inheritable: bool,
 }
 macro_rules! genset {
-    ($name:ident : $ty:ty) => {
-        #[doc = concat!(
-            "Sets the [`",
-            stringify!($name),
-            "`](#structfield.", stringify!($name),
-            ") parameter to the specified value."
-        )]
-        #[must_use = "builder setters take the entire structure and return the result"]
-        // FIXME this Into bound probably doesn't work all too well for `path`
-        pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
-            self.$name = $name.into();
-            self
-        }
-    };
-    ($($name:ident : $ty:ty),+ $(,)?) => {
-        $(genset!($name: $ty);)+
-    };
+	($name:ident : $ty:ty) => {
+		#[doc = concat!(
+			"Sets the [`",
+			stringify!($name),
+			"`](#structfield.", stringify!($name),
+			") parameter to the specified value."
+		)]
+		#[must_use = "builder setters take the entire structure and return the result"]
+		// FIXME this Into bound probably doesn't work all too well for `path`
+		pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
+			self.$name = $name.into();
+			self
+		}
+	};
+	($($name:ident : $ty:ty),+ $(,)?) => {
+		$(genset!($name: $ty);)+
+	};
 }
 impl<'a> PipeListenerOptions<'a> {
-    /// Creates a new builder with default options.
-    pub fn new() -> Self {
-        const DEFAULT_WAIT_TIMEOUT: NonZeroU32 = match NonZeroU32::new(50) {
-            Some(v) => v,
-            None => unreachable!(),
-        };
-        Self {
-            path: Cow::Borrowed(Path::new("")),
-            mode: PipeMode::Bytes,
-            nonblocking: false,
-            instance_limit: None,
-            write_through: false,
-            accept_remote: false,
-            input_buffer_size_hint: 512,
-            output_buffer_size_hint: 512,
-            wait_timeout: DEFAULT_WAIT_TIMEOUT,
-            security_descriptor: None,
-            inheritable: false,
-        }
-    }
-    /// Clones configuration options which are not owned by value and returns a copy of the original
-    /// option table which is guaranteed not to borrow anything and thus ascribes to the `'static`
-    /// lifetime.
-    pub fn to_owned(&self) -> PipeListenerOptions<'static> {
-        // We need this ugliness because the compiler does not understand that
-        // PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
-        // replace the name field with Cow::Owned and just copy all other elements over thanks
-        // to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
-        // RFC for this, would be nice.
-        PipeListenerOptions {
-            path: Cow::Owned(self.path.clone().into_owned()),
-            mode: self.mode,
-            nonblocking: self.nonblocking,
-            instance_limit: self.instance_limit,
-            write_through: self.write_through,
-            accept_remote: self.accept_remote,
-            input_buffer_size_hint: self.input_buffer_size_hint,
-            output_buffer_size_hint: self.output_buffer_size_hint,
-            wait_timeout: self.wait_timeout,
-            security_descriptor: match self.security_descriptor {
-                Some(Cow::Owned(o)) => Some(Cow::Owned(o)),
-                Some(Cow::Borrowed(b)) => Some(Cow::Owned(*b)),
-                None => None,
-            },
-            inheritable: self.inheritable,
-        }
-    }
+	/// Creates a new builder with default options.
+	pub fn new() -> Self {
+		const DEFAULT_WAIT_TIMEOUT: NonZeroU32 = match NonZeroU32::new(50) {
+			Some(v) => v,
+			None => unreachable!(),
+		};
+		Self {
+			path: Cow::Borrowed(Path::new("")),
+			mode: PipeMode::Bytes,
+			nonblocking: false,
+			instance_limit: None,
+			write_through: false,
+			accept_remote: false,
+			input_buffer_size_hint: 512,
+			output_buffer_size_hint: 512,
+			wait_timeout: DEFAULT_WAIT_TIMEOUT,
+			security_descriptor: None,
+			inheritable: false,
+		}
+	}
+	/// Clones configuration options which are not owned by value and returns a copy of the original
+	/// option table which is guaranteed not to borrow anything and thus ascribes to the `'static`
+	/// lifetime.
+	pub fn to_owned(&self) -> PipeListenerOptions<'static> {
+		// We need this ugliness because the compiler does not understand that
+		// PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
+		// replace the name field with Cow::Owned and just copy all other elements over thanks
+		// to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
+		// RFC for this, would be nice.
+		PipeListenerOptions {
+			path: Cow::Owned(self.path.clone().into_owned()),
+			mode: self.mode,
+			nonblocking: self.nonblocking,
+			instance_limit: self.instance_limit,
+			write_through: self.write_through,
+			accept_remote: self.accept_remote,
+			input_buffer_size_hint: self.input_buffer_size_hint,
+			output_buffer_size_hint: self.output_buffer_size_hint,
+			wait_timeout: self.wait_timeout,
+			security_descriptor: match self.security_descriptor {
+				Some(Cow::Owned(o)) => Some(Cow::Owned(o)),
+				Some(Cow::Borrowed(b)) => Some(Cow::Owned(*b)),
+				None => None,
+			},
+			inheritable: self.inheritable,
+		}
+	}
 
-    /// Sets the [`path`](#structfield.path) parameter to the specified value.
-    #[inline]
-    pub fn path<T: ?Sized>(mut self, path: impl Into<Cow<'a, T>>) -> Self
-    where
-        T: AsRef<Path> + ToOwned + 'a,
-        T::Owned: Into<PathBuf>,
-    {
-        self.path = match path.into() {
-            Cow::Borrowed(b) => Cow::Borrowed(b.as_ref()),
-            Cow::Owned(o) => Cow::Owned(o.into()),
-        };
-        self
-    }
-    genset! {
-        mode: PipeMode,
-        nonblocking: bool,
-        instance_limit: Option<NonZeroU8>,
-        write_through: bool,
-        accept_remote: bool,
-        input_buffer_size_hint: u32,
-        output_buffer_size_hint: u32,
-        wait_timeout: NonZeroU32,
-        security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
-        inheritable: bool,
-    }
+	/// Sets the [`path`](#structfield.path) parameter to the specified value.
+	#[inline]
+	pub fn path<T: ?Sized>(mut self, path: impl Into<Cow<'a, T>>) -> Self
+	where
+		T: AsRef<Path> + ToOwned + 'a,
+		T::Owned: Into<PathBuf>,
+	{
+		self.path = match path.into() {
+			Cow::Borrowed(b) => Cow::Borrowed(b.as_ref()),
+			Cow::Owned(o) => Cow::Owned(o.into()),
+		};
+		self
+	}
+	genset! {
+		mode: PipeMode,
+		nonblocking: bool,
+		instance_limit: Option<NonZeroU8>,
+		write_through: bool,
+		accept_remote: bool,
+		input_buffer_size_hint: u32,
+		output_buffer_size_hint: u32,
+		wait_timeout: NonZeroU32,
+		security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+		inheritable: bool,
+	}
 
-    /// Creates an instance of a pipe for a listener with the specified stream type and with the
-    /// first-instance flag set to the specified value.
-    pub(super) fn create_instance(
-        &self,
-        first: bool,
-        nonblocking: bool,
-        overlapped: bool,
-        role: PipeStreamRole,
-        recv_mode: Option<PipeMode>,
-    ) -> io::Result<OwnedHandle> {
-        if recv_mode == Some(PipeMode::Messages) && self.mode == PipeMode::Bytes {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "\
+	/// Creates an instance of a pipe for a listener with the specified stream type and with the
+	/// first-instance flag set to the specified value.
+	pub(super) fn create_instance(
+		&self,
+		first: bool,
+		nonblocking: bool,
+		overlapped: bool,
+		role: PipeStreamRole,
+		recv_mode: Option<PipeMode>,
+	) -> io::Result<OwnedHandle> {
+		if recv_mode == Some(PipeMode::Messages) && self.mode == PipeMode::Bytes {
+			return Err(io::Error::new(
+				io::ErrorKind::InvalidInput,
+				"\
 cannot create pipe server that has byte type but receives messages – have you forgotten to set the \
 `mode` field in `PipeListenerOptions`?",
-            ));
-        }
+			));
+		}
 
-        let path = encode_to_utf16(self.path.as_os_str());
-        let open_mode = self.open_mode(first, role, overlapped);
-        let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
+		let path = encode_to_utf16(self.path.as_os_str());
+		let open_mode = self.open_mode(first, role, overlapped);
+		let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 
-        let sa = SecurityDescriptor::create_security_attributes(
-            self.security_descriptor.as_deref(),
-            self.inheritable,
-        );
+		let sa = SecurityDescriptor::create_security_attributes(
+			self.security_descriptor.as_deref(),
+			self.inheritable,
+		);
 
-        let max_instances = match self.instance_limit.map(NonZeroU8::get) {
-            Some(255) => return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
-            )),
-            Some(x) => x.into(),
-            None => 255,
-        };
+		let max_instances = match self.instance_limit.map(NonZeroU8::get) {
+			Some(255) => return Err(io::Error::new(
+				io::ErrorKind::InvalidInput,
+				"cannot set 255 as the named pipe instance limit due to 255 being a reserved value",
+			)),
+			Some(x) => x.into(),
+			None => 255,
+		};
 
-        let (handle, success) = unsafe {
-            let handle = CreateNamedPipeW(
-                path.as_ptr(),
-                open_mode,
-                pipe_mode,
-                max_instances,
-                self.output_buffer_size_hint,
-                self.input_buffer_size_hint,
-                self.wait_timeout.get(),
-                (&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
-            );
-            (handle, handle != INVALID_HANDLE_VALUE)
-        };
-        ok_or_errno!(success => unsafe {
-            // SAFETY: we just made it and received ownership
-            OwnedHandle::from_raw_handle(handle as RawHandle)
-        })
-    }
-    /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the
-    /// type of pipe stream that the listener will create, thus determining the direction of the
-    /// pipe and its mode.
-    ///
-    /// # Errors
-    /// In addition to regular OS errors, an error will be returned if the given `Rm` is
-    /// [`pipe_mode::Messages`], but the `mode` field isn't also [`pipe_mode::Messages`].
-    pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
-        let (owned_config, instance) =
-            self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
-        let nonblocking = owned_config.nonblocking.into();
-        Ok(PipeListener {
-            config: owned_config,
-            nonblocking,
-            stored_instance: Mutex::new(instance),
-            _phantom: PhantomData,
-        })
-    }
-    /// Alias for [`.create()`](Self::create) with the same `Rm` and `Sm`.
-    #[inline]
-    pub fn create_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
-        self.create::<M, M>()
-    }
-    /// Alias for [`.create()`](Self::create) with an `Sm` of [`pipe_mode::None`].
-    #[inline]
-    pub fn create_recv_only<Rm: PipeModeTag>(
-        &self,
-    ) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
-        self.create::<Rm, pipe_mode::None>()
-    }
-    /// Alias for [`.create()`](Self::create) with an `Rm` of [`pipe_mode::None`].
-    #[inline]
-    pub fn create_send_only<Sm: PipeModeTag>(
-        &self,
-    ) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
-        self.create::<pipe_mode::None, Sm>()
-    }
-    fn _create(
-        &self,
-        role: PipeStreamRole,
-        recv_mode: Option<PipeMode>,
-    ) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
-        let owned_config = self.to_owned();
+		let (handle, success) = unsafe {
+			let handle = CreateNamedPipeW(
+				path.as_ptr(),
+				open_mode,
+				pipe_mode,
+				max_instances,
+				self.output_buffer_size_hint,
+				self.input_buffer_size_hint,
+				self.wait_timeout.get(),
+				(&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
+			);
+			(handle, handle != INVALID_HANDLE_VALUE)
+		};
+		ok_or_errno!(success => unsafe {
+			// SAFETY: we just made it and received ownership
+			OwnedHandle::from_raw_handle(handle as RawHandle)
+		})
+	}
+	/// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the
+	/// type of pipe stream that the listener will create, thus determining the direction of the
+	/// pipe and its mode.
+	///
+	/// # Errors
+	/// In addition to regular OS errors, an error will be returned if the given `Rm` is
+	/// [`pipe_mode::Messages`], but the `mode` field isn't also [`pipe_mode::Messages`].
+	pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
+		let (owned_config, instance) =
+			self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
+		let nonblocking = owned_config.nonblocking.into();
+		Ok(PipeListener {
+			config: owned_config,
+			nonblocking,
+			stored_instance: Mutex::new(instance),
+			_phantom: PhantomData,
+		})
+	}
+	/// Alias for [`.create()`](Self::create) with the same `Rm` and `Sm`.
+	#[inline]
+	pub fn create_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
+		self.create::<M, M>()
+	}
+	/// Alias for [`.create()`](Self::create) with an `Sm` of [`pipe_mode::None`].
+	#[inline]
+	pub fn create_recv_only<Rm: PipeModeTag>(
+		&self,
+	) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+		self.create::<Rm, pipe_mode::None>()
+	}
+	/// Alias for [`.create()`](Self::create) with an `Rm` of [`pipe_mode::None`].
+	#[inline]
+	pub fn create_send_only<Sm: PipeModeTag>(
+		&self,
+	) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+		self.create::<pipe_mode::None, Sm>()
+	}
+	fn _create(
+		&self,
+		role: PipeStreamRole,
+		recv_mode: Option<PipeMode>,
+	) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
+		let owned_config = self.to_owned();
 
-        let instance = self
-            .create_instance(true, self.nonblocking, false, role, recv_mode)
-            .map(FileHandle::from)?;
-        Ok((owned_config, instance))
-    }
+		let instance = self
+			.create_instance(true, self.nonblocking, false, role, recv_mode)
+			.map(FileHandle::from)?;
+		Ok((owned_config, instance))
+	}
 
-    fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> u32 {
-        let mut open_mode = 0_u32;
-        open_mode |= u32::from(role.direction_as_server());
-        if first {
-            open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
-        }
-        if self.write_through {
-            open_mode |= FILE_FLAG_WRITE_THROUGH;
-        }
-        if overlapped {
-            open_mode |= FILE_FLAG_OVERLAPPED;
-        }
-        open_mode
-    }
-    fn pipe_mode(&self, recv_mode: Option<PipeMode>, nonblocking: bool) -> u32 {
-        let mut pipe_mode = 0_u32;
-        pipe_mode |= self.mode.to_pipe_type();
-        pipe_mode |= recv_mode.map_or(0, PipeMode::to_readmode);
-        if nonblocking {
-            pipe_mode |= PIPE_NOWAIT;
-        }
-        if !self.accept_remote {
-            pipe_mode |= PIPE_REJECT_REMOTE_CLIENTS;
-        }
-        pipe_mode
-    }
+	fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> u32 {
+		let mut open_mode = 0_u32;
+		open_mode |= u32::from(role.direction_as_server());
+		if first {
+			open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+		}
+		if self.write_through {
+			open_mode |= FILE_FLAG_WRITE_THROUGH;
+		}
+		if overlapped {
+			open_mode |= FILE_FLAG_OVERLAPPED;
+		}
+		open_mode
+	}
+	fn pipe_mode(&self, recv_mode: Option<PipeMode>, nonblocking: bool) -> u32 {
+		let mut pipe_mode = 0_u32;
+		pipe_mode |= self.mode.to_pipe_type();
+		pipe_mode |= recv_mode.map_or(0, PipeMode::to_readmode);
+		if nonblocking {
+			pipe_mode |= PIPE_NOWAIT;
+		}
+		if !self.accept_remote {
+			pipe_mode |= PIPE_REJECT_REMOTE_CLIENTS;
+		}
+		pipe_mode
+	}
 }
 impl Default for PipeListenerOptions<'_> {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::new()
-    }
+	#[inline(always)]
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    let success = unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 };
-    if success {
-        Ok(())
-    } else {
-        let last_error = io::Error::last_os_error();
-        if last_error.raw_os_error() == Some(ERROR_PIPE_CONNECTED as i32) {
-            Ok(())
-        } else {
-            Err(last_error)
-        }
-    }
+	let success = unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 };
+	if success {
+		Ok(())
+	} else {
+		let last_error = io::Error::last_os_error();
+		if last_error.raw_os_error() == Some(ERROR_PIPE_CONNECTED as i32) {
+			Ok(())
+		} else {
+			Err(last_error)
+		}
+	}
 }

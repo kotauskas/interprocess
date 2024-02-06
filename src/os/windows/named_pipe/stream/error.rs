@@ -1,9 +1,9 @@
 use super::*;
 use crate::error::ConversionError;
 use std::{
-    fmt::{self, Debug, Display, Formatter},
-    io,
-    os::windows::prelude::*,
+	fmt::{self, Debug, Display, Formatter},
+	io,
+	os::windows::prelude::*,
 };
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
@@ -11,37 +11,37 @@ use std::{
 /// Not to be confused with the Tokio version.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FromHandleErrorKind {
-    /// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a
-    /// pipe client.
-    IsServerCheckFailed,
-    /// The type being converted into has message semantics, but it wasn't possible to determine
-    /// whether message boundaries are preserved in the pipe.
-    MessageBoundariesCheckFailed,
-    /// The type being converted into has message semantics, but message boundaries are not
-    /// preserved in the pipe.
-    NoMessageBoundaries,
+	/// It wasn't possible to determine whether the pipe handle corresponds to a pipe server or a
+	/// pipe client.
+	IsServerCheckFailed,
+	/// The type being converted into has message semantics, but it wasn't possible to determine
+	/// whether message boundaries are preserved in the pipe.
+	MessageBoundariesCheckFailed,
+	/// The type being converted into has message semantics, but message boundaries are not
+	/// preserved in the pipe.
+	NoMessageBoundaries,
 }
 impl FromHandleErrorKind {
-    const fn msg(self) -> &'static str {
-        use FromHandleErrorKind::*;
-        match self {
-            IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
-            MessageBoundariesCheckFailed => {
-                "failed to make sure that the pipe preserves message boundaries"
-            }
-            NoMessageBoundaries => "the pipe does not preserve message boundaries",
-        }
-    }
+	const fn msg(self) -> &'static str {
+		use FromHandleErrorKind::*;
+		match self {
+			IsServerCheckFailed => "failed to determine if the pipe is server-side or not",
+			MessageBoundariesCheckFailed => {
+				"failed to make sure that the pipe preserves message boundaries"
+			}
+			NoMessageBoundaries => "the pipe does not preserve message boundaries",
+		}
+	}
 }
 impl From<FromHandleErrorKind> for io::Error {
-    fn from(e: FromHandleErrorKind) -> Self {
-        io::Error::new(io::ErrorKind::Other, e.msg())
-    }
+	fn from(e: FromHandleErrorKind) -> Self {
+		io::Error::new(io::ErrorKind::Other, e.msg())
+	}
 }
 impl Display for FromHandleErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.msg())
-    }
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.write_str(self.msg())
+	}
 }
 
 /// Error type for [`TryFrom<OwnedHandle>`](TryFrom) constructors.

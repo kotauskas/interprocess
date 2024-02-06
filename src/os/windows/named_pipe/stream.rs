@@ -124,8 +124,8 @@ use std::{marker::PhantomData, os::windows::prelude::*};
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
-    raw: MaybeArc<RawPipeStream>,
-    _phantom: PhantomData<(Rm, Sm)>,
+	raw: MaybeArc<RawPipeStream>,
+	_phantom: PhantomData<(Rm, Sm)>,
 }
 
 /// Type alias for a pipe stream with the same receive mode and send mode.
@@ -141,8 +141,8 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-    handle: Option<FileHandle>,
-    is_server: bool,
-    needs_flush: NeedsFlush,
-    concurrency_detector: ConcurrencyDetector,
+	handle: Option<FileHandle>,
+	is_server: bool,
+	needs_flush: NeedsFlush,
+	concurrency_detector: ConcurrencyDetector,
 }

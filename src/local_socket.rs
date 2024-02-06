@@ -38,11 +38,11 @@
 //! ## Differences from regular sockets
 //! A few missing features, primarily on Windows, require local sockets to omit some important
 //! functionality, because code relying on it wouldn't be portable. Some notable differences are:
-//! - No `.shutdown()` – your communication protocol must manually negotiate end of transmission.
-//!   Notably, `.read_to_string()` and `.read_all()` will always block indefinitely at some point.
-//! - No datagram sockets – the difference in semantics between connectionless datagram Unix-domain
-//!   sockets and connection-based named message pipes on Windows does not allow bridging those two
-//!   into a common API. You can emulate datagrams on top of streams anyway, so no big deal, right?
+//! -	No `.shutdown()` – your communication protocol must manually negotiate end of transmission.
+//! 	Notably, `.read_to_string()` and `.read_all()` will always block indefinitely at some point.
+//! -	No datagram sockets – the difference in semantics between connectionless datagram Unix-domain
+//! 	sockets and connection-based named message pipes on Windows does not allow bridging those two
+//! 	into a common API. You can emulate datagrams on top of streams anyway, so no big deal, right?
 
 mod listener;
 mod name;
@@ -63,9 +63,9 @@ pub use {listener::*, name::*, name_type_support::*, stream::*, to_name::*};
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio {
-    mod listener;
-    mod stream;
-    pub use {listener::*, stream::*};
+	mod listener;
+	mod stream;
+	pub use {listener::*, stream::*};
 }
 
 // TODO extension traits in crate::os for exposing some OS-specific functionality here

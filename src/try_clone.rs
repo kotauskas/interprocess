@@ -5,11 +5,11 @@
 /// wrap OS objects (which is to say, the majority of types here) to enable handle/file descriptor
 /// duplication functionality on them.
 pub trait TryClone: Sized {
-    /// Clones `self`, possibly returning an error.
-    fn try_clone(&self) -> std::io::Result<Self>;
+	/// Clones `self`, possibly returning an error.
+	fn try_clone(&self) -> std::io::Result<Self>;
 }
 impl<T: Clone> TryClone for T {
-    fn try_clone(&self) -> std::io::Result<Self> {
-        Ok(self.clone())
-    }
+	fn try_clone(&self) -> std::io::Result<Self> {
+		Ok(self.clone())
+	}
 }

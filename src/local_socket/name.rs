@@ -1,12 +1,12 @@
 use std::{
-    borrow::Cow,
-    ffi::{OsStr, OsString},
-    fmt::Debug,
+	borrow::Cow,
+	ffi::{OsStr, OsString},
+	fmt::Debug,
 };
 
 impmod! {
-    local_socket,
-    is_namespaced,
+	local_socket,
+	is_namespaced,
 }
 
 // TODO maybe emulate NS on FS-only via tmpfs?
@@ -32,88 +32,88 @@ impmod! {
 // TODO document automatic checks
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LocalSocketName<'s> {
-    raw: Cow<'s, OsStr>,
-    path: bool,
+	raw: Cow<'s, OsStr>,
+	path: bool,
 }
 impl<'s> LocalSocketName<'s> {
-    // TODO get rid of those
+	// TODO get rid of those
 
-    /// Returns `true` if the name points to the dedicated local socket namespace, `false`
-    /// otherwise.
-    #[inline]
-    pub fn is_namespaced(&self) -> bool {
-        is_namespaced(self)
-    }
+	/// Returns `true` if the name points to the dedicated local socket namespace, `false`
+	/// otherwise.
+	#[inline]
+	pub fn is_namespaced(&self) -> bool {
+		is_namespaced(self)
+	}
 
-    /// Returns `true` if the name is stored as a filesystem path, `false` otherwise.
-    ///
-    /// Note that it is possible for [`.is_namespaced()`](Self::is_namespaced) and `.is_path()` to
-    /// return `true` simultaneously:
-    /// ```
-    /// # #[cfg(windows)] {
-    /// # use interprocess::local_socket::{LocalSocketName, ToFsName, ToNsName};
-    /// let name = r"\\.\pipe\example".to_fs_name().unwrap();
-    /// assert!(name.is_namespaced()); // \\.\pipe\ is a namespace
-    /// assert!(name.is_path());       // \\.\pipe\example is a path
-    /// }
-    /// ```
-    #[inline]
-    pub const fn is_path(&self) -> bool {
-        self.path
-    }
+	/// Returns `true` if the name is stored as a filesystem path, `false` otherwise.
+	///
+	/// Note that it is possible for [`.is_namespaced()`](Self::is_namespaced) and `.is_path()` to
+	/// return `true` simultaneously:
+	/// ```
+	/// # #[cfg(windows)] {
+	/// # use interprocess::local_socket::{LocalSocketName, ToFsName, ToNsName};
+	/// let name = r"\\.\pipe\example".to_fs_name().unwrap();
+	/// assert!(name.is_namespaced());	// \\.\pipe\ is a namespace
+	/// assert!(name.is_path());		// \\.\pipe\example is a path
+	/// }
+	/// ```
+	#[inline]
+	pub const fn is_path(&self) -> bool {
+		self.path
+	}
 
-    /// Returns the `OsStr` part of the name's internal representation.
-    ///
-    /// The returned value might reflect the type of the name (whether it was a filesystem path or a
-    /// namespaced name) in some situations on some platforms, namely on Linux, or it might not.
-    /// Additionally, two equal `LocalSocketName`s may or may not have their outputs of `.raw()`
-    /// compare equal, and vice versa.
-    ///
-    /// If you need the value as an owned `OsString` instead, use [`.into_raw()`](Self::into_raw).
-    #[inline]
-    pub fn raw(&'s self) -> &'s OsStr {
-        &self.raw
-    }
+	/// Returns the `OsStr` part of the name's internal representation.
+	///
+	/// The returned value might reflect the type of the name (whether it was a filesystem path or a
+	/// namespaced name) in some situations on some platforms, namely on Linux, or it might not.
+	/// Additionally, two equal `LocalSocketName`s may or may not have their outputs of `.raw()`
+	/// compare equal, and vice versa.
+	///
+	/// If you need the value as an owned `OsString` instead, use [`.into_raw()`](Self::into_raw).
+	#[inline]
+	pub fn raw(&'s self) -> &'s OsStr {
+		&self.raw
+	}
 
-    /// Returns the `OsStr` part of the name's internal representation as an `OsString`, cloning if
-    /// necessary. See [`.raw()`](Self::raw()).
-    #[inline]
-    pub fn into_raw(self) -> OsString {
-        self.raw.into_owned()
-    }
+	/// Returns the `OsStr` part of the name's internal representation as an `OsString`, cloning if
+	/// necessary. See [`.raw()`](Self::raw()).
+	#[inline]
+	pub fn into_raw(self) -> OsString {
+		self.raw.into_owned()
+	}
 
-    /// Returns the `OsStr` part of the name's internal representation as a *borrowed*
-    /// `Cow<'_, OsStr>`. See [`.raw()`](Self::raw()).
-    #[inline]
-    pub const fn raw_cow(&'s self) -> &'s Cow<'s, OsStr> {
-        &self.raw
-    }
+	/// Returns the `OsStr` part of the name's internal representation as a *borrowed*
+	/// `Cow<'_, OsStr>`. See [`.raw()`](Self::raw()).
+	#[inline]
+	pub const fn raw_cow(&'s self) -> &'s Cow<'s, OsStr> {
+		&self.raw
+	}
 
-    /// Consumes `self` and returns the `OsStr` part of the name's internal representation as a
-    /// `Cow<'_,OsStr>` without cloning. See [`.raw()`](Self::raw()).
-    #[inline]
-    pub fn into_raw_cow(self) -> Cow<'s, OsStr> {
-        self.raw
-    }
+	/// Consumes `self` and returns the `OsStr` part of the name's internal representation as a
+	/// `Cow<'_,OsStr>` without cloning. See [`.raw()`](Self::raw()).
+	#[inline]
+	pub fn into_raw_cow(self) -> Cow<'s, OsStr> {
+		self.raw
+	}
 
-    /// Produces a `LocalSocketName` that borrows from `self`.
-    #[inline]
-    pub fn borrow(&self) -> LocalSocketName<'_> {
-        LocalSocketName {
-            raw: Cow::Borrowed(&self.raw),
-            path: self.path,
-        }
-    }
+	/// Produces a `LocalSocketName` that borrows from `self`.
+	#[inline]
+	pub fn borrow(&self) -> LocalSocketName<'_> {
+		LocalSocketName {
+			raw: Cow::Borrowed(&self.raw),
+			path: self.path,
+		}
+	}
 
-    /// Extends the lifetime to `'static`, cloning if necessary.
-    pub fn into_owned(self) -> LocalSocketName<'static> {
-        LocalSocketName {
-            raw: Cow::Owned(self.raw.into_owned()),
-            path: self.path,
-        }
-    }
+	/// Extends the lifetime to `'static`, cloning if necessary.
+	pub fn into_owned(self) -> LocalSocketName<'static> {
+		LocalSocketName {
+			raw: Cow::Owned(self.raw.into_owned()),
+			path: self.path,
+		}
+	}
 
-    pub(crate) const fn new(raw: Cow<'s, OsStr>, path: bool) -> Self {
-        Self { raw, path }
-    }
+	pub(crate) const fn new(raw: Cow<'s, OsStr>, path: bool) -> Self {
+		Self { raw, path }
+	}
 }

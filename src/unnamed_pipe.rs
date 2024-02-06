@@ -11,9 +11,9 @@
 //! unnamed pipe connection. It just so happens that this crate supports all three.
 
 impmod! {unnamed_pipe,
-    UnnamedPipeRecver as UnnamedPipeRecverImpl,
-    UnnamedPipeSender as UnnamedPipeSenderImpl,
-    pipe as pipe_impl,
+	UnnamedPipeRecver as UnnamedPipeRecverImpl,
+	UnnamedPipeSender as UnnamedPipeSenderImpl,
+	pipe as pipe_impl,
 }
 use std::io;
 
@@ -24,7 +24,7 @@ use std::io;
 /// configuration process for the pipe is needed.
 #[inline]
 pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
-    pipe_impl()
+	pipe_impl()
 }
 
 /// A handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
@@ -43,12 +43,12 @@ pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
 // field is pub(crate) to allow platform builders to create the public-facing pipe types
 pub struct UnnamedPipeRecver(pub(crate) UnnamedPipeRecverImpl);
 multimacro! {
-    UnnamedPipeRecver,
-    forward_sync_read,
-    forward_handle,
-    forward_try_clone,
-    forward_debug,
-    derive_raw,
+	UnnamedPipeRecver,
+	forward_sync_read,
+	forward_handle,
+	forward_try_clone,
+	forward_debug,
+	derive_raw,
 }
 
 /// A handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
@@ -66,10 +66,10 @@ multimacro! {
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 pub struct UnnamedPipeSender(pub(crate) UnnamedPipeSenderImpl);
 multimacro! {
-    UnnamedPipeSender,
-    forward_sync_write,
-    forward_handle,
-    forward_try_clone,
-    forward_debug,
-    derive_raw,
+	UnnamedPipeSender,
+	forward_sync_write,
+	forward_handle,
+	forward_try_clone,
+	forward_debug,
+	derive_raw,
 }

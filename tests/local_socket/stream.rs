@@ -1,115 +1,115 @@
 use crate::{
-    local_socket::{LocalSocketListener, LocalSocketName, LocalSocketStream},
-    tests::util::*,
+	local_socket::{LocalSocketListener, LocalSocketName, LocalSocketStream},
+	tests::util::*,
 };
 use color_eyre::eyre::WrapErr;
 use std::{
-    io::{BufRead, BufReader, Write},
-    str,
-    sync::{mpsc::Sender, Arc},
-    thread,
+	io::{BufRead, BufReader, Write},
+	str,
+	sync::{mpsc::Sender, Arc},
+	thread,
 };
 
 fn msg(server: bool, nts: bool) -> Box<str> {
-    message(None, server, Some(['\n', '\0'][nts as usize]))
+	message(None, server, Some(['\n', '\0'][nts as usize]))
 }
 
 pub fn server(
-    id: &'static str,
-    handle_client: fn(LocalSocketStream) -> TestResult,
-    name_sender: Sender<Arc<LocalSocketName<'static>>>,
-    num_clients: u32,
-    namespaced: bool,
+	id: &'static str,
+	handle_client: fn(LocalSocketStream) -> TestResult,
+	name_sender: Sender<Arc<LocalSocketName<'static>>>,
+	num_clients: u32,
+	namespaced: bool,
 ) -> TestResult {
-    let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
-        LocalSocketListener::bind(nm.borrow())
-    })?;
-    let _ = name_sender.send(name);
-    listener
-        .incoming()
-        .take(num_clients.try_into().unwrap())
-        .try_for_each(|conn| handle_client(conn.opname("accept")?))
+	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
+		LocalSocketListener::bind(nm.borrow())
+	})?;
+	let _ = name_sender.send(name);
+	listener
+		.incoming()
+		.take(num_clients.try_into().unwrap())
+		.try_for_each(|conn| handle_client(conn.opname("accept")?))
 }
 
 pub fn handle_client_nosplit(conn: LocalSocketStream) -> TestResult {
-    let mut conn = BufReader::new(conn);
-    recv(&mut conn, &msg(false, false), 0)?;
-    send(conn.get_mut(), &msg(true, false), 0)?;
-    recv(&mut conn, &msg(false, true), 1)?;
-    send(conn.get_mut(), &msg(true, true), 1)
+	let mut conn = BufReader::new(conn);
+	recv(&mut conn, &msg(false, false), 0)?;
+	send(conn.get_mut(), &msg(true, false), 0)?;
+	recv(&mut conn, &msg(false, true), 1)?;
+	send(conn.get_mut(), &msg(true, true), 1)
 }
 
 pub fn handle_client_split(conn: LocalSocketStream) -> TestResult {
-    let (recver, sender) = conn.split();
+	let (recver, sender) = conn.split();
 
-    let recv = thread::spawn(move || {
-        let mut recver = BufReader::new(recver);
-        recv(&mut recver, &msg(true, false), 0)?;
-        recv(&mut recver, &msg(true, true), 1)?;
-        TestResult::<_>::Ok(recver.into_inner())
-    });
-    let send = thread::spawn(move || {
-        let mut sender = sender;
-        send(&mut sender, &msg(false, false), 0)?;
-        send(&mut sender, &msg(false, true), 1)?;
-        TestResult::<_>::Ok(sender)
-    });
+	let recv = thread::spawn(move || {
+		let mut recver = BufReader::new(recver);
+		recv(&mut recver, &msg(true, false), 0)?;
+		recv(&mut recver, &msg(true, true), 1)?;
+		TestResult::<_>::Ok(recver.into_inner())
+	});
+	let send = thread::spawn(move || {
+		let mut sender = sender;
+		send(&mut sender, &msg(false, false), 0)?;
+		send(&mut sender, &msg(false, true), 1)?;
+		TestResult::<_>::Ok(sender)
+	});
 
-    let recver = recv.join().unwrap()?;
-    let sender = send.join().unwrap()?;
-    LocalSocketStream::reunite(recver, sender).opname("reunite")?;
-    Ok(())
+	let recver = recv.join().unwrap()?;
+	let sender = send.join().unwrap()?;
+	LocalSocketStream::reunite(recver, sender).opname("reunite")?;
+	Ok(())
 }
 
 pub fn client_nosplit(name: &LocalSocketName<'_>) -> TestResult {
-    let mut conn = LocalSocketStream::connect(name.borrow())
-        .opname("connect")
-        .map(BufReader::new)?;
-    send(conn.get_mut(), &msg(false, false), 0)?;
-    recv(&mut conn, &msg(true, false), 0)?;
-    send(conn.get_mut(), &msg(false, true), 1)?;
-    recv(&mut conn, &msg(true, true), 1)
+	let mut conn = LocalSocketStream::connect(name.borrow())
+		.opname("connect")
+		.map(BufReader::new)?;
+	send(conn.get_mut(), &msg(false, false), 0)?;
+	recv(&mut conn, &msg(true, false), 0)?;
+	send(conn.get_mut(), &msg(false, true), 1)?;
+	recv(&mut conn, &msg(true, true), 1)
 }
 
 pub fn client_split(name: &LocalSocketName<'_>) -> TestResult {
-    let (recver, sender) = LocalSocketStream::connect(name.borrow())
-        .opname("connect")?
-        .split();
+	let (recver, sender) = LocalSocketStream::connect(name.borrow())
+		.opname("connect")?
+		.split();
 
-    let recv = thread::spawn(move || {
-        let mut recver = BufReader::new(recver);
-        recv(&mut recver, &msg(false, false), 0)?;
-        recv(&mut recver, &msg(false, true), 1)?;
-        TestResult::<_>::Ok(recver.into_inner())
-    });
-    let send = thread::spawn(move || {
-        let mut sender = sender;
-        send(&mut sender, &msg(true, false), 0)?;
-        send(&mut sender, &msg(true, true), 1)?;
-        TestResult::<_>::Ok(sender)
-    });
+	let recv = thread::spawn(move || {
+		let mut recver = BufReader::new(recver);
+		recv(&mut recver, &msg(false, false), 0)?;
+		recv(&mut recver, &msg(false, true), 1)?;
+		TestResult::<_>::Ok(recver.into_inner())
+	});
+	let send = thread::spawn(move || {
+		let mut sender = sender;
+		send(&mut sender, &msg(true, false), 0)?;
+		send(&mut sender, &msg(true, true), 1)?;
+		TestResult::<_>::Ok(sender)
+	});
 
-    let recver = recv.join().unwrap()?;
-    let sender = send.join().unwrap()?;
-    LocalSocketStream::reunite(recver, sender).opname("reunite")?;
-    Ok(())
+	let recver = recv.join().unwrap()?;
+	let sender = send.join().unwrap()?;
+	LocalSocketStream::reunite(recver, sender).opname("reunite")?;
+	Ok(())
 }
 
 fn recv(conn: &mut dyn BufRead, exp: &str, nr: u8) -> TestResult {
-    let term = *exp.as_bytes().last().unwrap();
-    let fs = ["first", "second"][nr as usize];
+	let term = *exp.as_bytes().last().unwrap();
+	let fs = ["first", "second"][nr as usize];
 
-    let mut buffer = Vec::with_capacity(exp.len());
-    conn.read_until(term, &mut buffer)
-        .wrap_err_with(|| format!("{} receive failed", fs))?;
-    ensure_eq!(
-        str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
-        exp,
-    );
-    Ok(())
+	let mut buffer = Vec::with_capacity(exp.len());
+	conn.read_until(term, &mut buffer)
+		.wrap_err_with(|| format!("{} receive failed", fs))?;
+	ensure_eq!(
+		str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
+		exp,
+	);
+	Ok(())
 }
 fn send(conn: &mut dyn Write, msg: &str, nr: u8) -> TestResult {
-    let fs = ["first", "second"][nr as usize];
-    conn.write_all(msg.as_bytes())
-        .with_context(|| format!("{} socket send failed", fs))
+	let fs = ["first", "second"][nr as usize];
+	conn.write_all(msg.as_bytes())
+		.with_context(|| format!("{} socket send failed", fs))
 }
