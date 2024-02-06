@@ -3,7 +3,6 @@
 mod platform_check;
 
 // TODO add OS-specific ext-traits
-// TODO un-mod.rs
 // TODO inspect panic points
 
 #[macro_use]
