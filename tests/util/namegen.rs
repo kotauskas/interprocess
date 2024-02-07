@@ -28,11 +28,11 @@ pub type NameResult<T> = io::Result<Arc<T>>;
 
 pub fn namegen_local_socket(
 	id: &'static str,
-	namespaced: bool, // TODO path
+	path: bool,
 ) -> NameGen<LocalSocketName<'static>, impl FnMut(u32) -> io::Result<Arc<LocalSocketName<'static>>>>
 {
 	NameGen::new(id, move |rn| {
-		if namespaced { next_ns(rn) } else { next_fs(rn) }.map(Arc::new)
+		if path { next_fs(rn) } else { next_ns(rn) }.map(Arc::new)
 	})
 }
 

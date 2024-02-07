@@ -19,9 +19,9 @@ pub fn server(
 	handle_client: fn(LocalSocketStream) -> TestResult,
 	name_sender: Sender<Arc<LocalSocketName<'static>>>,
 	num_clients: u32,
-	namespaced: bool,
+	path: bool,
 ) -> TestResult {
-	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
+	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
 		LocalSocketListener::bind(nm.borrow())
 	})?;
 	let _ = name_sender.send(name);

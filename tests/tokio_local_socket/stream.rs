@@ -22,9 +22,9 @@ pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
 	mut handle_client: impl FnMut(LocalSocketStream) -> HCF,
 	name_sender: Sender<Arc<LocalSocketName<'static>>>,
 	num_clients: u32,
-	namespaced: bool,
+	path: bool,
 ) -> TestResult {
-	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, namespaced), |nm| {
+	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
 		LocalSocketListener::bind(nm.borrow())
 	})?;
 
