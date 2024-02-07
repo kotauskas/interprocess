@@ -66,6 +66,7 @@ impl LocalSocketStream {
 	pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
 		LocalSocketStreamImpl::connect(name).map(Self)
 	}
+
 	/// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
 	///
 	/// In nonblocking mode, receiving and sending immediately returns with the
@@ -78,6 +79,7 @@ impl LocalSocketStream {
 	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		self.0.set_nonblocking(nonblocking)
 	}
+
 	/// Splits a stream into a receive half and a send half, which can be used to receive from and
 	/// send to the stream concurrently from different threads, entailing a memory allocation.
 	#[inline]

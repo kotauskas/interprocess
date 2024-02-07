@@ -67,6 +67,7 @@ impl LocalSocketStream {
 	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
 		LocalSocketStreamImpl::connect(name).await.map(Self::from)
 	}
+
 	/// Splits a stream into a receive half and a send half, which can be used to receive data from
 	/// and send data to the stream concurrently from independently spawned tasks, entailing a
 	/// memory allocation.
@@ -74,6 +75,18 @@ impl LocalSocketStream {
 	pub fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.split();
 		(RecvHalf(r), SendHalf(w))
+	}
+	/// Attempts to reunite a receive half with a send half to yield the original stream back,
+	/// returning both halves as an error if they belong to different streams (or when using
+	/// this method on streams that haven't been split to begin with).
+	#[inline]
+	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
+		LocalSocketStreamImpl::reunite(rh.0, sh.0)
+			.map(Self)
+			.map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+				rh: RecvHalf(rh),
+				sh: SendHalf(sh),
+			})
 	}
 }
 #[doc(hidden)]
@@ -128,3 +141,8 @@ multimacro! {
 	forward_debug,
 	derive_asraw,
 }
+
+/// [`ReuniteError`](crate::error::ReuniteError) for Tokio local socket streams.
+pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
+/// Result type for [`LocalSocketStream::reunite()`].
+pub type ReuniteResult = Result<LocalSocketStream, ReuniteError>;
