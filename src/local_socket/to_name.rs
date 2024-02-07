@@ -65,12 +65,12 @@ fn err_ns() -> io::Error {
 }
 
 fn from_osstr(osstr: &OsStr, path: bool) -> io::Result<LocalSocketName<'_>> {
-	is_supported(dbg!(osstr), path)
+	is_supported(osstr, path)
 		.then(|| LocalSocketName::new(Cow::Borrowed(osstr), path))
 		.ok_or_else(if path { err_fs } else { err_ns })
 }
 fn from_osstring(osstring: OsString, path: bool) -> io::Result<LocalSocketName<'static>> {
-	is_supported(dbg!(&osstring), path)
+	is_supported(&osstring, path)
 		.then(|| LocalSocketName::new(Cow::Owned(osstring), path))
 		.ok_or_else(if path { err_fs } else { err_ns })
 }
