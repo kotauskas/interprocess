@@ -1,19 +1,32 @@
 // TODO test various error conditions
-// TODO test reunite in some shape or form
 #![cfg(feature = "tokio")]
 
 mod no_server;
 mod stream;
 
 use crate::{
-	local_socket::NameTypeSupport,
+	local_socket::{tokio::LocalSocketStream, LocalSocketName, NameTypeSupport},
 	tests::util::{self, testinit, TestResult},
 };
+use std::{future::Future, pin::Pin, sync::Arc};
 
+#[allow(clippy::type_complexity)]
 async fn test_stream(id: &'static str, split: bool, nmspc: bool) -> TestResult {
 	use stream::*;
 	testinit();
-	util::tokio::drive_server_and_multiple_clients(move |s, n| server(id, s, n, nmspc), client)
+	type Fut = Pin<Box<dyn Future<Output = TestResult> + Send + 'static>>;
+	type F<T> = Box<dyn Fn(T) -> Fut + Send + Sync>;
+	let hcl: F<LocalSocketStream> = if split {
+		Box::new(|conn| Box::pin(handle_client_split(conn)))
+	} else {
+		Box::new(|conn| Box::pin(handle_client_nosplit(conn)))
+	};
+	let client: F<Arc<LocalSocketName<'static>>> = if split {
+		Box::new(|conn| Box::pin(client_split(conn)))
+	} else {
+		Box::new(|conn| Box::pin(client_nosplit(conn)))
+	};
+	util::tokio::drive_server_and_multiple_clients(move |s, n| server(id, hcl, s, n, nmspc), client)
 		.await
 }
 
@@ -26,9 +39,14 @@ macro_rules! matrix {
 		}
 		Ok(())
 	}};
-	($nm:ident $split:ident $nmspc:ident) => {
+	($nm:ident false $nmspc:ident) => {
 		#[tokio::test]
-		async fn $nm() -> TestResult { matrix!(@body $split $nmspc) }
+		async fn $nm() -> TestResult { matrix!(@body false $nmspc) }
+	};
+	($nm:ident true $nmspc:ident) => {
+		#[tokio::test]
+		#[cfg(not(windows))]
+		async fn $nm() -> TestResult { matrix!(@body true $nmspc) }
 	};
 	($($nm:ident $split:ident $nmspc:ident)+) => { $(matrix!($nm $split $nmspc);)+ };
 }

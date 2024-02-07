@@ -28,7 +28,7 @@ pub type NameResult<T> = io::Result<Arc<T>>;
 
 pub fn namegen_local_socket(
 	id: &'static str,
-	namespaced: bool,
+	namespaced: bool, // TODO path
 ) -> NameGen<LocalSocketName<'static>, impl FnMut(u32) -> io::Result<Arc<LocalSocketName<'static>>>>
 {
 	NameGen::new(id, move |rn| {

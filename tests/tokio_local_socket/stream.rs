@@ -6,19 +6,20 @@ use crate::{
 	tests::util::*,
 };
 use ::tokio::{
-	io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+	io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
 	sync::oneshot::Sender,
 	task, try_join,
 };
 use color_eyre::eyre::WrapErr;
-use std::{convert::TryInto, str, sync::Arc};
+use std::{convert::TryInto, future::Future, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {
 	message(None, server, Some(['\n', '\0'][nts as usize]))
 }
 
-pub async fn server(
+pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
 	id: &'static str,
+	mut handle_client: impl FnMut(LocalSocketStream) -> HCF,
 	name_sender: Sender<Arc<LocalSocketName<'static>>>,
 	num_clients: u32,
 	namespaced: bool,
@@ -31,13 +32,8 @@ pub async fn server(
 
 	let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
 	for _ in 0..num_clients {
-		let stream = listener.accept().await.opname("accept")?;
-		tasks.push(task::spawn(async move {
-			try_join!(
-				recv(&stream, msg(false, false), msg(false, true)),
-				send(&stream, msg(true, false), msg(true, true)),
-			)
-		}));
+		let conn = listener.accept().await.opname("accept")?;
+		tasks.push(task::spawn(handle_client(conn)));
 	}
 	for task in tasks {
 		task.await
@@ -46,56 +42,99 @@ pub async fn server(
 	}
 	Ok(())
 }
-pub async fn client(nm: Arc<LocalSocketName<'static>>) -> TestResult {
-	let stream = LocalSocketStream::connect(nm.borrow())
+
+pub async fn handle_client_nosplit(conn: LocalSocketStream) -> TestResult {
+	let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
+	let recv = async {
+		recv(&mut recver, &msg(false, false), 0).await?;
+		recv(&mut recver, &msg(false, true), 1).await
+	};
+	let send = async {
+		send(&mut sender, &msg(true, false), 0).await?;
+		send(&mut sender, &msg(true, true), 1).await
+	};
+	try_join!(recv, send).map(|((), ())| ())
+}
+
+pub async fn handle_client_split(conn: LocalSocketStream) -> TestResult {
+	let (recver, sender) = conn.split();
+
+	let recv = task::spawn(async move {
+		let mut recver = BufReader::new(recver);
+		recv(&mut recver, &msg(true, false), 0).await?;
+		recv(&mut recver, &msg(true, true), 1).await?;
+		TestResult::<_>::Ok(recver.into_inner())
+	});
+	let send = task::spawn(async move {
+		let mut sender = sender;
+		send(&mut sender, &msg(false, false), 0).await?;
+		send(&mut sender, &msg(false, true), 1).await?;
+		TestResult::<_>::Ok(sender)
+	});
+
+	let (recver, sender) = try_join!(recv, send)?;
+	LocalSocketStream::reunite(recver?, sender?).opname("reunite")?;
+	Ok(())
+}
+
+pub async fn client_nosplit(nm: Arc<LocalSocketName<'static>>) -> TestResult {
+	let conn = LocalSocketStream::connect(nm.borrow())
 		.await
 		.opname("connect")?;
-	try_join!(
-		recv(&stream, msg(true, false), msg(true, true)),
-		send(&stream, msg(false, false), msg(false, true)),
-	)
-	.map(|((), ())| ())
+	let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
+	let recv = async {
+		recv(&mut recver, &msg(true, false), 0).await?;
+		recv(&mut recver, &msg(true, true), 1).await
+	};
+	let send = async {
+		send(&mut sender, &msg(false, false), 0).await?;
+		send(&mut sender, &msg(false, true), 1).await
+	};
+	try_join!(recv, send).map(|((), ())| ())
 }
 
-async fn recv(
-	stream: &LocalSocketStream,
-	exp1: impl AsRef<str>,
-	exp2: impl AsRef<str>,
-) -> TestResult {
-	let mut recver = BufReader::new(stream);
-	let mut sbuffer = String::with_capacity(128);
-
-	recver
-		.read_line(&mut sbuffer)
+pub async fn client_split(name: Arc<LocalSocketName<'_>>) -> TestResult {
+	let (recver, sender) = LocalSocketStream::connect(name.borrow())
 		.await
-		.context("first receive failed")?;
-	ensure_eq!(sbuffer, exp1.as_ref());
-	sbuffer.clear();
-	let mut buffer = sbuffer.into_bytes();
+		.opname("connect")?
+		.split();
 
-	recver
-		.read_until(b'\0', &mut buffer)
+	let recv = task::spawn(async move {
+		let mut recver = BufReader::new(recver);
+		recv(&mut recver, &msg(false, false), 0).await?;
+		recv(&mut recver, &msg(false, true), 1).await?;
+		TestResult::<_>::Ok(recver.into_inner())
+	});
+	let send = task::spawn(async move {
+		let mut sender = sender;
+		send(&mut sender, &msg(true, false), 0).await?;
+		send(&mut sender, &msg(true, true), 1).await?;
+		TestResult::<_>::Ok(sender)
+	});
+
+	let (recver, sender) = try_join!(recv, send)?;
+	LocalSocketStream::reunite(recver?, sender?).opname("reunite")?;
+	Ok(())
+}
+
+async fn recv(conn: &mut (dyn AsyncBufRead + Unpin + Send), exp: &str, nr: u8) -> TestResult {
+	let term = *exp.as_bytes().last().unwrap();
+	let fs = ["first", "second"][nr as usize];
+
+	let mut buffer = Vec::with_capacity(exp.len());
+	conn.read_until(term, &mut buffer)
 		.await
-		.context("second receive failed")?;
+		.wrap_err_with(|| format!("{} receive failed", fs))?;
 	ensure_eq!(
-		str::from_utf8(&buffer).context("second received message was not valid UTF-8")?,
-		exp2.as_ref(),
+		str::from_utf8(&buffer).with_context(|| format!("{} receive wasn't valid UTF-8", fs))?,
+		exp,
 	);
-
 	Ok(())
 }
-async fn send(
-	mut stream: &LocalSocketStream,
-	msg1: impl AsRef<str>,
-	msg2: impl AsRef<str>,
-) -> TestResult {
-	stream
-		.write_all(msg1.as_ref().as_bytes())
+
+async fn send(conn: &mut (dyn AsyncWrite + Unpin + Send), msg: &str, nr: u8) -> TestResult {
+	let fs = ["first", "second"][nr as usize];
+	conn.write_all(msg.as_bytes())
 		.await
-		.context("first send failed")?;
-	stream
-		.write_all(msg2.as_ref().as_bytes())
-		.await
-		.context("second send failed")?;
-	Ok(())
+		.with_context(|| format!("{} socket send failed", fs))
 }

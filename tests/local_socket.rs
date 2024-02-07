@@ -3,7 +3,10 @@
 mod no_server;
 mod stream;
 
-use crate::{local_socket::NameTypeSupport, tests::util::*};
+use crate::{
+	local_socket::{LocalSocketName, NameTypeSupport},
+	tests::util::*,
+};
 
 fn test_stream(id: &'static str, split: bool, nmspc: bool) -> TestResult {
 	use stream::*;
@@ -13,13 +16,13 @@ fn test_stream(id: &'static str, split: bool, nmspc: bool) -> TestResult {
 	} else {
 		handle_client_nosplit as _
 	};
-	let scl = |s, n| server(id, hcl, s, n, nmspc);
-	// I love the Rust typesystem
-	if split {
-		drive_server_and_multiple_clients(scl, client_split)?;
+	let client: fn(&LocalSocketName<'_>) -> TestResult = if split {
+		client_split as _
 	} else {
-		drive_server_and_multiple_clients(scl, client_nosplit)?;
-	}
+		client_nosplit as _
+	};
+	let scl = |s, n| server(id, hcl, s, n, nmspc);
+	drive_server_and_multiple_clients(scl, client)?;
 	Ok(())
 }
 
