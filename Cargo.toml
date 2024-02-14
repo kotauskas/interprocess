@@ -37,7 +37,6 @@ tokio = { version = "1.32.0", features = [
 	"time",
 	"io-util",
 ], optional = true }
-cfg-if = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.48.0", features = [
