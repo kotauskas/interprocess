@@ -58,15 +58,15 @@ matrix! {
 fn no_server_file() -> TestResult {
 	testinit();
 	if NameTypeSupport::query().fs_supported() {
-		no_server::run_and_verify_error(false)?;
+		no_server::run_and_verify_error(true)?;
 	}
 	Ok(())
 }
 #[test]
 fn no_server_namespaced() -> TestResult {
 	testinit();
-	if NameTypeSupport::query().fs_supported() {
-		no_server::run_and_verify_error(true)?;
+	if NameTypeSupport::query().ns_supported() {
+		no_server::run_and_verify_error(false)?;
 	}
 	Ok(())
 }

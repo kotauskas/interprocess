@@ -62,7 +62,7 @@ matrix! {
 async fn no_server_file() -> TestResult {
 	testinit();
 	if NameTypeSupport::query().fs_supported() {
-		no_server::run_and_verify_error(false).await?;
+		no_server::run_and_verify_error(true).await?;
 	}
 	Ok(())
 }
@@ -70,7 +70,7 @@ async fn no_server_file() -> TestResult {
 async fn no_server_namespaced() -> TestResult {
 	testinit();
 	if NameTypeSupport::query().ns_supported() {
-		no_server::run_and_verify_error(true).await?;
+		no_server::run_and_verify_error(false).await?;
 	}
 	Ok(())
 }
