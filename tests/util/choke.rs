@@ -49,7 +49,7 @@ impl ChokeInner {
 	}
 }
 
-/// A guard for `Choke` that owns one unit towards the limit.
+/// Guard for `Choke` that owns one unit towards the limit.
 pub struct ChokeGuard(Weak<ChokeInner>);
 impl Drop for ChokeGuard {
 	fn drop(&mut self) {

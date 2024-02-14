@@ -16,7 +16,7 @@ use tokio::net::windows::named_pipe::{
 	NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
 };
 
-/// A Tokio-based named pipe stream, created by a server-side listener or by connecting to a server.
+/// Tokio-based named pipe stream, created by a server-side listener or by connecting to a server.
 ///
 /// This type combines in itself all possible combinations of receive modes and send modes, plugged
 /// into it using the `Rm` and `Sm` generic parameters respectively.

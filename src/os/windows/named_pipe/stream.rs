@@ -12,7 +12,7 @@ use super::{ConcurrencyDetector, MaybeArc, NeedsFlush};
 use crate::os::windows::FileHandle;
 use std::{marker::PhantomData, os::windows::prelude::*};
 
-/// A named pipe stream, created by a server-side listener or by connecting to a server.
+/// Named pipe stream, created by a server-side listener or by connecting to a server.
 ///
 /// This type combines in itself all possible combinations of
 /// [receive modes and send modes](pipe_mode), plugged into it using the `Rm` and `Sm` generic

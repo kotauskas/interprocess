@@ -9,7 +9,7 @@ impmod! {local_socket,
 
 // TODO concurrency prevention on all platforms
 
-/// A local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by connecting
+/// Local socket byte stream, obtained either from [`Listener`](super::Listener) or by connecting
 /// to an existing local socket.
 ///
 /// # Examples
@@ -111,7 +111,7 @@ multimacro! {
 	derive_asintoraw,
 }
 
-/// A receive half of a local socket stream, obtained by splitting a [`Stream`].
+/// Receive half of a local socket stream, obtained by splitting a [`Stream`].
 // TODO example
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
@@ -124,7 +124,7 @@ multimacro! {
 	derive_asraw,
 }
 
-/// A send half of a local socket stream, obtained by splitting a [`Stream`].
+/// Send half of a local socket stream, obtained by splitting a [`Stream`].
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
 	SendHalf,

@@ -27,7 +27,7 @@ pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
 	pipe_impl()
 }
 
-/// A handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
+/// Handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
 /// with the [sending end](UnnamedPipeSender).
 ///
 /// The core functionality is exposed in a [`Read`](io::Read) interface. On Windows, the
@@ -51,7 +51,7 @@ multimacro! {
 	derive_raw,
 }
 
-/// A handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
+/// Handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
 /// the [receiving end](UnnamedPipeRecver).
 ///
 /// The core functionality is exposed in a [`Write`](io::Write) interface. On Windows, the

@@ -5,7 +5,7 @@ impmod! {local_socket,
 	Listener as ListenerImpl
 }
 
-/// A local socket server, listening for connections.
+/// Local socket server, listening for connections.
 ///
 /// # Name reclamation
 /// *This section only applies to Unix domain sockets.*

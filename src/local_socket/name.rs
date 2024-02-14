@@ -13,7 +13,7 @@ impmod! {
 // TODO better PartialEq
 
 // TODO adjust docs
-/// A name for a local socket.
+/// Name for a local socket.
 ///
 /// Due to significant differences between how different platforms name local sockets, there needs
 /// to be a way to store and process those in a unified way while also retaining those

@@ -24,13 +24,13 @@ use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePip
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
 pub struct UnnamedPipeCreationOptions<'a> {
-	/// A security descriptor for the pipe.
+	/// Security descriptor for the pipe.
 	pub security_descriptor: Option<&'a SecurityDescriptor>,
 	/// Specifies whether the resulting pipe can be inherited by child processes.
 	///
 	/// The default value is `true`.
 	pub inheritable: bool,
-	/// A hint on the buffer size for the pipe. There is no way to ensure or check that the system
+	/// Hint on the buffer size for the pipe. There is no way to ensure or check that the system
 	/// actually uses this exact size, since it's only a hint. Set to `None` to disable the hint and
 	/// rely entirely on the system's default buffer size.
 	pub buffer_size_hint: Option<NonZeroUsize>,

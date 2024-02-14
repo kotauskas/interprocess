@@ -3,7 +3,7 @@ use windows_sys::Win32::Security::{
 	IsValidSecurityDescriptor, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR,
 };
 
-/// A borrowed [security descriptor][sd] which is known to be safe to use.
+/// Borrowed [security descriptor][sd] which is known to be safe to use.
 ///
 /// [sd]: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-security_descriptor
 #[derive(Copy, Clone)]

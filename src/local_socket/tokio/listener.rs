@@ -7,7 +7,7 @@ impmod! {local_socket::tokio,
 
 // TODO borrowed split in examples
 
-/// A Tokio-based local socket server, listening for connections.
+/// Tokio-based local socket server, listening for connections.
 ///
 /// [Name reclamation](super::super::Stream#name-reclamation) is performed by default on
 /// backends that necessitate it.

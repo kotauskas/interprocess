@@ -18,7 +18,7 @@ use std::{
 };
 use tokio::{net::windows::named_pipe::NamedPipeServer as TokioNPServer, sync::Mutex};
 
-/// A Tokio-based async server for a named pipe, asynchronously listening for connections to clients
+/// Tokio-based async server for a named pipe, asynchronously listening for connections to clients
 /// and producing asynchronous pipe streams.
 ///
 /// Note that this type does not correspond to any Tokio object, and is an invention of Interprocess

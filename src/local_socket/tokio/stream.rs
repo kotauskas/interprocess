@@ -7,7 +7,7 @@ impmod! {local_socket::tokio,
 	SendHalf as SendHalfImpl,
 }
 
-/// A Tokio-based local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by
+/// Tokio-based local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by
 /// connecting to an existing local socket.
 ///
 /// # Examples
@@ -108,7 +108,7 @@ multimacro! {
 	derive_asraw,
 }
 
-/// A receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+/// Receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
 ///
 /// # Examples
 // TODO
@@ -123,7 +123,7 @@ multimacro! {
 	forward_debug,
 	derive_asraw,
 }
-/// A send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+/// Send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
 ///
 /// # Examples
 // TODO
