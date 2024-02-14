@@ -1,13 +1,13 @@
 //! Platform-specific functionality for unnamed pipes.
 //!
-//! Currently, this consists of only the [`UnnamedPipeCreationOptions`] builder, but more might be
+//! Currently, this consists of only the [`CreationOptions`] builder, but more might be
 //! added.
 
-// TODO add examples
+// TODO add examples and tests
 
 use super::{winprelude::*, FileHandle, SecurityDescriptor};
 use crate::{
-	unnamed_pipe::{UnnamedPipeRecver as PubRecver, UnnamedPipeSender as PubSender},
+	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
 	weaken_buf_init_mut,
 };
 use std::{
@@ -23,7 +23,7 @@ use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePip
 /// additional Windows-specific parameters to a pipe.
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug)]
-pub struct UnnamedPipeCreationOptions<'a> {
+pub struct CreationOptions<'a> {
 	/// Security descriptor for the pipe.
 	pub security_descriptor: Option<&'a SecurityDescriptor>,
 	/// Specifies whether the resulting pipe can be inherited by child processes.
@@ -35,7 +35,7 @@ pub struct UnnamedPipeCreationOptions<'a> {
 	/// rely entirely on the system's default buffer size.
 	pub buffer_size_hint: Option<NonZeroUsize>,
 }
-impl<'a> UnnamedPipeCreationOptions<'a> {
+impl<'a> CreationOptions<'a> {
 	/// Starts with the default parameters for the pipe. Identical to `Default::default()`.
 	pub const fn new() -> Self {
 		Self {
@@ -104,45 +104,45 @@ impl<'a> UnnamedPipeCreationOptions<'a> {
 				let r = OwnedHandle::from_raw_handle(r as RawHandle);
 				(w, r)
 			};
-			let w = PubSender(UnnamedPipeSender(FileHandle::from(w)));
-			let r = PubRecver(UnnamedPipeRecver(FileHandle::from(r)));
+			let w = PubSender(Sender(FileHandle::from(w)));
+			let r = PubRecver(Recver(FileHandle::from(r)));
 			Ok((w, r))
 		} else {
 			Err(io::Error::last_os_error())
 		}
 	}
 }
-impl Default for UnnamedPipeCreationOptions<'_> {
+impl Default for CreationOptions<'_> {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
 pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
-	UnnamedPipeCreationOptions::default().build()
+	CreationOptions::default().build()
 }
 
-pub(crate) struct UnnamedPipeRecver(FileHandle);
-impl Read for UnnamedPipeRecver {
+pub(crate) struct Recver(FileHandle);
+impl Read for Recver {
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		self.0.read(weaken_buf_init_mut(buf))
 	}
 }
-impl Debug for UnnamedPipeRecver {
+impl Debug for Recver {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("UnnamedPipeRecver")
+		f.debug_tuple("Recver")
 			.field(&self.0.as_raw_handle())
 			.finish()
 	}
 }
 multimacro! {
-	UnnamedPipeRecver,
+	Recver,
 	forward_handle,
 	forward_try_clone,
 }
 
-pub(crate) struct UnnamedPipeSender(FileHandle);
-impl Write for UnnamedPipeSender {
+pub(crate) struct Sender(FileHandle);
+impl Write for Sender {
 	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
 		self.0.write(buf)
 	}
@@ -150,15 +150,15 @@ impl Write for UnnamedPipeSender {
 		self.0.flush()
 	}
 }
-impl Debug for UnnamedPipeSender {
+impl Debug for Sender {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("UnnamedPipeSender")
+		f.debug_tuple("Sender")
 			.field(&self.0.as_raw_handle())
 			.finish()
 	}
 }
 multimacro! {
-	UnnamedPipeSender,
+	Sender,
 	forward_handle,
 	forward_try_clone,
 }

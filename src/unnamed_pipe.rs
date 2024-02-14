@@ -11,8 +11,8 @@
 //! unnamed pipe connection. It just so happens that this crate supports all three.
 
 impmod! {unnamed_pipe,
-	UnnamedPipeRecver as UnnamedPipeRecverImpl,
-	UnnamedPipeSender as UnnamedPipeSenderImpl,
+	Recver as RecverImpl,
+	Sender as SenderImpl,
 	pipe as pipe_impl,
 }
 use std::io;
@@ -23,12 +23,12 @@ use std::io;
 /// The platform-specific builders in the `os` module of the crate might be more helpful if a
 /// configuration process for the pipe is needed.
 #[inline]
-pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
+pub fn pipe() -> io::Result<(Sender, Recver)> {
 	pipe_impl()
 }
 
 /// Handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
-/// with the [sending end](UnnamedPipeSender).
+/// with the [sending end](Sender).
 ///
 /// The core functionality is exposed in a [`Read`](io::Read) interface. On Windows, the
 /// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
@@ -41,9 +41,9 @@ pub fn pipe() -> io::Result<(UnnamedPipeSender, UnnamedPipeRecver)> {
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 // field is pub(crate) to allow platform builders to create the public-facing pipe types
-pub struct UnnamedPipeRecver(pub(crate) UnnamedPipeRecverImpl);
+pub struct Recver(pub(crate) RecverImpl);
 multimacro! {
-	UnnamedPipeRecver,
+	Recver,
 	forward_sync_read,
 	forward_handle,
 	forward_try_clone,
@@ -52,7 +52,7 @@ multimacro! {
 }
 
 /// Handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
-/// the [receiving end](UnnamedPipeRecver).
+/// the [receiving end](Recver).
 ///
 /// The core functionality is exposed in a [`Write`](io::Write) interface. On Windows, the
 /// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
@@ -64,9 +64,9 @@ multimacro! {
 /// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
-pub struct UnnamedPipeSender(pub(crate) UnnamedPipeSenderImpl);
+pub struct Sender(pub(crate) SenderImpl);
 multimacro! {
-	UnnamedPipeSender,
+	Sender,
 	forward_sync_write,
 	forward_handle,
 	forward_try_clone,

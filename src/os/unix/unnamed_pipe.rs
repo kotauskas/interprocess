@@ -1,6 +1,6 @@
 use super::FdOps;
 use crate::{
-	unnamed_pipe::{UnnamedPipeRecver as PubRecver, UnnamedPipeSender as PubSender},
+	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
 	Sealed,
 };
 use libc::c_int;
@@ -27,25 +27,25 @@ pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
 			let r = OwnedFd::from_raw_fd(fds[0]);
 			(w, r)
 		};
-		let w = PubSender(UnnamedPipeSender(FdOps(w)));
-		let r = PubRecver(UnnamedPipeRecver(FdOps(r)));
+		let w = PubSender(Sender(FdOps(w)));
+		let r = PubRecver(Recver(FdOps(r)));
 		Ok((w, r))
 	} else {
 		Err(io::Error::last_os_error())
 	}
 }
 
-pub(crate) struct UnnamedPipeRecver(FdOps);
-impl Sealed for UnnamedPipeRecver {}
-impl Debug for UnnamedPipeRecver {
+pub(crate) struct Recver(FdOps);
+impl Sealed for Recver {}
+impl Debug for Recver {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("UnnamedPipeRecver")
+		f.debug_struct("Recver")
 			.field("fd", &self.0 .0.as_raw_fd())
 			.finish()
 	}
 }
 multimacro! {
-	UnnamedPipeRecver,
+	Recver,
 	forward_rbv(FdOps, &),
 	forward_sync_ref_read,
 	forward_try_clone,
@@ -53,18 +53,18 @@ multimacro! {
 	derive_sync_mut_read,
 }
 
-pub(crate) struct UnnamedPipeSender(FdOps);
-impl Sealed for UnnamedPipeSender {}
-impl Debug for UnnamedPipeSender {
+pub(crate) struct Sender(FdOps);
+impl Sealed for Sender {}
+impl Debug for Sender {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("UnnamedPipeSender")
+		f.debug_struct("Sender")
 			.field("fd", &self.0 .0.as_raw_fd())
 			.finish()
 	}
 }
 
 multimacro! {
-	UnnamedPipeSender,
+	Sender,
 	forward_rbv(FdOps, &),
 	forward_sync_ref_write,
 	forward_try_clone,
