@@ -18,12 +18,13 @@ impl LocalSocketStream {
 		(RecvHalf(Arc::clone(&arc)), SendHalf(arc))
 	}
 	#[inline]
+	#[allow(clippy::unwrap_in_result)]
 	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
 		if !Arc::ptr_eq(&rh.0, &sh.0) {
 			return Err(ReuniteError { rh, sh });
 		}
 		drop(rh);
-		let inner = Arc::into_inner(sh.0).unwrap();
+		let inner = Arc::into_inner(sh.0).expect("stream half inexplicably copied");
 		Ok(inner)
 	}
 }

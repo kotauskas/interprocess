@@ -1,5 +1,5 @@
 use super::super::name_to_addr;
-use crate::{local_socket::LocalSocketName, os::unix::c_wrappers};
+use crate::{error::ReuniteError, local_socket::LocalSocketName, os::unix::c_wrappers};
 use std::{
 	io::{self, ErrorKind::WouldBlock},
 	net::Shutdown,
@@ -31,6 +31,7 @@ impl LocalSocketStream {
 	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
 		Self::_connect(name_to_addr(name)?).await.map(Self::from)
 	}
+	#[allow(clippy::unwrap_used)]
 	async fn _connect(addr: SocketAddr) -> io::Result<UnixStream> {
 		#[cfg(any(target_os = "linux", target_os = "android"))]
 		{
@@ -47,9 +48,19 @@ impl LocalSocketStream {
 		}
 		UnixStream::connect(addr.as_pathname().unwrap()).await
 	}
+
 	pub fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.into_split();
 		(RecvHalf(r), SendHalf(w))
+	}
+	#[inline]
+	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
+		rh.0.reunite(sh.0)
+			.map(Self)
+			.map_err(|tokio::net::unix::ReuniteError(rh, sh)| ReuniteError {
+				rh: RecvHalf(rh),
+				sh: SendHalf(sh),
+			})
 	}
 }
 impl From<UnixStream> for LocalSocketStream {

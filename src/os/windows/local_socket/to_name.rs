@@ -16,8 +16,8 @@ pub fn cstring_to_osstring(cstring: CString) -> io::Result<OsString> {
 		.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
-pub fn is_supported(s: &OsStr, path: bool) -> bool {
-	!path || is_pipefs(s)
+pub fn is_supported(s: &OsStr, path: bool) -> io::Result<bool> {
+	Ok(!path || is_pipefs(s))
 }
 
 #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)] // minlen check
@@ -55,10 +55,13 @@ mod tests {
 	static NP: &str = r"Именованная труба\yeah";
 	#[track_caller]
 	fn assert_supported(s: impl AsRef<OsStr>, path: bool) {
-		assert!(is_supported(s.as_ref(), path));
+		assert!(is_supported(s.as_ref(), path).unwrap());
 	}
 	fn assert_not_supported(s: impl AsRef<OsStr>, path: bool) {
-		assert!(!is_supported(s.as_ref(), path));
+		assert!(matches!(
+			is_supported(s.as_ref(), path),
+			Ok(false) | Err(..)
+		));
 	}
 
 	#[test]
