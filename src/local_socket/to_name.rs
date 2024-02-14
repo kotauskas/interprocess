@@ -1,4 +1,4 @@
-use super::LocalSocketName;
+use super::Name;
 use std::{
 	borrow::Cow,
 	ffi::{CStr, CString, OsStr, OsString},
@@ -17,7 +17,7 @@ macro_rules! trivial_string_impl {
 	($trait:ident $mtd:ident for $($tgt:ty => $via:ident :: $ctor:ident),+ $(,)?) => {$(
 		impl<'s> $trait<'s> for $tgt {
 			#[inline]
-			fn $mtd(self) -> io::Result<LocalSocketName<'s>> {
+			fn $mtd(self) -> io::Result<Name<'s>> {
 				$via::$ctor(self).$mtd()
 			}
 		}
@@ -29,7 +29,7 @@ pub trait ToFsName<'s> {
 	/// Performs the conversion to a filesystem-type name.
 	///
 	/// Fails if the resulting name isn't supported by the platform.
-	fn to_fs_name(self) -> io::Result<LocalSocketName<'s>>;
+	fn to_fs_name(self) -> io::Result<Name<'s>>;
 }
 
 /// Conversion to a namespaced local socket name.
@@ -37,7 +37,7 @@ pub trait ToNsName<'s> {
 	/// Performs the conversion to a namespaced name.
 	///
 	/// Fails if the resulting name isn't supported by the platform.
-	fn to_ns_name(self) -> io::Result<LocalSocketName<'s>>;
+	fn to_ns_name(self) -> io::Result<Name<'s>>;
 }
 
 #[allow(dead_code)]
@@ -65,26 +65,26 @@ fn err_ns() -> io::Error {
 	}
 }
 
-fn from_osstr(osstr: &OsStr, path: bool) -> io::Result<LocalSocketName<'_>> {
+fn from_osstr(osstr: &OsStr, path: bool) -> io::Result<Name<'_>> {
 	is_supported(osstr, path)?
-		.then(|| LocalSocketName::new(Cow::Borrowed(osstr), path))
+		.then(|| Name::new(Cow::Borrowed(osstr), path))
 		.ok_or_else(if path { err_fs } else { err_ns })
 }
-fn from_osstring(osstring: OsString, path: bool) -> io::Result<LocalSocketName<'static>> {
+fn from_osstring(osstring: OsString, path: bool) -> io::Result<Name<'static>> {
 	is_supported(&osstring, path)?
-		.then(|| LocalSocketName::new(Cow::Owned(osstring), path))
+		.then(|| Name::new(Cow::Owned(osstring), path))
 		.ok_or_else(if path { err_fs } else { err_ns })
 }
 
 impl<'s> ToFsName<'s> for &'s Path {
 	#[inline]
-	fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_fs_name(self) -> io::Result<Name<'s>> {
 		from_osstr(self.as_os_str(), true)
 	}
 }
 impl<'s> ToFsName<'s> for PathBuf {
 	#[inline]
-	fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_fs_name(self) -> io::Result<Name<'s>> {
 		from_osstring(self.into_os_string(), true)
 	}
 }
@@ -97,26 +97,26 @@ trivial_string_impl! { ToFsName to_fs_name for
 
 /// Will fail on Windows if the string isn't valid UTF-8.
 impl<'s> ToFsName<'s> for &'s CStr {
-	fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_fs_name(self) -> io::Result<Name<'s>> {
 		cstr_to_osstr(self).and_then(<&OsStr>::to_fs_name)
 	}
 }
 /// Will fail on Windows if the string isn't valid UTF-8.
 impl<'s> ToFsName<'s> for CString {
-	fn to_fs_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_fs_name(self) -> io::Result<Name<'s>> {
 		cstring_to_osstring(self).and_then(OsString::to_fs_name)
 	}
 }
 
 impl<'s> ToNsName<'s> for &'s OsStr {
 	#[inline]
-	fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_ns_name(self) -> io::Result<Name<'s>> {
 		from_osstr(self, false)
 	}
 }
 impl<'s> ToNsName<'s> for OsString {
 	#[inline]
-	fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_ns_name(self) -> io::Result<Name<'s>> {
 		from_osstring(self, false)
 	}
 }
@@ -127,13 +127,13 @@ trivial_string_impl! { ToNsName to_ns_name for
 
 /// Will fail on Windows if the string isn't valid UTF-8.
 impl<'s> ToNsName<'s> for &'s CStr {
-	fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_ns_name(self) -> io::Result<Name<'s>> {
 		cstr_to_osstr(self).and_then(<&OsStr>::to_ns_name)
 	}
 }
 /// Will fail on Windows if the string isn't valid UTF-8.
 impl<'s> ToNsName<'s> for CString {
-	fn to_ns_name(self) -> io::Result<LocalSocketName<'s>> {
+	fn to_ns_name(self) -> io::Result<Name<'s>> {
 		cstring_to_osstring(self).and_then(OsString::to_ns_name)
 	}
 }

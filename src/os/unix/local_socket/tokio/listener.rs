@@ -1,9 +1,7 @@
-use super::LocalSocketStream;
+use super::Stream;
 use crate::{
-	local_socket::LocalSocketName,
-	os::unix::local_socket::{
-		listener::LocalSocketListener as SyncLocalSocketListener, ReclaimGuard,
-	},
+	local_socket::Name,
+	os::unix::local_socket::{listener::Listener as SyncListener, ReclaimGuard},
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -12,17 +10,17 @@ use std::{
 };
 use tokio::net::UnixListener;
 
-pub struct LocalSocketListener {
+pub struct Listener {
 	listener: UnixListener,
 	reclaim: ReclaimGuard,
 }
-impl LocalSocketListener {
-	pub fn bind(name: LocalSocketName<'_>, keep_name: bool) -> io::Result<Self> {
-		Self::try_from(SyncLocalSocketListener::bind(name, keep_name)?)
+impl Listener {
+	pub fn bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
+		Self::try_from(SyncListener::bind(name, keep_name)?)
 	}
-	pub async fn accept(&self) -> io::Result<LocalSocketStream> {
+	pub async fn accept(&self) -> io::Result<Stream> {
 		let inner = self.listener.accept().await?.0;
-		Ok(LocalSocketStream(inner))
+		Ok(Stream(inner))
 	}
 
 	pub fn do_not_reclaim_name_on_drop(&mut self) {
@@ -30,9 +28,9 @@ impl LocalSocketListener {
 	}
 }
 
-impl TryFrom<SyncLocalSocketListener> for LocalSocketListener {
+impl TryFrom<SyncListener> for Listener {
 	type Error = io::Error;
-	fn try_from(mut sync: SyncLocalSocketListener) -> io::Result<Self> {
+	fn try_from(mut sync: SyncListener) -> io::Result<Self> {
 		sync.set_nonblocking(true)?;
 		let reclaim = sync.reclaim.take();
 		Ok(Self {
@@ -42,32 +40,32 @@ impl TryFrom<SyncLocalSocketListener> for LocalSocketListener {
 	}
 }
 
-impl Debug for LocalSocketListener {
+impl Debug for Listener {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("LocalSocketListener")
+		f.debug_struct("Listener")
 			.field("fd", &self.listener.as_raw_fd())
 			.field("reclaim", &self.reclaim)
 			.finish()
 	}
 }
-impl AsFd for LocalSocketListener {
+impl AsFd for Listener {
 	#[inline]
 	fn as_fd(&self) -> BorrowedFd<'_> {
 		self.listener.as_fd()
 	}
 }
-impl TryFrom<LocalSocketListener> for OwnedFd {
+impl TryFrom<Listener> for OwnedFd {
 	type Error = io::Error;
-	fn try_from(mut slf: LocalSocketListener) -> io::Result<Self> {
+	fn try_from(mut slf: Listener) -> io::Result<Self> {
 		slf.listener.into_std().map(|s| {
 			slf.reclaim.forget();
 			s.into()
 		})
 	}
 }
-impl TryFrom<OwnedFd> for LocalSocketListener {
+impl TryFrom<OwnedFd> for Listener {
 	type Error = io::Error;
 	fn try_from(fd: OwnedFd) -> io::Result<Self> {
-		Self::try_from(SyncLocalSocketListener::from(fd))
+		Self::try_from(SyncListener::from(fd))
 	}
 }

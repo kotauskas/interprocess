@@ -1,5 +1,5 @@
 use super::super::name_to_addr;
-use crate::{error::ReuniteError, local_socket::LocalSocketName, os::unix::c_wrappers};
+use crate::{error::ReuniteError, local_socket::Name, os::unix::c_wrappers};
 use std::{
 	io::{self, ErrorKind::WouldBlock},
 	net::Shutdown,
@@ -26,9 +26,9 @@ fn shutdown(slf: impl AsFd) -> Poll<io::Result<()>> {
 }
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) UnixStream);
-impl LocalSocketStream {
-	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+pub struct Stream(pub(super) UnixStream);
+impl Stream {
+	pub async fn connect(name: Name<'_>) -> io::Result<Self> {
 		Self::_connect(name_to_addr(name)?).await.map(Self::from)
 	}
 	#[allow(clippy::unwrap_used)]
@@ -63,7 +63,7 @@ impl LocalSocketStream {
 			})
 	}
 }
-impl From<UnixStream> for LocalSocketStream {
+impl From<UnixStream> for Stream {
 	#[inline]
 	fn from(inner: UnixStream) -> Self {
 		Self(inner)
@@ -83,13 +83,13 @@ fn ioloop(
 }
 
 multimacro! {
-	LocalSocketStream,
+	Stream,
 	pinproj_for_unpin(UnixStream),
 	forward_rbv(UnixStream, &),
 	forward_tokio_rw,
 	forward_as_handle(unix),
 }
-impl AsyncRead for &LocalSocketStream {
+impl AsyncRead for &Stream {
 	#[inline]
 	fn poll_read(
 		self: Pin<&mut Self>,
@@ -99,7 +99,7 @@ impl AsyncRead for &LocalSocketStream {
 		ioloop(|| self.0.try_read_buf(buf), || self.0.poll_read_ready(cx)).map(|e| e.map(|_| ()))
 	}
 }
-impl AsyncWrite for &LocalSocketStream {
+impl AsyncWrite for &Stream {
 	#[inline]
 	fn poll_write(
 		self: Pin<&mut Self>,
@@ -132,14 +132,14 @@ impl AsyncWrite for &LocalSocketStream {
 		shutdown(self.get_mut())
 	}
 }
-impl TryFrom<LocalSocketStream> for OwnedFd {
+impl TryFrom<Stream> for OwnedFd {
 	type Error = io::Error;
 	#[inline]
-	fn try_from(slf: LocalSocketStream) -> io::Result<Self> {
+	fn try_from(slf: Stream) -> io::Result<Self> {
 		Ok(slf.0.into_std()?.into())
 	}
 }
-impl TryFrom<OwnedFd> for LocalSocketStream {
+impl TryFrom<OwnedFd> for Stream {
 	type Error = io::Error;
 	#[inline]
 	fn try_from(fd: OwnedFd) -> io::Result<Self> {

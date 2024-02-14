@@ -23,17 +23,15 @@
 //!
 //! ### Platform-specific namespaces
 //! Since only Linux supports putting Unix-domain sockets in a separate namespace which is isolated
-//! from the filesystem, the `LocalSocketName`/`LocalSocketNameBuf` types are used to identify local
-//! sockets rather than `OsStr`/`OsString`: on Unix platforms other than Linux, which includes
-//! macOS, all flavors of BSD and possibly other Unix-like systems, the only way to name a
-//! Unix-domain socket is to use a filesystem path. As such, those platforms don't have the
-//! namespaced socket creation method available. Complicatng matters further, Windows does not
-//! support named pipes in the normal filesystem, meaning that namespaced local sockets are the only
-//! functional method on Windows.
+//! from the filesystem, the [`Name`] type is used to identify local sockets rather than `OsStr` or
+//! `OsString`: on Unix platforms other than Linux, which includes macOS, all flavors of BSD and
+//! possibly other Unix-like systems, the only way to name a Unix-domain socket is to use a
+//! filesystem path. As such, those platforms don't have the namespaced socket creation method
+//! available. Complicatng matters further, Windows does not support named pipes in the normal
+//! filesystem, meaning that namespaced local sockets are the only available method on Windows.
 //!
-//! As a way to solve this issue, [`LocalSocketName`]/`LocalSocketNameBuf` only provide creation in
-//! a platform-specific way, meaning that crate users are required to query [`NameTypeSupport`] to
-//! decide on the socket names.
+//! To solve this issue, [`Name`] has to be created with a specific name type in mind, with a
+//! [`NameTypeSupport`] query being necessary to decide on an appropriate socket name.
 //!
 //! ## Differences from regular sockets
 //! A few missing features, primarily on Windows, require local sockets to omit some important
@@ -69,4 +67,4 @@ pub mod tokio {
 }
 
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
-// TODO get rid of "LocalSocket" prefices on item names
+// TODO remove that whole ImplProperties thing in favor of a new trait-based system

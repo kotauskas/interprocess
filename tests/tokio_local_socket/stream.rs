@@ -1,7 +1,7 @@
 use crate::{
 	local_socket::{
-		tokio::{LocalSocketListener, LocalSocketStream},
-		LocalSocketName,
+		tokio::{Listener, Stream},
+		Name,
 	},
 	tests::util::*,
 };
@@ -19,13 +19,13 @@ fn msg(server: bool, nts: bool) -> Box<str> {
 
 pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
 	id: &'static str,
-	mut handle_client: impl FnMut(LocalSocketStream) -> HCF,
-	name_sender: Sender<Arc<LocalSocketName<'static>>>,
+	mut handle_client: impl FnMut(Stream) -> HCF,
+	name_sender: Sender<Arc<Name<'static>>>,
 	num_clients: u32,
 	path: bool,
 ) -> TestResult {
 	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
-		LocalSocketListener::bind(nm.borrow())
+		Listener::bind(nm.borrow())
 	})?;
 
 	let _ = name_sender.send(name);
@@ -43,7 +43,7 @@ pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
 	Ok(())
 }
 
-pub async fn handle_client_nosplit(conn: LocalSocketStream) -> TestResult {
+pub async fn handle_client_nosplit(conn: Stream) -> TestResult {
 	let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
 	let recv = async {
 		recv(&mut recver, &msg(false, false), 0).await?;
@@ -56,7 +56,7 @@ pub async fn handle_client_nosplit(conn: LocalSocketStream) -> TestResult {
 	try_join!(recv, send).map(|((), ())| ())
 }
 
-pub async fn handle_client_split(conn: LocalSocketStream) -> TestResult {
+pub async fn handle_client_split(conn: Stream) -> TestResult {
 	let (recver, sender) = conn.split();
 
 	let recv = task::spawn(async move {
@@ -73,14 +73,12 @@ pub async fn handle_client_split(conn: LocalSocketStream) -> TestResult {
 	});
 
 	let (recver, sender) = try_join!(recv, send)?;
-	LocalSocketStream::reunite(recver?, sender?).opname("reunite")?;
+	Stream::reunite(recver?, sender?).opname("reunite")?;
 	Ok(())
 }
 
-pub async fn client_nosplit(nm: Arc<LocalSocketName<'static>>) -> TestResult {
-	let conn = LocalSocketStream::connect(nm.borrow())
-		.await
-		.opname("connect")?;
+pub async fn client_nosplit(nm: Arc<Name<'static>>) -> TestResult {
+	let conn = Stream::connect(nm.borrow()).await.opname("connect")?;
 	let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
 	let recv = async {
 		recv(&mut recver, &msg(true, false), 0).await?;
@@ -93,8 +91,8 @@ pub async fn client_nosplit(nm: Arc<LocalSocketName<'static>>) -> TestResult {
 	try_join!(recv, send).map(|((), ())| ())
 }
 
-pub async fn client_split(name: Arc<LocalSocketName<'_>>) -> TestResult {
-	let (recver, sender) = LocalSocketStream::connect(name.borrow())
+pub async fn client_split(name: Arc<Name<'_>>) -> TestResult {
+	let (recver, sender) = Stream::connect(name.borrow())
 		.await
 		.opname("connect")?
 		.split();
@@ -113,7 +111,7 @@ pub async fn client_split(name: Arc<LocalSocketName<'_>>) -> TestResult {
 	});
 
 	let (recver, sender) = try_join!(recv, send)?;
-	LocalSocketStream::reunite(recver?, sender?).opname("reunite")?;
+	Stream::reunite(recver?, sender?).opname("reunite")?;
 	Ok(())
 }
 

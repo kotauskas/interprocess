@@ -1,23 +1,22 @@
-use super::LocalSocketName;
+use super::Name;
 use std::io;
 
 impmod! {local_socket,
-	LocalSocketStream as LocalSocketStreamImpl,
+	Stream as StreamImpl,
 	RecvHalf as RecvHalfImpl,
 	SendHalf as SendHalfImpl,
 }
 
 // TODO concurrency prevention on all platforms
 
-/// A local socket byte stream, obtained eiter from
-/// [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local
-/// socket.
+/// A local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by connecting
+/// to an existing local socket.
 ///
 /// # Examples
 ///
 /// ## Basic client
 /// ```no_run
-/// use interprocess::local_socket::{LocalSocketStream, NameTypeSupport, ToFsName, ToNsName};
+/// use interprocess::local_socket::{Stream, NameTypeSupport, ToFsName, ToNsName};
 /// use std::io::{prelude::*, BufReader};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
@@ -29,7 +28,7 @@ impmod! {local_socket,
 /// 	use NameTypeSupport::*;
 /// 	match NameTypeSupport::query() {
 /// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
-/// 		OnlyNs | Both => "@example.sock".to_ns_name()?,
+/// 		OnlyNs | Both => "example.sock".to_ns_name()?,
 /// 	}
 /// };
 ///
@@ -41,7 +40,7 @@ impmod! {local_socket,
 /// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
 /// // where connecting to a port that's not bound to any server will send a "connection refused"
 /// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let conn = LocalSocketStream::connect(name)?;
+/// let conn = Stream::connect(name)?;
 /// // Wrap it into a buffered reader right away so that we could receive a single line out of it.
 /// let mut conn = BufReader::new(conn);
 ///
@@ -59,12 +58,12 @@ impmod! {local_socket,
 /// print!("Server answered: {buffer}");
 /// # std::io::Result::<()>::Ok(())
 /// ```
-pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
-impl LocalSocketStream {
+pub struct Stream(pub(super) StreamImpl);
+impl Stream {
 	/// Connects to a remote local socket server.
 	#[inline]
-	pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketStreamImpl::connect(name).map(Self)
+	pub fn connect(name: Name<'_>) -> io::Result<Self> {
+		StreamImpl::connect(name).map(Self)
 	}
 
 	/// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
@@ -92,27 +91,27 @@ impl LocalSocketStream {
 	/// this method on streams that haven't been split to begin with).
 	#[inline]
 	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
-		LocalSocketStreamImpl::reunite(rh.0, sh.0)
-			.map(Self)
-			.map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+		StreamImpl::reunite(rh.0, sh.0).map(Self).map_err(
+			|crate::error::ReuniteError { rh, sh }| ReuniteError {
 				rh: RecvHalf(rh),
 				sh: SendHalf(sh),
-			})
+			},
+		)
 	}
 }
 multimacro! {
-	LocalSocketStream,
-	forward_rbv(LocalSocketStreamImpl, &),
+	Stream,
+	forward_rbv(StreamImpl, &),
 	forward_sync_ref_rw,
 	forward_asinto_handle,
 	forward_debug,
 	forward_try_clone,
-	forward_try_from_handle(LocalSocketStreamImpl),
+	forward_try_from_handle(StreamImpl),
 	derive_sync_mut_rw,
 	derive_asintoraw,
 }
 
-/// A receive half of a local socket stream, obtained by splitting a [`LocalSocketStream`].
+/// A receive half of a local socket stream, obtained by splitting a [`Stream`].
 // TODO example
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
@@ -125,7 +124,7 @@ multimacro! {
 	derive_asraw,
 }
 
-/// A send half of a local socket stream, obtained by splitting a [`LocalSocketStream`].
+/// A send half of a local socket stream, obtained by splitting a [`Stream`].
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
 	SendHalf,
@@ -139,5 +138,5 @@ multimacro! {
 
 /// [`ReuniteError`](crate::error::ReuniteError) for sync local socket streams.
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
-/// Result type for [`LocalSocketStream::reunite()`].
-pub type ReuniteResult = Result<LocalSocketStream, ReuniteError>;
+/// Result type for [`Stream::reunite()`].
+pub type ReuniteResult = Result<Stream, ReuniteError>;

@@ -1,6 +1,6 @@
 //! Tests what happens when a client attempts to connect to a local socket that doesn't exist.
 
-use crate::{local_socket::tokio::LocalSocketStream, tests::util::*};
+use crate::{local_socket::tokio::Stream, tests::util::*};
 use color_eyre::eyre::{bail, ensure};
 use std::io;
 
@@ -19,6 +19,6 @@ pub async fn run_and_verify_error(path: bool) -> TestResult {
 }
 async fn client(path: bool) -> io::Result<()> {
 	let nm = namegen_local_socket(make_id!(), path).next().unwrap();
-	LocalSocketStream::connect(nm?.borrow()).await?;
+	Stream::connect(nm?.borrow()).await?;
 	Ok(())
 }

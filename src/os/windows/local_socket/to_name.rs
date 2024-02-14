@@ -50,6 +50,7 @@ fn findslash(slice: &[u8]) -> Option<usize> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
 	use super::*;
 	static NP: &str = r"Именованная труба\yeah";

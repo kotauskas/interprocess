@@ -1,4 +1,4 @@
-use crate::local_socket::{LocalSocketName, ToFsName, ToNsName};
+use crate::local_socket::{Name, ToFsName, ToNsName};
 
 use super::Xorshift32;
 use std::{io, sync::Arc};
@@ -29,14 +29,13 @@ pub type NameResult<T> = io::Result<Arc<T>>;
 pub fn namegen_local_socket(
 	id: &'static str,
 	path: bool,
-) -> NameGen<LocalSocketName<'static>, impl FnMut(u32) -> io::Result<Arc<LocalSocketName<'static>>>>
-{
+) -> NameGen<Name<'static>, impl FnMut(u32) -> io::Result<Arc<Name<'static>>>> {
 	NameGen::new(id, move |rn| {
 		if path { next_fs(rn) } else { next_ns(rn) }.map(Arc::new)
 	})
 }
 
-fn next_fs(rn: u32) -> io::Result<LocalSocketName<'static>> {
+fn next_fs(rn: u32) -> io::Result<Name<'static>> {
 	if cfg!(windows) {
 		windows_path(rn)
 	} else if cfg!(unix) {
@@ -46,7 +45,7 @@ fn next_fs(rn: u32) -> io::Result<LocalSocketName<'static>> {
 	}
 	.to_fs_name()
 }
-fn next_ns(rn: u32) -> io::Result<LocalSocketName<'static>> {
+fn next_ns(rn: u32) -> io::Result<Name<'static>> {
 	format!("@interprocess-test-{:08x}", rn).to_ns_name()
 }
 

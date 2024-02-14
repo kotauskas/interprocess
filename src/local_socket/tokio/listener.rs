@@ -1,15 +1,15 @@
-use super::{super::LocalSocketName, LocalSocketStream};
+use super::{super::Name, Stream};
 use std::io;
 
 impmod! {local_socket::tokio,
-	LocalSocketListener as LocalSocketListenerImpl
+	Listener as ListenerImpl
 }
 
 // TODO borrowed split in examples
 
 /// A Tokio-based local socket server, listening for connections.
 ///
-/// [Name reclamation](super::super::LocalSocketStream#name-reclamation) is performed by default on
+/// [Name reclamation](super::super::Stream#name-reclamation) is performed by default on
 /// backends that necessitate it.
 ///
 /// # Examples
@@ -19,14 +19,14 @@ impmod! {local_socket::tokio,
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::local_socket::{
-/// 	tokio::{LocalSocketListener, LocalSocketStream},
+/// 	tokio::{Listener, Stream},
 /// 	NameTypeSupport, ToFsName, ToNsName,
 /// };
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 /// use std::io;
 ///
 /// // Describe the things we do when we've got a connection ready.
-/// async fn handle_conn(conn: LocalSocketStream) -> io::Result<()> {
+/// async fn handle_conn(conn: Stream) -> io::Result<()> {
 /// 	let mut recver = BufReader::new(&conn);
 /// 	let mut sender = &conn;
 ///
@@ -60,7 +60,7 @@ impmod! {local_socket::tokio,
 /// 			(pn.to_fs_name()?, pn)
 /// 		},
 /// 		OnlyNs | Both => {
-/// 			let pn = "@example.sock";
+/// 			let pn = "example.sock";
 /// 			(pn.to_ns_name()?, pn)
 /// 		},
 /// 	}
@@ -68,7 +68,7 @@ impmod! {local_socket::tokio,
 /// // Create our listener. In a more robust program, we'd check for an
 /// // existing socket file that has not been deleted for whatever reason,
 /// // ensure it's a socket file and not a normal file, and delete it.
-/// let listener = LocalSocketListener::bind(name)?;
+/// let listener = Listener::bind(name)?;
 ///
 /// // The syncronization between the server and client, if any is used, goes here.
 /// eprintln!("Server running at {printname}");
@@ -98,44 +98,44 @@ impmod! {local_socket::tokio,
 /// }
 /// # Ok(()) }
 /// ```
-pub struct LocalSocketListener(LocalSocketListenerImpl);
-impl LocalSocketListener {
+pub struct Listener(ListenerImpl);
+impl Listener {
 	/// Creates a socket server with the specified local socket name.
 	#[inline]
-	pub fn bind(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketListenerImpl::bind(name, true).map(Self::from)
+	pub fn bind(name: Name<'_>) -> io::Result<Self> {
+		ListenerImpl::bind(name, true).map(Self::from)
 	}
 	/// Like [`bind()`](Self::bind) followed by
 	/// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
 	/// allocation.
-	pub fn bind_without_name_reclamation(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketListenerImpl::bind(name, false).map(Self)
+	pub fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		ListenerImpl::bind(name, false).map(Self)
 	}
 
 	/// Listens for incoming connections to the socket, asynchronously waiting until a client is
 	/// connected.
 	#[inline]
-	pub async fn accept(&self) -> io::Result<LocalSocketStream> {
-		Ok(LocalSocketStream(self.0.accept().await?))
+	pub async fn accept(&self) -> io::Result<Stream> {
+		Ok(Stream(self.0.accept().await?))
 	}
 
-	/// Disables [name reclamation](super::super::LocalSocketStream#name-reclamation) on the listener.
+	/// Disables [name reclamation](super::super::Stream#name-reclamation) on the listener.
 	#[inline]
 	pub fn do_not_reclaim_name_on_drop(&mut self) {
 		self.0.do_not_reclaim_name_on_drop();
 	}
 }
 #[doc(hidden)]
-impl From<LocalSocketListenerImpl> for LocalSocketListener {
+impl From<ListenerImpl> for Listener {
 	#[inline]
-	fn from(inner: LocalSocketListenerImpl) -> Self {
+	fn from(inner: ListenerImpl) -> Self {
 		Self(inner)
 	}
 }
 multimacro! {
-	LocalSocketListener,
+	Listener,
 	forward_as_handle(unix),
-	forward_try_handle(LocalSocketListenerImpl, unix),
+	forward_try_handle(ListenerImpl, unix),
 	forward_debug,
 	derive_asraw(unix),
 }

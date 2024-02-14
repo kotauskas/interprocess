@@ -4,7 +4,7 @@ mod no_server;
 mod stream;
 
 use crate::{
-	local_socket::{LocalSocketName, NameTypeSupport},
+	local_socket::{Name, NameTypeSupport},
 	tests::util::*,
 };
 
@@ -16,7 +16,7 @@ fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 	} else {
 		handle_client_nosplit as _
 	};
-	let client: fn(&LocalSocketName<'_>) -> TestResult = if split {
+	let client: fn(&Name<'_>) -> TestResult = if split {
 		client_split as _
 	} else {
 		client_nosplit as _

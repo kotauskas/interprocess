@@ -1,15 +1,14 @@
-use super::super::LocalSocketName;
+use super::super::Name;
 use std::io;
 
 impmod! {local_socket::tokio,
-	LocalSocketStream as LocalSocketStreamImpl,
+	Stream as StreamImpl,
 	RecvHalf as RecvHalfImpl,
 	SendHalf as SendHalfImpl,
 }
 
-/// A Tokio-based local socket byte stream, obtained eiter from
-/// [`LocalSocketListener`](super::LocalSocketListener) or by connecting to an existing local
-/// socket.
+/// A Tokio-based local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by
+/// connecting to an existing local socket.
 ///
 /// # Examples
 ///
@@ -17,7 +16,7 @@ impmod! {local_socket::tokio,
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use interprocess::local_socket::{tokio::LocalSocketStream, NameTypeSupport, ToFsName, ToNsName};
+/// use interprocess::local_socket::{tokio::Stream, NameTypeSupport, ToFsName, ToNsName};
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
@@ -29,12 +28,12 @@ impmod! {local_socket::tokio,
 /// 	use NameTypeSupport::*;
 /// 	match NameTypeSupport::query() {
 /// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
-/// 		OnlyNs | Both => "@example.sock".to_ns_name()?,
+/// 		OnlyNs | Both => "example.sock".to_ns_name()?,
 /// 	}
 /// };
 ///
 /// // Await this here since we can't do a whole lot without a connection.
-/// let conn = LocalSocketStream::connect(name).await?;
+/// let conn = Stream::connect(name).await?;
 ///
 /// // This consumes our connection and splits it into two halves,
 /// // so that we can concurrently use both.
@@ -60,12 +59,12 @@ impmod! {local_socket::tokio,
 /// println!("Server answered: {}", buffer.trim());
 /// # Ok(()) }
 /// ```
-pub struct LocalSocketStream(pub(super) LocalSocketStreamImpl);
-impl LocalSocketStream {
+pub struct Stream(pub(super) StreamImpl);
+impl Stream {
 	/// Connects to a remote local socket server.
 	#[inline]
-	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketStreamImpl::connect(name).await.map(Self::from)
+	pub async fn connect(name: Name<'_>) -> io::Result<Self> {
+		StreamImpl::connect(name).await.map(Self::from)
 	}
 
 	/// Splits a stream into a receive half and a send half, which can be used to receive data from
@@ -81,36 +80,35 @@ impl LocalSocketStream {
 	/// this method on streams that haven't been split to begin with).
 	#[inline]
 	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
-		LocalSocketStreamImpl::reunite(rh.0, sh.0)
-			.map(Self)
-			.map_err(|crate::error::ReuniteError { rh, sh }| ReuniteError {
+		StreamImpl::reunite(rh.0, sh.0).map(Self).map_err(
+			|crate::error::ReuniteError { rh, sh }| ReuniteError {
 				rh: RecvHalf(rh),
 				sh: SendHalf(sh),
-			})
+			},
+		)
 	}
 }
 #[doc(hidden)]
-impl From<LocalSocketStreamImpl> for LocalSocketStream {
+impl From<StreamImpl> for Stream {
 	#[inline]
-	fn from(inner: LocalSocketStreamImpl) -> Self {
+	fn from(inner: StreamImpl) -> Self {
 		Self(inner)
 	}
 }
 
 multimacro! {
-	LocalSocketStream,
-	pinproj_for_unpin(LocalSocketStreamImpl),
-	forward_rbv(LocalSocketStreamImpl, &),
+	Stream,
+	pinproj_for_unpin(StreamImpl),
+	forward_rbv(StreamImpl, &),
 	forward_tokio_rw,
 	forward_tokio_ref_rw,
 	forward_as_handle,
-	forward_try_from_handle(LocalSocketStreamImpl),
+	forward_try_from_handle(StreamImpl),
 	forward_debug,
 	derive_asraw,
 }
 
-/// A receive half of a Tokio-based local socket stream, obtained by splitting a
-/// [`LocalSocketStream`].
+/// A receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
 ///
 /// # Examples
 // TODO
@@ -125,8 +123,7 @@ multimacro! {
 	forward_debug,
 	derive_asraw,
 }
-/// A send half of a Tokio-based local socket stream, obtained by splitting a
-/// [`LocalSocketStream`].
+/// A send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
 ///
 /// # Examples
 // TODO
@@ -144,5 +141,5 @@ multimacro! {
 
 /// [`ReuniteError`](crate::error::ReuniteError) for Tokio local socket streams.
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
-/// Result type for [`LocalSocketStream::reunite()`].
-pub type ReuniteResult = Result<LocalSocketStream, ReuniteError>;
+/// Result type for [`Stream::reunite()`].
+pub type ReuniteResult = Result<Stream, ReuniteError>;

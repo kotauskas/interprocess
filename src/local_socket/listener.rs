@@ -1,8 +1,8 @@
-use super::{LocalSocketName, LocalSocketStream};
+use super::{Name, Stream};
 use std::{io, iter::FusedIterator};
 
 impmod! {local_socket,
-	LocalSocketListener as LocalSocketListenerImpl
+	Listener as ListenerImpl
 }
 
 /// A local socket server, listening for connections.
@@ -38,15 +38,12 @@ impmod! {local_socket,
 ///
 /// ## Basic server
 /// ```no_run
-/// use interprocess::local_socket::{
-/// 	LocalSocketListener, LocalSocketStream,
-/// 	NameTypeSupport, ToFsName, ToNsName,
-/// };
+/// use interprocess::local_socket::{Listener, Stream, NameTypeSupport, ToFsName, ToNsName};
 /// use std::io::{self, prelude::*, BufReader};
 ///
 /// // Define a function that checks for errors in incoming connections. We'll use this to filter
 /// // through connections that fail on initialization for one reason or another.
-/// fn handle_error(conn: io::Result<LocalSocketStream>) -> Option<LocalSocketStream> {
+/// fn handle_error(conn: io::Result<Stream>) -> Option<Stream> {
 /// 	match conn {
 /// 		Ok(c) => Some(c),
 /// 		Err(e) => {
@@ -68,14 +65,14 @@ impmod! {local_socket,
 /// 			(pn.to_fs_name()?, pn)
 /// 		},
 /// 		OnlyNs | Both => {
-/// 			let pn = "@example.sock";
+/// 			let pn = "example.sock";
 /// 			(pn.to_ns_name()?, pn)
 /// 		},
 /// 	}
 /// };
 ///
 /// // Bind our listener.
-/// let listener = match LocalSocketListener::bind(name) {
+/// let listener = match Listener::bind(name) {
 /// 	Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
 /// 		// TODO update this
 /// 		// One important problem that is easy to handle improperly (or not at all) is the
@@ -135,27 +132,27 @@ impmod! {local_socket,
 /// }
 /// # io::Result::<()>::Ok(())
 /// ```
-pub struct LocalSocketListener(LocalSocketListenerImpl);
-impl LocalSocketListener {
+pub struct Listener(ListenerImpl);
+impl Listener {
 	/// Creates a socket server with the specified local socket name.
 	#[inline]
-	pub fn bind(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketListenerImpl::bind(name, true).map(Self)
+	pub fn bind(name: Name<'_>) -> io::Result<Self> {
+		ListenerImpl::bind(name, true).map(Self)
 	}
 	/// Like [`bind()`](Self::bind) followed by
 	/// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
 	/// allocation.
 	#[inline]
-	pub fn bind_without_name_reclamation(name: LocalSocketName<'_>) -> io::Result<Self> {
-		LocalSocketListenerImpl::bind(name, false).map(Self)
+	pub fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		ListenerImpl::bind(name, false).map(Self)
 	}
 
 	/// Listens for incoming connections to the socket, blocking until a client is connected.
 	///
 	/// See [`.incoming()`](Self::incoming) for a convenient way to create a main loop for a server.
 	#[inline]
-	pub fn accept(&self) -> io::Result<LocalSocketStream> {
-		self.0.accept().map(LocalSocketStream)
+	pub fn accept(&self) -> io::Result<Stream> {
+		self.0.accept().map(Stream)
 	}
 	/// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
 	/// Used together with `for` loops to conveniently create a main loop for a socket server.
@@ -189,7 +186,7 @@ impl LocalSocketListener {
 	}
 }
 multimacro! {
-	LocalSocketListener,
+	Listener,
 	forward_debug,
 	forward_into_handle,
 	forward_as_handle(unix),
@@ -197,21 +194,21 @@ multimacro! {
 	derive_raw(unix),
 }
 
-/// An infinite iterator over incoming client connections of a [`LocalSocketListener`].
+/// An infinite iterator over incoming client connections of a [`Listener`].
 ///
-/// This iterator is created by the [`incoming()`](LocalSocketListener::incoming) method on
-/// [`LocalSocketListener`] – see its documentation for more.
+/// This iterator is created by the [`incoming()`](Listener::incoming) method on [`Listener`] – see
+/// its documentation for more.
 #[derive(Debug)]
 pub struct Incoming<'a> {
-	listener: &'a LocalSocketListener,
+	listener: &'a Listener,
 }
-impl<'a> From<&'a LocalSocketListener> for Incoming<'a> {
-	fn from(listener: &'a LocalSocketListener) -> Self {
+impl<'a> From<&'a Listener> for Incoming<'a> {
+	fn from(listener: &'a Listener) -> Self {
 		Self { listener }
 	}
 }
 impl Iterator for Incoming<'_> {
-	type Item = io::Result<LocalSocketStream>;
+	type Item = io::Result<Stream>;
 	fn next(&mut self) -> Option<Self::Item> {
 		Some(self.listener.accept())
 	}

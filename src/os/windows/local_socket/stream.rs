@@ -1,6 +1,6 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
-	local_socket::LocalSocketName,
+	local_socket::Name,
 	os::windows::named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
 };
 use std::{io, os::windows::prelude::*};
@@ -10,9 +10,9 @@ type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) StreamImpl);
-impl LocalSocketStream {
-	pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+pub struct Stream(pub(super) StreamImpl);
+impl Stream {
+	pub fn connect(name: Name<'_>) -> io::Result<Self> {
 		if name.is_namespaced() {
 			StreamImpl::connect_with_prepend(name.raw(), None)
 		} else {
@@ -40,15 +40,15 @@ impl LocalSocketStream {
 	}
 }
 
-impl From<LocalSocketStream> for OwnedHandle {
-	fn from(s: LocalSocketStream) -> Self {
+impl From<Stream> for OwnedHandle {
+	fn from(s: Stream) -> Self {
 		// The outer local socket interface has receive and send halves and is always duplex in the
 		// unsplit type, so a split pipe stream can never appear here.
 		s.0.try_into()
-			.expect("split named pipe stream inside `LocalSocketStream`")
+			.expect("split named pipe stream inside `local_socket::Stream`")
 	}
 }
-impl TryFrom<OwnedHandle> for LocalSocketStream {
+impl TryFrom<OwnedHandle> for Stream {
 	type Error = FromHandleError;
 
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
@@ -64,7 +64,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 }
 
 multimacro! {
-	LocalSocketStream,
+	Stream,
 	forward_rbv(StreamImpl, &),
 	forward_sync_ref_rw, // The thunking already happens inside.
 	forward_as_handle,

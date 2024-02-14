@@ -1,5 +1,5 @@
-use super::{name_to_addr, LocalSocketStream, ReclaimGuard};
-use crate::local_socket::LocalSocketName;
+use super::{name_to_addr, ReclaimGuard, Stream};
+use crate::local_socket::Name;
 use std::{
 	fmt::{self, Debug, Formatter},
 	io,
@@ -9,12 +9,12 @@ use std::{
 	},
 };
 
-pub struct LocalSocketListener {
+pub struct Listener {
 	pub(super) listener: UnixListener,
 	pub(super) reclaim: ReclaimGuard,
 }
-impl LocalSocketListener {
-	pub fn bind(name: LocalSocketName<'_>, keep_name: bool) -> io::Result<Self> {
+impl Listener {
+	pub fn bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
 		Ok(Self {
 			listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)
 				.map_err(Self::decode_listen_error)?,
@@ -33,9 +33,9 @@ impl LocalSocketListener {
 	}
 
 	#[inline]
-	pub fn accept(&self) -> io::Result<LocalSocketStream> {
+	pub fn accept(&self) -> io::Result<Stream> {
 		// TODO make use of the second return value
-		self.listener.accept().map(|(s, _)| LocalSocketStream(s))
+		self.listener.accept().map(|(s, _)| Stream(s))
 	}
 	#[inline]
 	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
@@ -46,36 +46,36 @@ impl LocalSocketListener {
 	}
 }
 
-impl Debug for LocalSocketListener {
+impl Debug for Listener {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("LocalSocketListener")
+		f.debug_struct("Listener")
 			.field("fd", &self.listener.as_raw_fd())
 			.field("reclaim", &self.reclaim)
 			.finish()
 	}
 }
 
-impl From<LocalSocketListener> for UnixListener {
-	fn from(mut l: LocalSocketListener) -> Self {
+impl From<Listener> for UnixListener {
+	fn from(mut l: Listener) -> Self {
 		l.reclaim.forget();
 		l.listener
 	}
 }
 
-impl AsFd for LocalSocketListener {
+impl AsFd for Listener {
 	#[inline]
 	fn as_fd(&self) -> BorrowedFd<'_> {
 		self.listener.as_fd()
 	}
 }
-impl From<LocalSocketListener> for OwnedFd {
-	fn from(l: LocalSocketListener) -> Self {
+impl From<Listener> for OwnedFd {
+	fn from(l: Listener) -> Self {
 		UnixListener::from(l).into()
 	}
 }
-impl From<OwnedFd> for LocalSocketListener {
+impl From<OwnedFd> for Listener {
 	fn from(fd: OwnedFd) -> Self {
-		LocalSocketListener {
+		Listener {
 			listener: fd.into(),
 			reclaim: ReclaimGuard::default(),
 		}

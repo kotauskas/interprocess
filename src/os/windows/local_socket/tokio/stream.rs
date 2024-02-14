@@ -1,6 +1,6 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
-	local_socket::LocalSocketName,
+	local_socket::Name,
 	os::windows::named_pipe::{
 		pipe_mode::Bytes,
 		tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
@@ -13,9 +13,9 @@ type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) StreamImpl);
-impl LocalSocketStream {
-	pub async fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+pub struct Stream(pub(super) StreamImpl);
+impl Stream {
+	pub async fn connect(name: Name<'_>) -> io::Result<Self> {
 		if name.is_namespaced() {
 			StreamImpl::connect_with_prepend(name.raw(), None).await
 		} else {
@@ -39,7 +39,7 @@ impl LocalSocketStream {
 	}
 }
 
-impl TryFrom<OwnedHandle> for LocalSocketStream {
+impl TryFrom<OwnedHandle> for Stream {
 	type Error = FromHandleError;
 
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
@@ -55,7 +55,7 @@ impl TryFrom<OwnedHandle> for LocalSocketStream {
 }
 
 multimacro! {
-	LocalSocketStream,
+	Stream,
 	pinproj_for_unpin(StreamImpl),
 	forward_rbv(StreamImpl, &),
 	forward_tokio_rw,

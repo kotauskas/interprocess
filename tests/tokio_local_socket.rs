@@ -5,7 +5,7 @@ mod no_server;
 mod stream;
 
 use crate::{
-	local_socket::{tokio::LocalSocketStream, LocalSocketName, NameTypeSupport},
+	local_socket::{tokio::Stream, Name, NameTypeSupport},
 	tests::util::{self, testinit, TestResult},
 };
 use std::{future::Future, pin::Pin, sync::Arc};
@@ -16,12 +16,12 @@ async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 	testinit();
 	type Fut = Pin<Box<dyn Future<Output = TestResult> + Send + 'static>>;
 	type F<T> = Box<dyn Fn(T) -> Fut + Send + Sync>;
-	let hcl: F<LocalSocketStream> = if split {
+	let hcl: F<Stream> = if split {
 		Box::new(|conn| Box::pin(handle_client_split(conn)))
 	} else {
 		Box::new(|conn| Box::pin(handle_client_nosplit(conn)))
 	};
-	let client: F<Arc<LocalSocketName<'static>>> = if split {
+	let client: F<Arc<Name<'static>>> = if split {
 		Box::new(|conn| Box::pin(client_split(conn)))
 	} else {
 		Box::new(|conn| Box::pin(client_nosplit(conn)))

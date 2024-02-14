@@ -15,10 +15,10 @@ impmod! {
 // TODO adjust docs
 /// A name for a local socket.
 ///
-/// Due to vast differences between platforms in terms of how local sockets are named, there needs
-/// to be a way to store and process those in a unified way while also retaining platform-specific
-/// pecularities. `LocalSocketName` aims to bridge the gap between portability and platform-specific
-/// correctness.
+/// Due to significant differences between how different platforms name local sockets, there needs
+/// to be a way to store and process those in a unified way while also retaining those
+/// platform-specific pecularities. `Name` exists to bridge the gap between portability and
+/// correctness, minimizing the amount of platform-dependent code in downstream programs.
 ///
 /// # Creation
 /// Two traits are used to create names from basic strings: [`ToFsName`](super::ToFsName) and
@@ -31,13 +31,11 @@ impmod! {
 /// only available on Linux and Windows.
 // TODO document automatic checks
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct LocalSocketName<'s> {
+pub struct Name<'s> {
 	raw: Cow<'s, OsStr>,
 	path: bool,
 }
-impl<'s> LocalSocketName<'s> {
-	// TODO get rid of those
-
+impl<'s> Name<'s> {
 	/// Returns `true` if the name points to the dedicated local socket namespace, `false`
 	/// otherwise.
 	#[inline]
@@ -51,7 +49,7 @@ impl<'s> LocalSocketName<'s> {
 	/// return `true` simultaneously:
 	/// ```
 	/// # #[cfg(windows)] {
-	/// # use interprocess::local_socket::{LocalSocketName, ToFsName, ToNsName};
+	/// # use interprocess::local_socket::{ToFsName, ToNsName};
 	/// let name = r"\\.\pipe\example".to_fs_name().unwrap();
 	/// assert!(name.is_namespaced());	// \\.\pipe\ is a namespace
 	/// assert!(name.is_path());		// \\.\pipe\example is a path
@@ -66,8 +64,8 @@ impl<'s> LocalSocketName<'s> {
 	///
 	/// The returned value might reflect the type of the name (whether it was a filesystem path or a
 	/// namespaced name) in some situations on some platforms, namely on Linux, or it might not.
-	/// Additionally, two equal `LocalSocketName`s may or may not have their outputs of `.raw()`
-	/// compare equal, and vice versa.
+	/// Additionally, two equal `Name`s may or may not have their outputs of `.raw()` compare equal,
+	/// and vice versa.
 	///
 	/// If you need the value as an owned `OsString` instead, use [`.into_raw()`](Self::into_raw).
 	#[inline]
@@ -96,18 +94,18 @@ impl<'s> LocalSocketName<'s> {
 		self.raw
 	}
 
-	/// Produces a `LocalSocketName` that borrows from `self`.
+	/// Produces a `Name` that borrows from `self`.
 	#[inline]
-	pub fn borrow(&self) -> LocalSocketName<'_> {
-		LocalSocketName {
+	pub fn borrow(&self) -> Name<'_> {
+		Name {
 			raw: Cow::Borrowed(&self.raw),
 			path: self.path,
 		}
 	}
 
 	/// Extends the lifetime to `'static`, cloning if necessary.
-	pub fn into_owned(self) -> LocalSocketName<'static> {
-		LocalSocketName {
+	pub fn into_owned(self) -> Name<'static> {
+		Name {
 			raw: Cow::Owned(self.raw.into_owned()),
 			path: self.path,
 		}

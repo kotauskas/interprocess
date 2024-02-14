@@ -1,11 +1,11 @@
 use super::name_to_addr;
-use crate::{error::ReuniteError, local_socket::LocalSocketName, TryClone};
+use crate::{error::ReuniteError, local_socket::Name, TryClone};
 use std::{io, os::unix::net::UnixStream, sync::Arc};
 
 #[derive(Debug)]
-pub struct LocalSocketStream(pub(super) UnixStream);
-impl LocalSocketStream {
-	pub fn connect(name: LocalSocketName<'_>) -> io::Result<Self> {
+pub struct Stream(pub(super) UnixStream);
+impl Stream {
+	pub fn connect(name: Name<'_>) -> io::Result<Self> {
 		UnixStream::connect_addr(&name_to_addr(name)?).map(Self)
 	}
 	#[inline]
@@ -29,7 +29,7 @@ impl LocalSocketStream {
 	}
 }
 
-impl TryClone for LocalSocketStream {
+impl TryClone for Stream {
 	#[inline]
 	fn try_clone(&self) -> std::io::Result<Self> {
 		self.0.try_clone().map(Self)
@@ -37,7 +37,7 @@ impl TryClone for LocalSocketStream {
 }
 
 multimacro! {
-	LocalSocketStream,
+	Stream,
 	forward_rbv(UnixStream, &),
 	forward_sync_ref_rw,
 	forward_handle(unix),
@@ -45,20 +45,20 @@ multimacro! {
 }
 
 #[derive(Debug)]
-pub struct RecvHalf(pub(super) Arc<LocalSocketStream>);
+pub struct RecvHalf(pub(super) Arc<Stream>);
 multimacro! {
 	RecvHalf,
-	forward_rbv(LocalSocketStream, *),
+	forward_rbv(Stream, *),
 	forward_sync_ref_read,
 	forward_as_handle,
 	derive_sync_mut_read,
 }
 
 #[derive(Debug)]
-pub struct SendHalf(pub(super) Arc<LocalSocketStream>);
+pub struct SendHalf(pub(super) Arc<Stream>);
 multimacro! {
 	SendHalf,
-	forward_rbv(LocalSocketStream, *),
+	forward_rbv(Stream, *),
 	forward_sync_ref_write,
 	forward_as_handle,
 	derive_sync_mut_write,
