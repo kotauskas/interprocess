@@ -143,6 +143,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 }
 
 /// Extends [`PipeListenerOptions`] with a constructor method for the Tokio [`PipeListener`].
+#[allow(private_bounds)]
 pub trait PipeListenerOptionsExt: Sealed {
 	/// Creates a Tokio pipe listener from the builder. See the
 	/// [non-async `create` method on `PipeListenerOptions`](PipeListenerOptions::create) for more.
