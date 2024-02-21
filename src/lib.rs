@@ -8,6 +8,7 @@ mod platform_check;
 #[macro_use]
 mod macros;
 
+pub mod bound_util;
 pub mod error;
 pub mod local_socket;
 pub mod unnamed_pipe;
