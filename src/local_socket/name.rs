@@ -4,8 +4,7 @@ use std::{
 	fmt::Debug,
 };
 
-impmod! {
-	local_socket,
+impmod! {local_socket::name,
 	is_namespaced,
 }
 

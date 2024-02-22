@@ -1,4 +1,4 @@
-impmod! {local_socket,
+impmod! {local_socket::name,
 	name_type_support_query as name_type_support_query_impl,
 	NAME_TYPE_ALWAYS_SUPPORTED as NAME_TYPE_ALWAYS_SUPPORTED_REAL,
 }

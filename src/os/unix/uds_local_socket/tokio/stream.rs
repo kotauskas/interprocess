@@ -56,7 +56,7 @@ impl Stream {
 	#[inline]
 	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
 		rh.0.reunite(sh.0)
-			.map(Self)
+			.map(Self::from)
 			.map_err(|tokio::net::unix::ReuniteError(rh, sh)| ReuniteError {
 				rh: RecvHalf(rh),
 				sh: SendHalf(sh),

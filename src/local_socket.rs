@@ -42,12 +42,36 @@
 //! 	sockets and connection-based named message pipes on Windows does not allow bridging those two
 //! 	into a common API. You can emulate datagrams on top of streams anyway, so no big deal, right?
 
-mod listener;
+#[macro_use]
+mod enumdef;
+
 mod name;
 mod name_type_support;
-mod stream;
 mod to_name;
-pub use {listener::*, name::*, name_type_support::*, stream::*, to_name::*};
+mod stream {
+	pub(super) mod r#enum;
+	pub(super) mod r#trait;
+}
+mod listener {
+	pub(super) mod r#enum;
+	pub(super) mod r#trait;
+}
+
+pub use {listener::r#enum::*, name::*, name_type_support::*, stream::r#enum::*, to_name::*};
+
+/// Traits representing the interface of local sockets.
+pub mod traits {
+	pub use super::{listener::r#trait::*, stream::r#trait::*};
+}
+
+/// Re-exports of [traits](super::traits) done in a way that doesn't pollute the scope, as well as
+/// of the enum-dispatch types with their names prefixed with `LocalSocket`.
+pub mod prelude {
+	pub use super::{
+		traits::{Listener as _, ListenerExt as _, Stream as _},
+		Listener as LocalSocketListener, Stream as LocalSocketStream,
+	};
+}
 
 /// Asynchronous local sockets which work with the Tokio runtime and event loop.
 ///
@@ -68,3 +92,5 @@ pub mod tokio {
 
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
 // TODO remove that whole ImplProperties thing in favor of a new trait-based system
+// TODO concurrency prevention on all platforms
+// TODO restore implementations of Unix fd traits on enums

@@ -184,6 +184,7 @@ impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
 		})
 	}
 }
+#[doc(hidden)]
 impl Sealed for PipeListenerOptions<'_> {}
 fn _create_tokio(
 	config: &PipeListenerOptions<'_>,

@@ -1,10 +1,16 @@
-use super::{Name, Stream};
-use std::{io, iter::FusedIterator};
+use super::r#trait;
+use crate::local_socket::{Name, Stream};
+use std::io;
+#[cfg(unix)]
+use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
+#[cfg(windows)]
+use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
-impmod! {local_socket,
-	Listener as ListenerImpl
+impmod! {local_socket::dispatch,
+	self,
 }
 
+mkenum!(
 /// Local socket server, listening for connections.
 ///
 /// # Name reclamation
@@ -38,7 +44,11 @@ impmod! {local_socket,
 ///
 /// ## Basic server
 /// ```no_run
-/// use interprocess::local_socket::{Listener, Stream, NameTypeSupport, ToFsName, ToNsName};
+/// use interprocess::local_socket::{
+/// 	prelude::*,
+/// 	Listener, Stream,
+/// 	NameTypeSupport, ToFsName, ToNsName,
+/// };
 /// use std::io::{self, prelude::*, BufReader};
 ///
 /// // Define a function that checks for errors in incoming connections. We'll use this to filter
@@ -84,8 +94,8 @@ impmod! {local_socket,
 /// 		// we leave this up to the user, but in a real application, you usually don't want to do
 /// 		// that.
 /// 		eprintln!(
-/// 			"\
-///Error: could not start server because the socket file is occupied. Please check if {printname} \
+/// 			"
+///Error: could not start server because the socket file is occupied. Please check if {printname}
 ///is in use by another process and try again."
 /// 		);
 /// 		return Err(e.into());
@@ -116,13 +126,13 @@ impmod! {local_socket,
 /// 	// Now that the receive has come through and the client is waiting on the server's send, do
 /// 	// it. (`.get_mut()` is to get the sender, `BufReader` doesn't implement a pass-through
 /// 	// `Write`.)
-/// 	conn.get_mut().write_all(b"Hello from server!\n")?;
+/// 	conn.get_mut().write_all(b"Hello from server!n")?;
 ///
 /// 	// Print out the result, getting the newline for free!
 /// 	print!("Client answered: {buffer}");
 ///
 /// 	// Let's add an exit condition to shut the server down gracefully.
-/// 	if buffer == "stop\n" {
+/// 	if buffer == "stopn" {
 /// 		break;
 /// 	}
 ///
@@ -132,88 +142,49 @@ impmod! {local_socket,
 /// }
 /// # io::Result::<()>::Ok(())
 /// ```
-pub struct Listener(ListenerImpl);
-impl Listener {
-	/// Creates a socket server with the specified local socket name.
-	#[inline]
-	pub fn bind(name: Name<'_>) -> io::Result<Self> {
-		ListenerImpl::bind(name, true).map(Self)
-	}
-	/// Like [`bind()`](Self::bind) followed by
-	/// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
-	/// allocation.
-	#[inline]
-	pub fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		ListenerImpl::bind(name, false).map(Self)
-	}
+Listener);
 
-	/// Listens for incoming connections to the socket, blocking until a client is connected.
-	///
-	/// See [`.incoming()`](Self::incoming) for a convenient way to create a main loop for a server.
-	#[inline]
-	pub fn accept(&self) -> io::Result<Stream> {
-		self.0.accept().map(Stream)
-	}
-	/// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
-	/// Used together with `for` loops to conveniently create a main loop for a socket server.
-	#[inline]
-	pub fn incoming(&self) -> Incoming<'_> {
-		Incoming::from(self)
-	}
+impl r#trait::Listener for Listener {
+	type Stream = Stream;
 
-	/// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
-	///
-	/// In nonblocking mode, calling [`.accept()`] and iterating through [`.incoming()`] will
-	/// immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error if there is no client
-	/// attempting to connect at the moment instead of blocking until one arrives.
-	///
-	/// # Platform-specific behavior
-	/// ## Windows
-	/// The nonblocking mode will be also be set for all new streams produced by [`.accept()`] and
-	/// [`.incoming()`].
-	///
-	/// [`.accept()`]: Self::accept
-	/// [`.incoming()`]: Self::incoming
 	#[inline]
-	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-		self.0.set_nonblocking(nonblocking)
+	fn bind(name: Name<'_>) -> io::Result<Self> {
+		dispatch::bind(name)
 	}
-
-	/// Disables [name reclamation](#name-reclamation) on the listener.
 	#[inline]
-	pub fn do_not_reclaim_name_on_drop(&mut self) {
-		self.0.do_not_reclaim_name_on_drop();
+	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		dispatch::bind_without_name_reclamation(name)
 	}
-}
-multimacro! {
-	Listener,
-	forward_debug,
-	forward_into_handle,
-	forward_as_handle(unix),
-	forward_from_handle(unix),
-	derive_raw(unix),
+	#[inline]
+	fn accept(&self) -> io::Result<Stream> {
+		dispatch!(Self: x in self => x.accept()).map(Stream::from)
+	}
+	#[inline]
+	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+		dispatch!(Self: x in self => x.set_nonblocking(nonblocking))
+	}
+	#[inline]
+	fn do_not_reclaim_name_on_drop(&mut self) {
+		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
+	}
 }
 
-/// An infinite iterator over incoming client connections of a [`Listener`].
-///
-/// This iterator is created by the [`incoming()`](Listener::incoming) method on [`Listener`] – see
-/// its documentation for more.
-#[derive(Debug)]
-pub struct Incoming<'a> {
-	listener: &'a Listener,
-}
-impl<'a> From<&'a Listener> for Incoming<'a> {
-	fn from(listener: &'a Listener) -> Self {
-		Self { listener }
+#[cfg(windows)]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
+impl From<Listener> for OwnedHandle {
+	fn from(l: Listener) -> Self {
+		match l {
+			Listener::NamedPipe(l) => l.into(),
+		}
 	}
 }
-impl Iterator for Incoming<'_> {
-	type Item = io::Result<Stream>;
-	fn next(&mut self) -> Option<Self::Item> {
-		Some(self.listener.accept())
-	}
-	fn size_hint(&self) -> (usize, Option<usize>) {
-		(usize::MAX, None)
+
+#[cfg(unix)]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+impl From<Listener> for OwnedFd {
+	fn from(l: Listener) -> Self {
+		match l {
+			Listener::UdSocket(l) => l.into(),
+		}
 	}
 }
-impl FusedIterator for Incoming<'_> {}

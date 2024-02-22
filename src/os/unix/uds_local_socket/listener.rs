@@ -1,5 +1,5 @@
 use super::{name_to_addr, ReclaimGuard, Stream};
-use crate::local_socket::Name;
+use crate::local_socket::{traits, Name};
 use std::{
 	fmt::{self, Debug, Formatter},
 	io,
@@ -9,12 +9,21 @@ use std::{
 	},
 };
 
+/// Wrapper around [`UnixListener`] that implements
+/// [`Listener`](crate::local_socket::traits::Listener).
 pub struct Listener {
 	pub(super) listener: UnixListener,
 	pub(super) reclaim: ReclaimGuard,
 }
 impl Listener {
-	pub fn bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
+	fn decode_listen_error(error: io::Error) -> io::Error {
+		io::Error::from(match error.kind() {
+			io::ErrorKind::AlreadyExists => io::ErrorKind::AddrInUse,
+			_ => return error,
+		})
+	}
+
+	pub(super) fn _bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
 		Ok(Self {
 			listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)
 				.map_err(Self::decode_listen_error)?,
@@ -24,24 +33,30 @@ impl Listener {
 				.unwrap_or_default(),
 		})
 	}
-
-	fn decode_listen_error(error: io::Error) -> io::Error {
-		io::Error::from(match error.kind() {
-			io::ErrorKind::AlreadyExists => io::ErrorKind::AddrInUse,
-			_ => return error,
-		})
-	}
+}
+#[doc(hidden)]
+impl crate::Sealed for Listener {}
+impl traits::Listener for Listener {
+	type Stream = Stream;
 
 	#[inline]
-	pub fn accept(&self) -> io::Result<Stream> {
-		// TODO make use of the second return value
-		self.listener.accept().map(|(s, _)| Stream(s))
+	fn bind(name: Name<'_>) -> io::Result<Self> {
+		Self::_bind(name, true)
 	}
 	#[inline]
-	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		Self::_bind(name, false)
+	}
+	#[inline]
+	fn accept(&self) -> io::Result<Stream> {
+		// TODO make use of the second return value in some shape or form
+		self.listener.accept().map(|(s, _)| Stream::from(s))
+	}
+	#[inline]
+	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		self.listener.set_nonblocking(nonblocking)
 	}
-	pub fn do_not_reclaim_name_on_drop(&mut self) {
+	fn do_not_reclaim_name_on_drop(&mut self) {
 		self.reclaim.forget();
 	}
 }

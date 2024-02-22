@@ -1,7 +1,11 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
-	local_socket::Name,
+	local_socket::{
+		traits::{self, ReuniteResult},
+		Name,
+	},
 	os::windows::named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
+	Sealed,
 };
 use std::{io, os::windows::prelude::*};
 
@@ -9,10 +13,17 @@ type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
+/// Wrapper around [`DuplexPipeStream`] that implements
+/// [`Stream`](crate::local_socket::traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
-impl Stream {
-	pub fn connect(name: Name<'_>) -> io::Result<Self> {
+#[doc(hidden)]
+impl Sealed for Stream {}
+impl traits::Stream for Stream {
+	type RecvHalf = RecvHalf;
+	type SendHalf = SendHalf;
+
+	fn connect(name: Name<'_>) -> io::Result<Self> {
 		if name.is_namespaced() {
 			StreamImpl::connect_with_prepend(name.raw(), None)
 		} else {
@@ -21,16 +32,16 @@ impl Stream {
 		.map(Self)
 	}
 	#[inline]
-	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		self.0.set_nonblocking(nonblocking)
 	}
 	#[inline]
-	pub fn split(self) -> (RecvHalf, SendHalf) {
+	fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.split();
 		(RecvHalf(r), SendHalf(w))
 	}
 	#[inline]
-	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
+	fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult<Self> {
 		StreamImpl::reunite(rh.0, sh.0)
 			.map(Self)
 			.map_err(|ReuniteError { rh, sh }| ReuniteError {
@@ -72,8 +83,15 @@ multimacro! {
 	derive_sync_mut_rw,
 }
 
+/// Wrapper around [`RecvPipeStream`] that implements
+/// [`RecvHalf`](crate::local_socket::traits::RecvHalf).
 #[derive(Debug)]
 pub struct RecvHalf(pub(super) RecvHalfImpl);
+#[doc(hidden)]
+impl Sealed for RecvHalf {}
+impl traits::RecvHalf for RecvHalf {
+	type Stream = Stream;
+}
 multimacro! {
 	RecvHalf,
 	forward_rbv(RecvHalfImpl, &),
@@ -82,8 +100,15 @@ multimacro! {
 	derive_sync_mut_read,
 }
 
+/// Wrapper around [`SendPipeStream`] that implements
+/// [`SendHalf`](crate::local_socket::traits::SendHalf).
 #[derive(Debug)]
 pub struct SendHalf(pub(super) SendHalfImpl);
+#[doc(hidden)]
+impl Sealed for SendHalf {}
+impl traits::SendHalf for SendHalf {
+	type Stream = Stream;
+}
 multimacro! {
 	SendHalf,
 	forward_rbv(SendHalfImpl, &),

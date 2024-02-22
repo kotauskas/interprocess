@@ -11,16 +11,23 @@
 
 pub(crate) mod imports;
 
+mod c_wrappers;
 mod fdops;
 // Exported into child modules specifically, not this file.
 use fdops::*;
 
 pub mod fifo_file;
+pub mod uds_local_socket;
 
-mod c_wrappers;
-
-pub(crate) mod local_socket;
 pub(crate) mod unnamed_pipe;
+
+pub(crate) mod local_socket {
+	pub mod dispatch;
+	pub mod name;
+
+	// temporary
+	pub(crate) use super::uds_local_socket::tokio;
+}
 
 mod unixprelude {
 	#[allow(unused_imports)]

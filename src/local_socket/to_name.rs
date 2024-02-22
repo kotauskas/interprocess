@@ -7,7 +7,7 @@ use std::{
 	str,
 };
 
-impmod! {local_socket::to_name,
+impmod! {local_socket::name,
 	cstr_to_osstr,
 	cstring_to_osstring,
 	is_supported,

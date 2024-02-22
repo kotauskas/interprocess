@@ -1,19 +1,17 @@
-//! Adapter module, implements local sockets under Unix.
+//! Local sockets implemented using Unix domain sockets.
 
 mod listener;
 mod stream;
 pub use {listener::*, stream::*};
 
-pub mod to_name;
-
 #[cfg(feature = "tokio")]
-pub mod tokio {
+pub(crate) mod tokio {
 	mod listener;
 	mod stream;
 	pub use {listener::*, stream::*};
 }
 
-use crate::local_socket::{Name, NameTypeSupport};
+use crate::local_socket::Name;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::linux::net::SocketAddrExt;
 use std::{
@@ -58,16 +56,4 @@ impl Drop for ReclaimGuard {
 			}
 		}
 	}
-}
-
-pub fn name_type_support_query() -> NameTypeSupport {
-	NAME_TYPE_ALWAYS_SUPPORTED
-}
-#[cfg(uds_linux_namespace)]
-pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::Both;
-#[cfg(not(uds_linux_namespace))]
-pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyFs;
-
-pub fn is_namespaced(slf: &Name<'_>) -> bool {
-	!slf.is_path()
 }

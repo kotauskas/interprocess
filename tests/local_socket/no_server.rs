@@ -1,6 +1,9 @@
 //! Tests what happens when a client attempts to connect to a local socket that doesn't exist.
 
-use crate::{local_socket::Stream, tests::util::*};
+use crate::{
+	local_socket::{prelude::*, Stream},
+	tests::util::*,
+};
 use color_eyre::eyre::{bail, ensure};
 use std::io;
 

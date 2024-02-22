@@ -1,5 +1,5 @@
 use crate::{
-	local_socket::{Listener, Name, Stream},
+	local_socket::{prelude::*, Listener, Name, Stream},
 	tests::util::*,
 };
 use color_eyre::eyre::WrapErr;

@@ -1,8 +1,21 @@
+use crate::local_socket::{Name, NameTypeSupport};
 use std::{
 	ffi::{CStr, CString, OsStr, OsString},
 	io,
 	os::unix::ffi::{OsStrExt, OsStringExt},
 };
+
+pub fn name_type_support_query() -> NameTypeSupport {
+	NAME_TYPE_ALWAYS_SUPPORTED
+}
+#[cfg(uds_linux_namespace)]
+pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::Both;
+#[cfg(not(uds_linux_namespace))]
+pub const NAME_TYPE_ALWAYS_SUPPORTED: NameTypeSupport = NameTypeSupport::OnlyFs;
+
+pub fn is_namespaced(slf: &Name<'_>) -> bool {
+	!slf.is_path()
+}
 
 #[inline]
 pub fn cstr_to_osstr(cstr: &CStr) -> io::Result<&OsStr> {
