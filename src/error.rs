@@ -203,9 +203,34 @@ pub struct ReuniteError<R, S> {
 	/// Ownership of the send half.
 	pub sh: S,
 }
+impl<R, S> ReuniteError<R, S> {
+	/// Maps the halves of the stream using the given closures.
+	#[inline]
+	pub fn map_halves<NR: From<R>, NS: From<S>>(
+		self,
+		fr: impl FnOnce(R) -> NR,
+		fs: impl FnOnce(S) -> NS,
+	) -> ReuniteError<NR, NS> {
+		let Self { rh, sh } = self;
+		ReuniteError {
+			rh: fr(rh),
+			sh: fs(sh),
+		}
+	}
+	/// Maps the halves of the stream using the [`From`] trait.
+	///
+	/// This is useful when implementing wrappers around stream types.
+	#[inline]
+	pub fn convert_halves<NR: From<R>, NS: From<S>>(self) -> ReuniteError<NR, NS> {
+		self.map_halves(From::from, From::from)
+	}
+}
 impl<R, S> Display for ReuniteError<R, S> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.write_str("tried to reunite halves of different streams")
+		f.write_str("attempt to reunite stream halves that come from different streams")
 	}
 }
 impl<R: Debug, S: Debug> Error for ReuniteError<R, S> {}
+
+/// Result type of `.reunite()` on splittable stream types.
+pub type ReuniteResult<T, R, S> = Result<T, ReuniteError<R, S>>;
