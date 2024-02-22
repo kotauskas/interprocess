@@ -8,8 +8,11 @@ mod wrapper_fns;
 pub(super) use r#impl::*;
 pub(crate) use wrapper_fns::*;
 
-use super::{ConcurrencyDetector, MaybeArc, NeedsFlush};
-use crate::os::windows::FileHandle;
+use super::{MaybeArc, NeedsFlush};
+use crate::{
+	local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
+	os::windows::FileHandle,
+};
 use std::{marker::PhantomData, os::windows::prelude::*};
 
 /// Named pipe stream, created by a server-side listener or by connecting to a server.
@@ -144,5 +147,12 @@ pub(crate) struct RawPipeStream {
 	handle: Option<FileHandle>,
 	is_server: bool,
 	needs_flush: NeedsFlush,
-	concurrency_detector: ConcurrencyDetector,
+	concurrency_detector: ConcurrencyDetector<NamedPipeSite>,
+}
+
+#[derive(Default)]
+struct NamedPipeSite;
+impl ConcurrencyDetectionSite for NamedPipeSite {
+	const NAME: &'static str = "named pipe";
+	const WOULD_ACTUALLY_DEADLOCK: bool = true;
 }

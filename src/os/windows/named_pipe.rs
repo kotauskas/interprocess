@@ -63,13 +63,12 @@ pub mod local_socket {
 }
 
 mod atomic_enum;
-mod concurrency_detector;
 mod limbo_pool;
 mod maybe_arc;
 mod needs_flush;
 mod path_conversion;
 
-use {atomic_enum::*, concurrency_detector::*, maybe_arc::*, needs_flush::*};
+use {atomic_enum::*, maybe_arc::*, needs_flush::*};
 
 /// Asynchronous named pipes which work with the Tokio runtime and event loop.
 ///
