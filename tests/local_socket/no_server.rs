@@ -7,9 +7,9 @@ use crate::{
 use color_eyre::eyre::{bail, ensure};
 use std::io;
 
-pub fn run_and_verify_error(path: bool) -> TestResult {
+pub fn run_and_verify_error(id: &'static str, path: bool) -> TestResult {
 	use io::ErrorKind::*;
-	let err = match client(path) {
+	let err = match client(id, path) {
 		Err(e) => e,
 		Ok(()) => bail!("client successfully connected to nonexistent server"),
 	};
@@ -20,8 +20,8 @@ pub fn run_and_verify_error(path: bool) -> TestResult {
 	);
 	Ok(())
 }
-fn client(path: bool) -> io::Result<()> {
-	let nm = namegen_local_socket(make_id!(), path).next().unwrap();
+fn client(id: &'static str, path: bool) -> io::Result<()> {
+	let nm = namegen_local_socket(id, path).next().unwrap();
 	Stream::connect(nm?.borrow())?;
 	Ok(())
 }

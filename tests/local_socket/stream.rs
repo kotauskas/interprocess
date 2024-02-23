@@ -7,7 +7,6 @@ use std::{
 	io::{BufRead, BufReader, Write},
 	str,
 	sync::{mpsc::Sender, Arc},
-	thread,
 };
 
 fn msg(server: bool, nts: bool) -> Box<str> {
@@ -31,7 +30,7 @@ pub fn server(
 		.try_for_each(|conn| handle_client(conn.opname("accept")?))
 }
 
-pub fn handle_client_nosplit(conn: Stream) -> TestResult {
+pub fn handle_client(conn: Stream) -> TestResult {
 	let mut conn = BufReader::new(conn);
 	recv(&mut conn, &msg(false, false), 0)?;
 	send(conn.get_mut(), &msg(true, false), 0)?;
@@ -39,29 +38,7 @@ pub fn handle_client_nosplit(conn: Stream) -> TestResult {
 	send(conn.get_mut(), &msg(true, true), 1)
 }
 
-pub fn handle_client_split(conn: Stream) -> TestResult {
-	let (recver, sender) = conn.split();
-
-	let recv = thread::spawn(move || {
-		let mut recver = BufReader::new(recver);
-		recv(&mut recver, &msg(true, false), 0)?;
-		recv(&mut recver, &msg(true, true), 1)?;
-		TestResult::<_>::Ok(recver.into_inner())
-	});
-	let send = thread::spawn(move || {
-		let mut sender = sender;
-		send(&mut sender, &msg(false, false), 0)?;
-		send(&mut sender, &msg(false, true), 1)?;
-		TestResult::<_>::Ok(sender)
-	});
-
-	let recver = recv.join().unwrap()?;
-	let sender = send.join().unwrap()?;
-	Stream::reunite(recver, sender).opname("reunite")?;
-	Ok(())
-}
-
-pub fn client_nosplit(name: &Name<'_>) -> TestResult {
+pub fn client(name: &Name<'_>) -> TestResult {
 	let mut conn = Stream::connect(name.borrow())
 		.opname("connect")
 		.map(BufReader::new)?;
@@ -69,28 +46,6 @@ pub fn client_nosplit(name: &Name<'_>) -> TestResult {
 	recv(&mut conn, &msg(true, false), 0)?;
 	send(conn.get_mut(), &msg(false, true), 1)?;
 	recv(&mut conn, &msg(true, true), 1)
-}
-
-pub fn client_split(name: &Name<'_>) -> TestResult {
-	let (recver, sender) = Stream::connect(name.borrow()).opname("connect")?.split();
-
-	let recv = thread::spawn(move || {
-		let mut recver = BufReader::new(recver);
-		recv(&mut recver, &msg(false, false), 0)?;
-		recv(&mut recver, &msg(false, true), 1)?;
-		TestResult::<_>::Ok(recver.into_inner())
-	});
-	let send = thread::spawn(move || {
-		let mut sender = sender;
-		send(&mut sender, &msg(true, false), 0)?;
-		send(&mut sender, &msg(true, true), 1)?;
-		TestResult::<_>::Ok(sender)
-	});
-
-	let recver = recv.join().unwrap()?;
-	let sender = send.join().unwrap()?;
-	Stream::reunite(recver, sender).opname("reunite")?;
-	Ok(())
 }
 
 fn recv(conn: &mut dyn BufRead, exp: &str, nr: u8) -> TestResult {
