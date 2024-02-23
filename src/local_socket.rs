@@ -64,7 +64,7 @@ pub mod traits {
 	pub use super::{listener::r#trait::*, stream::r#trait::*};
 }
 
-/// Re-exports of [traits](super::traits) done in a way that doesn't pollute the scope, as well as
+/// Re-exports of [traits](traits) done in a way that doesn't pollute the scope, as well as
 /// of the enum-dispatch types with their names prefixed with `LocalSocket`.
 pub mod prelude {
 	pub use super::{

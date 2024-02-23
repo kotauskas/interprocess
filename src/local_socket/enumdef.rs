@@ -1,4 +1,4 @@
-/// Only dispatches with &self and &mut self.
+/// Only dispatches with `&self` and `&mut self`.
 macro_rules! dispatch {
 	($ty:ident: $nm:ident in $var:expr => $e:expr) => {{
 		match $var {
