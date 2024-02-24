@@ -43,8 +43,9 @@
 mod enums;
 mod listener;
 mod stream;
+mod wait_timeout;
 
-pub use {enums::*, listener::*, stream::*};
+pub use {enums::*, listener::*, stream::*, wait_timeout::*};
 
 /// Local sockets implemented using Windows named pipes.
 pub mod local_socket {

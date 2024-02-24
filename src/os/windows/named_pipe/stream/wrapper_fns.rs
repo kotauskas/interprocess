@@ -1,4 +1,8 @@
-use crate::os::windows::{named_pipe::PipeMode, winprelude::*, FileHandle};
+use crate::os::windows::{
+	named_pipe::{PipeMode, WaitTimeout},
+	winprelude::*,
+	FileHandle,
+};
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use windows_sys::Win32::{
 	Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},
@@ -182,27 +186,9 @@ pub(crate) fn set_nonblocking_given_readmode(
 	set_named_pipe_handle_state(handle, Some(mode), None, None)
 }
 
-// TODO this should be public API
-#[repr(transparent)] // #[repr(u32)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct WaitTimeout(u32);
-impl WaitTimeout {
-	pub(crate) const DEFAULT: Self = Self(0x00000000);
-	//pub(crate) const FOREVER: Self = Self(0xffffffff);
-}
-impl From<WaitTimeout> for u32 {
-	fn from(x: WaitTimeout) -> Self {
-		x.0
-	}
-}
-impl Default for WaitTimeout {
-	fn default() -> Self {
-		Self::DEFAULT
-	}
-}
 pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
 	assert_nts(path)?;
-	let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.0) != 0 };
+	let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.to_raw()) != 0 };
 	ok_or_errno!(success => ())
 }
 

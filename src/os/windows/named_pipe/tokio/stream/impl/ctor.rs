@@ -1,9 +1,8 @@
 use super::*;
 use crate::os::windows::{
 	named_pipe::{
-		connect_without_waiting,
-		stream::{block_for_server, WaitTimeout},
-		MaybeArc, NeedsFlushVal, PipeMode,
+		connect_without_waiting, stream::block_for_server, MaybeArc, NeedsFlushVal, PipeMode,
+		WaitTimeout,
 	},
 	path_conversion::*,
 };

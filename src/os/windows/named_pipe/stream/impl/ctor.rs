@@ -1,7 +1,6 @@
-use std::{ffi::OsStr, path::Path};
-
 use super::*;
-use crate::os::windows::path_conversion::*;
+use crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*};
+use std::{ffi::OsStr, path::Path};
 use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
 impl RawPipeStream {

@@ -1,4 +1,6 @@
-use super::{pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
+use super::{
+	pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream, WaitTimeout,
+};
 use crate::{
 	os::windows::{path_conversion::*, winprelude::*, FileHandle, SecurityDescriptor},
 	poison_error, LOCK_POISON,
@@ -9,7 +11,7 @@ use std::{
 	io,
 	marker::PhantomData,
 	mem::replace,
-	num::{NonZeroU32, NonZeroU8},
+	num::NonZeroU8,
 	ptr,
 	sync::{
 		atomic::{AtomicBool, Ordering::Relaxed},
@@ -132,6 +134,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
 }
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
+// TODO allow partial modification for later instances
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
@@ -183,8 +186,7 @@ pub struct PipeListenerOptions<'a> {
 	pub output_buffer_size_hint: u32,
 	/// The default timeout clients use when connecting. Used unless another timeout is specified
 	/// when waiting by a client.
-	// TODO use WaitTimeout struct
-	pub wait_timeout: NonZeroU32,
+	pub wait_timeout: WaitTimeout,
 	/// The security descriptor to create the named pipe server with.
 	pub security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
 	/// Whether the resulting handle is to be inheritable by child processes or not.
@@ -215,10 +217,6 @@ impl<'a> PipeListenerOptions<'a> {
 	/// Creates a new builder with default options.
 	#[allow(clippy::indexing_slicing)] // are you fucking with me
 	pub fn new() -> Self {
-		const DEFAULT_WAIT_TIMEOUT: NonZeroU32 = match NonZeroU32::new(50) {
-			Some(v) => v,
-			None => unreachable!(),
-		};
 		Self {
 			path: Cow::Borrowed(u16cstr!("")),
 			mode: PipeMode::Bytes,
@@ -228,7 +226,7 @@ impl<'a> PipeListenerOptions<'a> {
 			accept_remote: false,
 			input_buffer_size_hint: 512,
 			output_buffer_size_hint: 512,
-			wait_timeout: DEFAULT_WAIT_TIMEOUT,
+			wait_timeout: WaitTimeout::DEFAULT,
 			security_descriptor: None,
 			inheritable: false,
 		}
@@ -275,7 +273,7 @@ impl<'a> PipeListenerOptions<'a> {
 		accept_remote: bool,
 		input_buffer_size_hint: u32,
 		output_buffer_size_hint: u32,
-		wait_timeout: NonZeroU32,
+		wait_timeout: WaitTimeout,
 		security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
 		inheritable: bool,
 	}
@@ -324,7 +322,7 @@ cannot create pipe server that has byte type but receives messages – have you 
 				max_instances,
 				self.output_buffer_size_hint,
 				self.input_buffer_size_hint,
-				self.wait_timeout.get(),
+				self.wait_timeout.to_raw(),
 				(&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
 			);
 			(handle, handle != INVALID_HANDLE_VALUE)
