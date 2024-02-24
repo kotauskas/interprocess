@@ -60,7 +60,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	/// Connects to the specified named pipe at the specified path (the `\\<hostname>\pipe\` prefix
 	/// is not added automatically), blocking until a server instance is dispatched.
 	#[inline]
-	pub fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
+	pub fn connect_by_path(path: impl AsRef<Path>) -> io::Result<Self> {
 		RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE).map(Self::new)
 	}
 

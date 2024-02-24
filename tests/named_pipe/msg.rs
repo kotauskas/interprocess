@@ -97,7 +97,7 @@ pub fn server_stc(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: 
 }
 
 pub fn client_duplex(name: &str) -> TestResult {
-	let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Messages>::connect(name)
+	let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Messages>::connect_by_path(name)
 		.opname("connect")?
 		.split();
 
@@ -113,13 +113,15 @@ pub fn client_duplex(name: &str) -> TestResult {
 	Ok(())
 }
 pub fn client_cts(name: &str) -> TestResult {
-	let mut sender = SendPipeStream::<pipe_mode::Messages>::connect(name).opname("connect")?;
+	let mut sender =
+		SendPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?;
 	let [msg1, msg2] = msgs(false);
 	send(&mut sender, msg1, 0)?;
 	send(&mut sender, msg2, 1)
 }
 pub fn client_stc(name: &str) -> TestResult {
-	let mut recver = RecvPipeStream::<pipe_mode::Messages>::connect(name).opname("connect")?;
+	let mut recver =
+		RecvPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?;
 	let [msg1, msg2] = msgs(true);
 	recv(&mut recver, msg1, 0)?;
 	recv(&mut recver, msg2, 1)

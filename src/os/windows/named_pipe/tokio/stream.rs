@@ -37,7 +37,7 @@ use tokio::net::windows::named_pipe::{
 /// use interprocess::os::windows::named_pipe::{pipe_mode, tokio::*};
 ///
 /// // Await this here since we can't do a whole lot without a connection.
-/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example").await?;
+/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(r"\\.\pipe\Example").await?;
 ///
 /// // This consumes our connection and splits it into two owned halves, so that we could
 /// // concurrently act on both. Take care not to use the .split() method from the futures crate's

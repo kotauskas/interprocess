@@ -84,7 +84,7 @@ async fn handle_conn_stc(
 }
 
 pub async fn client_duplex(name: Arc<str>) -> TestResult {
-	let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Bytes>::connect(&*name)
+	let (mut recver, mut sender) = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(&*name)
 		.await
 		.opname("connect")?
 		.split();
@@ -93,13 +93,13 @@ pub async fn client_duplex(name: Arc<str>) -> TestResult {
 	Ok(())
 }
 pub async fn client_cts(name: Arc<str>) -> TestResult {
-	let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect(&*name)
+	let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect_by_path(&*name)
 		.await
 		.opname("connect")?;
 	send(&mut sender, msg(false)).await
 }
 pub async fn client_stc(name: Arc<str>) -> TestResult {
-	let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect(&*name)
+	let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect_by_path(&*name)
 		.await
 		.opname("connect")?;
 	recv(&mut recver, msg(true)).await

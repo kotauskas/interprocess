@@ -19,7 +19,7 @@ impl Stream {
 		if name.is_namespaced() {
 			StreamImpl::connect_with_prepend(name.raw(), None).await
 		} else {
-			StreamImpl::connect(name.raw()).await
+			StreamImpl::connect_by_path(name.raw()).await
 		}
 		.map(Self)
 	}

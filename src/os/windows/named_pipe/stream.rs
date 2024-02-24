@@ -71,7 +71,7 @@ use std::{marker::PhantomData, os::windows::prelude::*};
 /// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
 /// // where connecting to a port that's not bound to any server will send a "connection refused"
 /// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect("Example")?;
+/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(r"\\.\pipe\Example")?;
 /// // Wrap it into a buffered reader right away so that we could receive a single line out of it.
 /// let mut conn = BufReader::new(conn);
 ///
@@ -103,7 +103,7 @@ use std::{marker::PhantomData, os::windows::prelude::*};
 /// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
 /// // where connecting to a port that's not bound to any server will send a "connection refused"
 /// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect("Example")?;
+/// let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect_by_path(r"\\.\pipe\Example")?;
 ///
 /// // Here's our message so that we could check its length later.
 /// static MESSAGE: &[u8] = b"Hello from client!";
