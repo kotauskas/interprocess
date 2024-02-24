@@ -5,10 +5,11 @@ pub mod named_pipe;
 pub mod unnamed_pipe;
 //pub mod mailslot;
 
+mod path_conversion;
 mod security_descriptor;
 mod share_handle;
 
-pub use {security_descriptor::*, share_handle::*};
+pub use {path_conversion::*, security_descriptor::*, share_handle::*};
 
 mod file_handle;
 pub(crate) mod local_socket {

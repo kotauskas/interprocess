@@ -1,12 +1,12 @@
 use super::stream::Stream;
 use crate::{
 	local_socket::{traits, Name},
-	os::windows::named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
+	os::windows::{
+		named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
+		path_conversion::*,
+	},
 };
-use std::{
-	io,
-	path::{Path, PathBuf},
-};
+use std::{io, path::Path};
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
@@ -23,16 +23,13 @@ impl traits::Listener for Listener {
 		Self::bind_without_name_reclamation(name)
 	}
 	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		let path = Path::new(name.raw());
 		let mut options = PipeListenerOptions::new();
-		options.path = if name.is_namespaced() {
-			// PERF this allocates twice
-			[Path::new(r"\\.\pipe\"), path]
-				.iter()
-				.collect::<PathBuf>()
-				.into()
+		options.path = if name.is_path() {
+			Path::new(name.raw()).to_wtf_16().map_err(to_io_error)?
 		} else {
-			path.into()
+			convert_and_encode_path(name.raw(), None)
+				.to_wtf_16()
+				.map_err(to_io_error)?
 		};
 		options.create().map(Self)
 	}

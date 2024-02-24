@@ -1,9 +1,11 @@
 use super::*;
-use crate::os::windows::named_pipe::{
-	connect_without_waiting,
+use crate::os::windows::{
+	named_pipe::{
+		connect_without_waiting,
+		stream::{block_for_server, WaitTimeout},
+		MaybeArc, NeedsFlushVal, PipeMode,
+	},
 	path_conversion::*,
-	stream::{block_for_server, WaitTimeout},
-	MaybeArc, NeedsFlushVal, PipeMode,
 };
 use std::{ffi::OsStr, mem::take, path::Path};
 
@@ -36,7 +38,7 @@ impl RawPipeStream {
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
-		Self::_connect(encode_to_utf16(path.as_os_str()), recv, send).await
+		Self::_connect(encode_to_wtf16(path.as_os_str()), recv, send).await
 	}
 
 	async fn connect_with_prepend(

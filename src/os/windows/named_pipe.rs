@@ -66,7 +66,6 @@ mod atomic_enum;
 mod limbo_pool;
 mod maybe_arc;
 mod needs_flush;
-mod path_conversion;
 
 use {atomic_enum::*, maybe_arc::*, needs_flush::*};
 

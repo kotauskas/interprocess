@@ -1,8 +1,6 @@
-use super::{
-	path_conversion::*, pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream,
-};
+use super::{pipe_mode, PipeMode, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
 use crate::{
-	os::windows::{winprelude::*, FileHandle, SecurityDescriptor},
+	os::windows::{path_conversion::*, winprelude::*, FileHandle, SecurityDescriptor},
 	poison_error, LOCK_POISON,
 };
 use std::{
@@ -12,13 +10,13 @@ use std::{
 	marker::PhantomData,
 	mem::replace,
 	num::{NonZeroU32, NonZeroU8},
-	path::{Path, PathBuf},
 	ptr,
 	sync::{
 		atomic::{AtomicBool, Ordering::Relaxed},
 		Mutex,
 	},
 };
+use widestring::{u16cstr, U16CStr};
 use windows_sys::Win32::{
 	Foundation::ERROR_PIPE_CONNECTED,
 	Security::SECURITY_ATTRIBUTES,
@@ -138,8 +136,8 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
 #[non_exhaustive]
 pub struct PipeListenerOptions<'a> {
 	/// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
-	/// automatically appended!
-	pub path: Cow<'a, Path>,
+	/// automatically prepended!
+	pub path: Cow<'a, U16CStr>,
 	/// Specifies how data is written into the data stream. This is required in all cases,
 	/// regardless of whether the pipe is inbound, outbound or duplex, since this affects all data
 	/// being written into the pipe, not just the data written by the server.
@@ -215,13 +213,14 @@ macro_rules! genset {
 }
 impl<'a> PipeListenerOptions<'a> {
 	/// Creates a new builder with default options.
+	#[allow(clippy::indexing_slicing)] // are you fucking with me
 	pub fn new() -> Self {
 		const DEFAULT_WAIT_TIMEOUT: NonZeroU32 = match NonZeroU32::new(50) {
 			Some(v) => v,
 			None => unreachable!(),
 		};
 		Self {
-			path: Cow::Borrowed(Path::new("")),
+			path: Cow::Borrowed(u16cstr!("")),
 			mode: PipeMode::Bytes,
 			nonblocking: false,
 			instance_limit: None,
@@ -264,15 +263,8 @@ impl<'a> PipeListenerOptions<'a> {
 
 	/// Sets the [`path`](#structfield.path) parameter to the specified value.
 	#[inline]
-	pub fn path<T: ?Sized>(mut self, path: impl Into<Cow<'a, T>>) -> Self
-	where
-		T: AsRef<Path> + ToOwned + 'a,
-		T::Owned: Into<PathBuf>,
-	{
-		self.path = match path.into() {
-			Cow::Borrowed(b) => Cow::Borrowed(b.as_ref()),
-			Cow::Owned(o) => Cow::Owned(o.into()),
-		};
+	pub fn path(mut self, path: impl ToWtf16<'a>) -> Self {
+		self.path = path.to_wtf_16().expect(EXPECT_WTF16);
 		self
 	}
 	genset! {
@@ -307,7 +299,6 @@ cannot create pipe server that has byte type but receives messages – have you 
 			));
 		}
 
-		let path = encode_to_utf16(self.path.as_os_str());
 		let open_mode = self.open_mode(first, role, overlapped);
 		let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 
@@ -327,7 +318,7 @@ cannot create pipe server that has byte type but receives messages – have you 
 
 		let (handle, success) = unsafe {
 			let handle = CreateNamedPipeW(
-				path.as_ptr(),
+				self.path.as_ptr(),
 				open_mode,
 				pipe_mode,
 				max_instances,

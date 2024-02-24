@@ -1,16 +1,16 @@
 use super::Stream;
 use crate::{
 	local_socket::Name,
-	os::windows::named_pipe::{
-		pipe_mode,
-		tokio::{PipeListener as GenericPipeListener, PipeListenerOptionsExt as _},
-		PipeListenerOptions,
+	os::windows::{
+		named_pipe::{
+			pipe_mode,
+			tokio::{PipeListener as GenericPipeListener, PipeListenerOptionsExt as _},
+			PipeListenerOptions,
+		},
+		path_conversion::*,
 	},
 };
-use std::{
-	io,
-	path::{Path, PathBuf},
-};
+use std::{io, path::Path};
 
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
@@ -18,16 +18,13 @@ type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 pub struct Listener(PipeListener);
 impl Listener {
 	pub fn bind(name: Name<'_>, _: bool) -> io::Result<Self> {
-		let path = Path::new(name.raw());
 		let mut options = PipeListenerOptions::new();
-		options.path = if name.is_namespaced() {
-			// PERF this allocates twice
-			[Path::new(r"\\.\pipe\"), path]
-				.iter()
-				.collect::<PathBuf>()
-				.into()
+		options.path = if name.is_path() {
+			Path::new(name.raw()).to_wtf_16().map_err(to_io_error)?
 		} else {
-			path.into()
+			convert_and_encode_path(name.raw(), None)
+				.to_wtf_16()
+				.map_err(to_io_error)?
 		};
 		options.create_tokio().map(Self)
 	}

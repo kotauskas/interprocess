@@ -1,7 +1,7 @@
 use std::{ffi::OsStr, path::Path};
 
 use super::*;
-use crate::os::windows::named_pipe::path_conversion::*;
+use crate::os::windows::path_conversion::*;
 use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
 impl RawPipeStream {
@@ -21,7 +21,7 @@ impl RawPipeStream {
 	}
 
 	fn connect(path: &Path, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
-		Self::_connect(&encode_to_utf16(path.as_os_str()), recv, send)
+		Self::_connect(&encode_to_wtf16(path.as_os_str()), recv, send)
 	}
 
 	fn connect_with_prepend(
