@@ -38,8 +38,7 @@ impl traits::Listener for Listener {
 		options.create().map(Self)
 	}
 	fn accept(&self) -> io::Result<Stream> {
-		let inner = self.0.accept()?;
-		Ok(Stream(inner))
+		self.0.accept()
 	}
 	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		self.0.set_nonblocking(nonblocking)

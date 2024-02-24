@@ -4,10 +4,7 @@ use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 #[cfg(unix)]
 use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 #[cfg(windows)]
-use {
-	crate::{error::ConversionError, os::windows::named_pipe::local_socket as np_impl},
-	std::os::windows::prelude::*,
-};
+use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
 impmod! {local_socket::dispatch,
 	self,
@@ -160,19 +157,20 @@ impl TryClone for Stream {
 #[cfg(windows)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
 impl TryFrom<OwnedHandle> for Stream {
-	type Error = ConversionError<OwnedHandle>;
+	type Error = <np_impl::Stream as TryFrom<OwnedHandle>>::Error;
 	#[inline]
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		Ok(Self::NamedPipe(handle.try_into()?))
+		handle.try_into().map(Self::NamedPipe)
 	}
 }
 
 #[cfg(windows)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl From<Stream> for OwnedHandle {
-	fn from(slf: Stream) -> Self {
+impl TryFrom<Stream> for OwnedHandle {
+	type Error = <OwnedHandle as TryFrom<np_impl::Stream>>::Error;
+	fn try_from(slf: Stream) -> Result<Self, Self::Error> {
 		match slf {
-			Stream::NamedPipe(s) => s.into(),
+			Stream::NamedPipe(s) => s.try_into(),
 		}
 	}
 }
