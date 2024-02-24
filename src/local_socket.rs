@@ -96,5 +96,3 @@ pub(crate) use concurrency_detector::*;
 
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
 // TODO remove that whole ImplProperties thing in favor of a new trait-based system
-// TODO concurrency prevention on all platforms
-// TODO restore implementations of Unix fd traits on enums

@@ -36,7 +36,6 @@
 
 // TODO improve docs
 // TODO add examples
-// TODO document limbo further
 // TODO client impersonation
 // TODO raw instance functionality
 // TODO transactions
