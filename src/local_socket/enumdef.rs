@@ -48,7 +48,6 @@ macro_rules! mkenum {
 			#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
 			UdSocket(uds_impl::$nm),
 		}
-		// TODO is doc(hidden) still necessary?
 		impl $crate::Sealed for $nm {}
 		#[cfg(windows)]
 		#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]

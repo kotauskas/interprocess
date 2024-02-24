@@ -34,7 +34,6 @@ impl Listener {
 		})
 	}
 }
-#[doc(hidden)]
 impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;

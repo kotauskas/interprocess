@@ -14,7 +14,6 @@ type ListenerImpl = PipeListener<Bytes, Bytes>;
 /// [`Listener`](crate::local_socket::traits::Listener).
 #[derive(Debug)]
 pub struct Listener(ListenerImpl);
-#[doc(hidden)]
 impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;

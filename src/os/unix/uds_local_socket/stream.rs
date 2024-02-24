@@ -17,7 +17,6 @@ use std::{
 /// [`Stream`](crate::local_socket::traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) UnixStream, ConcurrencyDetector<LocalSocketSite>);
-#[doc(hidden)]
 impl Sealed for Stream {}
 impl traits::Stream for Stream {
 	type RecvHalf = RecvHalf;
@@ -101,7 +100,6 @@ multimacro! {
 /// [`Stream`]'s receive half, implemented using [`Arc`].
 #[derive(Debug)]
 pub struct RecvHalf(pub(super) Arc<Stream>);
-#[doc(hidden)]
 impl Sealed for RecvHalf {}
 impl traits::RecvHalf for RecvHalf {
 	type Stream = Stream;
@@ -117,7 +115,6 @@ multimacro! {
 /// [`Stream`]'s send half, implemented using [`Arc`].
 #[derive(Debug)]
 pub struct SendHalf(pub(super) Arc<Stream>);
-#[doc(hidden)]
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {
 	type Stream = Stream;
