@@ -20,6 +20,25 @@ pub fn poison_error<T>(_: PoisonError<T>) -> io::Error {
 	io::Error::other(LOCK_POISON)
 }
 
+trait OrErrno<T>: Sized {
+	fn ok_or_errno(self, value: impl FnOnce() -> T) -> io::Result<T>;
+	#[inline(always)]
+	fn or_errno(self, value: T) -> io::Result<T> {
+		self.ok_or_errno(|| value)
+	}
+}
+
+impl<T> OrErrno<T> for bool {
+	#[inline]
+	fn ok_or_errno(self, value: impl FnOnce() -> T) -> io::Result<T> {
+		if self {
+			Ok(value())
+		} else {
+			Err(std::io::Error::last_os_error())
+		}
+	}
+}
+
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
 	#[inline]
 	#[track_caller]

@@ -1,20 +1,23 @@
 use super::*;
-use crate::os::windows::{
-	named_pipe::{pipe_mode, PipeMode, PipeModeTag, WaitTimeout},
-	path_conversion::*,
-	SecurityDescriptor,
+use crate::{
+	os::windows::{
+		named_pipe::{pipe_mode, PipeMode, PipeModeTag, WaitTimeout},
+		path_conversion::*,
+		SecurityDescriptor,
+	},
+	TryClone,
 };
 use std::{borrow::Cow, io, marker::PhantomData, num::NonZeroU8, sync::Mutex};
 use widestring::{u16cstr, U16CStr};
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
 // TODO allow partial modification for later instances
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[non_exhaustive]
-pub struct PipeListenerOptions<'a> {
+pub struct PipeListenerOptions<'path> {
 	/// Specifies the name for the named pipe. The necessary `\\.\pipe\` prefix is *not*
 	/// automatically prepended!
-	pub path: Cow<'a, U16CStr>,
+	pub path: Cow<'path, U16CStr>,
 	/// Specifies how data is written into the data stream. This is required in all cases,
 	/// regardless of whether the pipe is inbound, outbound or duplex, since this affects all data
 	/// being written into the pipe, not just the data written by the server.
@@ -62,12 +65,13 @@ pub struct PipeListenerOptions<'a> {
 	/// when waiting by a client.
 	pub wait_timeout: WaitTimeout,
 	/// The security descriptor to create the named pipe server with.
-	pub security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+	pub security_descriptor: Option<SecurityDescriptor>,
 	/// Whether the resulting handle is to be inheritable by child processes or not.
 	///
 	/// There is little to no reason for this to ever be `true`.
 	pub inheritable: bool,
 }
+
 macro_rules! genset {
 	($name:ident : $ty:ty) => {
 		#[doc = concat!(
@@ -87,7 +91,7 @@ macro_rules! genset {
 		$(genset!($name: $ty);)+
 	};
 }
-impl<'a> PipeListenerOptions<'a> {
+impl<'path> PipeListenerOptions<'path> {
 	/// Creates a new builder with default options.
 	#[allow(clippy::indexing_slicing)] // are you fucking with me
 	pub fn new() -> Self {
@@ -108,13 +112,13 @@ impl<'a> PipeListenerOptions<'a> {
 	/// Clones configuration options which are not owned by value and returns a copy of the original
 	/// option table which is guaranteed not to borrow anything and thus ascribes to the `'static`
 	/// lifetime.
-	pub fn to_owned(&self) -> PipeListenerOptions<'static> {
+	pub fn to_owned(&self) -> io::Result<PipeListenerOptions<'static>> {
 		// We need this ugliness because the compiler does not understand that
 		// PipeListenerOptions<'a> can coerce into PipeListenerOptions<'static> if we manually
 		// replace the name field with Cow::Owned and just copy all other elements over thanks
 		// to the fact that they don't contain a mention of the lifetime 'a. Tbh we need an
 		// RFC for this, would be nice.
-		PipeListenerOptions {
+		Ok(PipeListenerOptions {
 			path: Cow::Owned(self.path.clone().into_owned()),
 			mode: self.mode,
 			nonblocking: self.nonblocking,
@@ -124,18 +128,18 @@ impl<'a> PipeListenerOptions<'a> {
 			input_buffer_size_hint: self.input_buffer_size_hint,
 			output_buffer_size_hint: self.output_buffer_size_hint,
 			wait_timeout: self.wait_timeout,
-			security_descriptor: match self.security_descriptor {
-				Some(Cow::Owned(o)) => Some(Cow::Owned(o)),
-				Some(Cow::Borrowed(b)) => Some(Cow::Owned(*b)),
-				None => None,
-			},
+			security_descriptor: self
+				.security_descriptor
+				.as_ref()
+				.map(|sd| sd.try_clone())
+				.transpose()?,
 			inheritable: self.inheritable,
-		}
+		})
 	}
 
 	/// Sets the [`path`](#structfield.path) parameter to the specified value.
 	#[inline]
-	pub fn path(mut self, path: impl ToWtf16<'a>) -> Self {
+	pub fn path(mut self, path: impl ToWtf16<'path>) -> Self {
 		self.path = path.to_wtf_16().expect(EXPECT_WTF16);
 		self
 	}
@@ -148,7 +152,7 @@ impl<'a> PipeListenerOptions<'a> {
 		input_buffer_size_hint: u32,
 		output_buffer_size_hint: u32,
 		wait_timeout: WaitTimeout,
-		security_descriptor: Option<Cow<'a, SecurityDescriptor>>,
+		security_descriptor: Option<SecurityDescriptor>,
 		inheritable: bool,
 	}
 
@@ -190,9 +194,32 @@ impl<'a> PipeListenerOptions<'a> {
 		self.create::<pipe_mode::None, Sm>()
 	}
 }
+
 impl Default for PipeListenerOptions<'_> {
 	#[inline(always)]
 	fn default() -> Self {
 		Self::new()
+	}
+}
+
+impl TryClone for PipeListenerOptions<'_> {
+	fn try_clone(&self) -> io::Result<Self> {
+		Ok(Self {
+			path: self.path.clone(),
+			mode: self.mode,
+			nonblocking: self.nonblocking,
+			instance_limit: self.instance_limit,
+			write_through: self.write_through,
+			accept_remote: self.accept_remote,
+			input_buffer_size_hint: self.input_buffer_size_hint,
+			output_buffer_size_hint: self.output_buffer_size_hint,
+			wait_timeout: self.wait_timeout,
+			security_descriptor: self
+				.security_descriptor
+				.as_ref()
+				.map(|sd| sd.try_clone())
+				.transpose()?,
+			inheritable: self.inheritable,
+		})
 	}
 }

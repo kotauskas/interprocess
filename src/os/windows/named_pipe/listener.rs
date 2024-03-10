@@ -22,6 +22,8 @@ use std::{
 };
 use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
 
+// TODO add conversion from handle after all; allow passing assumed config
+
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// Note that this type does not correspond to any Win32 object, and is an invention of Interprocess

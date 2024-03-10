@@ -1,8 +1,9 @@
 use super::*;
 use crate::os::windows::{
+	create_security_attributes,
 	named_pipe::{PipeMode, PipeStreamRole},
 	winprelude::*,
-	FileHandle, SecurityDescriptor,
+	FileHandle,
 };
 use std::{io, num::NonZeroU8};
 use windows_sys::Win32::{
@@ -19,7 +20,7 @@ impl PipeListenerOptions<'_> {
 		role: PipeStreamRole,
 		recv_mode: Option<PipeMode>,
 	) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
-		let owned_config = self.to_owned();
+		let owned_config = self.to_owned()?;
 
 		let instance = self
 			.create_instance(true, self.nonblocking, false, role, recv_mode)
@@ -49,8 +50,8 @@ cannot create pipe server that has byte type but receives messages – have you 
 		let open_mode = self.open_mode(first, role, overlapped);
 		let pipe_mode = self.pipe_mode(recv_mode, nonblocking);
 
-		let sa = SecurityDescriptor::create_security_attributes(
-			self.security_descriptor.as_deref(),
+		let sa = create_security_attributes(
+			self.security_descriptor.as_ref().map(|sd| sd.borrow()),
 			self.inheritable,
 		);
 

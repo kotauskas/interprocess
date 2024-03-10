@@ -191,7 +191,7 @@ fn _create_tokio(
 	recv_mode: Option<PipeMode>,
 ) -> io::Result<(PipeListenerOptions<'static>, TokioNPServer)> {
 	// Shadow to avoid mixing them up.
-	let mut config = config.to_owned();
+	let mut config = config.to_owned()?;
 
 	// Tokio should ideally already set that, but let's do it just in case.
 	config.nonblocking = false;

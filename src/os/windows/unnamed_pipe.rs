@@ -5,7 +5,7 @@
 
 // TODO add examples and tests
 
-use super::{winprelude::*, FileHandle, SecurityDescriptor};
+use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{
 	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
 	weaken_buf_init_mut,
@@ -22,10 +22,10 @@ use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePip
 /// You can use this instead of the simple [`pipe` function](crate::unnamed_pipe::pipe) to supply
 /// additional Windows-specific parameters to a pipe.
 #[non_exhaustive]
-#[derive(Copy, Clone, Debug)]
-pub struct CreationOptions<'a> {
+#[derive(Clone, Debug)]
+pub struct CreationOptions<'sd> {
 	/// Security descriptor for the pipe.
-	pub security_descriptor: Option<&'a SecurityDescriptor>,
+	pub security_descriptor: Option<BorrowedSecurityDescriptor<'sd>>,
 	/// Specifies whether the resulting pipe can be inherited by child processes.
 	///
 	/// The default value is `true`.
@@ -35,7 +35,7 @@ pub struct CreationOptions<'a> {
 	/// rely entirely on the system's default buffer size.
 	pub buffer_size_hint: Option<NonZeroUsize>,
 }
-impl<'a> CreationOptions<'a> {
+impl<'sd> CreationOptions<'sd> {
 	/// Starts with the default parameters for the pipe. Identical to `Default::default()`.
 	pub const fn new() -> Self {
 		Self {
@@ -51,7 +51,7 @@ impl<'a> CreationOptions<'a> {
 	#[inline]
 	pub fn security_descriptor(
 		mut self,
-		security_descriptor: Option<&'a SecurityDescriptor>,
+		security_descriptor: Option<BorrowedSecurityDescriptor<'sd>>,
 	) -> Self {
 		self.security_descriptor = security_descriptor;
 		self
@@ -83,10 +83,7 @@ impl<'a> CreationOptions<'a> {
 			None => 0,
 		} as u32;
 
-		let sd = SecurityDescriptor::create_security_attributes(
-			self.security_descriptor,
-			self.inheritable,
-		);
+		let sd = create_security_attributes(self.security_descriptor, self.inheritable);
 
 		let [mut w, mut r] = [INVALID_HANDLE_VALUE; 2];
 		let success = unsafe {

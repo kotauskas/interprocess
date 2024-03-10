@@ -12,6 +12,7 @@ macro_rules! impmod { // TODO remove
 
 /// Branches on the given boolean expression, returning `Err` with `errno`/`GetLastError()` if it's
 /// false.
+// TODO remove in favor of the trait
 macro_rules! ok_or_errno {
 	($success:expr => $($scb:tt)+) => {
 		if $success {
