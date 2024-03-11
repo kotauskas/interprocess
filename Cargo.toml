@@ -30,7 +30,7 @@ tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
 [dependencies]
-tokio = { version = "1.32.0", features = [
+tokio = { version = "1.36.0", features = [
 	"sync",
 	"rt-multi-thread",
 	"net",
@@ -56,7 +56,7 @@ widestring = "1.0.2"
 libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [dev-dependencies]
-tokio = { version = "1.28.0", features = [
+tokio = { version = "1.36.0", features = [
 	"rt-multi-thread",
 	"io-util",
 	"sync",
