@@ -1,7 +1,10 @@
-use crate::os::windows::{
-	named_pipe::{PipeMode, WaitTimeout},
-	winprelude::*,
-	FileHandle,
+use crate::{
+	os::windows::{
+		named_pipe::{PipeMode, WaitTimeout},
+		winprelude::*,
+		FileHandle,
+	},
+	HandleOrErrno, OrErrno,
 };
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use windows_sys::Win32::{
@@ -22,22 +25,21 @@ pub(crate) unsafe fn hget(
 	f: unsafe extern "system" fn(HANDLE, *mut u32) -> i32,
 ) -> io::Result<u32> {
 	let mut x: u32 = 0;
-	let ok = unsafe { f(handle.as_int_handle(), &mut x as *mut _) != 0 };
-	ok_or_errno!(ok => x)
+	unsafe { f(handle.as_int_handle(), &mut x as *mut _) }.true_val_or_errno(x)
 }
 
 pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
 	let mut flags: u32 = 0;
-	let success = unsafe {
+	unsafe {
 		GetNamedPipeInfo(
 			handle.as_int_handle(),
 			&mut flags as *mut _,
 			ptr::null_mut(),
 			ptr::null_mut(),
 			ptr::null_mut(),
-		) != 0
-	};
-	ok_or_errno!(success => flags)
+		)
+	}
+	.true_val_or_errno(flags)
 }
 pub(crate) fn is_server_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
 	// Source: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
@@ -56,7 +58,7 @@ pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Res
 #[allow(dead_code)] // TODO give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 	let mut msglen: u32 = 0;
-	let ok = unsafe {
+	unsafe {
 		PeekNamedPipe(
 			handle.as_int_handle(),
 			ptr::null_mut(),
@@ -64,9 +66,9 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 			ptr::null_mut(),
 			ptr::null_mut(),
 			&mut msglen as *mut _,
-		) != 0
-	};
-	ok_or_errno!(ok => msglen as usize)
+		)
+	}
+	.true_val_or_errno(msglen as usize)
 }
 
 fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {
@@ -92,8 +94,8 @@ pub(crate) fn connect_without_waiting(
 	assert_nts(path)?;
 	let access_flags = modes_to_access_flags(recv, send);
 	let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
-	let (success, handle) = unsafe {
-		let handle = CreateFileW(
+	match unsafe {
+		CreateFileW(
 			path.as_ptr().cast(),
 			access_flags,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -101,13 +103,12 @@ pub(crate) fn connect_without_waiting(
 			OPEN_EXISTING,
 			flags,
 			0,
-		);
-		(handle != INVALID_HANDLE_VALUE, handle)
-	};
-	match ok_or_errno!(success => unsafe {
-		// SAFETY: we just created this handle
-		FileHandle::from(OwnedHandle::from_raw_handle(handle as RawHandle))
-	}) {
+		)
+		.handle_or_errno()
+		.map(|h|
+			// SAFETY: we just created this handle
+			FileHandle::from(OwnedHandle::from_raw_handle(h as RawHandle)))
+	} {
 		Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
 			Err(io::ErrorKind::WouldBlock.into())
 		}
@@ -127,7 +128,7 @@ pub(crate) fn get_named_pipe_handle_state(
 	// TODO expose the rest of the owl as public API
 	let toptr = |r: &mut u32| r as *mut u32;
 	let null = ptr::null_mut();
-	let success = unsafe {
+	unsafe {
 		GetNamedPipeHandleStateW(
 			handle.as_int_handle(),
 			mode.map(toptr).unwrap_or(null),
@@ -141,9 +142,9 @@ pub(crate) fn get_named_pipe_handle_state(
 			username
 				.map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX))
 				.unwrap_or(0),
-		) != 0
-	};
-	ok_or_errno!(success => ())
+		)
+	}
+	.true_val_or_errno(())
 }
 pub(crate) fn set_named_pipe_handle_state(
 	handle: BorrowedHandle<'_>,
@@ -162,15 +163,15 @@ pub(crate) fn set_named_pipe_handle_state(
 	);
 	let toptr = |r: &mut u32| r as *mut u32;
 	let null = ptr::null_mut();
-	let success = unsafe {
+	unsafe {
 		SetNamedPipeHandleState(
 			handle.as_int_handle(),
 			if has_mode { toptr(&mut mode_) } else { null },
 			if has_mcc { toptr(&mut mcc) } else { null },
 			if has_cdt { toptr(&mut cdt) } else { null },
-		) != 0
-	};
-	ok_or_errno!(success => ())
+		)
+	}
+	.true_val_or_errno(())
 }
 
 pub(crate) fn set_nonblocking_given_readmode(
@@ -188,8 +189,7 @@ pub(crate) fn set_nonblocking_given_readmode(
 
 pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
 	assert_nts(path)?;
-	let success = unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.to_raw()) != 0 };
-	ok_or_errno!(success => ())
+	unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.to_raw()) }.true_val_or_errno(())
 }
 
 fn assert_nts(s: &[u16]) -> io::Result<()> {

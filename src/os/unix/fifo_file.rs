@@ -21,6 +21,7 @@
 //! [`remove_file()`](std::fs::remove_file).
 
 use super::unixprelude::*;
+use crate::OrErrno;
 use std::{ffi::CString, io, path::Path};
 
 /// Creates a FIFO file at the specified path with the specified permissions.
@@ -38,6 +39,6 @@ pub fn create_fifo<P: AsRef<Path>>(path: P, mode: mode_t) -> io::Result<()> {
 }
 fn _create_fifo(path: &Path, mode: mode_t) -> io::Result<()> {
 	let path = CString::new(path.as_os_str().as_bytes())?;
-	let success = unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) == 0 };
-	ok_or_errno!(success => ())
+	unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr() as *const _, mode) != -1 }
+		.true_val_or_errno(())
 }

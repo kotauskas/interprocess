@@ -1,9 +1,12 @@
 use super::*;
-use crate::os::windows::{
-	create_security_attributes,
-	named_pipe::{PipeMode, PipeStreamRole},
-	winprelude::*,
-	FileHandle,
+use crate::{
+	os::windows::{
+		create_security_attributes,
+		named_pipe::{PipeMode, PipeStreamRole},
+		winprelude::*,
+		FileHandle,
+	},
+	HandleOrErrno,
 };
 use std::{io, num::NonZeroU8};
 use windows_sys::Win32::{
@@ -64,8 +67,8 @@ cannot create pipe server that has byte type but receives messages – have you 
 			None => 255,
 		};
 
-		let (handle, success) = unsafe {
-			let handle = CreateNamedPipeW(
+		unsafe {
+			CreateNamedPipeW(
 				self.path.as_ptr(),
 				open_mode,
 				pipe_mode,
@@ -74,13 +77,12 @@ cannot create pipe server that has byte type but receives messages – have you 
 				self.input_buffer_size_hint,
 				self.wait_timeout.to_raw(),
 				(&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
-			);
-			(handle, handle != INVALID_HANDLE_VALUE)
-		};
-		ok_or_errno!(success => unsafe {
-			// SAFETY: we just made it and received ownership
-			OwnedHandle::from_raw_handle(handle as RawHandle)
-		})
+			)
+			.handle_or_errno()
+			.map(|h|
+				// SAFETY: we just made it and received ownership
+				OwnedHandle::from_raw_handle(h as RawHandle))
+		}
 	}
 
 	fn open_mode(&self, first: bool, role: PipeStreamRole, overlapped: bool) -> u32 {

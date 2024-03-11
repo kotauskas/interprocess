@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
 use std::{
 	io,
 	mem::{transmute, MaybeUninit},
@@ -7,6 +9,8 @@ use std::{
 	pin::Pin,
 	sync::PoisonError,
 };
+#[cfg(windows)]
+use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 
 /// Utility trait that, if used as a supertrait, prevents other crates from implementing the
 /// trait.
@@ -15,29 +19,84 @@ pub(crate) trait DebugExpectExt: Sized {
 	fn debug_expect(self, msg: &str);
 }
 
-pub static LOCK_POISON: &str = "unexpected lock poison";
-pub fn poison_error<T>(_: PoisonError<T>) -> io::Error {
+pub(crate) static LOCK_POISON: &str = "unexpected lock poison";
+pub(crate) fn poison_error<T>(_: PoisonError<T>) -> io::Error {
 	io::Error::other(LOCK_POISON)
 }
 
-trait OrErrno<T>: Sized {
-	fn ok_or_errno(self, value: impl FnOnce() -> T) -> io::Result<T>;
+pub(crate) trait OrErrno<T>: Sized {
+	fn true_or_errno(self, f: impl FnOnce() -> T) -> io::Result<T>;
 	#[inline(always)]
-	fn or_errno(self, value: T) -> io::Result<T> {
-		self.ok_or_errno(|| value)
+	fn true_val_or_errno(self, value: T) -> io::Result<T> {
+		self.true_or_errno(|| value)
+	}
+	fn false_or_errno(self, f: impl FnOnce() -> T) -> io::Result<T>;
+	#[inline(always)]
+	fn false_val_or_errno(self, value: T) -> io::Result<T> {
+		self.true_or_errno(|| value)
 	}
 }
-
-impl<T> OrErrno<T> for bool {
+impl<B: ToBool, T> OrErrno<T> for B {
 	#[inline]
-	fn ok_or_errno(self, value: impl FnOnce() -> T) -> io::Result<T> {
-		if self {
-			Ok(value())
+	fn true_or_errno(self, f: impl FnOnce() -> T) -> io::Result<T> {
+		if self.to_bool() {
+			Ok(f())
 		} else {
-			Err(std::io::Error::last_os_error())
+			Err(io::Error::last_os_error())
+		}
+	}
+	fn false_or_errno(self, f: impl FnOnce() -> T) -> io::Result<T> {
+		if !self.to_bool() {
+			Ok(f())
+		} else {
+			Err(io::Error::last_os_error())
 		}
 	}
 }
+
+// TODO nonzero_or_errno
+
+#[cfg(unix)]
+pub(crate) trait FdOrErrno: Sized {
+	fn fd_or_errno(self) -> io::Result<Self>;
+}
+#[cfg(unix)]
+impl FdOrErrno for RawFd {
+	#[inline]
+	fn fd_or_errno(self) -> io::Result<Self> {
+		(self != -1).true_val_or_errno(self)
+	}
+}
+
+#[cfg(windows)]
+pub(crate) trait HandleOrErrno: Sized {
+	fn handle_or_errno(self) -> io::Result<Self>;
+}
+#[cfg(windows)]
+impl HandleOrErrno for HANDLE {
+	#[inline]
+	fn handle_or_errno(self) -> io::Result<Self> {
+		(self != INVALID_HANDLE_VALUE).true_val_or_errno(self)
+	}
+}
+
+pub(crate) trait ToBool {
+	fn to_bool(self) -> bool;
+}
+impl ToBool for bool {
+	#[inline(always)]
+	fn to_bool(self) -> bool {
+		self
+	}
+}
+impl ToBool for i32 {
+	#[inline(always)]
+	fn to_bool(self) -> bool {
+		self != 0
+	}
+}
+
+// TODO add a helper for casting references to pointers and then forbid all as casts
 
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
 	#[inline]

@@ -1,3 +1,5 @@
+use crate::OrErrno;
+
 use super::*;
 use std::{
 	io,
@@ -68,7 +70,7 @@ impl LocalBox {
 	fn allocate(sz: u32) -> io::Result<Self> {
 		// Unwrap note: this code isn't supposed to compile on Win16.
 		let allocation = unsafe { LocalAlloc(LMEM_FIXED, sz.try_into().unwrap()) };
-		ok_or_errno!(!allocation.is_null() => unsafe {
+		(allocation.is_null()).false_or_errno(|| unsafe {
 			Self(NonNull::new_unchecked(allocation.cast()), PhantomData)
 		})
 	}
@@ -81,8 +83,10 @@ impl LocalBox {
 }
 impl Drop for LocalBox {
 	fn drop(&mut self) {
-		let success = unsafe { LocalFree(self.0.as_ptr()).is_null() };
-		ok_or_errno!(success => ()).expect("LocalFree() failed");
+		unsafe { LocalFree(self.0.as_ptr()) }
+			.is_null()
+			.true_val_or_errno(())
+			.expect("LocalFree() failed")
 	}
 }
 
@@ -97,15 +101,15 @@ unsafe fn get_acl_info<T>(
 	information_class: ACL_INFORMATION_CLASS,
 ) -> io::Result<T> {
 	let mut info = unsafe { zeroed::<T>() };
-	let success = unsafe {
+	unsafe {
 		GetAclInformation(
 			acl,
 			(&mut info as *mut T).cast(),
 			size_of_val(&info) as u32,
 			information_class,
-		) != 0
-	};
-	ok_or_errno!(success => info)
+		)
+		.true_val_or_errno(info)
+	}
 }
 
 #[allow(clippy::unwrap_used)]
@@ -121,8 +125,7 @@ fn create_acl(sz: u32, rev: u32) -> io::Result<LocalBox> {
 	};
 
 	let mut acl = LocalBox::allocate(sz)?;
-	let success = unsafe { InitializeAcl(acl.as_acl(), sz, rev) != 0 };
-	ok_or_errno!(success => acl)
+	unsafe { InitializeAcl(acl.as_acl(), sz, rev) }.true_val_or_errno(acl)
 }
 
 unsafe fn clone_acl(acl: *mut ACL) -> io::Result<LocalBox> {
@@ -137,11 +140,8 @@ unsafe fn clone_acl(acl: *mut ACL) -> io::Result<LocalBox> {
 	unsafe {
 		let mut ace = ptr::null_mut();
 		for i in 0..sz_info.AceCount {
-			let success = GetAce(new_acl.as_acl(), i, &mut ace) != 0;
-			ok_or_errno!(success => ())?;
-
-			let success = AddAce(new_acl.as_acl(), rev, i, ace.cast_const(), 1) != 0;
-			ok_or_errno!(success => ())?;
+			GetAce(new_acl.as_acl(), i, &mut ace).true_val_or_errno(())?;
+			AddAce(new_acl.as_acl(), rev, i, ace.cast_const(), 1).true_val_or_errno(())?;
 		}
 	}
 	Ok(new_acl)
@@ -153,13 +153,12 @@ unsafe fn clone_sid(sid: PSID) -> io::Result<Option<LocalBox>> {
 		// `None.clone() == None`, we return the same value.
 		return Ok(None);
 	}
-	ok_or_errno!(unsafe { IsValidSid(sid) != 0 } => ())?;
+	unsafe { IsValidSid(sid) }.true_val_or_errno(())?;
 
 	let num_subauths = unsafe { *GetSidSubAuthorityCount(sid) };
 	let sz = unsafe { GetSidLengthRequired(num_subauths) };
 
 	let mut new_sid = LocalBox::allocate(sz)?;
 
-	let success = unsafe { CopySid(sz, new_sid.as_sid(), sid) != 0 };
-	ok_or_errno!(success => Some(new_sid))
+	unsafe { CopySid(sz, new_sid.as_sid(), sid) }.true_val_or_errno(Some(new_sid))
 }

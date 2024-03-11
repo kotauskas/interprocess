@@ -1,5 +1,5 @@
 use super::{c_wrappers, downgrade_eof, winprelude::*};
-use crate::TryClone;
+use crate::{OrErrno, TryClone};
 use std::{io, mem::MaybeUninit, ptr};
 use windows_sys::Win32::Storage::FileSystem::{FlushFileBuffers, ReadFile, WriteFile};
 
@@ -10,34 +10,32 @@ impl FileHandle {
 	pub fn read(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
 		let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
 
-		let (success, num_bytes_read) = unsafe {
-			let mut num_bytes_read: u32 = 0;
-			let result = ReadFile(
+		let mut bytes_read: u32 = 0;
+		unsafe {
+			ReadFile(
 				self.as_int_handle(),
 				buf.as_mut_ptr().cast(),
 				len,
-				&mut num_bytes_read as *mut _,
+				&mut bytes_read as *mut _,
 				ptr::null_mut(),
-			);
-			(result != 0, num_bytes_read as usize)
-		};
-		ok_or_errno!(success => num_bytes_read)
+			)
+		}
+		.true_val_or_errno(bytes_read as usize)
 	}
 	pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
 		let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
 
-		let (success, bytes_written) = unsafe {
-			let mut bytes_written: u32 = 0;
-			let result = WriteFile(
+		let mut bytes_written: u32 = 0;
+		unsafe {
+			WriteFile(
 				self.as_int_handle(),
 				buf.as_ptr().cast(),
 				len,
 				&mut bytes_written as *mut _,
 				ptr::null_mut(),
-			);
-			(result != 0, bytes_written as usize)
-		};
-		ok_or_errno!(success => bytes_written)
+			)
+		}
+		.true_val_or_errno(bytes_written as usize)
 	}
 	#[inline(always)]
 	pub fn flush(&self) -> io::Result<()> {
@@ -45,8 +43,7 @@ impl FileHandle {
 	}
 	#[inline]
 	pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
-		let success = unsafe { FlushFileBuffers(handle) != 0 };
-		downgrade_eof(ok_or_errno!(success => ()))
+		downgrade_eof(unsafe { FlushFileBuffers(handle) }.true_val_or_errno(()))
 	}
 }
 impl TryClone for FileHandle {

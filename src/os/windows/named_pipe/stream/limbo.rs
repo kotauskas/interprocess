@@ -4,7 +4,7 @@ use crate::{
 		winprelude::*,
 		FileHandle,
 	},
-	DebugExpectExt, LOCK_POISON,
+	DebugExpectExt, OrErrno, LOCK_POISON,
 };
 use std::{
 	io,
@@ -23,8 +23,7 @@ pub(super) struct Corpse {
 impl Corpse {
 	#[inline]
 	pub fn disconnect(&self) -> io::Result<()> {
-		let success = unsafe { DisconnectNamedPipe(self.handle.as_int_handle()) != 0 };
-		ok_or_errno!(success => ())
+		unsafe { DisconnectNamedPipe(self.handle.as_int_handle()).true_val_or_errno(()) }
 	}
 }
 impl Drop for Corpse {

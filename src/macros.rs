@@ -10,19 +10,6 @@ macro_rules! impmod { // TODO remove
 	};
 }
 
-/// Branches on the given boolean expression, returning `Err` with `errno`/`GetLastError()` if it's
-/// false.
-// TODO remove in favor of the trait
-macro_rules! ok_or_errno {
-	($success:expr => $($scb:tt)+) => {
-		if $success {
-			Ok($($scb)+)
-		} else {
-			Err(::std::io::Error::last_os_error())
-		}
-	};
-}
-
 /// Generates a method that projects `self.0` of type `src` to a `Pin` for type `dst`.
 macro_rules! pinproj_for_unpin {
 	($src:ty, $dst:ty) => {

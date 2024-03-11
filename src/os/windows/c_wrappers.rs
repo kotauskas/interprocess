@@ -1,3 +1,5 @@
+use crate::OrErrno;
+
 use super::winprelude::*;
 use std::io;
 use windows_sys::Win32::{
@@ -21,7 +23,7 @@ fn duplicate_handle_inner(
 	other_process: Option<BorrowedHandle<'_>>,
 ) -> io::Result<RawHandle> {
 	let mut new_handle = INVALID_HANDLE_VALUE;
-	let success = unsafe {
+	unsafe {
 		let proc = GetCurrentProcess();
 		DuplicateHandle(
 			proc,
@@ -31,7 +33,7 @@ fn duplicate_handle_inner(
 			0,
 			0,
 			DUPLICATE_SAME_ACCESS,
-		) != 0
-	};
-	ok_or_errno!(success => new_handle as _)
+		)
+	}
+	.true_val_or_errno(new_handle as _)
 }

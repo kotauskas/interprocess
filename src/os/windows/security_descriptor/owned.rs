@@ -1,5 +1,5 @@
 use super::*;
-use crate::{DebugExpectExt, TryClone};
+use crate::{DebugExpectExt, OrErrno, TryClone};
 use std::{
 	ffi::c_void,
 	fmt::{self, Debug, Formatter},
@@ -43,13 +43,12 @@ impl SecurityDescriptor {
 	/// Creates a [default](Default) security descriptor.
 	pub fn new() -> io::Result<Self> {
 		let mut sd = MaybeUninit::<SECURITY_DESCRIPTOR>::uninit();
-		let success = unsafe {
-			InitializeSecurityDescriptor(sd.as_mut_ptr().cast(), SECURITY_DESCRIPTOR_REVISION) != 0
-		};
-		ok_or_errno!(success => unsafe {
-			// SAFETY: InitializeSecurityDescriptor() creates a well-initialized absolute SD
-			Self::from_owned(sd.assume_init())
-		})
+		unsafe {
+			InitializeSecurityDescriptor(sd.as_mut_ptr().cast(), SECURITY_DESCRIPTOR_REVISION)
+				.true_or_errno(||
+					// SAFETY: InitializeSecurityDescriptor() creates a well-initialized absolute SD
+					Self::from_owned(sd.assume_init()))
+		}
 	}
 
 	/// Wraps the given security descriptor, assuming ownership.

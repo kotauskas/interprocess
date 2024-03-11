@@ -7,14 +7,16 @@ use windows_sys::Win32::{
 	},
 };
 
+use crate::OrErrno;
+
 pub(super) unsafe fn control_and_revision(
 	sd: *const c_void,
 ) -> io::Result<(SECURITY_DESCRIPTOR_CONTROL, u32)> {
 	let mut control = SECURITY_DESCRIPTOR_CONTROL::default();
 	let mut revision = 0;
-	let success =
-		unsafe { GetSecurityDescriptorControl(sd.cast_mut(), &mut control, &mut revision) != 0 };
-	ok_or_errno!(success => (control, revision))
+
+	unsafe { GetSecurityDescriptorControl(sd.cast_mut(), &mut control, &mut revision) }
+		.true_val_or_errno((control, revision))
 }
 
 pub(super) unsafe fn acl(
@@ -24,8 +26,7 @@ pub(super) unsafe fn acl(
 	let mut exists = 0;
 	let mut pacl = ptr::null_mut();
 	let mut defaulted = 0;
-	let success = unsafe { f(sd.cast_mut(), &mut exists, &mut pacl, &mut defaulted) != 0 };
-	ok_or_errno!(success => {
+	unsafe { f(sd.cast_mut(), &mut exists, &mut pacl, &mut defaulted) }.true_or_errno(|| {
 		if exists != 0 {
 			Some((pacl, defaulted != 0))
 		} else {
@@ -39,10 +40,7 @@ pub(super) unsafe fn sid(
 ) -> io::Result<(PSID, bool)> {
 	let mut psid = ptr::null_mut();
 	let mut defaulted = 1;
-	let success = unsafe { f(sd.cast_mut(), &mut psid, &mut defaulted) != 0 };
-	ok_or_errno!(success => {
-		(psid, defaulted != 0)
-	})
+	unsafe { f(sd.cast_mut(), &mut psid, &mut defaulted) }.true_or_errno(|| (psid, defaulted != 0))
 }
 
 pub(super) unsafe fn set_acl(
@@ -55,8 +53,7 @@ pub(super) unsafe fn set_acl(
 	// Note that the null ACL is a valid value that does not represent the lack of an ACL. The null
 	// pointer this defaults to will be ignored by Windows because has_acl == false.
 	let acl = acl.unwrap_or(ptr::null_mut());
-	let success = unsafe { f(sd.cast_mut(), has_acl, acl, defaulted as i32) != 0 };
-	ok_or_errno!(success => ())
+	unsafe { f(sd.cast_mut(), has_acl, acl, defaulted as i32) }.true_val_or_errno(())
 }
 pub(super) unsafe fn set_sid(
 	sd: *const c_void,
@@ -64,8 +61,7 @@ pub(super) unsafe fn set_sid(
 	defaulted: bool,
 	f: unsafe extern "system" fn(*mut c_void, PSID, BOOL) -> BOOL,
 ) -> io::Result<()> {
-	let success = unsafe { f(sd.cast_mut(), sid, defaulted as i32) != 0 };
-	ok_or_errno!(success => ())
+	unsafe { f(sd.cast_mut(), sid, defaulted as i32) }.true_val_or_errno(())
 }
 
 pub(super) unsafe fn set_control(
@@ -73,8 +69,7 @@ pub(super) unsafe fn set_control(
 	mask: SECURITY_DESCRIPTOR_CONTROL,
 	value: SECURITY_DESCRIPTOR_CONTROL,
 ) -> io::Result<()> {
-	let success = unsafe { SetSecurityDescriptorControl(sd.cast_mut(), mask, value) != 0 };
-	ok_or_errno!(success => ())
+	unsafe { SetSecurityDescriptorControl(sd.cast_mut(), mask, value) }.true_val_or_errno(())
 }
 
 pub(super) unsafe fn unset_acl(
@@ -91,15 +86,15 @@ pub(super) unsafe fn unset_sid(
 }
 
 pub(super) unsafe fn free_acl(acl: *mut ACL) -> io::Result<()> {
-	let success = unsafe { LocalFree(acl.cast()).is_null() };
-	ok_or_errno!(success => ())
+	unsafe { LocalFree(acl.cast()) }
+		.is_null()
+		.true_val_or_errno(())
 }
 pub(super) unsafe fn free_sid(sid: PSID) -> io::Result<()> {
 	if sid.is_null() {
 		return Ok(());
 	}
-	let success = unsafe { FreeSid(sid).is_null() };
-	if success {
+	if unsafe { FreeSid(sid) }.is_null() {
 		Ok(())
 	} else {
 		Err(io::Error::new(
