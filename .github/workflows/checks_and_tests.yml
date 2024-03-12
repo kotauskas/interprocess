@@ -43,21 +43,21 @@ jobs:
           command: doc
           args: "--no-deps"
 
-      - name: Run Clippy for all-features configuration
+      - name: Run Clippy for Tokio configuration
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: "--all-features -- -A unknown_lints"
+          args: "--features tokio -- -A unknown_lints"
 
-      - name: Run tests for all-features configuration
+      - name: Run tests for Tokio configuration
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: "--all-features"
+          args: "--features tokio"
 
 
-      - name: Run rustdoc for all-features configuration
+      - name: Run rustdoc for Tokio configuration
         uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: "--all-features --no-deps"
+          args: "--features tokio --no-deps"

@@ -17,6 +17,7 @@ pub(crate) mod local_socket {
 	pub mod name;
 
 	// temporary
+	#[cfg(feature = "tokio")]
 	pub(crate) use super::named_pipe::local_socket::tokio;
 }
 

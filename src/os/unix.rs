@@ -26,6 +26,7 @@ pub(crate) mod local_socket {
 	pub mod name;
 
 	// temporary
+	#[cfg(feature = "tokio")]
 	pub(crate) use super::uds_local_socket::tokio;
 }
 
