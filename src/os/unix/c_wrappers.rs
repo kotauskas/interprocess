@@ -16,8 +16,11 @@ pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
 	}
 	#[cfg(not(target_os = "linux"))]
 	{
-		let new_fd =
-			unsafe { libc::dup(fd.as_raw_fd()).fd_or_errno(|| OwnedFd::from_raw_fd(new_fd))? };
+		let new_fd = unsafe {
+			libc::dup(fd.as_raw_fd())
+				.fd_or_errno()
+				.map(|fd| OwnedFd::from_raw_fd(fd))?
+		};
 		set_cloexec(new_fd.as_fd())?;
 		Ok(new_fd)
 	}
