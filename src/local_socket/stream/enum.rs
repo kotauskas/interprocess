@@ -1,11 +1,15 @@
 use super::r#trait;
-use crate::{local_socket::Name, TryClone};
+use crate::{
+	local_socket::{flush_unsupported, Name},
+	TryClone,
+};
 use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 #[cfg(unix)]
 use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 #[cfg(windows)]
 use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
+// FIXME awkward macro syntax
 impmod! {local_socket::dispatch,
 	self,
 }
@@ -38,7 +42,7 @@ macro_rules! dispatch_write {
 		}
 		#[inline]
 		fn flush(&mut self) -> io::Result<()> {
-			dispatch!($ty: x in self => x.flush())
+			flush_unsupported()
 		}
 		#[inline]
 		fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -199,7 +203,7 @@ multimacro! {
 	Stream,
 	dispatch_read,
 	dispatch_write,
-	dispatch_asraw,
+	dispatch_as_handle,
 }
 
 // TODO maybe adjust the Debug of halves to mention that they're local sockets
@@ -213,7 +217,7 @@ impl r#trait::RecvHalf for RecvHalf {
 multimacro! {
 	RecvHalf,
 	dispatch_read,
-	dispatch_asraw,
+	dispatch_as_handle,
 }
 
 mkenum!(
@@ -225,7 +229,7 @@ impl r#trait::SendHalf for SendHalf {
 multimacro! {
 	SendHalf,
 	dispatch_write,
-	dispatch_asraw,
+	dispatch_as_handle,
 }
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].

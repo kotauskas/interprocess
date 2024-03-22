@@ -14,11 +14,8 @@ pub use {path_conversion::*, security_descriptor::*, share_handle::*};
 mod file_handle;
 pub(crate) mod local_socket {
 	pub mod dispatch;
+	pub mod dispatch_tokio;
 	pub mod name;
-
-	// temporary
-	#[cfg(feature = "tokio")]
-	pub(crate) use super::named_pipe::local_socket::tokio;
 }
 
 pub(crate) use file_handle::*;

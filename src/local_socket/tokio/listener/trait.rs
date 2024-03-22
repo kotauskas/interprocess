@@ -1,10 +1,16 @@
 use crate::{
-	local_socket::{stream::r#trait::Stream, Name},
+	local_socket::{tokio::stream::r#trait::Stream, Name},
 	Sealed,
 };
-use std::{io, iter::FusedIterator};
+use futures_core::Stream as AsyncIterator;
+use std::{
+	future::Future,
+	io,
+	pin::Pin,
+	task::{Context, Poll},
+};
 
-/// Local socket server implementations.
+/// Tokio local socket server implementations.
 ///
 /// Types on which this trait is implemented are variants of the
 /// [`Listener` enum](super::r#enum::Listener). In addition, it is implemented on `Listener` itself,
@@ -23,37 +29,24 @@ pub trait Listener: Sized + Sealed {
 	/// memory allocation.
 	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self>;
 
-	/// Listens for incoming connections to the socket, blocking until a client is connected.
+	/// Asynchronously listens for incoming connections to the socket, returning a future that
+	/// finishes only when a client is connected.
 	///
 	/// See [`.incoming()`](ListenerExt::incoming) for a convenient way to create a main loop for a
 	/// server.
-	fn accept(&self) -> io::Result<Self::Stream>;
-
-	/// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
-	///
-	/// In nonblocking mode, calling [`.accept()`] and iterating through [`.incoming()`] will
-	/// immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error if there is no client
-	/// attempting to connect at the moment instead of blocking until one arrives.
-	///
-	/// # Platform-specific behavior
-	/// ## Windows
-	/// The nonblocking mode will be also be set for all new streams produced by [`.accept()`] and
-	/// [`.incoming()`].
-	///
-	/// [`.accept()`]: Listener::accept
-	/// [`.incoming()`]: ListenerExt::incoming
-	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()>;
+	fn accept(&self) -> impl Future<Output = io::Result<Self::Stream>> + Send + Sync;
 
 	/// Disables [name reclamation](#name-reclamation) on the listener.
 	// TODO link this
 	fn do_not_reclaim_name_on_drop(&mut self);
-	// TODO ImplProperties type of thing
 }
 
 /// Methods derived from the interface of [`Listener`].
 pub trait ListenerExt: Listener {
-	/// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
-	/// Used together with `for` loops to conveniently create a main loop for a socket server.
+	/// Creates an infinite [asynchronous iterator](AsyncIterator) which calls
+	/// [`.accept()`](Self::accept) with each iteration.
+	///
+	/// Used to conveniently create a main loop for a socket server.
 	#[inline]
 	fn incoming(&self) -> Incoming<'_, Self> {
 		self.into()
@@ -61,10 +54,12 @@ pub trait ListenerExt: Listener {
 }
 impl<T: Listener> ListenerExt for T {}
 
-/// An infinite iterator over incoming client connections of a [`Listener`].
+/// An infinite [asynchronous iterator](AsyncIterator) over incoming client connections of a
+/// [`Listener`].
 ///
-/// This iterator is created by the [`incoming()`](ListenerExt::incoming) method on
-/// [`ListenerExt`] – see its documentation for more.
+/// This str- *ahem,* **asynchronous iterator**, is created by the
+/// [`incoming()`](ListenerExt::incoming) method on [`ListenerExt`] – see its documentation for
+/// more.
 #[derive(Debug)]
 pub struct Incoming<'a, L> {
 	listener: &'a L,
@@ -74,14 +69,20 @@ impl<'a, L: Listener> From<&'a L> for Incoming<'a, L> {
 		Self { listener }
 	}
 }
-impl<L: Listener> Iterator for Incoming<'_, L> {
+
+impl<L: Listener> AsyncIterator for Incoming<'_, L> {
 	type Item = io::Result<L::Stream>;
-	fn next(&mut self) -> Option<Self::Item> {
-		Some(self.listener.accept())
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		let mut fut = self.get_mut().listener.accept();
+		unsafe {
+			// SAFETY: we aren't moving the future anywhere
+			Pin::new_unchecked(&mut fut)
+		}
+		.poll(cx)
+		.map(Some)
 	}
 	#[inline]
 	fn size_hint(&self) -> (usize, Option<usize>) {
 		(usize::MAX, None)
 	}
 }
-impl<L: Listener> FusedIterator for Incoming<'_, L> {}

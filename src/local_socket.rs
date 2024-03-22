@@ -62,6 +62,10 @@ pub use {listener::r#enum::*, name::*, name_type_support::*, stream::r#enum::*, 
 /// Traits representing the interface of local sockets.
 pub mod traits {
 	pub use super::{listener::r#trait::*, stream::r#trait::*};
+	/// Traits for the Tokio variants of local socket objects.
+	pub mod tokio {
+		pub use super::super::tokio::{listener::r#trait::*, stream::r#trait::*};
+	}
 }
 
 /// Re-exports of [traits](traits) done in a way that doesn't pollute the scope, as well as
@@ -85,9 +89,23 @@ pub mod prelude {
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio {
-	mod listener;
-	mod stream;
-	pub use {listener::*, stream::*};
+	pub(super) mod listener {
+		pub(in super::super) mod r#enum;
+		pub(in super::super) mod r#trait;
+	}
+	pub(super) mod stream {
+		pub(in super::super) mod r#enum;
+		pub(in super::super) mod r#trait;
+	}
+	pub use {listener::r#enum::*, stream::r#enum::*};
+
+	/// Like the [sync local socket prelude](super::prelude), but for Tokio local sockets.
+	pub mod prelude {
+		pub use super::{
+			super::traits::tokio::{Listener as _, ListenerExt as _, Stream as _},
+			Listener as LocalSocketListener, Stream as LocalSocketStream,
+		};
+	}
 }
 
 mod concurrency_detector;
@@ -97,3 +115,19 @@ pub(crate) use concurrency_detector::*;
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
 // TODO remove that whole ImplProperties thing in favor of a new trait-based system
 // TODO ListenerOptions
+
+use std::io;
+
+#[cold]
+fn flush_unsupported() -> io::Result<()> {
+	Err(io::Error::new(
+		io::ErrorKind::Unsupported,
+		"local sockets cannot be flushed",
+	))
+}
+
+#[cfg(feature = "async")]
+#[cold]
+fn async_flush_unsupported() -> std::task::Poll<io::Result<()>> {
+	flush_unsupported().into()
+}

@@ -1,12 +1,18 @@
-use super::{super::Name, Stream};
+use super::r#trait;
+use crate::local_socket::{tokio::Stream, Name};
+#[cfg(windows)]
+use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use std::io;
+#[cfg(unix)]
+use {crate::os::unix::uds_local_socket::tokio as uds_impl, std::os::unix::prelude::*};
 
-impmod! {local_socket::tokio,
-	Listener as ListenerImpl
+impmod! {local_socket::dispatch_tokio,
+	self,
 }
 
 // TODO borrowed split in examples
 
+mkenum!(
 /// Tokio-based local socket server, listening for connections.
 ///
 /// [Name reclamation](super::super::Stream#name-reclamation) is performed by default on
@@ -68,6 +74,7 @@ impmod! {local_socket::tokio,
 /// // Create our listener. In a more robust program, we'd check for an
 /// // existing socket file that has not been deleted for whatever reason,
 /// // ensure it's a socket file and not a normal file, and delete it.
+/// // TODO update this
 /// let listener = Listener::bind(name)?;
 ///
 /// // The syncronization between the server and client, if any is used, goes here.
@@ -98,45 +105,29 @@ impmod! {local_socket::tokio,
 /// }
 /// # Ok(()) }
 /// ```
-pub struct Listener(ListenerImpl);
-impl Listener {
-	/// Creates a socket server with the specified local socket name.
-	#[inline]
-	pub fn bind(name: Name<'_>) -> io::Result<Self> {
-		ListenerImpl::bind(name, true).map(Self::from)
-	}
-	/// Like [`bind()`](Self::bind) followed by
-	/// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop), but avoids a memory
-	/// allocation.
-	pub fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		ListenerImpl::bind(name, false).map(Self)
-	}
+Listener);
 
-	/// Listens for incoming connections to the socket, asynchronously waiting until a client is
-	/// connected.
-	#[inline]
-	pub async fn accept(&self) -> io::Result<Stream> {
-		Ok(Stream(self.0.accept().await?))
-	}
+impl r#trait::Listener for Listener {
+	type Stream = Stream;
 
-	/// Disables [name reclamation](super::super::Stream#name-reclamation) on the listener.
 	#[inline]
-	pub fn do_not_reclaim_name_on_drop(&mut self) {
-		self.0.do_not_reclaim_name_on_drop();
+	fn bind(name: Name<'_>) -> io::Result<Self> {
+		dispatch_tokio::bind(name)
+	}
+	#[inline]
+	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		dispatch_tokio::bind_without_name_reclamation(name)
+	}
+	#[inline]
+	async fn accept(&self) -> io::Result<Stream> {
+		dispatch!(Self: x in self => x.accept())
+			.await
+			.map(Stream::from)
+	}
+	#[inline]
+	fn do_not_reclaim_name_on_drop(&mut self) {
+		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
 	}
 }
-#[doc(hidden)]
-impl From<ListenerImpl> for Listener {
-	#[inline]
-	fn from(inner: ListenerImpl) -> Self {
-		Self(inner)
-	}
-}
-multimacro! {
-	Listener,
-	forward_as_handle(unix),
-	forward_try_handle(ListenerImpl, unix),
-	forward_debug,
-	derive_asraw(unix),
-}
-// TODO: incoming
+
+// TODO handle ops (currently Unix-only)

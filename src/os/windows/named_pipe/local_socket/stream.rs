@@ -39,3 +39,5 @@ impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {
 	type Stream = Stream;
 }
+
+// TODO reintroduce shim types to forbid flushes (should fail with NotSupported on all platforms)

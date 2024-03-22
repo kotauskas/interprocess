@@ -1,24 +1,21 @@
 /// Only dispatches with `&self` and `&mut self`.
 macro_rules! dispatch {
+	(@$arm:ident $nm:ident $e:expr) => {{
+		let mut _arm2 = $arm;
+		let $nm = &mut _arm2;
+		$e
+	}};
 	($ty:ident: $nm:ident in $var:expr => $e:expr) => {{
 		match $var {
 			#[cfg(windows)]
-			$ty::NamedPipe(_arm) => {
-				let mut _arm2 = _arm;
-				let $nm = &mut _arm2;
-				$e
-			}
+			$ty::NamedPipe(arm) => dispatch!(@arm $nm $e),
 			#[cfg(unix)]
-			$ty::UdSocket(_arm) => {
-				let mut _arm2 = _arm;
-				let $nm = &mut _arm2;
-				$e
-			}
+			$ty::UdSocket(arm) => dispatch!(@arm $nm $e),
 		}
 	}};
 }
 
-macro_rules! dispatch_asraw {
+macro_rules! dispatch_as_handle {
 	($ty:ident) => {
 		#[cfg(windows)]
 		impl AsHandle for $ty {

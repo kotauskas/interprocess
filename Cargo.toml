@@ -25,7 +25,7 @@ exclude = [
 
 [features]
 default = []
-async = []
+async = ["futures-core"]
 tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
@@ -37,6 +37,7 @@ tokio = { version = "1.36.0", features = [
 	"time",
 	"io-util",
 ], optional = true }
+futures-core = { version = "0.3.28", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52.0", features = [

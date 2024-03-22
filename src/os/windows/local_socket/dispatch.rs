@@ -1,3 +1,5 @@
+// TODO rename to dispatch_sync
+
 use super::super::named_pipe::local_socket as np_impl;
 use crate::local_socket::{prelude::*, Listener, Name, Stream};
 use std::io;

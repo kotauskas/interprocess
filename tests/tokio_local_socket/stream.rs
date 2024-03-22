@@ -1,6 +1,6 @@
 use crate::{
 	local_socket::{
-		tokio::{Listener, Stream},
+		tokio::{prelude::*, Listener, Stream},
 		Name,
 	},
 	tests::util::*,
