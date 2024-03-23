@@ -97,14 +97,8 @@ macro_rules! forward_handle {
 	};
 }
 
-// TODO deal with this documentation mess (also allow replacing that Error signature with a name)
 macro_rules! forward_try_into_handle {
 	(@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
-		/// Releases ownership of the handle/file descriptor, detaches the object from the async
-		/// runtime and returns the handle/file descriptor as an owned object.
-		///
-		/// # Errors
-		/// If called outside the async runtime that corresponds to this type.
 		#[cfg($cfg)]
 		impl $(<$($lt)*>)? ::std::convert::TryFrom<$ty> for ::std::os::$cfg::io::$hty {
 			type Error = <::std::os::$cfg::io::$hty as ::std::convert::TryFrom<$fldt>>::Error;
@@ -128,11 +122,6 @@ macro_rules! forward_try_into_handle {
 
 macro_rules! forward_try_from_handle {
 	(@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
-		/// Creates an async object from a given owned handle/file descriptor. This will also attach
-		/// the object to the async runtime this function is called in.
-		///
-		/// # Errors
-		/// If called outside the async runtime that corresponds to this type.
 		#[cfg($cfg)]
 		impl $(<$($lt)*>)? ::std::convert::TryFrom<::std::os::$cfg::io::$hty> for $ty {
 			type Error = <$fldt as ::std::convert::TryFrom<::std::os::$cfg::io::$hty>>::Error;
