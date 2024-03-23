@@ -96,6 +96,7 @@ multimacro! {
 	forward_tokio_ref_read,
 	forward_as_handle,
 	derive_tokio_mut_write,
+	derive_trivial_conv(StreamImpl),
 }
 
 pub struct RecvHalf(pub(super) RecvHalfImpl);
@@ -111,6 +112,7 @@ multimacro! {
 	forward_tokio_ref_read,
 	forward_as_handle,
 	forward_debug("local_socket::RecvHalf"),
+	derive_trivial_conv(RecvHalfImpl),
 }
 
 pub struct SendHalf(pub(super) SendHalfImpl);
@@ -144,4 +146,5 @@ multimacro! {
 	forward_as_handle,
 	forward_debug("local_socket::SendHalf"),
 	derive_tokio_mut_write,
+	derive_trivial_conv(SendHalfImpl),
 }

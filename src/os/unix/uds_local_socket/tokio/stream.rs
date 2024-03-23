@@ -88,6 +88,7 @@ multimacro! {
 	forward_rbv(UnixStream, &),
 	forward_tokio_rw,
 	forward_as_handle(unix),
+	derive_trivial_conv(UnixStream),
 }
 impl AsyncRead for &Stream {
 	#[inline]
