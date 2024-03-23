@@ -6,9 +6,7 @@ use std::io;
 #[cfg(unix)]
 use {crate::os::unix::uds_local_socket::tokio as uds_impl, std::os::unix::prelude::*};
 
-impmod! {local_socket::dispatch_tokio,
-	self,
-}
+impmod! { local_socket::dispatch_tokio as dispatch }
 
 // TODO borrowed split in examples
 
@@ -112,11 +110,11 @@ impl r#trait::Listener for Listener {
 
 	#[inline]
 	fn bind(name: Name<'_>) -> io::Result<Self> {
-		dispatch_tokio::bind(name)
+		dispatch::bind(name)
 	}
 	#[inline]
 	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		dispatch_tokio::bind_without_name_reclamation(name)
+		dispatch::bind_without_name_reclamation(name)
 	}
 	#[inline]
 	async fn accept(&self) -> io::Result<Stream> {

@@ -13,9 +13,7 @@ use {
 	crate::os::windows::named_pipe::local_socket::tokio as np_impl, std::os::windows::prelude::*,
 };
 
-impmod! {local_socket::dispatch_tokio,
-	self as dispatch,
-}
+impmod! { local_socket::dispatch_tokio as dispatch }
 
 macro_rules! dispatch_read {
 	(@iw $ty:ident) => {

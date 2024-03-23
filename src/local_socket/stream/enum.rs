@@ -9,10 +9,7 @@ use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 #[cfg(windows)]
 use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
-// FIXME awkward macro syntax
-impmod! {local_socket::dispatch_sync,
-	self,
-}
+impmod! { local_socket::dispatch_sync }
 
 macro_rules! dispatch_read {
 	(@iw $ty:ident) => {

@@ -1,7 +1,11 @@
 #![allow(unused_macros)]
 // TODO more internal docs
 
-macro_rules! impmod { // TODO remove
+/// Dispatches to a symmetrically named submodule in the target OS module.
+macro_rules! impmod {
+	($($osmod:ident)::+ $(as $into:ident)?) => {
+		impmod!($($osmod)::+, self $(as $into)?);
+	};
 	($($osmod:ident)::+, $($orig:ident $(as $into:ident)?),* $(,)?) => {
 		#[cfg(unix)]
 		use $crate::os::unix::$($osmod)::+::{$($orig $(as $into)?,)*};

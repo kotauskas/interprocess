@@ -4,9 +4,7 @@ use std::{
 	fmt::Debug,
 };
 
-impmod! {local_socket::name,
-	is_namespaced,
-}
+impmod! {local_socket::name, is_namespaced}
 
 // TODO maybe emulate NS on FS-only via tmpfs?
 // TODO better PartialEq
