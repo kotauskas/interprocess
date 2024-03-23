@@ -1,9 +1,6 @@
 use super::*;
 use crate::{error::ConversionError, os::windows::winprelude::*};
-use std::{
-	fmt::{self, Display, Formatter},
-	io,
-};
+use std::fmt::{self, Display, Formatter};
 
 /// Additional contextual information for conversions from a raw handle to a named pipe stream.
 ///

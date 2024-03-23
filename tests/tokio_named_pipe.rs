@@ -9,7 +9,7 @@ use crate::{
 	},
 };
 use color_eyre::eyre::WrapErr;
-use std::{convert::TryInto, future::Future, io, path::Path, sync::Arc};
+use std::{future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
 
 use super::util::namegen_named_pipe;

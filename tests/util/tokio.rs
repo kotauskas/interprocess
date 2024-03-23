@@ -1,6 +1,6 @@
 use super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
 use color_eyre::eyre::{bail, Context};
-use std::{convert::TryInto, future::Future, sync::Arc};
+use std::{future::Future, sync::Arc};
 use tokio::{
 	sync::{
 		oneshot::{channel, Sender},

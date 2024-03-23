@@ -11,7 +11,7 @@ use ::tokio::{
 	task, try_join,
 };
 use color_eyre::eyre::WrapErr;
-use std::{convert::TryInto, future::Future, str, sync::Arc};
+use std::{future::Future, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {
 	message(None, server, Some(['\n', '\0'][nts as usize]))

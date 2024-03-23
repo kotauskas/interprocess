@@ -5,7 +5,7 @@ use crate::{
 	os::windows::{winprelude::*, FileHandle},
 	DebugExpectExt, LOCK_POISON,
 };
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use tokio::{
 	runtime::{self, Handle as RuntimeHandle, Runtime},
 	sync::mpsc::{unbounded_channel, UnboundedSender},

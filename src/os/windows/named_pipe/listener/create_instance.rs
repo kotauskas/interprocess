@@ -1,14 +1,9 @@
 use super::*;
 use crate::{
-	os::windows::{
-		create_security_attributes,
-		named_pipe::{PipeMode, PipeStreamRole},
-		winprelude::*,
-		FileHandle,
-	},
+	os::windows::{create_security_attributes, named_pipe::PipeMode, winprelude::*},
 	HandleOrErrno,
 };
-use std::{io, num::NonZeroU8};
+use std::num::NonZeroU8;
 use windows_sys::Win32::{
 	Security::SECURITY_ATTRIBUTES,
 	Storage::FileSystem::{

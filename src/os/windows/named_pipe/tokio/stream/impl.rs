@@ -18,7 +18,7 @@ mod send_off;
 
 use super::*;
 use crate::os::windows::{
-	named_pipe::{has_msg_boundaries_from_sys, hget, is_server_from_sys, MaybeArc, PipeMode},
+	named_pipe::{has_msg_boundaries_from_sys, hget, is_server_from_sys, PipeMode},
 	winprelude::*,
 };
 use std::{

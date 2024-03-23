@@ -2,7 +2,6 @@ use crate::OrErrno;
 
 use super::*;
 use std::{
-	io,
 	marker::PhantomData,
 	mem::{size_of, size_of_val, zeroed, ManuallyDrop},
 	ptr::{self, NonNull},

@@ -1,7 +1,6 @@
 use super::*;
 use crate::{DebugExpectExt, OrErrno, TryClone};
 use std::{
-	ffi::c_void,
 	fmt::{self, Debug, Formatter},
 	mem::MaybeUninit,
 };

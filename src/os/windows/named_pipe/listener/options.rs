@@ -1,13 +1,13 @@
 use super::*;
 use crate::{
 	os::windows::{
-		named_pipe::{pipe_mode, PipeMode, PipeModeTag, WaitTimeout},
+		named_pipe::{pipe_mode, PipeMode, WaitTimeout},
 		path_conversion::*,
 		SecurityDescriptor,
 	},
 	TryClone,
 };
-use std::{borrow::Cow, io, marker::PhantomData, num::NonZeroU8, sync::Mutex};
+use std::{borrow::Cow, num::NonZeroU8};
 use widestring::{u16cstr, U16CStr};
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.

@@ -1,9 +1,6 @@
 use super::*;
 use crate::os::windows::{
-	named_pipe::{
-		connect_without_waiting, stream::block_for_server, MaybeArc, NeedsFlushVal, PipeMode,
-		WaitTimeout,
-	},
+	named_pipe::{connect_without_waiting, stream::block_for_server, NeedsFlushVal, WaitTimeout},
 	path_conversion::*,
 };
 use std::{ffi::OsStr, mem::take, path::Path};

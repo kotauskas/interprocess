@@ -1,5 +1,5 @@
 use super::PipeModeTag;
-use std::{convert::TryFrom, mem};
+use std::mem;
 use windows_sys::Win32::{
 	Storage::FileSystem::{PIPE_ACCESS_DUPLEX, PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND},
 	System::Pipes::{PIPE_READMODE_BYTE, PIPE_READMODE_MESSAGE, PIPE_TYPE_BYTE, PIPE_TYPE_MESSAGE},

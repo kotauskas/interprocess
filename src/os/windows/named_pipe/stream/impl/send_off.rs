@@ -1,8 +1,5 @@
 use super::*;
-use crate::os::windows::{
-	named_pipe::stream::limbo::{send_off, Corpse},
-	FileHandle,
-};
+use crate::os::windows::named_pipe::stream::limbo::{send_off, Corpse};
 
 pub(crate) static LIMBO_ERR: &str =
 	"attempt to perform operation on pipe stream which has been sent off to limbo";

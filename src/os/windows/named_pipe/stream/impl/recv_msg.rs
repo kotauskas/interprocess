@@ -1,6 +1,6 @@
 use super::*;
 use crate::os::windows::downgrade_eof;
-use recvmsg::{prelude::*, NoAddrBuf, RecvMsg, RecvResult};
+use recvmsg::{prelude::*, NoAddrBuf, RecvResult};
 use windows_sys::Win32::Foundation::ERROR_MORE_DATA;
 
 pub(crate) const DISCARD_BUF_SIZE: usize = {
