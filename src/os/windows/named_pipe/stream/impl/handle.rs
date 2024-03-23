@@ -1,5 +1,6 @@
 use super::*;
 use crate::TryClone;
+use std::mem::ManuallyDrop;
 
 impl AsHandle for RawPipeStream {
 	#[inline]
@@ -27,7 +28,9 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
 impl From<RawPipeStream> for OwnedHandle {
 	#[inline]
 	fn from(x: RawPipeStream) -> Self {
-		x.into()
+		let x = ManuallyDrop::new(x);
+		let handle = unsafe { std::ptr::read(&x.handle) };
+		handle.expect(LIMBO_ERR).into()
 	}
 }
 
