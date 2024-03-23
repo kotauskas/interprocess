@@ -63,13 +63,15 @@ pub use {listener::r#enum::*, name::*, name_type_support::*, stream::r#enum::*, 
 pub mod traits {
 	pub use super::{listener::r#trait::*, stream::r#trait::*};
 	/// Traits for the Tokio variants of local socket objects.
+	#[cfg(feature = "tokio")]
+	#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 	pub mod tokio {
 		pub use super::super::tokio::{listener::r#trait::*, stream::r#trait::*};
 	}
 }
 
-/// Re-exports of [traits](traits) done in a way that doesn't pollute the scope, as well as
-/// of the enum-dispatch types with their names prefixed with `LocalSocket`.
+/// Re-exports of [traits] done in a way that doesn't pollute the scope, as well as of the
+/// enum-dispatch types with their names prefixed with `LocalSocket`.
 pub mod prelude {
 	pub use super::{
 		traits::{Listener as _, ListenerExt as _, Stream as _},

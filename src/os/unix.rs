@@ -23,6 +23,7 @@ pub(crate) mod unnamed_pipe;
 
 pub(crate) mod local_socket {
 	pub mod dispatch_sync;
+	#[cfg(feature = "tokio")]
 	pub mod dispatch_tokio;
 	pub mod name;
 }

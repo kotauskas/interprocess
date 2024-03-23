@@ -14,6 +14,7 @@ pub use {path_conversion::*, security_descriptor::*, share_handle::*};
 mod file_handle;
 pub(crate) mod local_socket {
 	pub mod dispatch_sync;
+	#[cfg(feature = "tokio")]
 	pub mod dispatch_tokio;
 	pub mod name;
 }
