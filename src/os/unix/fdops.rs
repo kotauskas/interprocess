@@ -1,9 +1,6 @@
 use super::{c_wrappers, unixprelude::*};
 use crate::{OrErrno, TryClone};
-use std::{
-	io::{self, prelude::*, IoSlice, IoSliceMut},
-	os::fd::OwnedFd,
-};
+use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 
 #[repr(transparent)]
 pub(super) struct FdOps(pub(super) OwnedFd);
