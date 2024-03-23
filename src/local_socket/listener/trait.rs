@@ -7,7 +7,7 @@ use std::{io, iter::FusedIterator};
 /// Local socket server implementations.
 ///
 /// Types on which this trait is implemented are variants of the
-/// [`Listener` enum](super::r#enum::Listener). In addition, it is implemented on `Listener` itself,
+/// [`Listener` enum](super::enum::Listener). In addition, it is implemented on `Listener` itself,
 /// which makes it a trait object of sorts. See its documentation for more on the semantics of the
 /// methods seen here.
 #[allow(private_bounds)]
@@ -52,8 +52,9 @@ pub trait Listener: Sized + Sealed {
 
 /// Methods derived from the interface of [`Listener`].
 pub trait ListenerExt: Listener {
-	/// Creates an infinite iterator which calls [`.accept()`](Self::accept) with each iteration.
-	/// Used together with `for` loops to conveniently create a main loop for a socket server.
+	/// Creates an infinite iterator which calls [`.accept()`](Listener::accept) with each
+	/// iteration. Used together with `for` loops to conveniently create a main loop for a
+	/// socket server.
 	#[inline]
 	fn incoming(&self) -> Incoming<'_, Self> {
 		self.into()

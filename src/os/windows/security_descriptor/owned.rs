@@ -20,7 +20,7 @@ use windows_sys::Win32::{
 /// [lh]: https://learn.microsoft.com/en-us/windows/win32/memory/global-and-local-functions
 #[repr(C)]
 pub struct SecurityDescriptor(SECURITY_DESCRIPTOR);
-/// Interior mutability is not provided through [`OwnedSecurityDescriptor`].
+/// Interior mutability is not provided through [`SecurityDescriptor`].
 unsafe impl Sync for SecurityDescriptor {}
 unsafe impl Send for SecurityDescriptor {}
 

@@ -18,19 +18,19 @@ mkenum!(
 ///
 /// When a Unix domain socket listener is closed, its associated socket file is not automatically
 /// deleted. Instead, it remains on the filesystem in a zombie state, neither accepting connections
-/// nor allowing a new listener to reuse it – [`bind()`](Self::bind) will return
+/// nor allowing a new listener to reuse it – [`bind()`](trait::Listener::bind) will return
 /// [`AddrInUse`](io::ErrorKind::AddrInUse) unless it is deleted manually.
 ///
 /// Interprocess implements *automatic name reclamation* via: when the local socket listener is
 /// dropped, it performs [`std::fs::remove_file()`] (i.e. `unlink()`) with the path that was
-/// originally passed to [`bind()`](Self::bind), allowing for subsequent reuse of the local socket
-/// name.
+/// originally passed to [`bind()`](trait::Listener::bind), allowing for subsequent reuse of the
+/// local socket name.
 ///
 /// If the program crashes in a way that doesn't unwind the stack, the deletion will not occur and
 /// the socket file will linger on the filesystem, in which case manual deletion will be necessary.
 /// Identially, the automatic name reclamation mechanism can be opted out of via
-/// [`.do_not_reclaim_name_on_drop()`](Self::do_not_reclaim_name_on_drop) or
-/// [`bind_without_name_reclamation()`](Self::bind_without_name_reclamation).
+/// [`.do_not_reclaim_name_on_drop()`](trait::Listener::do_not_reclaim_name_on_drop) or
+/// [`bind_without_name_reclamation()`](trait::Listener::bind_without_name_reclamation).
 ///
 /// Note that the socket file can be unlinked by other programs at any time, retaining the inode the
 /// listener is bound to but making it inaccessible to peers if it was at its last hardlink. If that

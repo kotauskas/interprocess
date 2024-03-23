@@ -10,7 +10,7 @@ use std::io::{self, prelude::*};
 /// Local socket stream implementations.
 ///
 /// Types on which this trait is implemented are variants of the
-/// [`Stream` enum](super::r#enum::Stream). In addition, it is implemented on `Stream` itself, which
+/// [`Stream` enum](super::enum::Stream). In addition, it is implemented on `Stream` itself, which
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
 pub trait Stream: Sized + Read + RefRead + Write + RefWrite + Sealed {
@@ -49,7 +49,7 @@ pub trait Stream: Sized + Read + RefRead + Write + RefWrite + Sealed {
 /// Receive halves of [`Stream`]s, obtained through [`.split()`](Stream::split).
 ///
 /// Types on which this trait is implemented are variants of the
-/// [`RecvHalf` enum](super::r#enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
+/// [`RecvHalf` enum](super::enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
 /// which makes it a trait object of sorts.
 pub trait RecvHalf: Sized + Read + RefRead + Sealed {
 	/// The stream type the half is split from.
@@ -59,7 +59,7 @@ pub trait RecvHalf: Sized + Read + RefRead + Sealed {
 /// Send halves of [`Stream`]s, obtained through [`.split()`](Stream::split).
 ///
 /// Types on which this trait is implemented are variants of the
-/// [`SendHalf` enum](super::r#enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
+/// [`SendHalf` enum](super::enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
 /// which makes it a trait object of sorts.
 pub trait SendHalf: Sized + Write + RefWrite + Sealed {
 	/// The stream type the half is split from.

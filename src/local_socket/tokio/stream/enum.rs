@@ -59,8 +59,8 @@ macro_rules! dispatch_write {
 }
 
 mkenum!(
-/// Tokio-based local socket byte stream, obtained eiter from [`Listener`](super::Listener) or by
-/// connecting to an existing local socket.
+/// Tokio-based local socket byte stream, obtained eiter from [`Listener`](super::super::Listener)
+/// or by connecting to an existing local socket.
 ///
 /// # Examples
 ///
@@ -210,5 +210,5 @@ multimacro! {
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
 
-/// Result type for [`.reunite()`](r#trait::Stream::reunite) on [`Stream`].
+/// Result type for [`.reunite()`](trait::Stream::reunite) on [`Stream`].
 pub type ReuniteResult = r#trait::ReuniteResult<Stream>;

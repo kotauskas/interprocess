@@ -57,16 +57,28 @@ mod listener {
 	pub(super) mod r#trait;
 }
 
-pub use {listener::r#enum::*, name::*, name_type_support::*, stream::r#enum::*, to_name::*};
+pub use {
+	listener::{r#enum::*, r#trait::Incoming},
+	name::*,
+	name_type_support::*,
+	stream::r#enum::*,
+	to_name::*,
+};
 
 /// Traits representing the interface of local sockets.
 pub mod traits {
-	pub use super::{listener::r#trait::*, stream::r#trait::*};
+	pub use super::{
+		listener::r#trait::{Listener, ListenerExt},
+		stream::r#trait::*,
+	};
 	/// Traits for the Tokio variants of local socket objects.
 	#[cfg(feature = "tokio")]
 	#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 	pub mod tokio {
-		pub use super::super::tokio::{listener::r#trait::*, stream::r#trait::*};
+		pub use super::super::tokio::{
+			listener::r#trait::{Listener, ListenerExt},
+			stream::r#trait::*,
+		};
 	}
 }
 
@@ -99,7 +111,10 @@ pub mod tokio {
 		pub(in super::super) mod r#enum;
 		pub(in super::super) mod r#trait;
 	}
-	pub use {listener::r#enum::*, stream::r#enum::*};
+	pub use {
+		listener::{r#enum::*, r#trait::Incoming},
+		stream::r#enum::*,
+	};
 
 	/// Like the [sync local socket prelude](super::prelude), but for Tokio local sockets.
 	pub mod prelude {
