@@ -81,7 +81,6 @@ macro_rules! genset {
 			") parameter to the specified value."
 		)]
 		#[must_use = "builder setters take the entire structure and return the result"]
-		// FIXME this Into bound probably doesn't work all too well for `path`
 		pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
 			self.$name = $name.into();
 			self
