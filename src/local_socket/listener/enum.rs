@@ -6,7 +6,7 @@ use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 #[cfg(windows)]
 use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
-impmod! {local_socket::dispatch,
+impmod! {local_socket::dispatch_sync,
 	self,
 }
 
@@ -149,11 +149,11 @@ impl r#trait::Listener for Listener {
 
 	#[inline]
 	fn bind(name: Name<'_>) -> io::Result<Self> {
-		dispatch::bind(name)
+		dispatch_sync::bind(name)
 	}
 	#[inline]
 	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		dispatch::bind_without_name_reclamation(name)
+		dispatch_sync::bind_without_name_reclamation(name)
 	}
 	#[inline]
 	fn accept(&self) -> io::Result<Stream> {

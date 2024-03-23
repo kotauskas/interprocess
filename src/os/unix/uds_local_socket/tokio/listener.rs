@@ -1,7 +1,8 @@
 use super::Stream;
 use crate::{
-	local_socket::{prelude::*, Name},
+	local_socket::{prelude::*, traits::tokio as traits, Name},
 	os::unix::uds_local_socket::{listener::Listener as SyncListener, ReclaimGuard},
+	Sealed,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -14,16 +15,22 @@ pub struct Listener {
 	listener: UnixListener,
 	reclaim: ReclaimGuard,
 }
-impl Listener {
-	pub fn bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
-		Self::try_from(SyncListener::_bind(name, keep_name)?)
+impl Sealed for Listener {}
+impl traits::Listener for Listener {
+	type Stream = Stream;
+
+	fn bind(name: Name<'_>) -> io::Result<Self> {
+		Self::try_from(SyncListener::_bind(name, true)?)
 	}
-	pub async fn accept(&self) -> io::Result<Stream> {
+	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		Self::try_from(SyncListener::_bind(name, false)?)
+	}
+	async fn accept(&self) -> io::Result<Stream> {
 		let inner = self.listener.accept().await?.0;
 		Ok(Stream::from(inner))
 	}
 
-	pub fn do_not_reclaim_name_on_drop(&mut self) {
+	fn do_not_reclaim_name_on_drop(&mut self) {
 		self.reclaim.forget();
 	}
 }

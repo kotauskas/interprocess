@@ -25,7 +25,7 @@ mkenum!(
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::local_socket::{
-/// 	tokio::{Listener, Stream},
+/// 	tokio::{prelude::*, Listener, Stream},
 /// 	NameTypeSupport, ToFsName, ToNsName,
 /// };
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
@@ -129,5 +129,17 @@ impl r#trait::Listener for Listener {
 		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
 	}
 }
+
+#[cfg(unix)]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+impl TryFrom<OwnedFd> for Listener {
+	type Error = <uds_impl::Listener as TryFrom<OwnedFd>>::Error;
+	fn try_from(fd: OwnedFd) -> Result<Self, Self::Error> {
+		uds_impl::Listener::try_from(fd).map(Self::UdSocket)
+	}
+}
+
+#[cfg(unix)]
+dispatch_as_handle!(Listener);
 
 // TODO handle ops (currently Unix-only)

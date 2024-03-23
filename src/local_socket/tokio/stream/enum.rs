@@ -68,7 +68,10 @@ mkenum!(
 /// ```no_run
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use interprocess::local_socket::{tokio::Stream, NameTypeSupport, ToFsName, ToNsName};
+/// use interprocess::local_socket::{
+/// 	tokio::{prelude::*, Stream},
+/// 	NameTypeSupport, ToFsName, ToNsName,
+/// };
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 ///
 /// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:

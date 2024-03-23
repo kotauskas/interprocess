@@ -1,5 +1,7 @@
 //! Local sockets implemented using Unix domain sockets.
 
+// TODO forbid flush
+
 mod listener;
 mod stream;
 pub use {listener::*, stream::*};

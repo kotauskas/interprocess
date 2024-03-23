@@ -22,12 +22,9 @@ pub mod uds_local_socket;
 pub(crate) mod unnamed_pipe;
 
 pub(crate) mod local_socket {
-	pub mod dispatch;
+	pub mod dispatch_sync;
+	pub mod dispatch_tokio;
 	pub mod name;
-
-	// temporary
-	#[cfg(feature = "tokio")]
-	pub(crate) use super::uds_local_socket::tokio;
 }
 
 mod unixprelude {

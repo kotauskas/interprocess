@@ -1,19 +1,17 @@
-// TODO rename to dispatch_sync
-
-use super::super::named_pipe::local_socket as np_impl;
+use super::super::uds_local_socket as uds_impl;
 use crate::local_socket::{prelude::*, Listener, Name, Stream};
 use std::io;
 
 #[inline]
 pub fn bind(name: Name<'_>) -> io::Result<Listener> {
-	np_impl::Listener::bind(name).map(Listener::from)
+	uds_impl::Listener::bind(name).map(Listener::from)
 }
 
 #[inline]
 pub fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Listener> {
-	np_impl::Listener::bind(name).map(Listener::from)
+	uds_impl::Listener::bind_without_name_reclamation(name).map(Listener::from)
 }
 
 pub fn connect(name: Name<'_>) -> io::Result<Stream> {
-	np_impl::Stream::connect(name).map(Stream::from)
+	uds_impl::Stream::connect(name).map(Stream::from)
 }

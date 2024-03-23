@@ -1,5 +1,10 @@
 use super::super::name_to_addr;
-use crate::{error::ReuniteError, local_socket::Name, os::unix::c_wrappers};
+use crate::{
+	error::ReuniteError,
+	local_socket::{traits::tokio as traits, Name},
+	os::unix::c_wrappers,
+	Sealed,
+};
 use std::{
 	io::{self, ErrorKind::WouldBlock},
 	net::Shutdown,
@@ -27,10 +32,9 @@ fn shutdown(slf: impl AsFd) -> Poll<io::Result<()>> {
 
 #[derive(Debug)]
 pub struct Stream(pub(super) UnixStream);
+impl Sealed for Stream {}
+
 impl Stream {
-	pub async fn connect(name: Name<'_>) -> io::Result<Self> {
-		Self::_connect(name_to_addr(name)?).await.map(Self::from)
-	}
 	#[allow(clippy::unwrap_used)]
 	async fn _connect(addr: SocketAddr) -> io::Result<UnixStream> {
 		#[cfg(any(target_os = "linux", target_os = "android"))]
@@ -48,25 +52,27 @@ impl Stream {
 		}
 		UnixStream::connect(addr.as_pathname().unwrap()).await
 	}
+}
 
-	pub fn split(self) -> (RecvHalf, SendHalf) {
+impl traits::Stream for Stream {
+	type RecvHalf = RecvHalf;
+	type SendHalf = SendHalf;
+
+	async fn connect(name: Name<'_>) -> io::Result<Self> {
+		Self::_connect(name_to_addr(name)?).await.map(Self::from)
+	}
+	fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.into_split();
 		(RecvHalf(r), SendHalf(w))
 	}
 	#[inline]
-	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
+	fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
 		rh.0.reunite(sh.0)
 			.map(Self::from)
 			.map_err(|tokio::net::unix::ReuniteError(rh, sh)| ReuniteError {
 				rh: RecvHalf(rh),
 				sh: SendHalf(sh),
 			})
-	}
-}
-impl From<UnixStream> for Stream {
-	#[inline]
-	fn from(inner: UnixStream) -> Self {
-		Self(inner)
 	}
 }
 
@@ -151,6 +157,10 @@ impl TryFrom<OwnedFd> for Stream {
 }
 
 pub struct RecvHalf(RecvHalfImpl);
+impl Sealed for RecvHalf {}
+impl traits::RecvHalf for RecvHalf {
+	type Stream = Stream;
+}
 multimacro! {
 	RecvHalf,
 	pinproj_for_unpin(RecvHalfImpl),
@@ -179,6 +189,10 @@ impl AsFd for RecvHalf {
 }
 
 pub struct SendHalf(SendHalfImpl);
+impl Sealed for SendHalf {}
+impl traits::SendHalf for SendHalf {
+	type Stream = Stream;
+}
 multimacro! {
 	SendHalf,
 	pinproj_for_unpin(SendHalfImpl),

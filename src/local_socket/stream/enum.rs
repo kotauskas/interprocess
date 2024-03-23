@@ -10,7 +10,7 @@ use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
 // FIXME awkward macro syntax
-impmod! {local_socket::dispatch,
+impmod! {local_socket::dispatch_sync,
 	self,
 }
 
@@ -118,7 +118,7 @@ impl r#trait::Stream for Stream {
 
 	#[inline]
 	fn connect(name: Name<'_>) -> io::Result<Self> {
-		dispatch::connect(name)
+		dispatch_sync::connect(name)
 	}
 	#[inline]
 	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {

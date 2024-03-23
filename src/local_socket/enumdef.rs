@@ -18,10 +18,19 @@ macro_rules! dispatch {
 macro_rules! dispatch_as_handle {
 	($ty:ident) => {
 		#[cfg(windows)]
+		#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
 		impl AsHandle for $ty {
 			#[inline]
 			fn as_handle(&self) -> BorrowedHandle<'_> {
 				dispatch!(Self: x in self => (*x).as_handle())
+			}
+		}
+		#[cfg(unix)]
+		#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+		impl AsFd for $ty {
+			#[inline]
+			fn as_fd(&self) -> BorrowedFd<'_> {
+				dispatch!(Self: x in self => (*x).as_fd())
 			}
 		}
 	};
