@@ -52,7 +52,7 @@ pub mod local_socket {
 	mod listener;
 	mod stream;
 	pub use listener::*;
-	pub(crate) use stream::*;
+	pub use stream::*;
 
 	/// Async local sockets for Tokio implemented using named pipes.
 	#[cfg(feature = "tokio")]

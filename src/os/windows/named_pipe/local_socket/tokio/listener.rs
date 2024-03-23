@@ -1,6 +1,6 @@
 use super::Stream;
 use crate::{
-	local_socket::Name,
+	local_socket::{traits::tokio as traits, Name},
 	os::windows::{
 		named_pipe::{
 			pipe_mode,
@@ -9,6 +9,7 @@ use crate::{
 		},
 		path_conversion::*,
 	},
+	Sealed,
 };
 use std::{io, path::Path};
 
@@ -16,8 +17,10 @@ type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
 #[derive(Debug)]
 pub struct Listener(PipeListener);
-impl Listener {
-	pub fn bind(name: Name<'_>, _: bool) -> io::Result<Self> {
+impl Sealed for Listener {}
+impl traits::Listener for Listener {
+	type Stream = Stream;
+	fn bind(name: Name<'_>) -> io::Result<Self> {
 		let mut options = PipeListenerOptions::new();
 		options.path = if name.is_path() {
 			Path::new(name.raw()).to_wtf_16().map_err(to_io_error)?
@@ -28,9 +31,13 @@ impl Listener {
 		};
 		options.create_tokio().map(Self)
 	}
-	pub async fn accept(&self) -> io::Result<Stream> {
+	#[inline]
+	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
+		Self::bind(name)
+	}
+	async fn accept(&self) -> io::Result<Stream> {
 		let inner = self.0.accept().await?;
 		Ok(Stream(inner))
 	}
-	pub fn do_not_reclaim_name_on_drop(&mut self) {}
+	fn do_not_reclaim_name_on_drop(&mut self) {}
 }

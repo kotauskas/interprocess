@@ -15,6 +15,7 @@ type ListenerImpl = PipeListener<Bytes, Bytes>;
 #[derive(Debug)]
 pub struct Listener(ListenerImpl);
 impl crate::Sealed for Listener {}
+
 impl traits::Listener for Listener {
 	type Stream = Stream;
 
@@ -34,11 +35,12 @@ impl traits::Listener for Listener {
 		options.create().map(Self)
 	}
 	fn accept(&self) -> io::Result<Stream> {
-		self.0.accept()
+		self.0.accept().map(Stream)
 	}
 	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		self.0.set_nonblocking(nonblocking)
 	}
 	fn do_not_reclaim_name_on_drop(&mut self) {}
 }
+
 forward_into_handle!(Listener);

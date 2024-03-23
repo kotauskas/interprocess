@@ -119,7 +119,7 @@ pub(crate) use concurrency_detector::*;
 use std::io;
 
 #[cold]
-fn flush_unsupported() -> io::Result<()> {
+pub(crate) fn flush_unsupported() -> io::Result<()> {
 	Err(io::Error::new(
 		io::ErrorKind::Unsupported,
 		"local sockets cannot be flushed",
@@ -128,6 +128,6 @@ fn flush_unsupported() -> io::Result<()> {
 
 #[cfg(feature = "async")]
 #[cold]
-fn async_flush_unsupported() -> std::task::Poll<io::Result<()>> {
+pub(crate) fn async_flush_unsupported() -> std::task::Poll<io::Result<()>> {
 	flush_unsupported().into()
 }

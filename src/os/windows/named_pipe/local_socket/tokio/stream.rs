@@ -1,12 +1,23 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
-	local_socket::Name,
+	local_socket::{
+		async_flush_unsupported,
+		traits::tokio::{self as traits, ReuniteResult},
+		Name,
+	},
 	os::windows::named_pipe::{
 		pipe_mode::Bytes,
 		tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
 	},
+	Sealed,
 };
-use std::{io, os::windows::prelude::*};
+use std::{
+	io,
+	os::windows::prelude::*,
+	pin::Pin,
+	task::{Context, Poll},
+};
+use tokio::io::AsyncWrite;
 
 type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
@@ -14,8 +25,12 @@ type SendHalfImpl = SendPipeStream<Bytes>;
 
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
-impl Stream {
-	pub async fn connect(name: Name<'_>) -> io::Result<Self> {
+impl Sealed for Stream {}
+impl traits::Stream for Stream {
+	type RecvHalf = RecvHalf;
+	type SendHalf = SendHalf;
+
+	async fn connect(name: Name<'_>) -> io::Result<Self> {
 		if name.is_namespaced() {
 			StreamImpl::connect_with_prepend(name.raw(), None).await
 		} else {
@@ -24,18 +39,37 @@ impl Stream {
 		.map(Self)
 	}
 	#[inline]
-	pub fn split(self) -> (RecvHalf, SendHalf) {
+	fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.split();
 		(RecvHalf(r), SendHalf(w))
 	}
 	#[inline]
-	pub fn reunite(rh: RecvHalf, sh: SendHalf) -> Result<Self, ReuniteError<RecvHalf, SendHalf>> {
+	fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult<Self> {
 		StreamImpl::reunite(rh.0, sh.0)
 			.map(Self)
 			.map_err(|ReuniteError { rh, sh }| ReuniteError {
 				rh: RecvHalf(rh),
 				sh: SendHalf(sh),
 			})
+	}
+}
+
+impl AsyncWrite for &Stream {
+	#[inline]
+	fn poll_write(
+		self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+		buf: &[u8],
+	) -> Poll<io::Result<usize>> {
+		Pin::new(&mut &self.get_mut().0).poll_write(cx, buf)
+	}
+	#[inline]
+	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		async_flush_unsupported()
+	}
+	#[inline]
+	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+		Pin::new(&mut &self.get_mut().0).poll_shutdown(cx)
 	}
 }
 
@@ -58,12 +92,17 @@ multimacro! {
 	Stream,
 	pinproj_for_unpin(StreamImpl),
 	forward_rbv(StreamImpl, &),
-	forward_tokio_rw,
-	forward_tokio_ref_rw,
+	forward_tokio_read,
+	forward_tokio_ref_read,
 	forward_as_handle,
+	derive_tokio_mut_write,
 }
 
 pub struct RecvHalf(pub(super) RecvHalfImpl);
+impl Sealed for RecvHalf {}
+impl traits::RecvHalf for RecvHalf {
+	type Stream = Stream;
+}
 multimacro! {
 	RecvHalf,
 	pinproj_for_unpin(RecvHalfImpl),
@@ -75,12 +114,34 @@ multimacro! {
 }
 
 pub struct SendHalf(pub(super) SendHalfImpl);
+impl Sealed for SendHalf {}
+impl traits::SendHalf for SendHalf {
+	type Stream = Stream;
+}
+
+impl AsyncWrite for &SendHalf {
+	#[inline]
+	fn poll_write(
+		self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+		buf: &[u8],
+	) -> Poll<io::Result<usize>> {
+		Pin::new(&mut &self.get_mut().0).poll_write(cx, buf)
+	}
+	#[inline]
+	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		async_flush_unsupported()
+	}
+	#[inline]
+	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+		Pin::new(&mut &self.get_mut().0).poll_shutdown(cx)
+	}
+}
+
 multimacro! {
 	SendHalf,
-	pinproj_for_unpin(SendHalfImpl),
 	forward_rbv(SendHalfImpl, &),
-	forward_tokio_write,
-	forward_tokio_ref_write,
 	forward_as_handle,
 	forward_debug("local_socket::SendHalf"),
+	derive_tokio_mut_write,
 }

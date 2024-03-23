@@ -50,9 +50,11 @@ macro_rules! dispatch_write {
 		}
 	};
 	($ty:ident) => {
+		/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
 		impl Write for &$ty {
 			dispatch_write!(@iw $ty);
 		}
+		/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
 		impl Write for $ty {
 			dispatch_write!(@iw $ty);
 		}
@@ -170,11 +172,10 @@ impl TryFrom<OwnedHandle> for Stream {
 
 #[cfg(windows)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl TryFrom<Stream> for OwnedHandle {
-	type Error = <OwnedHandle as TryFrom<np_impl::Stream>>::Error;
-	fn try_from(slf: Stream) -> Result<Self, Self::Error> {
+impl From<Stream> for OwnedHandle {
+	fn from(slf: Stream) -> Self {
 		match slf {
-			Stream::NamedPipe(s) => s.try_into(),
+			Stream::NamedPipe(s) => s.into(),
 		}
 	}
 }
