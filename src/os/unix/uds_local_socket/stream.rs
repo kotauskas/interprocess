@@ -117,29 +117,13 @@ multimacro! {
 /// [`Stream`]'s send half, implemented using [`Arc`].
 #[derive(Debug)]
 pub struct SendHalf(pub(super) Arc<Stream>);
-
-impl Write for &SendHalf {
-	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-		let _guard = self.0 .1.lock();
-		(&mut &*self.0).write(buf)
-	}
-	fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-		let _guard = self.0 .1.lock();
-		(&mut &*self.0).write_vectored(bufs)
-	}
-	#[inline]
-	fn flush(&mut self) -> io::Result<()> {
-		flush_unsupported()
-	}
-	// FUTURE is_write_vectored
-}
-
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {
 	type Stream = Stream;
 }
 multimacro! {
 	SendHalf,
+	forward_sync_ref_write,
 	forward_as_handle,
 	derive_sync_mut_write,
 }
