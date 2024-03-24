@@ -15,7 +15,7 @@ use windows_sys::Win32::{
 	},
 	System::Pipes::{
 		GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState,
-		WaitNamedPipeW, PIPE_NOWAIT,
+		WaitNamedPipeW, PIPE_NOWAIT, PIPE_SERVER_END, PIPE_TYPE_MESSAGE,
 	},
 };
 
@@ -42,18 +42,10 @@ pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
 	.true_val_or_errno(flags)
 }
 pub(crate) fn is_server_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
-	// Source: https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
-	const PIPE_IS_SERVER_BIT: u32 = 0x00000001;
-
-	let flags = get_flags(handle)?;
-	Ok(flags & PIPE_IS_SERVER_BIT != 0)
+	Ok(get_flags(handle)? & PIPE_SERVER_END != 0)
 }
 pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
-	// Same source.
-	const PIPE_IS_MESSAGE_BIT: u32 = 0x00000004;
-
-	let flags = get_flags(handle)?;
-	Ok((flags & PIPE_IS_MESSAGE_BIT) != 0)
+	Ok((get_flags(handle)? & PIPE_TYPE_MESSAGE) != 0)
 }
 #[allow(dead_code)] // TODO give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
