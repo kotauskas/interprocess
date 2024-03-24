@@ -69,11 +69,29 @@ mkenum!(
 /// 		},
 /// 	}
 /// };
-/// // Create our listener. In a more robust program, we'd check for an
-/// // existing socket file that has not been deleted for whatever reason,
-/// // ensure it's a socket file and not a normal file, and delete it.
-/// // TODO update this
-/// let listener = Listener::bind(name)?;
+///
+/// // Bind our listener.
+/// let listener = match Listener::bind(name) {
+/// 	Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
+/// 		// When a program that uses a file-type socket name terminates its socket server without
+/// 		// deleting the file, a "corpse socket" remains, which can neither be connected to nor
+/// 		// reused by a new listener. Normally, Interprocess takes care of this on affected
+/// 		// platforms by deleting the socket file when the listener is dropped. (This is
+/// 		// vulnerable to all sorts of races and thus can be disabled.)
+/// 		//
+/// 		// There are multiple ways this error can be handled, if it occurs, but when the
+/// 		// listener only comes from Interprocess, it can be assumed that its previous instance
+/// 		// either has crashed or simply hasn't exited yet. In this example, we leave cleanup up
+/// 		// to the user, but in a real application, you usually don't want to do that.
+/// 		eprintln!(
+/// 			"
+///Error: could not start server because the socket file is occupied. Please check if {printname}
+///is in use by another process and try again."
+/// 		);
+/// 		return Err(e.into());
+/// 	}
+/// 	x => x?,
+/// };
 ///
 /// // The syncronization between the server and client, if any is used, goes here.
 /// eprintln!("Server running at {printname}");

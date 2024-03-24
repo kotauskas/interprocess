@@ -82,15 +82,16 @@ mkenum!(
 /// // Bind our listener.
 /// let listener = match Listener::bind(name) {
 /// 	Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
-/// 		// TODO update this
-/// 		// One important problem that is easy to handle improperly (or not at all) is the
-/// 		// "corpse sockets" that are left when a program that uses a file-type socket name
-/// 		// terminates its socket server without deleting the file. There's no single strategy
-/// 		// for handling this kind of address-already-occupied error. Services that are supposed
-/// 		// to only exist as a single instance running on a system should check if another
-/// 		// instance is actually running, and if not, delete the socket file. In this example,
-/// 		// we leave this up to the user, but in a real application, you usually don't want to do
-/// 		// that.
+/// 		// When a program that uses a file-type socket name terminates its socket server without
+/// 		// deleting the file, a "corpse socket" remains, which can neither be connected to nor
+/// 		// reused by a new listener. Normally, Interprocess takes care of this on affected
+/// 		// platforms by deleting the socket file when the listener is dropped. (This is
+/// 		// vulnerable to all sorts of races and thus can be disabled.)
+/// 		//
+/// 		// There are multiple ways this error can be handled, if it occurs, but when the
+/// 		// listener only comes from Interprocess, it can be assumed that its previous instance
+/// 		// either has crashed or simply hasn't exited yet. In this example, we leave cleanup up
+/// 		// to the user, but in a real application, you usually don't want to do that.
 /// 		eprintln!(
 /// 			"
 ///Error: could not start server because the socket file is occupied. Please check if {printname}
