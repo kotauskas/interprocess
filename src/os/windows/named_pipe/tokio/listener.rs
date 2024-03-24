@@ -127,6 +127,43 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 		Ok(PipeStream::new(raw))
 	}
 
+	/// Creates a listener from a [corresponding Tokio object](TokioNPServer) and a
+	/// [`PipeListenerOptions`] table with the assumption that the handle was created with those
+	/// options.
+	///
+	/// The options are necessary to provide because the listener needs to create new instances of
+	/// the named pipe server in `.accept()`.
+	// TODO mention TryFrom<OwnedHandle> here
+	pub fn from_tokio_and_options(
+		tokio_object: TokioNPServer,
+		options: PipeListenerOptions<'static>,
+	) -> Self {
+		Self {
+			config: options,
+			stored_instance: Mutex::new(tokio_object),
+			_phantom: PhantomData,
+		}
+	}
+
+	/// Creates a listener from a handle and a [`PipeListenerOptions`] table with the assumption
+	/// that the handle was created with those options.
+	///
+	/// The options are necessary to provide because the listener needs to create new instances of
+	/// the named pipe server in `.accept()`.
+	///
+	/// # Errors
+	/// Returns an error if called outside a Tokio runtime.
+	// TODO mention TryFrom<OwnedHandle> here
+	pub fn from_handle_and_options(
+		handle: OwnedHandle,
+		options: PipeListenerOptions<'static>,
+	) -> io::Result<Self> {
+		Ok(Self::from_tokio_and_options(
+			npserver_from_handle(handle)?,
+			options,
+		))
+	}
+
 	fn create_instance(&self) -> io::Result<TokioNPServer> {
 		self.config
 			.create_instance(false, false, true, Self::STREAM_ROLE, Rm::MODE)
@@ -177,11 +214,7 @@ impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
 	fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
 		let (owned_config, instance) =
 			_create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
-		Ok(PipeListener {
-			config: owned_config,
-			stored_instance: Mutex::new(instance),
-			_phantom: PhantomData,
-		})
+		Ok(PipeListener::from_tokio_and_options(instance, owned_config))
 	}
 }
 impl Sealed for PipeListenerOptions<'_> {}
@@ -197,7 +230,7 @@ fn _create_tokio(
 	config.nonblocking = false;
 
 	let instance = config
-		.create_instance(true, config.nonblocking, true, role, recv_mode)
+		.create_instance(true, false, true, role, recv_mode)
 		.and_then(npserver_from_handle)?;
 
 	Ok((config, instance))

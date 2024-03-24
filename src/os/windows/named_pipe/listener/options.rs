@@ -39,19 +39,19 @@ pub struct PipeListenerOptions<'path> {
 	pub nonblocking: bool,
 	/// Specifies the maximum amount of instances of the pipe which can be created, i.e. how many
 	/// clients can be communicated with at once. If set to 1, trying to create multiple instances
-	/// at the same time will return an error. If set to `None`, no limit is applied. The value 255
-	/// is not allowed because of Windows limitations.
+	/// at the same time will return an error (in fact, this breaks `.accept()`). If set to `None`,
+	/// no limit is applied. The value 255 is not allowed because it is the underlying Windows API's
+	/// sentinel for not having a limit.
 	pub instance_limit: Option<NonZeroU8>,
 	/// Enables write-through mode, which applies only to network connections to the pipe. If
 	/// enabled, sending to the pipe will always block until all data is delivered to the other end
 	/// instead of piling up in the kernel's network buffer until a certain amount of data
-	/// accamulates or a certain period of time passes, which is when the system actually sends the
+	/// accumulates or a certain period of time passes, which is when the system actually sends the
 	/// contents of the buffer over the network.
 	///
-	/// Not required for pipes which are restricted to local connections only. If debug assertions
-	/// are enabled, setting this parameter on a local-only pipe will cause a panic when the pipe is
-	/// created; in release builds, creation will successfully complete without any errors and the
-	/// flag will be completely ignored.
+	/// If debug assertions are enabled, setting this parameter on a local-only pipe will cause a
+	/// panic when the pipe is created; in release builds, creation will successfully complete
+	/// without any errors and the flag will be completely ignored.
 	pub write_through: bool,
 	/// Enables remote machines to connect to the named pipe over the network.
 	pub accept_remote: bool,
@@ -165,14 +165,12 @@ impl<'path> PipeListenerOptions<'path> {
 	pub fn create<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
 		let (owned_config, instance) =
 			self._create(PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
-		let nonblocking = owned_config.nonblocking.into();
-		Ok(PipeListener {
-			config: owned_config,
-			nonblocking,
-			stored_instance: Mutex::new(instance),
-			_phantom: PhantomData,
-		})
+		Ok(PipeListener::from_handle_and_options(
+			instance.into(),
+			owned_config,
+		))
 	}
+
 	/// Alias for [`.create()`](Self::create) with the same `Rm` and `Sm`.
 	#[inline]
 	pub fn create_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {

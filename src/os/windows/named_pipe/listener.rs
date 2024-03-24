@@ -22,7 +22,7 @@ use std::{
 };
 use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
 
-// TODO add conversion from handle after all; allow passing assumed config
+// TODO add conversion from handle after all
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
@@ -60,12 +60,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 
 		Ok(PipeStream::new(raw))
 	}
+
 	/// Creates an iterator which accepts connections from clients, blocking each time `next()` is
 	/// called until one connects.
-	#[inline(always)]
+	#[inline]
 	pub fn incoming(&self) -> Incoming<'_, Rm, Sm> {
 		Incoming(self)
 	}
+
 	/// Enables or disables the nonblocking mode for all existing instances of the listener and
 	/// future ones. By default, it is disabled.
 	///
@@ -86,6 +88,24 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 		Ok(())
 	}
 
+	/// Creates a listener from a handle and a [`PipeListenerOptions`] table with the assumption
+	/// that the handle was created with those options.
+	///
+	/// The options are necessary to provide because the listener needs to create new instances of
+	/// the named pipe server in `.accept()`.
+	// TODO mention TryFrom<OwnedHandle> here
+	pub fn from_handle_and_options(
+		handle: OwnedHandle,
+		options: PipeListenerOptions<'static>,
+	) -> Self {
+		Self {
+			nonblocking: AtomicBool::new(options.nonblocking),
+			config: options,
+			stored_instance: Mutex::new(FileHandle::from(handle)),
+			_phantom: PhantomData,
+		}
+	}
+
 	fn create_instance(&self, nonblocking: bool) -> io::Result<FileHandle> {
 		self.config
 			.create_instance(false, nonblocking, false, Self::STREAM_ROLE, Rm::MODE)
@@ -101,6 +121,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 			.finish()
 	}
 }
+
 impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandle {
 	fn from(p: PipeListener<Rm, Sm>) -> Self {
 		p.stored_instance.into_inner().expect(LOCK_POISON).into()
