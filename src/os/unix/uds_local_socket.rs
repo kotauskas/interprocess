@@ -22,15 +22,24 @@ use std::{
 
 #[allow(clippy::indexing_slicing)]
 fn name_to_addr(name: Name<'_>) -> io::Result<SocketAddr> {
-	let _is_ns = name.is_namespaced();
+	let is_ns = name.is_namespaced();
 	let name = name.into_raw_cow();
-	#[cfg(any(target_os = "linux", target_os = "android"))]
-	if _is_ns {
-		let mut bytes = name.as_bytes();
-		if bytes.first() == Some(&b'\0') {
-			bytes = &bytes[1..];
+	if is_ns {
+		#[cfg(any(target_os = "linux", target_os = "android"))]
+		{
+			let mut bytes = name.as_bytes();
+			if bytes.first() == Some(&b'\0') {
+				bytes = &bytes[1..];
+			}
+			return SocketAddr::from_abstract_name(bytes);
 		}
-		return SocketAddr::from_abstract_name(bytes);
+		#[cfg(not(any(target_os = "linux", target_os = "android")))]
+		{
+			return Err(io::Error::new(
+				io::ErrorKind::Unsupported,
+				"the socket namespace is not supported on this platform – use a path instead",
+			));
+		}
 	}
 	SocketAddr::from_pathname(Path::new(&name))
 }
