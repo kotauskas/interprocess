@@ -1,4 +1,4 @@
-use super::{AtomicEnum, ReprU8};
+use crate::{AtomicEnum, ReprU8};
 use std::sync::atomic::Ordering::*;
 
 #[derive(Debug)]

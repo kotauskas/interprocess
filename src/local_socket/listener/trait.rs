@@ -31,24 +31,38 @@ pub trait Listener: Sized + Sealed {
 
 	/// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
 	///
-	/// In nonblocking mode, calling [`.accept()`] and iterating through [`.incoming()`] will
-	/// immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error if there is no client
-	/// attempting to connect at the moment instead of blocking until one arrives.
+	/// In the `Accept` and `Both` nonblocking modes, calling [`.accept()`] and iterating through
+	/// [`.incoming()`] will immediately return a [`WouldBlock`](io::ErrorKind::WouldBlock) error
+	/// if there is no client attempting to connect at the moment instead of blocking until one
+	/// arrives.
 	///
-	/// # Platform-specific behavior
-	/// ## Windows
-	/// The nonblocking mode will be also be set for all new streams produced by [`.accept()`] and
-	/// [`.incoming()`].
+	/// In the `Stream` and `Both` nonblocking modes, the resulting stream will have nonblocking
+	/// mode enabled.
 	///
 	/// [`.accept()`]: Listener::accept
 	/// [`.incoming()`]: ListenerExt::incoming
-	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()>;
+	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()>;
 
 	/// Disables [name reclamation](#name-reclamation) on the listener.
 	// TODO link this
 	fn do_not_reclaim_name_on_drop(&mut self);
 	// TODO ImplProperties type of thing
 }
+
+/// The manner in which a [listener](Listener) is to be nonblocking.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ListenerNonblockingMode {
+	/// Neither `.accept()` nor the resulting stream are to have nonblocking semantics.
+	Neither,
+	/// `.accept()` will be nonblocking, but the resulting stream will not.
+	Accept,
+	/// The resulting stream will be nonblocking, but `.accept()` will not.
+	Stream,
+	/// Both `.accept()` and the resulting stream are to have nonblocking semantics.
+	Both,
+}
+unsafe impl crate::ReprU8 for ListenerNonblockingMode {}
 
 /// Methods derived from the interface of [`Listener`].
 pub trait ListenerExt: Listener {

@@ -1,5 +1,5 @@
 use super::r#trait;
-use crate::local_socket::{Name, Stream};
+use crate::local_socket::{ListenerNonblockingMode, Name, Stream};
 use std::io;
 #[cfg(unix)]
 use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
@@ -159,7 +159,7 @@ impl r#trait::Listener for Listener {
 		dispatch!(Self: x in self => x.accept()).map(Stream::from)
 	}
 	#[inline]
-	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
 		dispatch!(Self: x in self => x.set_nonblocking(nonblocking))
 	}
 	#[inline]

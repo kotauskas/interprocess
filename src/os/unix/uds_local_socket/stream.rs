@@ -123,6 +123,7 @@ impl traits::SendHalf for SendHalf {
 }
 multimacro! {
 	SendHalf,
+	forward_rbv(Stream, *),
 	forward_sync_ref_write,
 	forward_as_handle,
 	derive_sync_mut_write,

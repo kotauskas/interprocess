@@ -34,8 +34,9 @@ pub mod os {
 mod try_clone;
 pub use try_clone::*;
 
+mod atomic_enum;
 mod misc;
-pub(crate) use misc::*;
+pub(crate) use {atomic_enum::*, misc::*};
 
 #[cfg(test)]
 #[path = "../tests/index.rs"]

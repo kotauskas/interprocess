@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{
 	fmt::{self, Debug, Formatter},
 	marker::PhantomData,
@@ -13,6 +15,11 @@ impl<E: ReprU8> AtomicEnum<E> {
 	#[inline]
 	pub fn new(val: E) -> Self {
 		Self(AtomicU8::new(val.to_u8()), PhantomData)
+	}
+	#[inline]
+	pub fn load(&self, ordering: Ordering) -> E {
+		let v = self.0.load(ordering);
+		unsafe { E::from_u8(v) }
 	}
 	#[inline]
 	pub fn store(&self, val: E, ordering: Ordering) {

@@ -1,19 +1,26 @@
 use super::stream::Stream;
 use crate::{
-	local_socket::{traits, Name},
+	local_socket::{
+		traits::{self, ListenerNonblockingMode, Stream as _},
+		Name,
+	},
 	os::windows::{
 		named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
 		path_conversion::*,
 	},
+	AtomicEnum,
 };
-use std::{io, path::Path};
+use std::{io, os::windows::prelude::*, path::Path, sync::atomic::Ordering::SeqCst};
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
 /// Wrapper around [`PipeListener`] that implements
 /// [`Listener`](crate::local_socket::traits::Listener).
 #[derive(Debug)]
-pub struct Listener(ListenerImpl);
+pub struct Listener {
+	listener: ListenerImpl,
+	nonblocking: AtomicEnum<ListenerNonblockingMode>,
+}
 impl crate::Sealed for Listener {}
 
 impl traits::Listener for Listener {
@@ -32,15 +39,37 @@ impl traits::Listener for Listener {
 				.to_wtf_16()
 				.map_err(to_io_error)?
 		};
-		options.create().map(Self)
+		let listener = options.create()?;
+		Ok(Self {
+			listener,
+			nonblocking: AtomicEnum::new(ListenerNonblockingMode::Neither),
+		})
 	}
 	fn accept(&self) -> io::Result<Stream> {
-		self.0.accept().map(Stream)
+		use ListenerNonblockingMode as LNM;
+		let stream = self.listener.accept().map(Stream)?;
+		// TODO verify necessity of orderings
+		let nonblocking = self.nonblocking.load(SeqCst);
+		if matches!(nonblocking, LNM::Accept) {
+			stream.set_nonblocking(false)?;
+		} else if matches!(nonblocking, LNM::Stream) {
+			stream.set_nonblocking(true)?;
+		}
+		Ok(stream)
 	}
-	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-		self.0.set_nonblocking(nonblocking)
+	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
+		use ListenerNonblockingMode::*;
+		self.listener
+			.set_nonblocking(matches!(nonblocking, Accept | Both))?;
+		self.nonblocking.store(nonblocking, SeqCst);
+		Ok(())
 	}
 	fn do_not_reclaim_name_on_drop(&mut self) {}
 }
 
-forward_into_handle!(Listener);
+impl From<Listener> for OwnedHandle {
+	#[inline]
+	fn from(l: Listener) -> Self {
+		l.listener.into()
+	}
+}

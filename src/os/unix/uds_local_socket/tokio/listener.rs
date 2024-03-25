@@ -1,6 +1,6 @@
 use super::Stream;
 use crate::{
-	local_socket::{prelude::*, traits::tokio as traits, Name},
+	local_socket::{prelude::*, traits::tokio as traits, ListenerNonblockingMode, Name},
 	os::unix::uds_local_socket::{listener::Listener as SyncListener, ReclaimGuard},
 	Sealed,
 };
@@ -38,7 +38,7 @@ impl traits::Listener for Listener {
 impl TryFrom<SyncListener> for Listener {
 	type Error = io::Error;
 	fn try_from(mut sync: SyncListener) -> io::Result<Self> {
-		sync.set_nonblocking(true)?;
+		sync.set_nonblocking(ListenerNonblockingMode::Accept)?;
 		let reclaim = sync.reclaim.take();
 		Ok(Self {
 			listener: UnixListener::from_std(sync.into())?,

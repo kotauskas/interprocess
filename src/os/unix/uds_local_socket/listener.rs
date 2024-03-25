@@ -1,19 +1,24 @@
 use super::{name_to_addr, ReclaimGuard, Stream};
-use crate::local_socket::{traits, Name};
+use crate::local_socket::{
+	traits::{self, Stream as _},
+	ListenerNonblockingMode, Name,
+};
 use std::{
-	fmt::{self, Debug, Formatter},
 	io,
 	os::{
 		fd::{AsFd, BorrowedFd, OwnedFd},
-		unix::{io::AsRawFd, net::UnixListener},
+		unix::net::UnixListener,
 	},
+	sync::atomic::{AtomicBool, Ordering::SeqCst},
 };
 
 /// Wrapper around [`UnixListener`] that implements
 /// [`Listener`](crate::local_socket::traits::Listener).
+#[derive(Debug)]
 pub struct Listener {
 	pub(super) listener: UnixListener,
 	pub(super) reclaim: ReclaimGuard,
+	pub(super) nonblocking_streams: AtomicBool,
 }
 impl Listener {
 	fn decode_listen_error(error: io::Error) -> io::Error {
@@ -31,6 +36,7 @@ impl Listener {
 				.then_some(name.into_owned())
 				.map(ReclaimGuard::new)
 				.unwrap_or_default(),
+			nonblocking_streams: AtomicBool::new(false),
 		})
 	}
 }
@@ -49,23 +55,23 @@ impl traits::Listener for Listener {
 	#[inline]
 	fn accept(&self) -> io::Result<Stream> {
 		// TODO make use of the second return value in some shape or form
-		self.listener.accept().map(|(s, _)| Stream::from(s))
+		let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
+		if self.nonblocking_streams.load(SeqCst) {
+			stream.set_nonblocking(true)?;
+		}
+		Ok(stream)
 	}
 	#[inline]
-	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-		self.listener.set_nonblocking(nonblocking)
+	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
+		use ListenerNonblockingMode::*;
+		self.listener
+			.set_nonblocking(matches!(nonblocking, Accept | Both))?;
+		self.nonblocking_streams
+			.store(matches!(nonblocking, Stream | Both), SeqCst);
+		Ok(())
 	}
 	fn do_not_reclaim_name_on_drop(&mut self) {
 		self.reclaim.forget();
-	}
-}
-
-impl Debug for Listener {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("Listener")
-			.field("fd", &self.listener.as_raw_fd())
-			.field("reclaim", &self.reclaim)
-			.finish()
 	}
 }
 
@@ -92,6 +98,7 @@ impl From<OwnedFd> for Listener {
 		Listener {
 			listener: fd.into(),
 			reclaim: ReclaimGuard::default(),
+			nonblocking_streams: AtomicBool::new(false),
 		}
 	}
 }

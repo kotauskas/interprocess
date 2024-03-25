@@ -63,12 +63,13 @@ pub use {
 	name_type_support::*,
 	stream::r#enum::*,
 	to_name::*,
+	traits::ListenerNonblockingMode,
 };
 
 /// Traits representing the interface of local sockets.
 pub mod traits {
 	pub use super::{
-		listener::r#trait::{Listener, ListenerExt},
+		listener::r#trait::{Listener, ListenerExt, ListenerNonblockingMode},
 		stream::r#trait::*,
 	};
 	/// Traits for the Tokio variants of local socket objects.
@@ -132,7 +133,6 @@ pub(crate) use concurrency_detector::*;
 // TODO extension traits in crate::os for exposing some OS-specific functionality here
 // TODO remove that whole ImplProperties thing in favor of a new trait-based system
 // TODO ListenerOptions
-// TODO clean up matters of nonblocking listeners
 
 use std::io;
 
@@ -144,7 +144,7 @@ pub(crate) fn flush_unsupported() -> io::Result<()> {
 	))
 }
 
-#[cfg(feature = "async")]
+#[cfg(feature = "tokio")]
 #[cold]
 pub(crate) fn async_flush_unsupported() -> std::task::Poll<io::Result<()>> {
 	flush_unsupported().into()
