@@ -36,8 +36,7 @@ pub trait Listener: Sized + Sealed {
 	/// server.
 	fn accept(&self) -> impl Future<Output = io::Result<Self::Stream>> + Send + Sync;
 
-	/// Disables [name reclamation](#name-reclamation) on the listener.
-	// TODO link this
+	/// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
 	fn do_not_reclaim_name_on_drop(&mut self);
 }
 

@@ -180,6 +180,16 @@ impl From<Listener> for OwnedHandle {
 
 #[cfg(unix)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+impl AsFd for Listener {
+	fn as_fd(&self) -> BorrowedFd<'_> {
+		match self {
+			Listener::UdSocket(l) => l.as_fd(),
+		}
+	}
+}
+
+#[cfg(unix)]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
 impl From<Listener> for OwnedFd {
 	fn from(l: Listener) -> Self {
 		match l {
@@ -188,4 +198,4 @@ impl From<Listener> for OwnedFd {
 	}
 }
 
-// TODO AsHandle, From<OwnedHandle>
+// TODO From<OwnedHandle>

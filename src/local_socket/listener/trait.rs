@@ -43,8 +43,7 @@ pub trait Listener: Sized + Sealed {
 	/// [`.incoming()`]: ListenerExt::incoming
 	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()>;
 
-	/// Disables [name reclamation](#name-reclamation) on the listener.
-	// TODO link this
+	/// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
 	fn do_not_reclaim_name_on_drop(&mut self);
 	// TODO ImplProperties type of thing
 }
