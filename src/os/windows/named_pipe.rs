@@ -64,6 +64,7 @@ pub mod local_socket {
 }
 
 mod atomic_enum;
+mod c_wrappers;
 mod limbo_pool;
 mod maybe_arc;
 mod needs_flush;

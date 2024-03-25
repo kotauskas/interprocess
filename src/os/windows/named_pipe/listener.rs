@@ -4,7 +4,7 @@ mod options;
 
 pub use {incoming::*, options::*};
 
-use super::{PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
+use super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
 use crate::{
 	os::windows::{winprelude::*, FileHandle},
 	poison_error, LOCK_POISON,
@@ -22,7 +22,7 @@ use std::{
 };
 use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
 
-// TODO add conversion from handle after all
+// TODO finish create_instance and add conversion from handles after all
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
@@ -82,7 +82,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 		// Doesn't actually even need to be atomic to begin with, but it's simpler and more
 		// convenient to do this instead. The mutex takes care of ordering.
 		self.nonblocking.store(nonblocking, Relaxed);
-		super::set_nonblocking_given_readmode(instance.as_handle(), nonblocking, Rm::MODE)?;
+		c_wrappers::set_nonblocking_given_readmode(instance.as_handle(), nonblocking, Rm::MODE)?;
 		// Make it clear that the lock survives until this moment.
 		drop(instance);
 		Ok(())
@@ -119,6 +119,20 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 			.field("instance", &self.stored_instance)
 			.field("nonblocking", &self.nonblocking.load(Relaxed))
 			.finish()
+	}
+}
+
+/// The returned handle is owned by the listener until the next call to
+/// `.accept()`/`<Incoming as Iterator>::next()`, after which it is owned by the returned stream
+/// instead.
+///
+/// This momentarily locks an internal mutex.
+impl<Rm: PipeModeTag, Sm: PipeModeTag> AsRawHandle for PipeListener<Rm, Sm> {
+	fn as_raw_handle(&self) -> RawHandle {
+		self.stored_instance
+			.lock()
+			.expect(LOCK_POISON)
+			.as_raw_handle()
 	}
 }
 

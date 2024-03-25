@@ -1,7 +1,10 @@
 use super::{c_wrappers, downgrade_eof, winprelude::*};
 use crate::{OrErrno, TryClone};
 use std::{io, mem::MaybeUninit, ptr};
-use windows_sys::Win32::Storage::FileSystem::{FlushFileBuffers, ReadFile, WriteFile};
+use windows_sys::Win32::{
+	Foundation::MAX_PATH,
+	Storage::FileSystem::{FlushFileBuffers, GetFinalPathNameByHandleW, ReadFile, WriteFile},
+};
 
 /// Newtype wrapper which defines file I/O operations on a handle to a file.
 #[repr(transparent)]
@@ -44,6 +47,41 @@ impl FileHandle {
 	#[inline]
 	pub fn flush_hndl(handle: HANDLE) -> io::Result<()> {
 		downgrade_eof(unsafe { FlushFileBuffers(handle) }.true_val_or_errno(()))
+	}
+
+	// The second arm is unreachable if cap > len.
+	#[allow(dead_code, clippy::arithmetic_side_effects)]
+	pub fn path(handle: BorrowedHandle<'_>) -> io::Result<Vec<u16>> {
+		let mut buf = Vec::with_capacity((MAX_PATH + 1) as usize);
+		match Self::_path(handle.as_int_handle(), &mut buf) {
+			(_, Ok(true)) => Ok(buf),
+			(len, Ok(false)) => {
+				buf.reserve_exact(len - buf.capacity());
+				match Self::_path(handle.as_int_handle(), &mut buf) {
+					(_, Ok(true)) => Ok(buf),
+					(_, Ok(false)) => unreachable!(),
+					(_, Err(e)) => Err(e),
+				}
+			}
+			(_, Err(e)) => Err(e),
+		}
+	}
+	#[allow(clippy::arithmetic_side_effects)] // Path lengths can never overflow usize.
+	fn _path(handle: HANDLE, buf: &mut Vec<u16>) -> (usize, io::Result<bool>) {
+		buf.clear();
+		let buflen = buf.capacity().try_into().unwrap_or(u32::MAX);
+		let rslt = unsafe { GetFinalPathNameByHandleW(handle, buf.as_mut_ptr(), buflen, 0) };
+		let len = rslt as usize;
+		let e = if rslt >= buflen {
+			Ok(false)
+		} else if rslt == 0 {
+			Err(io::Error::last_os_error())
+		} else {
+			// +1 to include the nul terminator in the size.
+			unsafe { buf.set_len(rslt as usize + 1) }
+			Ok(true)
+		};
+		(len, e)
 	}
 }
 impl TryClone for FileHandle {

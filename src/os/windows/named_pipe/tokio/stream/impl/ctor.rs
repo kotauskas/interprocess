@@ -1,6 +1,6 @@
 use super::*;
 use crate::os::windows::{
-	named_pipe::{connect_without_waiting, stream::block_for_server, NeedsFlushVal, WaitTimeout},
+	named_pipe::{NeedsFlushVal, WaitTimeout},
 	path_conversion::*,
 };
 use std::{ffi::OsStr, mem::take, path::Path};
@@ -22,7 +22,7 @@ impl RawPipeStream {
 
 	async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
 		tokio::task::spawn_blocking(move || {
-			block_for_server(&path, WaitTimeout::DEFAULT)?;
+			c_wrappers::block_for_server(&path, WaitTimeout::DEFAULT)?;
 			Ok(path)
 		})
 		.await
@@ -52,7 +52,7 @@ impl RawPipeStream {
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
 		let client = loop {
-			match connect_without_waiting(&path, recv, send, true) {
+			match c_wrappers::connect_without_waiting(&path, recv, send, true) {
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
 					let path_take = Self::wait_for_server(take(&mut path)).await?;
 					path = path_take;

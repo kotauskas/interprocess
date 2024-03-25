@@ -15,9 +15,16 @@ use windows_sys::Win32::{
 	},
 	System::Pipes::{
 		GetNamedPipeHandleStateW, GetNamedPipeInfo, PeekNamedPipe, SetNamedPipeHandleState,
-		WaitNamedPipeW, PIPE_NOWAIT, PIPE_SERVER_END, PIPE_TYPE_MESSAGE,
+		WaitNamedPipeW, PIPE_NOWAIT,
 	},
 };
+
+fn optional_out_ptr<T>(outref: Option<&mut T>) -> *mut T {
+	match outref {
+		Some(outref) => outref as *mut T,
+		None => ptr::null_mut(),
+	}
+}
 
 /// Helper for several functions that take a handle and a u32 out-pointer.
 pub(crate) unsafe fn hget(
@@ -28,25 +35,95 @@ pub(crate) unsafe fn hget(
 	unsafe { f(handle.as_int_handle(), &mut x as *mut _) }.true_val_or_errno(x)
 }
 
-pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
-	let mut flags: u32 = 0;
+pub(crate) fn get_np_info(
+	handle: BorrowedHandle<'_>,
+	flags: Option<&mut u32>,
+	in_buf: Option<&mut u32>,
+	out_buf: Option<&mut u32>,
+	max_instances: Option<&mut u32>,
+) -> io::Result<()> {
 	unsafe {
 		GetNamedPipeInfo(
 			handle.as_int_handle(),
-			&mut flags as *mut _,
-			ptr::null_mut(),
-			ptr::null_mut(),
-			ptr::null_mut(),
+			optional_out_ptr(flags),
+			optional_out_ptr(in_buf),
+			optional_out_ptr(out_buf),
+			optional_out_ptr(max_instances),
 		)
 	}
-	.true_val_or_errno(flags)
+	.true_val_or_errno(())
 }
-pub(crate) fn is_server_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
-	Ok(get_flags(handle)? & PIPE_SERVER_END != 0)
+
+pub(crate) fn get_np_handle_state(
+	handle: BorrowedHandle<'_>,
+	mode: Option<&mut u32>,
+	cur_instances: Option<&mut u32>,
+	max_collection_count: Option<&mut u32>,
+	collect_data_timeout: Option<&mut u32>,
+	mut username: Option<&mut [MaybeUninit<u16>]>,
+) -> io::Result<()> {
+	// TODO expose the rest of the owl as public API
+	unsafe {
+		GetNamedPipeHandleStateW(
+			handle.as_int_handle(),
+			optional_out_ptr(mode),
+			optional_out_ptr(cur_instances),
+			optional_out_ptr(max_collection_count),
+			optional_out_ptr(collect_data_timeout),
+			username
+				.as_deref_mut()
+				.map(|s| s.as_mut_ptr().cast())
+				.unwrap_or(ptr::null_mut()),
+			username
+				.map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX))
+				.unwrap_or(0),
+		)
+	}
+	.true_val_or_errno(())
 }
-pub(crate) fn has_msg_boundaries_from_sys(handle: BorrowedHandle<'_>) -> io::Result<bool> {
-	Ok((get_flags(handle)? & PIPE_TYPE_MESSAGE) != 0)
+
+pub(crate) fn set_np_handle_state(
+	handle: BorrowedHandle<'_>,
+	mode: Option<u32>,
+	max_collection_count: Option<u32>,
+	collect_data_timeout: Option<u32>,
+) -> io::Result<()> {
+	let (mut mode_, has_mode) = (mode.unwrap_or_default(), mode.is_some());
+	let (mut mcc, has_mcc) = (
+		max_collection_count.unwrap_or_default(),
+		max_collection_count.is_some(),
+	);
+	let (mut cdt, has_cdt) = (
+		collect_data_timeout.unwrap_or_default(),
+		collect_data_timeout.is_some(),
+	);
+	let toptr = |r: &mut u32| r as *mut u32;
+	let null = ptr::null_mut();
+	unsafe {
+		SetNamedPipeHandleState(
+			handle.as_int_handle(),
+			if has_mode { toptr(&mut mode_) } else { null },
+			if has_mcc { toptr(&mut mcc) } else { null },
+			if has_cdt { toptr(&mut cdt) } else { null },
+		)
+	}
+	.true_val_or_errno(())
 }
+
+#[inline]
+pub(crate) fn get_flags(handle: BorrowedHandle<'_>) -> io::Result<u32> {
+	let mut flags: u32 = 0;
+	get_np_info(handle, Some(&mut flags), None, None, None)?;
+	Ok(flags)
+}
+
+#[allow(dead_code)]
+pub(crate) fn get_np_handle_mode(handle: BorrowedHandle<'_>) -> io::Result<u32> {
+	let mut mode = 0_u32;
+	get_np_handle_state(handle, Some(&mut mode), None, None, None, None)?;
+	Ok(mode)
+}
+
 #[allow(dead_code)] // TODO give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 	let mut msglen: u32 = 0;
@@ -108,64 +185,6 @@ pub(crate) fn connect_without_waiting(
 	}
 }
 
-#[allow(dead_code)]
-pub(crate) fn get_named_pipe_handle_state(
-	handle: BorrowedHandle<'_>,
-	mode: Option<&mut u32>,
-	cur_instances: Option<&mut u32>,
-	max_collection_count: Option<&mut u32>,
-	collect_data_timeout: Option<&mut u32>,
-	mut username: Option<&mut [MaybeUninit<u16>]>,
-) -> io::Result<()> {
-	// TODO expose the rest of the owl as public API
-	let toptr = |r: &mut u32| r as *mut u32;
-	let null = ptr::null_mut();
-	unsafe {
-		GetNamedPipeHandleStateW(
-			handle.as_int_handle(),
-			mode.map(toptr).unwrap_or(null),
-			cur_instances.map(toptr).unwrap_or(null),
-			max_collection_count.map(toptr).unwrap_or(null),
-			collect_data_timeout.map(toptr).unwrap_or(null),
-			username
-				.as_deref_mut()
-				.map(|s| s.as_mut_ptr().cast())
-				.unwrap_or(ptr::null_mut()),
-			username
-				.map(|s| u32::try_from(s.len()).unwrap_or(u32::MAX))
-				.unwrap_or(0),
-		)
-	}
-	.true_val_or_errno(())
-}
-pub(crate) fn set_named_pipe_handle_state(
-	handle: BorrowedHandle<'_>,
-	mode: Option<u32>,
-	max_collection_count: Option<u32>,
-	collect_data_timeout: Option<u32>,
-) -> io::Result<()> {
-	let (mut mode_, has_mode) = (mode.unwrap_or_default(), mode.is_some());
-	let (mut mcc, has_mcc) = (
-		max_collection_count.unwrap_or_default(),
-		max_collection_count.is_some(),
-	);
-	let (mut cdt, has_cdt) = (
-		collect_data_timeout.unwrap_or_default(),
-		collect_data_timeout.is_some(),
-	);
-	let toptr = |r: &mut u32| r as *mut u32;
-	let null = ptr::null_mut();
-	unsafe {
-		SetNamedPipeHandleState(
-			handle.as_int_handle(),
-			if has_mode { toptr(&mut mode_) } else { null },
-			if has_mcc { toptr(&mut mcc) } else { null },
-			if has_cdt { toptr(&mut cdt) } else { null },
-		)
-	}
-	.true_val_or_errno(())
-}
-
 pub(crate) fn set_nonblocking_given_readmode(
 	handle: BorrowedHandle<'_>,
 	nonblocking: bool,
@@ -176,7 +195,7 @@ pub(crate) fn set_nonblocking_given_readmode(
 	if nonblocking {
 		mode |= PIPE_NOWAIT;
 	}
-	set_named_pipe_handle_state(handle, Some(mode), None, None)
+	set_np_handle_state(handle, Some(mode), None, None)
 }
 
 pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {

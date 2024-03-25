@@ -1,5 +1,7 @@
+use windows_sys::Win32::System::Pipes::{PIPE_SERVER_END, PIPE_TYPE_MESSAGE};
+
 use super::*;
-use crate::TryClone;
+use crate::{os::windows::c_wrappers::duplicate_handle, TryClone};
 use std::mem::ManuallyDrop;
 
 impl AsHandle for RawPipeStream {
@@ -8,21 +10,31 @@ impl AsHandle for RawPipeStream {
 		self.file_handle().as_handle()
 	}
 }
+derive_asraw!(RawPipeStream);
+
+impl RawPipeStream {
+	fn from_handle_given_flags(handle: OwnedHandle, flags: u32) -> Self {
+		Self::new(FileHandle::from(handle), flags & PIPE_SERVER_END != 0)
+	}
+}
+
+fn is_server_check_failed_error(cause: io::Error, handle: OwnedHandle) -> FromHandleError {
+	FromHandleError {
+		details: FromHandleErrorKind::IsServerCheckFailed,
+		cause: Some(cause),
+		source: Some(handle),
+	}
+}
+
 impl TryFrom<OwnedHandle> for RawPipeStream {
 	type Error = FromHandleError;
 
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		let is_server = match is_server_from_sys(handle.as_handle()) {
-			Ok(b) => b,
-			Err(e) => {
-				return Err(FromHandleError {
-					details: FromHandleErrorKind::IsServerCheckFailed,
-					cause: Some(e),
-					source: Some(handle),
-				})
-			}
+		let flags = match c_wrappers::get_flags(handle.as_handle()) {
+			Ok(f) => f,
+			Err(e) => return Err(is_server_check_failed_error(e, handle)),
 		};
-		Ok(Self::new(FileHandle::from(handle), is_server))
+		Ok(Self::from_handle_given_flags(handle, flags))
 	}
 }
 impl From<RawPipeStream> for OwnedHandle {
@@ -33,8 +45,6 @@ impl From<RawPipeStream> for OwnedHandle {
 		handle.expect(LIMBO_ERR).into()
 	}
 }
-
-derive_asraw!(RawPipeStream);
 
 /// Attempts to unwrap the given stream into the raw owned handle type, returning itself back if
 /// no ownership over it is available, as is the case when the stream is split.
@@ -59,35 +69,28 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<PipeStream<Rm, Sm>> for OwnedHand
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
 	type Error = FromHandleError;
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		let raw = RawPipeStream::try_from(handle)?;
+		let flags = match c_wrappers::get_flags(handle.as_handle()) {
+			Ok(f) => f,
+			Err(e) => return Err(is_server_check_failed_error(e, handle)),
+		};
 		// If the wrapper type tries to receive incoming data as messages, that might break if
 		// the underlying pipe has no message boundaries. Let's check for that.
-		if Rm::MODE == Some(PipeMode::Messages) {
-			let msg_bnd = match has_msg_boundaries_from_sys(raw.as_handle()) {
-				Ok(b) => b,
-				Err(e) => {
-					return Err(FromHandleError {
-						details: FromHandleErrorKind::MessageBoundariesCheckFailed,
-						cause: Some(e),
-						source: Some(raw.into()),
-					})
-				}
-			};
-			if !msg_bnd {
-				return Err(FromHandleError {
-					details: FromHandleErrorKind::NoMessageBoundaries,
-					cause: None,
-					source: Some(raw.into()),
-				});
-			}
+		if Rm::MODE == Some(PipeMode::Messages) && flags & PIPE_TYPE_MESSAGE == 0 {
+			return Err(FromHandleError {
+				details: FromHandleErrorKind::NoMessageBoundaries,
+				cause: None,
+				source: Some(handle),
+			});
 		}
-		Ok(Self::new(raw))
+		Ok(Self::new(RawPipeStream::from_handle_given_flags(
+			handle, flags,
+		)))
 	}
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
 	fn try_clone(&self) -> io::Result<Self> {
-		let handle = c_wrappers::duplicate_handle(self.as_handle())?;
+		let handle = duplicate_handle(self.as_handle())?;
 		self.raw.needs_flush.on_clone();
 		let mut new = RawPipeStream::new(handle.into(), self.is_server());
 		new.needs_flush = NeedsFlushVal::Always.into();

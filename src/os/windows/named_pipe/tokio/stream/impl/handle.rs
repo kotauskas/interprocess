@@ -1,3 +1,5 @@
+use windows_sys::Win32::System::Pipes::{PIPE_SERVER_END, PIPE_TYPE_MESSAGE};
+
 use super::*;
 use std::mem::ManuallyDrop;
 
@@ -15,27 +17,18 @@ impl AsHandle for RawPipeStream {
 		self.inner().as_handle()
 	}
 }
+derive_asraw!(RawPipeStream);
 
-impl TryFrom<OwnedHandle> for RawPipeStream {
-	type Error = FromHandleError;
-
-	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		let is_server = match is_server_from_sys(handle.as_handle()) {
-			Ok(b) => b,
-			Err(e) => {
-				return Err(FromHandleError {
-					details: FromHandleErrorKind::IsServerCheckFailed,
-					cause: Some(e),
-					source: Some(handle),
-				})
-			}
-		};
-
+impl RawPipeStream {
+	fn try_from_handle_given_flags(
+		handle: OwnedHandle,
+		flags: u32,
+	) -> Result<Self, FromHandleError> {
 		let rh = handle.as_raw_handle();
 		let handle = ManuallyDrop::new(handle);
 
 		let tkresult = unsafe {
-			match is_server {
+			match flags & PIPE_SERVER_END != 0 {
 				true => TokioNPServer::from_raw_handle(rh).map(InnerTokio::Server),
 				false => TokioNPClient::from_raw_handle(rh).map(InnerTokio::Client),
 			}
@@ -51,8 +44,24 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
 	}
 }
 
-// Tokio does not implement TryInto<OwnedHandle>
-derive_asraw!(RawPipeStream);
+fn is_server_check_failed_error(cause: io::Error, handle: OwnedHandle) -> FromHandleError {
+	FromHandleError {
+		details: FromHandleErrorKind::IsServerCheckFailed,
+		cause: Some(cause),
+		source: Some(handle),
+	}
+}
+
+impl TryFrom<OwnedHandle> for RawPipeStream {
+	type Error = FromHandleError;
+
+	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+		match c_wrappers::get_flags(handle.as_handle()) {
+			Ok(flags) => Self::try_from_handle_given_flags(handle, flags),
+			Err(e) => Err(is_server_check_failed_error(e, handle)),
+		}
+	}
+}
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
 	fn as_handle(&self) -> BorrowedHandle<'_> {
@@ -71,28 +80,20 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
 	type Error = FromHandleError;
 
 	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+		let flags = match c_wrappers::get_flags(handle.as_handle()) {
+			Ok(f) => f,
+			Err(e) => return Err(is_server_check_failed_error(e, handle)),
+		};
 		// If the wrapper type tries to receive incoming data as messages, that might break if
 		// the underlying pipe has no message boundaries. Let's check for that.
-		if Rm::MODE == Some(PipeMode::Messages) {
-			let msg_bnd = match has_msg_boundaries_from_sys(handle.as_handle()) {
-				Ok(b) => b,
-				Err(e) => {
-					return Err(FromHandleError {
-						details: FromHandleErrorKind::MessageBoundariesCheckFailed,
-						cause: Some(e),
-						source: Some(handle),
-					})
-				}
-			};
-			if !msg_bnd {
-				return Err(FromHandleError {
-					details: FromHandleErrorKind::NoMessageBoundaries,
-					cause: None,
-					source: Some(handle),
-				});
-			}
+		if Rm::MODE == Some(PipeMode::Messages) && flags & PIPE_TYPE_MESSAGE == 0 {
+			return Err(FromHandleError {
+				details: FromHandleErrorKind::NoMessageBoundaries,
+				cause: None,
+				source: Some(handle),
+			});
 		}
-		let raw = RawPipeStream::try_from(handle)?;
+		let raw = RawPipeStream::try_from_handle_given_flags(handle, flags)?;
 		Ok(Self::new(raw))
 	}
 }

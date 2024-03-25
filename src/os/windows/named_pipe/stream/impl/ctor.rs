@@ -34,9 +34,9 @@ impl RawPipeStream {
 
 	fn _connect(path: &[u16], recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
 		let handle = loop {
-			match connect_without_waiting(path, recv, send, false) {
+			match c_wrappers::connect_without_waiting(path, recv, send, false) {
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-					block_for_server(path, WaitTimeout::DEFAULT)?;
+					c_wrappers::block_for_server(path, WaitTimeout::DEFAULT)?;
 					continue;
 				}
 				els => break els,
@@ -44,7 +44,7 @@ impl RawPipeStream {
 		}?;
 
 		if recv == Some(PipeMode::Messages) {
-			set_named_pipe_handle_state(
+			c_wrappers::set_np_handle_state(
 				handle.as_handle(),
 				Some(PIPE_READMODE_MESSAGE),
 				None,

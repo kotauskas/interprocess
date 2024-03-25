@@ -4,9 +4,7 @@ pub use {enums::*, error::*};
 
 mod r#impl;
 mod limbo;
-mod wrapper_fns;
 pub(super) use r#impl::*;
-pub(crate) use wrapper_fns::*;
 
 use super::{MaybeArc, NeedsFlush};
 use crate::{

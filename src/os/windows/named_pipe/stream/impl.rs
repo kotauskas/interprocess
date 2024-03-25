@@ -12,8 +12,12 @@ pub(crate) use send_off::{LIMBO_ERR, REBURY_ERR};
 
 use super::*;
 use crate::os::windows::{
-	c_wrappers, decode_eof,
-	named_pipe::{needs_flush::NeedsFlushVal, PipeMode},
+	decode_eof,
+	named_pipe::{
+		c_wrappers::{self as c_wrappers, hget},
+		needs_flush::NeedsFlushVal,
+		PipeMode,
+	},
 	FileHandle,
 };
 use std::{
@@ -108,6 +112,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	/// [`.set_nonblocking()`]: super::super::PipeListener::set_nonblocking
 	#[inline]
 	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-		super::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
+		c_wrappers::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
 	}
 }
