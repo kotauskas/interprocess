@@ -33,7 +33,7 @@ impl Listener {
 			listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)
 				.map_err(Self::decode_listen_error)?,
 			reclaim: keep_name
-				.then_some(name.into_owned())
+				.then(|| name.into_owned())
 				.map(ReclaimGuard::new)
 				.unwrap_or_default(),
 			nonblocking_streams: AtomicBool::new(false),
