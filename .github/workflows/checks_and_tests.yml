@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: ["1.74.0", nightly]
+        toolchain: ["1.75.0", nightly]
 
     name: ${{ matrix.toolchain }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -54,7 +54,6 @@ jobs:
         with:
           command: test
           args: "--features tokio"
-
 
       - name: Run rustdoc for Tokio configuration
         uses: actions-rs/cargo@v1
