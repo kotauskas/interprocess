@@ -1,5 +1,5 @@
 use super::r#trait;
-use crate::local_socket::{tokio::Stream, Name};
+use crate::local_socket::{tokio::Stream, ListenerOptions};
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use std::io;
@@ -127,12 +127,8 @@ impl r#trait::Listener for Listener {
 	type Stream = Stream;
 
 	#[inline]
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		dispatch::bind(name)
-	}
-	#[inline]
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		dispatch::bind_without_name_reclamation(name)
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		dispatch::from_options(options)
 	}
 	#[inline]
 	async fn accept(&self) -> io::Result<Stream> {

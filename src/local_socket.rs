@@ -54,11 +54,12 @@ mod stream {
 }
 mod listener {
 	pub(super) mod r#enum;
+	pub(super) mod options;
 	pub(super) mod r#trait;
 }
 
 pub use {
-	listener::{r#enum::*, r#trait::Incoming},
+	listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
 	name::*,
 	name_type_support::*,
 	stream::r#enum::*,

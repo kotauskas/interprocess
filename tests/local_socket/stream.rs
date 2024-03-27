@@ -1,5 +1,5 @@
 use crate::{
-	local_socket::{prelude::*, Listener, Name, Stream},
+	local_socket::{prelude::*, ListenerOptions, Name, Stream},
 	tests::util::*,
 };
 use color_eyre::eyre::WrapErr;
@@ -21,7 +21,7 @@ pub fn server(
 	path: bool,
 ) -> TestResult {
 	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
-		Listener::bind(nm.borrow())
+		ListenerOptions::new().name(nm.borrow()).create_sync()
 	})?;
 	let _ = name_sender.send(name);
 	listener

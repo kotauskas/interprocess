@@ -1,5 +1,5 @@
 use crate::{
-	local_socket::{tokio::stream::r#trait::Stream, Name},
+	local_socket::{tokio::stream::r#trait::Stream, ListenerOptions},
 	Sealed,
 };
 use futures_core::Stream as AsyncIterator;
@@ -21,13 +21,8 @@ pub trait Listener: Sized + Sealed {
 	/// The stream type associated with this listener.
 	type Stream: Stream;
 
-	/// Creates a socket server with the specified local socket name.
-	fn bind(name: Name<'_>) -> io::Result<Self>;
-
-	/// Like [`bind()`](Listener::bind) followed by
-	/// [`.do_not_reclaim_name_on_drop()`](Listener::do_not_reclaim_name_on_drop), but avoids a
-	/// memory allocation.
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self>;
+	/// Creates a socket server using the specified options.
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
 
 	/// Asynchronously listens for incoming connections to the socket, returning a future that
 	/// finishes only when a client is connected.

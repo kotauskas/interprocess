@@ -27,7 +27,7 @@ impmod! {local_socket::name, is_namespaced}
 /// systems, and names pointing to an abstract namespace reserved specifically for local sockets are
 /// only available on Linux and Windows.
 // TODO document automatic checks
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Name<'s> {
 	raw: Cow<'s, OsStr>,
 	path: bool,

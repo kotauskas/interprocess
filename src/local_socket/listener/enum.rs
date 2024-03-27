@@ -1,12 +1,12 @@
-use super::r#trait;
-use crate::local_socket::{ListenerNonblockingMode, Name, Stream};
+use super::{options::ListenerOptions, r#trait};
+use crate::local_socket::{ListenerNonblockingMode, Stream};
 use std::io;
 #[cfg(unix)]
 use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
 #[cfg(windows)]
 use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
-impmod! {local_socket::dispatch_sync}
+impmod! {local_socket::dispatch_sync as dispatch}
 
 mkenum!(
 /// Local socket server, listening for connections.
@@ -147,12 +147,8 @@ impl r#trait::Listener for Listener {
 	type Stream = Stream;
 
 	#[inline]
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		dispatch_sync::bind(name)
-	}
-	#[inline]
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		dispatch_sync::bind_without_name_reclamation(name)
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		dispatch::from_options(options)
 	}
 	#[inline]
 	fn accept(&self) -> io::Result<Stream> {

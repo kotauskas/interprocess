@@ -1,7 +1,7 @@
 use super::{name_to_addr, ReclaimGuard, Stream};
 use crate::local_socket::{
 	traits::{self, Stream as _},
-	ListenerNonblockingMode, Name,
+	ListenerNonblockingMode, ListenerOptions,
 };
 use std::{
 	io,
@@ -27,30 +27,28 @@ impl Listener {
 			_ => return error,
 		})
 	}
-
-	pub(super) fn _bind(name: Name<'_>, keep_name: bool) -> io::Result<Self> {
-		Ok(Self {
-			listener: UnixListener::bind_addr(&name_to_addr(name.borrow())?)
-				.map_err(Self::decode_listen_error)?,
-			reclaim: keep_name
-				.then(|| name.into_owned())
-				.map(ReclaimGuard::new)
-				.unwrap_or_default(),
-			nonblocking_streams: AtomicBool::new(false),
-		})
-	}
 }
 impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;
 
-	#[inline]
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		Self::_bind(name, true)
-	}
-	#[inline]
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		Self::_bind(name, false)
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		let listener = UnixListener::bind_addr(&name_to_addr(options.name.borrow())?)
+			.map_err(Self::decode_listen_error)?;
+
+		if options.nonblocking.accept_nonblocking() {
+			listener.set_nonblocking(true)?;
+		}
+
+		Ok(Self {
+			listener,
+			reclaim: options
+				.reclaim_name
+				.then(|| options.name.into_owned())
+				.map(ReclaimGuard::new)
+				.unwrap_or_default(),
+			nonblocking_streams: AtomicBool::new(options.nonblocking.stream_nonblocking()),
+		})
 	}
 	#[inline]
 	fn accept(&self) -> io::Result<Stream> {

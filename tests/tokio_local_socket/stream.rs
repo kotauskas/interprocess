@@ -1,7 +1,7 @@
 use crate::{
 	local_socket::{
-		tokio::{prelude::*, Listener, Stream},
-		Name,
+		tokio::{prelude::*, Stream},
+		ListenerOptions, Name,
 	},
 	tests::util::*,
 };
@@ -25,7 +25,7 @@ pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
 	path: bool,
 ) -> TestResult {
 	let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
-		Listener::bind(nm.borrow())
+		ListenerOptions::new().name(nm.borrow()).create_tokio()
 	})?;
 
 	let _ = name_sender.send(name);

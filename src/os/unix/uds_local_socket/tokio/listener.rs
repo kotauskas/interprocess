@@ -1,6 +1,6 @@
 use super::Stream;
 use crate::{
-	local_socket::{prelude::*, traits::tokio as traits, ListenerNonblockingMode, Name},
+	local_socket::{prelude::*, traits::tokio as traits, ListenerNonblockingMode, ListenerOptions},
 	os::unix::uds_local_socket::{listener::Listener as SyncListener, ReclaimGuard},
 	Sealed,
 };
@@ -19,11 +19,11 @@ impl Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;
 
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		Self::try_from(SyncListener::_bind(name, true)?)
-	}
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		Self::try_from(SyncListener::_bind(name, false)?)
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		options
+			.nonblocking(ListenerNonblockingMode::Neither)
+			.create_sync_as::<SyncListener>()
+			.and_then(Self::try_from)
 	}
 	async fn accept(&self) -> io::Result<Stream> {
 		let inner = self.listener.accept().await?.0;

@@ -2,7 +2,7 @@ use super::stream::Stream;
 use crate::{
 	local_socket::{
 		traits::{self, ListenerNonblockingMode, Stream as _},
-		Name,
+		ListenerOptions,
 	},
 	os::windows::{
 		named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
@@ -26,23 +26,22 @@ impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;
 
-	#[inline]
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		Self::bind_without_name_reclamation(name)
-	}
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		let mut options = PipeListenerOptions::new();
-		options.path = if name.is_path() {
-			Path::new(name.raw()).to_wtf_16().map_err(to_io_error)?
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		let mut impl_options = PipeListenerOptions::new();
+		impl_options.path = if options.name.is_path() {
+			Path::new(options.name.raw())
+				.to_wtf_16()
+				.map_err(to_io_error)?
 		} else {
-			convert_and_encode_path(name.raw(), None)
+			convert_and_encode_path(options.name.raw(), None)
 				.to_wtf_16()
 				.map_err(to_io_error)?
 		};
-		let listener = options.create()?;
+		impl_options.nonblocking = options.nonblocking.accept_nonblocking();
+
 		Ok(Self {
-			listener,
-			nonblocking: AtomicEnum::new(ListenerNonblockingMode::Neither),
+			listener: impl_options.create()?,
+			nonblocking: AtomicEnum::new(options.nonblocking),
 		})
 	}
 	fn accept(&self) -> io::Result<Stream> {
@@ -58,9 +57,8 @@ impl traits::Listener for Listener {
 		Ok(stream)
 	}
 	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
-		use ListenerNonblockingMode::*;
 		self.listener
-			.set_nonblocking(matches!(nonblocking, Accept | Both))?;
+			.set_nonblocking(nonblocking.accept_nonblocking())?;
 		self.nonblocking.store(nonblocking, SeqCst);
 		Ok(())
 	}

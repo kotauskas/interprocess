@@ -1,6 +1,6 @@
 use super::Stream;
 use crate::{
-	local_socket::{traits::tokio as traits, Name},
+	local_socket::{traits::tokio as traits, ListenerOptions},
 	os::windows::{
 		named_pipe::{
 			pipe_mode,
@@ -20,20 +20,19 @@ pub struct Listener(PipeListener);
 impl Sealed for Listener {}
 impl traits::Listener for Listener {
 	type Stream = Stream;
-	fn bind(name: Name<'_>) -> io::Result<Self> {
-		let mut options = PipeListenerOptions::new();
-		options.path = if name.is_path() {
-			Path::new(name.raw()).to_wtf_16().map_err(to_io_error)?
+
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+		let mut impl_options = PipeListenerOptions::new();
+		impl_options.path = if options.name.is_path() {
+			Path::new(options.name.raw())
+				.to_wtf_16()
+				.map_err(to_io_error)?
 		} else {
-			convert_and_encode_path(name.raw(), None)
+			convert_and_encode_path(options.name.raw(), None)
 				.to_wtf_16()
 				.map_err(to_io_error)?
 		};
-		options.create_tokio().map(Self)
-	}
-	#[inline]
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self> {
-		Self::bind(name)
+		impl_options.create_tokio().map(Self)
 	}
 	async fn accept(&self) -> io::Result<Stream> {
 		let inner = self.0.accept().await?;

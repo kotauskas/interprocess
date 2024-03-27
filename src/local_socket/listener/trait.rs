@@ -1,5 +1,5 @@
 use crate::{
-	local_socket::{stream::r#trait::Stream, Name},
+	local_socket::{stream::r#trait::Stream, ListenerOptions},
 	Sealed,
 };
 use std::{io, iter::FusedIterator};
@@ -15,13 +15,8 @@ pub trait Listener: Sized + Sealed {
 	/// The stream type associated with this listener.
 	type Stream: Stream;
 
-	/// Creates a socket server with the specified local socket name.
-	fn bind(name: Name<'_>) -> io::Result<Self>;
-
-	/// Like [`bind()`](Listener::bind) followed by
-	/// [`.do_not_reclaim_name_on_drop()`](Listener::do_not_reclaim_name_on_drop), but avoids a
-	/// memory allocation.
-	fn bind_without_name_reclamation(name: Name<'_>) -> io::Result<Self>;
+	/// Creates a socket server using the specified options.
+	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
 
 	/// Listens for incoming connections to the socket, blocking until a client is connected.
 	///
@@ -60,6 +55,18 @@ pub enum ListenerNonblockingMode {
 	Stream,
 	/// Both `.accept()` and the resulting stream are to have nonblocking semantics.
 	Both,
+}
+impl ListenerNonblockingMode {
+	/// Returns `true` if `self` prescribes nonblocking `.accept()`, `false` otherwise.
+	#[inline]
+	pub const fn accept_nonblocking(self) -> bool {
+		matches!(self, Self::Accept | Self::Both)
+	}
+	/// Returns `true` if `self` prescribes nonblocking streams, `false` otherwise.
+	#[inline]
+	pub const fn stream_nonblocking(self) -> bool {
+		matches!(self, Self::Stream | Self::Both)
+	}
 }
 unsafe impl crate::ReprU8 for ListenerNonblockingMode {}
 
