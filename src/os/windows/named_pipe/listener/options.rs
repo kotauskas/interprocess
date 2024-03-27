@@ -81,7 +81,8 @@ macro_rules! genset {
 			") parameter to the specified value."
 		)]
 		#[must_use = "builder setters take the entire structure and return the result"]
-		pub fn $name(mut self, $name: impl Into<$ty>) -> Self {
+		#[inline]
+		pub fn $name(mut self, $name: $ty) -> Self {
 			self.$name = $name.into();
 			self
 		}
