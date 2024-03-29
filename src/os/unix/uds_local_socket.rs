@@ -60,7 +60,7 @@ impl ReclaimGuard {
 impl Drop for ReclaimGuard {
 	fn drop(&mut self) {
 		if let Self(Some(name)) = self {
-			if name.is_namespaced() {
+			if name.is_path() {
 				let _ = std::fs::remove_file(name.raw());
 			}
 		}
