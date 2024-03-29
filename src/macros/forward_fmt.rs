@@ -1,4 +1,5 @@
 use std::fmt::{self, Debug, Formatter};
+#[allow(dead_code)]
 pub(crate) fn debug_forward_with_custom_name(
 	nm: &str,
 	fld: &dyn Debug,

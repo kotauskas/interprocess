@@ -44,10 +44,11 @@ impl<'sd> CreationOptions<'sd> {
 			buffer_size_hint: None,
 		}
 	}
+	// TODO use macro
 	/// Specifies the pointer to the security descriptor for the pipe.
 	///
 	/// See the [associated field](#structfield.security_descriptor) for more.
-	#[must_use = "this is not an in-place operation"]
+	#[must_use = builder_must_use!()]
 	#[inline]
 	pub fn security_descriptor(
 		mut self,
@@ -59,7 +60,7 @@ impl<'sd> CreationOptions<'sd> {
 	/// Specifies whether the resulting pipe can be inherited by child processes.
 	///
 	/// See the [associated field](#structfield.inheritable) for more.
-	#[must_use = "this is not an in-place operation"]
+	#[must_use = builder_must_use!()]
 	#[inline]
 	pub fn inheritable(mut self, inheritable: bool) -> Self {
 		self.inheritable = inheritable;
@@ -68,7 +69,7 @@ impl<'sd> CreationOptions<'sd> {
 	/// Specifies the hint on the buffer size for the pipe.
 	///
 	/// See the [associated field](#structfield.buffer_size_hint) for more.
-	#[must_use = "this is not an in-place operation"]
+	#[must_use = builder_must_use!()]
 	#[inline]
 	pub fn buffer_size_hint(mut self, buffer_size_hint: Option<NonZeroUsize>) -> Self {
 		self.buffer_size_hint = buffer_size_hint;

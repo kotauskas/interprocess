@@ -50,6 +50,7 @@ impl ReclaimGuard {
 	fn new(name: Name<'static>) -> Self {
 		Self(if name.is_path() { Some(name) } else { None })
 	}
+	#[cfg_attr(not(feature = "tokio"), allow(dead_code))]
 	fn take(&mut self) -> Self {
 		Self(self.0.take())
 	}

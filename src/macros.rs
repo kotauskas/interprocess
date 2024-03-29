@@ -65,6 +65,39 @@ macro_rules! forward_rbv {
 	};
 }
 
+#[rustfmt::skip] macro_rules! builder_must_use {
+	() => {
+"builder setters take the entire structure and return it with the corresponding field modified"
+	};
+}
+
+macro_rules! builder_setters {
+	($(#[doc = $($doc:expr)+])+ $name:ident : $ty:ty) => {
+		$(#[doc = $($doc)+])+
+		#[must_use = builder_must_use!()]
+		#[inline(always)]
+		pub fn $name(mut self, $name: $ty) -> Self {
+			self.$name = $name.into();
+			self
+		}
+
+	};
+	($name:ident : $ty:ty) => {
+		builder_setters!(
+			#[doc = concat!(
+				"Sets the [`",
+				stringify!($name),
+				"`](#structfield.", stringify!($name),
+				") parameter to the specified value."
+			)]
+			$name : $ty
+		);
+	};
+	($($(#[doc = $($doc:tt)+])* $name:ident : $ty:ty),+ $(,)?) => {
+		$(builder_setters!($(#[doc = $($doc)+])* $name: $ty);)+
+	};
+}
+
 /// Generates this module's macro submodules.
 macro_rules! make_macro_modules {
 	($($modname:ident),+ $(,)?) => {$(

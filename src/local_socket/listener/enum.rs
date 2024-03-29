@@ -8,6 +8,8 @@ use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::
 
 impmod! {local_socket::dispatch_sync as dispatch}
 
+// TODO remove mentions of bind() and document builder
+
 mkenum!(
 /// Local socket server, listening for connections.
 ///

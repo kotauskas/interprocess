@@ -17,19 +17,13 @@ mod fdops;
 use fdops::*;
 
 pub mod fifo_file;
+pub mod local_socket;
 pub mod uds_local_socket;
 
 pub(crate) mod unnamed_pipe;
 
-pub(crate) mod local_socket {
-	pub mod dispatch_sync;
-	#[cfg(feature = "tokio")]
-	pub mod dispatch_tokio;
-	pub mod name;
-}
-
 mod unixprelude {
 	#[allow(unused_imports)]
-	pub use libc::{c_int, c_short, gid_t, mode_t, pid_t, size_t, uid_t};
+	pub use libc::{c_char, c_int, c_short, gid_t, mode_t, pid_t, size_t, uid_t};
 	pub use std::os::unix::prelude::*;
 }

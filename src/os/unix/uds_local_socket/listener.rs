@@ -1,7 +1,10 @@
 use super::{name_to_addr, ReclaimGuard, Stream};
-use crate::local_socket::{
-	traits::{self, Stream as _},
-	ListenerNonblockingMode, ListenerOptions,
+use crate::{
+	local_socket::{
+		traits::{self, Stream as _},
+		ListenerNonblockingMode, ListenerOptions,
+	},
+	os::unix::c_wrappers,
 };
 use std::{
 	io,
@@ -33,10 +36,18 @@ impl traits::Listener for Listener {
 	type Stream = Stream;
 
 	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
-		let listener = UnixListener::bind_addr(&name_to_addr(options.name.borrow())?)
-			.map_err(Self::decode_listen_error)?;
+		let nonblocking = options.nonblocking.accept_nonblocking();
 
-		if options.nonblocking.accept_nonblocking() {
+		let listener = c_wrappers::bind_and_listen_with_mode(
+			libc::SOCK_STREAM,
+			&name_to_addr(options.name.borrow())?,
+			nonblocking,
+			options.mode,
+		)
+		.map(UnixListener::from)
+		.map_err(Self::decode_listen_error)?;
+
+		if !c_wrappers::CAN_CREATE_NONBLOCKING && nonblocking {
 			listener.set_nonblocking(true)?;
 		}
 
@@ -87,6 +98,7 @@ impl AsFd for Listener {
 	}
 }
 impl From<Listener> for OwnedFd {
+	#[inline]
 	fn from(l: Listener) -> Self {
 		UnixListener::from(l).into()
 	}

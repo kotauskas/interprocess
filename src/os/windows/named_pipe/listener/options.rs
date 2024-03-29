@@ -72,25 +72,6 @@ pub struct PipeListenerOptions<'path> {
 	pub inheritable: bool,
 }
 
-macro_rules! genset {
-	($name:ident : $ty:ty) => {
-		#[doc = concat!(
-			"Sets the [`",
-			stringify!($name),
-			"`](#structfield.", stringify!($name),
-			") parameter to the specified value."
-		)]
-		#[must_use = "builder setters take the entire structure and return the result"]
-		#[inline]
-		pub fn $name(mut self, $name: $ty) -> Self {
-			self.$name = $name.into();
-			self
-		}
-	};
-	($($name:ident : $ty:ty),+ $(,)?) => {
-		$(genset!($name: $ty);)+
-	};
-}
 impl<'path> PipeListenerOptions<'path> {
 	/// Creates a new builder with default options.
 	#[allow(clippy::indexing_slicing)] // are you fucking with me
@@ -143,7 +124,7 @@ impl<'path> PipeListenerOptions<'path> {
 		self.path = path.to_wtf_16().expect(EXPECT_WTF16);
 		self
 	}
-	genset! {
+	builder_setters! {
 		mode: PipeMode,
 		nonblocking: bool,
 		instance_limit: Option<NonZeroU8>,

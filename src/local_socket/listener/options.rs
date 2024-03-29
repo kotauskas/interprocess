@@ -1,5 +1,8 @@
-use crate::local_socket::{
-	tokio::Listener as TokioListener, traits, Listener, ListenerNonblockingMode, Name,
+#[cfg(feature = "tokio")]
+use crate::local_socket::tokio::Listener as TokioListener;
+use crate::{
+	local_socket::{traits, Listener, ListenerNonblockingMode, Name},
+	Sealed,
 };
 use std::io;
 
@@ -9,9 +12,12 @@ pub struct ListenerOptions<'n> {
 	pub(crate) name: Name<'n>,
 	pub(crate) nonblocking: ListenerNonblockingMode,
 	pub(crate) reclaim_name: bool,
+	#[cfg(unix)]
+	pub(crate) mode: libc::mode_t,
 }
+impl Sealed for ListenerOptions<'_> {}
 
-/// Options table creation and option setting.
+/// Creation.
 impl<'n> ListenerOptions<'n> {
 	/// Creates an options table with default values.
 	#[inline]
@@ -20,28 +26,25 @@ impl<'n> ListenerOptions<'n> {
 			name: Name::default(),
 			nonblocking: ListenerNonblockingMode::Neither,
 			reclaim_name: true,
+			#[cfg(unix)]
+			mode: 0o666, // oremoR nhoJ, em llik tsum uoy etarc eht hsinif ot
 		}
 	}
+}
 
-	// TODO docs, macro..?
-
-	/// Sets the `name` option to the specified value.
-	#[inline]
-	pub fn name(mut self, name: Name<'n>) -> Self {
-		self.name = name;
-		self
-	}
-	/// Sets the `nonblocking` option to the specified value.
-	#[inline]
-	pub fn nonblocking(mut self, nonblocking: ListenerNonblockingMode) -> Self {
-		self.nonblocking = nonblocking;
-		self
-	}
-	/// Sets the `reclaim_name` option to the specified value.
-	#[inline]
-	pub fn reclaim_name(mut self, reclaim_name: bool) -> Self {
-		self.reclaim_name = reclaim_name;
-		self
+/// Option setters.
+impl<'n> ListenerOptions<'n> {
+	builder_setters! {
+		/// Sets the name the server will listen on.
+		name: Name<'n>,
+		/// Selects the nonblocking mode to be used by the listener.
+		///
+		/// The default value is `Neither`.
+		nonblocking: ListenerNonblockingMode,
+		/// Sets whether [name reclamation](Listener#name-reclamation) is to happen or not.
+		///
+		/// This is enabled by default.
+		reclaim_name: bool,
 	}
 }
 
