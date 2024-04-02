@@ -5,6 +5,9 @@ mod ext;
 mod owned;
 mod try_clone;
 
+#[allow(unused_imports)] // this is literally a false positive
+pub(crate) use try_clone::LocalBox;
+
 pub use {as_security_descriptor::*, borrowed::*, ext::*, owned::*};
 
 use try_clone::clone;

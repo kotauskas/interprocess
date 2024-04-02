@@ -1,13 +1,11 @@
 use super::{c_wrappers, AsSecurityDescriptor, AsSecurityDescriptorMut, SecurityDescriptor};
-use std::io;
-use windows_sys::Win32::{
-	Foundation::PSID,
-	Security::{
-		GetSecurityDescriptorDacl, GetSecurityDescriptorGroup, GetSecurityDescriptorOwner,
-		GetSecurityDescriptorSacl, SetSecurityDescriptorDacl, SetSecurityDescriptorGroup,
-		SetSecurityDescriptorOwner, SetSecurityDescriptorSacl, ACL, SECURITY_ATTRIBUTES,
-		SECURITY_DESCRIPTOR_CONTROL,
-	},
+use std::{ffi::c_void, io};
+use widestring::U16CStr;
+use windows_sys::Win32::Security::{
+	GetSecurityDescriptorDacl, GetSecurityDescriptorGroup, GetSecurityDescriptorOwner,
+	GetSecurityDescriptorSacl, SetSecurityDescriptorDacl, SetSecurityDescriptorGroup,
+	SetSecurityDescriptorOwner, SetSecurityDescriptorSacl, ACL, SECURITY_ATTRIBUTES,
+	SECURITY_DESCRIPTOR_CONTROL,
 };
 
 #[rustfmt::skip] macro_rules! indirect_methods {
@@ -15,7 +13,7 @@ use windows_sys::Win32::{
 		#[doc = concat!("\
 Returns a raw pointer to the contained ", $doc, " access control list, as well as the value of its
 corresponding \"defaulted\" boolean flag used to denote automatically generated ACLs.")]
-		#[inline] fn $nm(&self) -> io::Result<Option<(*mut ACL, bool)>> {
+		#[inline] fn $nm(&self) -> io::Result<Option<(*const ACL, bool)>> {
 			unsafe { c_wrappers::acl(self.as_sd(), $wfn) }
 		}
 	};
@@ -23,7 +21,7 @@ corresponding \"defaulted\" boolean flag used to denote automatically generated 
 		#[doc = concat!("\
 Returns a raw pointer to the contained ", $doc, " SID, as well as the value of its corresponding
 \"defaulted\" boolean flag used to denote SIDs that were chosen automatically.")]
-		#[inline] fn $nm(&self) -> io::Result<(PSID, bool)> {
+		#[inline] fn $nm(&self) -> io::Result<(*const c_void, bool)> {
 			unsafe { c_wrappers::sid(self.as_sd(), $wfn) }
 		}
 	};
@@ -85,7 +83,7 @@ The pointer:
 
 [lh]: https://learn.microsoft.com/en-us/windows/win32/memory/global-and-local-functions
 ")]
-		#[inline] unsafe fn $nm(&mut self, sid: PSID, defaulted: bool) -> io::Result<()> {
+		#[inline] unsafe fn $nm(&mut self, sid: *mut c_void, defaulted: bool) -> io::Result<()> {
 			if sid.is_null() {
 				return Err(
 					io::Error::new(
@@ -112,7 +110,7 @@ Same as [`.free_contents()`](Self::free_contents).")]
 			let val = self.$get()?;
 			self.$unset()?;
 			if let Some((val, _)) = val {
-				unsafe { c_wrappers::free_acl(val)? };
+				unsafe { c_wrappers::free_acl(val.cast_mut())? };
 			}
 			Ok(())
 		}
@@ -129,7 +127,7 @@ Same as [`.free_contents()`](Self::free_contents).")]
 		#[inline] fn $nm(&mut self) -> io::Result<()> {
 			let val = self.$get()?;
 			self.$unset()?;
-			unsafe { c_wrappers::free_sid(val.0)? };
+			unsafe { c_wrappers::free_sid(val.0.cast_mut())? };
 			Ok(())
 		}
 	};
@@ -158,7 +156,7 @@ pub trait AsSecurityDescriptorExt: AsSecurityDescriptor {
 	/// Clones the security descriptor, producing a new [owned one](SecurityDescriptor).
 	///
 	/// This is aliased to [`TryClone`](crate::TryClone) on [`SecurityDescriptor`] itself.
-	fn to_owned(&self) -> io::Result<SecurityDescriptor> {
+	fn to_owned_sd(&self) -> io::Result<SecurityDescriptor> {
 		unsafe { super::clone(self.as_sd()) }
 	}
 
@@ -166,6 +164,27 @@ pub trait AsSecurityDescriptorExt: AsSecurityDescriptor {
 	/// security descriptor borrow of `self`.
 	fn write_to_security_attributes(&self, attributes: &mut SECURITY_ATTRIBUTES) {
 		attributes.lpSecurityDescriptor = self.as_sd().cast_mut();
+	}
+
+	/// Serializes the security descriptor into [the security descriptor string format][sdsf] for
+	/// debug printing, textual storage and safe interchange.
+	///
+	/// The [`selector` bitflags][secinfo] determine the information that is serialized. This is
+	/// primarily useful for deserialization, since not all of the information that can be stored
+	/// in the string representation can be set without special permissions.
+	///
+	/// The result is returned by passing it by-reference to the specified closure. This is because
+	/// the slice is written to a `LocalAlloc()`-allocated buffer. Because there isn't a `LocalBox`
+	/// in the public API of Interprocess for the sake of simplicity, returning the buffer raw would
+	/// be prone to memory leaks.
+	///
+	/// [sdsf]: https://learn.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-string-format
+	/// [secinfo]: https://learn.microsoft.com/en-us/windows/win32/secauthz/security-information
+	fn serialize<R>(&self, selector: u32, f: impl FnOnce(&U16CStr) -> R) -> io::Result<R> {
+		let (s, bsz) = unsafe { c_wrappers::serialize(self.as_sd(), selector)? };
+		let slice =
+			unsafe { U16CStr::from_ptr_truncate(s.as_ptr(), bsz) }.map_err(io::Error::other)?;
+		Ok(f(slice))
 	}
 }
 impl<T: AsSecurityDescriptor + ?Sized> AsSecurityDescriptorExt for T {}
