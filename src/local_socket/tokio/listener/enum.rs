@@ -13,6 +13,8 @@ impmod! { local_socket::dispatch_tokio as dispatch }
 mkenum!(
 /// Tokio-based local socket server, listening for connections.
 ///
+/// This struct is created by [`ListenerOptions`](super::super::ListenerOptions).
+///
 /// [Name reclamation](super::super::Stream#name-reclamation) is performed by default on
 /// backends that necessitate it.
 ///
@@ -24,7 +26,7 @@ mkenum!(
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::local_socket::{
 /// 	tokio::{prelude::*, Listener, Stream},
-/// 	NameTypeSupport, ToFsName, ToNsName,
+/// 	ListenerOptions, NameTypeSupport, ToFsName, ToNsName,
 /// };
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 /// use std::io;
@@ -70,8 +72,12 @@ mkenum!(
 /// 	}
 /// };
 ///
-/// // Bind our listener.
-/// let listener = match Listener::bind(name) {
+/// // Configure our listener...
+/// let opts = ListenerOptions::new()
+/// 	.name(name);
+///
+/// // ...and create it.
+/// let listener = match opts.create_tokio() {
 /// 	Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
 /// 		// When a program that uses a file-type socket name terminates its socket server without
 /// 		// deleting the file, a "corpse socket" remains, which can neither be connected to nor
