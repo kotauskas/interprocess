@@ -12,51 +12,31 @@ jobs:
 
     name: ${{ matrix.toolchain }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: --cfg ci
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          profile: minimal
-          override: true
-          components: clippy
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy
+          rustup default ${{ matrix.toolchain }}
 
       - name: Run Clippy for default configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: "-- -A unknown_lints"
+        run: cargo clippy -- -A unknown_lints
 
       - name: Run tests for default configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
 
       - name: Run rustdoc for default configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: "--no-deps"
+        run: cargo doc --no-deps
 
       - name: Run Clippy for Tokio configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: "--features tokio -- -A unknown_lints"
+        run: cargo clippy --features tokio -- -A unknown_lints
 
       - name: Run tests for Tokio configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: "--features tokio"
+        run: cargo test --features tokio
 
       - name: Run rustdoc for Tokio configuration
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: "--features tokio --no-deps"
+        run: cargo doc --features tokio --no-deps
