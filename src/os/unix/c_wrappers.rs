@@ -76,7 +76,9 @@ pub(super) const CAN_CREATE_NONBLOCKING: bool =
 fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
 	let flags = {
 		#[cfg(not(any(target_os = "linux", target_os = "android")))]
-		#[rustfmt::skip] { 0 }
+		{
+			0
+		}
 		#[cfg(any(target_os = "linux", target_os = "android"))]
 		{
 			let mut flags = libc::SOCK_CLOEXEC;
