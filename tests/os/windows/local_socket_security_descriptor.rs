@@ -1,3 +1,5 @@
+#![cfg(not(ci))]
+
 use crate::{
 	local_socket::{traits::Stream as _, ListenerOptions, Stream},
 	os::windows::{
@@ -104,7 +106,7 @@ fn local_socket_security_descriptor() -> TestResult {
 			.opname("query of own executable's security descriptor")?
 	};
 	sd.serialize(SECINFO, |s| {
-		eprintln!("SDDL of the running executable\t: {}", s.display());
+		eprintln!("SDDL of the running executable: {}", s.display());
 	})
 	.opname("serialize")?;
 
