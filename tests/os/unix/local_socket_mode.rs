@@ -16,7 +16,7 @@ fn get_mode(fd: BorrowedFd<'_>) -> TestResult<mode_t> {
 }
 
 fn test_inner(path: bool) -> TestResult {
-	const MODE: libc::mode_t = 0o600;
+	const MODE: libc::mode_t = 0o700;
 	let (name, listener) =
 		listen_and_pick_name(&mut namegen_local_socket(make_id!(), path), |nm| {
 			ListenerOptions::new()
