@@ -50,6 +50,7 @@ windows-sys = { version = "0.52.0", features = [
 	"Win32_System_Threading",
 	"Win32_System_Memory",
 	"Win32_System_SystemServices",
+	"Win32_System_LibraryLoader",
 ] }
 recvmsg = "1.0.0"
 widestring = "1.0.2"
