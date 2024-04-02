@@ -14,13 +14,6 @@ pub trait ListenerOptionsExt: Sized + Sealed {
 	///
 	/// Note that this *may* or *may not* obey `umask`. It is recommended to set `umask` to 666₈
 	/// just before `.create()`.
-	///
-	/// # Platform-specific behavior
-	/// ## Linux
-	/// If the specified mode forbids read or write access for any of the three security principals
-	/// (i.e. not equal to 666₈ when `&`ed with 666₈), creation will fail if the local socket name
-	/// points to the abstract namespace.
-	// TODO make it happen and add a test
 	#[must_use = builder_must_use!()]
 	fn mode(self, mode: libc::mode_t) -> Self;
 }
