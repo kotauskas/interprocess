@@ -32,6 +32,7 @@ impl traits::Listener for Listener {
 				.to_wtf_16()
 				.map_err(to_io_error)?
 		};
+		impl_options.security_descriptor = options.security_descriptor;
 		impl_options.create_tokio().map(Self)
 	}
 	async fn accept(&self) -> io::Result<Stream> {

@@ -1,6 +1,7 @@
 //! Windows-specific functionality for various interprocess communication primitives, as well as
 //! Windows-specific ones.
 
+pub mod local_socket;
 pub mod named_pipe;
 pub mod unnamed_pipe;
 //pub mod mailslot;
@@ -12,16 +13,9 @@ mod share_handle;
 pub use {path_conversion::*, security_descriptor::*, share_handle::*};
 
 mod file_handle;
-pub(crate) mod local_socket {
-	pub mod dispatch_sync;
-	#[cfg(feature = "tokio")]
-	pub mod dispatch_tokio;
-	pub mod name;
-}
-
 pub(crate) use file_handle::*;
 
 mod c_wrappers;
-mod misc;
+pub(crate) mod misc;
 
-use misc::*;
+pub(crate) use misc::*;

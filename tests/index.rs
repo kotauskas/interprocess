@@ -7,6 +7,10 @@ mod os {
 	mod unix {
 		mod local_socket_mode;
 	}
+	#[cfg(windows)]
+	mod windows {
+		mod local_socket_security_descriptor;
+	}
 }
 
 mod local_socket;

@@ -1,6 +1,5 @@
-use crate::OrErrno;
-
 use super::winprelude::*;
+use crate::OrErrno;
 use std::io;
 use windows_sys::Win32::{
 	Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS},

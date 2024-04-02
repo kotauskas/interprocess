@@ -1,5 +1,7 @@
 #[cfg(feature = "tokio")]
 use crate::local_socket::tokio::Listener as TokioListener;
+#[cfg(windows)]
+use crate::os::windows::SecurityDescriptor;
 use crate::{
 	local_socket::{traits, Listener, ListenerNonblockingMode, Name},
 	Sealed,
@@ -7,15 +9,18 @@ use crate::{
 use std::io;
 
 /// A builder for [local socket listeners](traits::Listener), including [`Listener`].
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ListenerOptions<'n> {
 	pub(crate) name: Name<'n>,
 	pub(crate) nonblocking: ListenerNonblockingMode,
 	pub(crate) reclaim_name: bool,
 	#[cfg(unix)]
 	pub(crate) mode: libc::mode_t,
+	#[cfg(windows)]
+	pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
 impl Sealed for ListenerOptions<'_> {}
+// TODO TryClone
 
 /// Creation.
 impl<'n> ListenerOptions<'n> {
@@ -28,6 +33,8 @@ impl<'n> ListenerOptions<'n> {
 			reclaim_name: true,
 			#[cfg(unix)]
 			mode: 0o666, // oremoR nhoJ, em llik tsum uoy etarc eht hsinif ot
+			#[cfg(windows)]
+			security_descriptor: None,
 		}
 	}
 }

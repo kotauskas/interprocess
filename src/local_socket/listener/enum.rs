@@ -166,6 +166,8 @@ impl r#trait::Listener for Listener {
 	}
 }
 
+// TODO remove the forwarding, won't work with Ud-sockets on Windows
+
 #[cfg(windows)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
 impl From<Listener> for OwnedHandle {

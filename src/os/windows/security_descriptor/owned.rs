@@ -4,6 +4,7 @@ use std::{
 	fmt::{self, Debug, Formatter},
 	mem::MaybeUninit,
 };
+use widestring::U16CStr;
 use windows_sys::Win32::{
 	Security::{InitializeSecurityDescriptor, SECURITY_DESCRIPTOR, SE_SELF_RELATIVE},
 	System::SystemServices::SECURITY_DESCRIPTOR_REVISION,
@@ -50,6 +51,14 @@ impl SecurityDescriptor {
 		}
 	}
 
+	/// Deserializes a security descriptor from the [security descriptor string format][sdsf].
+	///
+	/// [sdsf]: https://learn.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-string-format
+	pub fn deserialize(sdsf: &U16CStr) -> io::Result<Self> {
+		let srsd = c_wrappers::deserialize(sdsf)?;
+		unsafe { BorrowedSecurityDescriptor::from_ptr(srsd.as_ptr()) }.to_owned_sd()
+	}
+
 	/// Wraps the given security descriptor, assuming ownership.
 	///
 	/// # Safety
@@ -83,6 +92,7 @@ impl Default for SecurityDescriptor {
 }
 
 impl TryClone for SecurityDescriptor {
+	#[inline]
 	fn try_clone(&self) -> io::Result<Self> {
 		unsafe { super::clone(self.as_sd()) }
 	}

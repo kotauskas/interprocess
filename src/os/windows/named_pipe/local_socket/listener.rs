@@ -38,6 +38,7 @@ impl traits::Listener for Listener {
 				.map_err(to_io_error)?
 		};
 		impl_options.nonblocking = options.nonblocking.accept_nonblocking();
+		impl_options.security_descriptor = options.security_descriptor;
 
 		Ok(Self {
 			listener: impl_options.create()?,
