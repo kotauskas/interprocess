@@ -4,7 +4,7 @@ use crate::local_socket::tokio::Listener as TokioListener;
 use crate::os::windows::SecurityDescriptor;
 use crate::{
 	local_socket::{traits, Listener, ListenerNonblockingMode, Name},
-	Sealed,
+	Sealed, TryClone,
 };
 use std::io;
 
@@ -20,7 +20,24 @@ pub struct ListenerOptions<'n> {
 	pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
 impl Sealed for ListenerOptions<'_> {}
-// TODO TryClone
+
+impl TryClone for ListenerOptions<'_> {
+	fn try_clone(&self) -> io::Result<Self> {
+		Ok(Self {
+			name: self.name.clone(),
+			nonblocking: self.nonblocking,
+			reclaim_name: self.reclaim_name,
+			#[cfg(unix)]
+			mode: self.mode,
+			#[cfg(windows)]
+			security_descriptor: self
+				.security_descriptor
+				.as_ref()
+				.map(TryClone::try_clone)
+				.transpose()?,
+		})
+	}
+}
 
 /// Creation.
 impl<'n> ListenerOptions<'n> {
