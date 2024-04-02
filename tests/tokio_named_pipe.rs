@@ -5,7 +5,9 @@ mod bytes;
 use crate::{
 	os::windows::named_pipe::PipeListenerOptions,
 	tests::util::{
-		listen_and_pick_name, testinit, tokio::drive_server_and_multiple_clients, TestResult,
+		listen_and_pick_name,
+		tokio::{drive_server_and_multiple_clients, test_wrapper},
+		TestResult,
 	},
 };
 use color_eyre::eyre::WrapErr;
@@ -18,15 +20,16 @@ macro_rules! matrix {
 	(@dir_s duplex) => {server_duplex}; (@dir_s stc) => {server_stc}; (@dir_s cts) => {server_cts};
 	(@dir_c duplex) => {client_duplex}; (@dir_c stc) => {client_stc}; (@dir_c cts) => {client_cts};
 	($($mod:ident $ty:ident $nm:ident)+) => {$(
-		#[tokio::test]
-		async fn $nm() -> TestResult {
+		#[test]
+		fn $nm() -> TestResult {
 			use $mod::*;
-			testinit();
-			let server = matrix!(@dir_s $ty);
-			drive_server_and_multiple_clients(
-				move |ns, nc| server(make_id!(), ns, nc),
-				matrix!(@dir_c $ty),
-			).await
+			test_wrapper(async {
+				let server = matrix!(@dir_s $ty);
+				drive_server_and_multiple_clients(
+					move |ns, nc| server(make_id!(), ns, nc),
+					matrix!(@dir_c $ty),
+				).await
+			})
 		}
 	)+};
 }

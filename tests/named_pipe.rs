@@ -17,12 +17,13 @@ macro_rules! matrix {
 		#[test]
 		fn $nm() -> TestResult {
 			use $mod::*;
-			testinit();
-			let server = matrix!(@dir_s $ty);
-			drive_server_and_multiple_clients(
-				|ns, nc| server(make_id!(), ns, nc),
-				matrix!(@dir_c $ty),
-			)
+			test_wrapper(|| {
+				let server = matrix!(@dir_s $ty);
+				drive_server_and_multiple_clients(
+					|ns, nc| server(make_id!(), ns, nc),
+					matrix!(@dir_c $ty),
+				)
+			})
 		}
 	)+};
 }

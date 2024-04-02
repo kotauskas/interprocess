@@ -1,4 +1,4 @@
-use super::{TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
+use super::{TestResult, WrapErrExt, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS};
 use color_eyre::eyre::{bail, Context};
 use std::{future::Future, sync::Arc};
 use tokio::{
@@ -8,6 +8,16 @@ use tokio::{
 	},
 	task, try_join,
 };
+
+pub fn test_wrapper(f: impl Future<Output = TestResult> + Send + 'static) -> TestResult {
+	super::test_wrapper(|| {
+		let rt = tokio::runtime::Builder::new_current_thread()
+			.enable_io()
+			.build()
+			.opname("Tokio runtime spawn")?;
+		rt.block_on(f)
+	})
+}
 
 /// Waits for the leader closure to reach a point where it sends a message for the follower closure,
 /// then runs the follower. Captures Eyre errors on both sides and panics if any occur, reporting

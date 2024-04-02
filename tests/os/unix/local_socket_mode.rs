@@ -1,5 +1,5 @@
 use crate::{
-	local_socket::{traits::Stream as _, ListenerOptions, Stream},
+	local_socket::{traits::Stream as _, Listener, ListenerOptions, Stream},
 	os::unix::local_socket::ListenerOptionsExt,
 	tests::util::*,
 	OrErrno,
@@ -25,18 +25,21 @@ fn test_inner(path: bool) -> TestResult {
 				.create_sync()
 		})?;
 	let _ = Stream::connect(Arc::try_unwrap(name).unwrap()).opname("client connect")?;
-	ensure_eq!(get_mode(listener.as_fd())?, MODE);
+	let fd = match &listener {
+		Listener::UdSocket(l) => l.as_fd(),
+	};
+	ensure_eq!(get_mode(fd)?, MODE);
 
 	Ok(())
 }
 
 #[test]
 fn local_socket_file_mode() -> TestResult {
-	test_inner(true)
+	test_wrapper(|| test_inner(true))
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn local_socket_namespaced_mode() -> TestResult {
-	test_inner(false)
+	test_wrapper(|| test_inner(false))
 }

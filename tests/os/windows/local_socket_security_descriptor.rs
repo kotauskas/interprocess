@@ -94,8 +94,7 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
 		})
 }
 
-#[test]
-fn local_socket_security_descriptor() -> TestResult {
+fn test_main() -> TestResult {
 	let sd = {
 		let mut pathbuf = [MaybeUninit::uninit(); MAX_PATH as _];
 		let path: OsString = get_self_exe(&mut pathbuf)
@@ -136,4 +135,9 @@ fn local_socket_security_descriptor() -> TestResult {
 	.opname("serialize and check")???;
 
 	Ok(())
+}
+
+#[test]
+fn local_socket_security_descriptor() -> TestResult {
+	test_wrapper(test_main)
 }

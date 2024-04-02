@@ -2,14 +2,14 @@
 //! it.
 #![allow(dead_code, unused_macros)]
 
-mod choke;
-
-mod drive;
 #[macro_use]
 mod eyre;
-mod xorshift;
 #[macro_use]
 mod namegen;
+mod choke;
+mod drive;
+mod wdt;
+mod xorshift;
 
 #[allow(unused_imports)]
 pub use {drive::*, eyre::*, namegen::*, xorshift::*};
@@ -23,8 +23,9 @@ const NUM_CONCURRENT_CLIENTS: u32 = 6;
 use color_eyre::eyre::WrapErr;
 use std::{fmt::Arguments, io, sync::Arc};
 
-pub fn testinit() {
+pub fn test_wrapper(f: impl (FnOnce() -> TestResult) + Send + 'static) -> TestResult {
 	eyre::install();
+	self::wdt::run_under_wachdog(f)
 }
 
 pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char>) -> Box<str> {

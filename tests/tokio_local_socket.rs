@@ -6,14 +6,13 @@ mod stream;
 
 use crate::{
 	local_socket::{tokio::Stream, Name, NameTypeSupport},
-	tests::util::{self, testinit, TestResult},
+	tests::util::{self, tokio::test_wrapper, TestResult},
 };
 use std::{future::Future, pin::Pin, sync::Arc};
 
 #[allow(clippy::type_complexity)]
 async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 	use stream::*;
-	testinit();
 	type Fut = Pin<Box<dyn Future<Output = TestResult> + Send + 'static>>;
 	type F<T> = Box<dyn Fn(T) -> Fut + Send + Sync>;
 	let hcl: F<Stream> = if split {
@@ -33,20 +32,22 @@ async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 macro_rules! matrix {
 	(@querymethod true $e:expr) => { NameTypeSupport::fs_supported($e) };
 	(@querymethod false $e:expr) => { NameTypeSupport::ns_supported($e) };
-	(@body $split:ident $path:ident) => {{
-		if matrix!(@querymethod $path NameTypeSupport::query()) {
-			test_stream(make_id!(), $split, $path).await?;
-		}
-		Ok(())
-	}};
+	(@body $split:ident $path:ident) => {
+		test_wrapper(async {
+			if matrix!(@querymethod $path NameTypeSupport::query()) {
+				test_stream(make_id!(), $split, $path).await?;
+			}
+			Ok(())
+		})
+	};
 	($nm:ident false $path:ident) => {
-		#[tokio::test]
-		async fn $nm() -> TestResult { matrix!(@body false $path) }
+		#[test]
+		fn $nm() -> TestResult { matrix!(@body false $path) }
 	};
 	($nm:ident true $path:ident) => {
-		#[tokio::test]
+		#[test]
 		#[cfg(not(windows))]
-		async fn $nm() -> TestResult { matrix!(@body true $path) }
+		fn $nm() -> TestResult { matrix!(@body true $path) }
 	};
 	($($nm:ident $split:ident $path:ident)+) => { $(matrix!($nm $split $path);)+ };
 }
@@ -58,19 +59,21 @@ matrix! {
 	stream_namespaced_split		true	false
 }
 
-#[tokio::test]
-async fn no_server_file() -> TestResult {
-	testinit();
-	if NameTypeSupport::query().fs_supported() {
-		no_server::run_and_verify_error(true).await?;
-	}
-	Ok(())
+#[test]
+fn no_server_file() -> TestResult {
+	test_wrapper(async {
+		if NameTypeSupport::query().fs_supported() {
+			no_server::run_and_verify_error(true).await?;
+		}
+		Ok(())
+	})
 }
-#[tokio::test]
-async fn no_server_namespaced() -> TestResult {
-	testinit();
-	if NameTypeSupport::query().ns_supported() {
-		no_server::run_and_verify_error(false).await?;
-	}
-	Ok(())
+#[test]
+fn no_server_namespaced() -> TestResult {
+	test_wrapper(async {
+		if NameTypeSupport::query().ns_supported() {
+			no_server::run_and_verify_error(false).await?;
+		}
+		Ok(())
+	})
 }
