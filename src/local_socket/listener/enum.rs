@@ -1,10 +1,10 @@
 use super::{options::ListenerOptions, r#trait};
 use crate::local_socket::{ListenerNonblockingMode, Stream};
-use std::io;
 #[cfg(unix)]
-use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
+use crate::os::unix::uds_local_socket as uds_impl;
 #[cfg(windows)]
-use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
+use crate::os::windows::named_pipe::local_socket as np_impl;
+use std::io;
 
 impmod! {local_socket::dispatch_sync as dispatch}
 
@@ -170,37 +170,3 @@ impl r#trait::Listener for Listener {
 		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
 	}
 }
-
-// TODO remove the forwarding, won't work with Ud-sockets on Windows
-
-#[cfg(windows)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl From<Listener> for OwnedHandle {
-	fn from(l: Listener) -> Self {
-		match l {
-			Listener::NamedPipe(l) => l.into(),
-		}
-	}
-}
-
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl AsFd for Listener {
-	fn as_fd(&self) -> BorrowedFd<'_> {
-		match self {
-			Listener::UdSocket(l) => l.as_fd(),
-		}
-	}
-}
-
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl From<Listener> for OwnedFd {
-	fn from(l: Listener) -> Self {
-		match l {
-			Listener::UdSocket(l) => l.into(),
-		}
-	}
-}
-
-// TODO From<OwnedHandle>

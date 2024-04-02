@@ -22,7 +22,7 @@ use std::{
 };
 use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
 
-// TODO finish create_instance and add conversion from handles after all
+// TODO finish collect_options and add conversion from handles after all
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///

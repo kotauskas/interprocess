@@ -1,13 +1,13 @@
 use super::r#trait;
+#[cfg(unix)]
+use crate::os::unix::uds_local_socket as uds_impl;
+#[cfg(windows)]
+use crate::os::windows::named_pipe::local_socket as np_impl;
 use crate::{
 	local_socket::{flush_unsupported, Name},
 	TryClone,
 };
 use std::io::{self, prelude::*, IoSlice, IoSliceMut};
-#[cfg(unix)]
-use {crate::os::unix::uds_local_socket as uds_impl, std::os::unix::prelude::*};
-#[cfg(windows)]
-use {crate::os::windows::named_pipe::local_socket as np_impl, std::os::windows::prelude::*};
 
 impmod! { local_socket::dispatch_sync }
 
@@ -155,53 +155,10 @@ impl TryClone for Stream {
 		dispatch!(Self: x in self => x.try_clone()).map(From::from)
 	}
 }
-
-/// Creates a [`NamedPipe`](Stream::NamedPipe) stream.
-#[cfg(windows)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl TryFrom<OwnedHandle> for Stream {
-	type Error = <np_impl::Stream as TryFrom<OwnedHandle>>::Error;
-	#[inline]
-	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		handle.try_into().map(Self::NamedPipe)
-	}
-}
-
-#[cfg(windows)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl From<Stream> for OwnedHandle {
-	fn from(slf: Stream) -> Self {
-		match slf {
-			Stream::NamedPipe(s) => s.into(),
-		}
-	}
-}
-
-/// Creates a [`UdSocket`](Stream::UdSocket) stream.
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl From<OwnedFd> for Stream {
-	#[inline]
-	fn from(fd: OwnedFd) -> Self {
-		Self::UdSocket(fd.into())
-	}
-}
-
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl From<Stream> for OwnedFd {
-	fn from(slf: Stream) -> Self {
-		match slf {
-			Stream::UdSocket(s) => s.into(),
-		}
-	}
-}
-
 multimacro! {
 	Stream,
 	dispatch_read,
 	dispatch_write,
-	dispatch_as_handle,
 }
 
 // TODO maybe adjust the Debug of halves to mention that they're local sockets
@@ -215,7 +172,6 @@ impl r#trait::RecvHalf for RecvHalf {
 multimacro! {
 	RecvHalf,
 	dispatch_read,
-	dispatch_as_handle,
 }
 
 mkenum!(
@@ -227,7 +183,6 @@ impl r#trait::SendHalf for SendHalf {
 multimacro! {
 	SendHalf,
 	dispatch_write,
-	dispatch_as_handle,
 }
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].

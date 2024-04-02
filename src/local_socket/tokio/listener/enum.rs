@@ -1,10 +1,10 @@
 use super::r#trait;
 use crate::local_socket::{tokio::Stream, ListenerOptions};
+#[cfg(unix)]
+use crate::os::unix::uds_local_socket::tokio as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use std::io;
-#[cfg(unix)]
-use {crate::os::unix::uds_local_socket::tokio as uds_impl, std::os::unix::prelude::*};
 
 impmod! { local_socket::dispatch_tokio as dispatch }
 
@@ -147,17 +147,3 @@ impl r#trait::Listener for Listener {
 		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
 	}
 }
-
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl TryFrom<OwnedFd> for Listener {
-	type Error = <uds_impl::Listener as TryFrom<OwnedFd>>::Error;
-	fn try_from(fd: OwnedFd) -> Result<Self, Self::Error> {
-		uds_impl::Listener::try_from(fd).map(Self::UdSocket)
-	}
-}
-
-#[cfg(unix)]
-dispatch_as_handle!(Listener);
-
-// TODO handle ops (currently Unix-only)

@@ -1,17 +1,15 @@
 use super::r#trait;
 use crate::local_socket::{async_flush_unsupported, Name};
+#[cfg(unix)]
+use crate::os::unix::uds_local_socket::tokio as uds_impl;
+#[cfg(windows)]
+use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use std::{
 	io,
 	pin::Pin,
 	task::{Context, Poll},
 };
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-#[cfg(unix)]
-use {crate::os::unix::uds_local_socket::tokio as uds_impl, std::os::unix::prelude::*};
-#[cfg(windows)]
-use {
-	crate::os::windows::named_pipe::local_socket::tokio as np_impl, std::os::windows::prelude::*,
-};
 
 impmod! { local_socket::dispatch_tokio as dispatch }
 
@@ -151,34 +149,10 @@ impl r#trait::Stream for Stream {
 		}
 	}
 }
-
-/// Creates a [`NamedPipe`](Stream::NamedPipe) stream.
-#[cfg(windows)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-impl TryFrom<OwnedHandle> for Stream {
-	type Error = <np_impl::Stream as TryFrom<OwnedHandle>>::Error;
-	#[inline]
-	fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
-		handle.try_into().map(Self::NamedPipe)
-	}
-}
-
-/// Creates a [`UdSocket`](Stream::UdSocket) stream.
-#[cfg(unix)]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-impl TryFrom<OwnedFd> for Stream {
-	type Error = <uds_impl::Stream as TryFrom<OwnedFd>>::Error;
-	#[inline]
-	fn try_from(fd: OwnedFd) -> Result<Self, Self::Error> {
-		fd.try_into().map(Self::UdSocket)
-	}
-}
-
 multimacro! {
 	Stream,
 	dispatch_read,
 	dispatch_write,
-	dispatch_as_handle,
 }
 
 mkenum!(
@@ -190,7 +164,6 @@ impl r#trait::RecvHalf for RecvHalf {
 multimacro! {
 	RecvHalf,
 	dispatch_read,
-	dispatch_as_handle,
 }
 
 mkenum!(
@@ -202,7 +175,6 @@ impl r#trait::SendHalf for SendHalf {
 multimacro! {
 	SendHalf,
 	dispatch_write,
-	dispatch_as_handle,
 }
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].

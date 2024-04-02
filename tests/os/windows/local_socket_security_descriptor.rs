@@ -1,7 +1,7 @@
 #![cfg(not(ci))]
 
 use crate::{
-	local_socket::{traits::Stream as _, ListenerOptions, Stream},
+	local_socket::{traits::Stream as _, Listener, ListenerOptions, Stream},
 	os::windows::{
 		local_socket::ListenerOptionsExt, AsRawHandleExt as _, AsSecurityDescriptorExt,
 		BorrowedSecurityDescriptor, LocalBox, SecurityDescriptor,
@@ -119,7 +119,9 @@ fn local_socket_security_descriptor() -> TestResult {
 		})?;
 	let _ = Stream::connect(Arc::try_unwrap(name).unwrap()).opname("client connect")?;
 
-	let listener_handle = OwnedHandle::from(listener);
+	let listener_handle = match listener {
+		Listener::NamedPipe(l) => OwnedHandle::from(l),
+	};
 	let listener_sd =
 		get_sd(listener_handle.as_handle(), SE_KERNEL_OBJECT).opname("get listener SD")?;
 
