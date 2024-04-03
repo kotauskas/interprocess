@@ -51,7 +51,7 @@ where
 	}
 }
 
-/// [Tokio's AsyncRead](TokioAsyncRead) by reference.
+/// [Tokio's `AsyncRead`](TokioAsyncRead) by reference.
 #[cfg(feature = "tokio")]
 pub trait RefTokioAsyncRead {
 	#[doc(hidden)]
@@ -75,7 +75,7 @@ where
 		self
 	}
 }
-/// [Tokio's AsyncWrite](TokioAsyncWrite) by reference.
+/// [Tokio's `AsyncWrite`](TokioAsyncWrite) by reference.
 #[cfg(feature = "tokio")]
 pub trait RefTokioAsyncWrite {
 	#[doc(hidden)]

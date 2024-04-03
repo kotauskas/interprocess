@@ -13,7 +13,7 @@ impmod! { local_socket::dispatch_tokio as dispatch }
 mkenum!(
 /// Tokio-based local socket server, listening for connections.
 ///
-/// This struct is created by [`ListenerOptions`](super::super::ListenerOptions).
+/// This struct is created by [`ListenerOptions`](crate::local_socket::ListenerOptions).
 ///
 /// [Name reclamation](super::super::Stream#name-reclamation) is performed by default on
 /// backends that necessitate it.
