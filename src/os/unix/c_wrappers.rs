@@ -221,7 +221,11 @@ pub(super) fn bind_and_listen_with_mode(
 		}
 	}
 	// Sad path, either got false or fell through from the second match arm
-	let _dg = (mode != 0o666).then(|| WithUmask::set(mode));
+	let _dg = (mode != 0o666).then(|| {
+		// The value that permissions get ANDed with is actually the inverse of the umask
+		let umask = !mode & 0o777;
+		WithUmask::set(umask)
+	});
 	// We race in this muthafucka, better get yo secure code ass back to Linux
 	let sock = create_socket(ty, nonblocking)?;
 	bind(sock.as_fd(), addr)?;
