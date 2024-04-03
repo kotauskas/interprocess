@@ -13,6 +13,7 @@ use std::{
 	sync::atomic::{AtomicBool, Ordering::Relaxed},
 };
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub(super) unsafe fn fcntl_int(fd: BorrowedFd<'_>, cmd: c_int, val: c_int) -> io::Result<c_int> {
 	let val = unsafe { libc::fcntl(fd.as_raw_fd(), cmd, val) };
 	(val != -1).true_val_or_errno(val)
@@ -77,6 +78,7 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
 	let flags = {
 		#[cfg(not(any(target_os = "linux", target_os = "android")))]
 		{
+			let _ = nonblocking;
 			0
 		}
 		#[cfg(any(target_os = "linux", target_os = "android"))]

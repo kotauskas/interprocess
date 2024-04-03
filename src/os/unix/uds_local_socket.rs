@@ -13,12 +13,8 @@ pub(crate) mod tokio {
 
 use crate::local_socket::Name;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use std::os::linux::net::SocketAddrExt;
-use std::{
-	io,
-	os::unix::{ffi::OsStrExt, net::SocketAddr},
-	path::Path,
-};
+use std::os::{unix::ffi::OsStrExt, linux::net::SocketAddrExt};
+use std::{io, os::unix::net::SocketAddr, path::Path};
 
 #[allow(clippy::indexing_slicing)]
 fn name_to_addr(name: Name<'_>) -> io::Result<SocketAddr> {

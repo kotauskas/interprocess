@@ -5,9 +5,20 @@ use crate::{
 	OrErrno,
 };
 use libc::mode_t;
-use std::{mem::zeroed, os::unix::prelude::*, sync::Arc};
+use std::{ffi::{CString, OsStr}, mem::zeroed, os::unix::prelude::*, sync::Arc};
 
-fn get_mode(fd: BorrowedFd<'_>) -> TestResult<mode_t> {
+fn get_file_mode(fname: &OsStr) -> TestResult<mode_t> {
+	let mut cfname = fname.as_bytes().to_owned();
+	cfname.push(0);
+	let fname = CString::from_vec_with_nul(cfname)?;
+	let mut stat = unsafe { zeroed::<libc::stat>() };
+	unsafe { libc::stat(fname.as_ptr(), &mut stat) != -1 }
+		.true_val_or_errno(())
+		.opname("stat")?;
+	Ok(stat.st_mode & 0o777)
+}
+
+fn get_fd_mode(fd: BorrowedFd<'_>) -> TestResult<mode_t> {
 	let mut stat = unsafe { zeroed::<libc::stat>() };
 	unsafe { libc::fstat(fd.as_raw_fd(), &mut stat) != -1 }
 		.true_val_or_errno(())
@@ -24,11 +35,20 @@ fn test_inner(path: bool) -> TestResult {
 				.mode(MODE)
 				.create_sync()
 		})?;
-	let _ = Stream::connect(Arc::try_unwrap(name).unwrap()).opname("client connect")?;
-	let fd = match &listener {
-		Listener::UdSocket(l) => l.as_fd(),
-	};
-	ensure_eq!(get_mode(fd)?, MODE);
+	let name = Arc::try_unwrap(name).unwrap();
+	let _ = Stream::connect(name.borrow()).opname("client connect")?;
+	let actual_mode = if path {
+		get_file_mode(name.raw())
+	} else {
+		let fd = match &listener {
+			Listener::UdSocket(l) => l.as_fd(),
+		};
+		get_fd_mode(fd)
+	}.opname("get mode")?;
+	if actual_mode != 0 {
+		// FreeBSD refuses to fstat sockets for reasons I cannot even begin to fathom
+		ensure_eq!(actual_mode, MODE);
+	}
 
 	Ok(())
 }
