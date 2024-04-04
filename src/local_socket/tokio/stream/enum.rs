@@ -11,7 +11,7 @@ use std::{
 };
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-impmod! { local_socket::dispatch_tokio as dispatch }
+impmod! {local_socket::dispatch_tokio as dispatch}
 
 macro_rules! dispatch_read {
 	(@iw $ty:ident) => {

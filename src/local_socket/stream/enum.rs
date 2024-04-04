@@ -9,7 +9,7 @@ use crate::{
 };
 use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 
-impmod! { local_socket::dispatch_sync }
+impmod! {local_socket::dispatch_sync}
 
 macro_rules! dispatch_read {
 	(@iw $ty:ident) => {

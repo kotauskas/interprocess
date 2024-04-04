@@ -98,6 +98,15 @@ macro_rules! builder_setters {
 	};
 }
 
+macro_rules! tag_enum {
+	($($(#[$attr:meta])* $tag:ident),+ $(,)?) => {$(
+		$( #[$attr] )*
+		#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+		pub enum $tag {}
+		impl $crate::Sealed for $tag {}
+	)+};
+}
+
 /// Generates this module's macro submodules.
 macro_rules! make_macro_modules {
 	($($modname:ident),+ $(,)?) => {$(

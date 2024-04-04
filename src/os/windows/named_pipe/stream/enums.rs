@@ -27,9 +27,7 @@ pub mod pipe_mode {
 	macro_rules! present_tag {
 		($($(#[$attr:meta])* $tag:ident is $mode:expr),+ $(,)?) => {
 			$(
-				$( #[$attr] )*
-				#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-				pub enum $tag {}
+				tag_enum!($( #[$attr] )* $tag);
 				impl PipeModeTag for $tag {
 					const MODE: Option<PipeMode> = $mode;
 				}

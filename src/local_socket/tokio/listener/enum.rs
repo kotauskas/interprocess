@@ -6,7 +6,7 @@ use crate::os::unix::uds_local_socket::tokio as uds_impl;
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use std::io;
 
-impmod! { local_socket::dispatch_tokio as dispatch }
+impmod! {local_socket::dispatch_tokio as dispatch}
 
 // TODO borrowed split in examples
 
