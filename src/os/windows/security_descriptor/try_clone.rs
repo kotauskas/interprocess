@@ -29,23 +29,29 @@ pub(super) unsafe fn clone(sd: *const c_void) -> io::Result<SecurityDescriptor> 
 		BorrowedSecurityDescriptor::from_ptr(sd)
 	};
 
-	let acl_fn =
-		|(acl, dfl)| io::Result::<(LocalBox<ACL>, bool)>::Ok((unsafe { clone_acl(acl)? }, dfl));
-	let sid_fn = |(sid, dfl)| {
+	let clnsid = |(sid, dfl)| {
 		io::Result::<(Option<LocalBox<c_void>>, bool)>::Ok((unsafe { clone_sid(sid)? }, dfl))
 	};
-	let dacl = old_sd.dacl()?.map(acl_fn).transpose()?;
-	let sacl = old_sd.sacl()?.map(acl_fn).transpose()?;
-	let owner = sid_fn(old_sd.owner()?)?;
-	let group = sid_fn(old_sd.group()?)?;
+	let dacl = old_sd.dacl()?;
+	let sacl = old_sd.sacl()?;
+	let owner = clnsid(old_sd.owner()?)?;
+	let group = clnsid(old_sd.group()?)?;
 
 	if let Some((acl, dfl)) = dacl {
-		let mut acl = ManuallyDrop::new(acl);
-		unsafe { new_sd.set_dacl(acl.as_mut_ptr(), dfl)? };
+		if acl.is_null() {
+			unsafe { new_sd.set_dacl(ptr::null_mut(), dfl)? };
+		} else {
+			let mut acl = ManuallyDrop::new(unsafe { clone_acl(acl)? });
+			unsafe { new_sd.set_dacl(acl.as_mut_ptr(), dfl)? };
+		}
 	}
 	if let Some((acl, dfl)) = sacl {
-		let mut acl = ManuallyDrop::new(acl);
-		unsafe { new_sd.set_dacl(acl.as_mut_ptr(), dfl)? };
+		if acl.is_null() {
+			unsafe { new_sd.set_sacl(ptr::null_mut(), dfl)? };
+		} else {
+			let mut acl = ManuallyDrop::new(unsafe { clone_acl(acl)? });
+			unsafe { new_sd.set_sacl(acl.as_mut_ptr(), dfl)? };
+		}
 	}
 
 	let assid = |sid: &mut LocalBox<c_void>| sid.as_mut_ptr();

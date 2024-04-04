@@ -51,8 +51,11 @@ Sets the ", $doc, " access control list to the specified value, assuming ownersh
 If `defaulted` is `true`, the ", $doc, " access control list is marked as having been produced by
 some default mechanism. This is only used for internal program logic and is not checked by Windows.
 
+Note that, for DACLs, a null ACL (`ptr::null_mut()`) is not the same as an unset/absent ACL: it
+actually provides ***full access*** for every security principal.
+
 # Safety
-The pointer:
+The pointer, *if not null*:
 - must point to a well-initialized ACL;
 - must not be owned elsewhere;
 - must be valid for deallocation with `LocalFree()`.
