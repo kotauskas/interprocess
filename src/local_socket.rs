@@ -129,19 +129,3 @@ pub mod tokio {
 
 mod concurrency_detector;
 pub(crate) use concurrency_detector::*;
-
-use std::io;
-
-#[cold]
-pub(crate) fn flush_unsupported() -> io::Result<()> {
-	Err(io::Error::new(
-		io::ErrorKind::Unsupported,
-		"local sockets cannot be flushed",
-	))
-}
-
-#[cfg(feature = "tokio")]
-#[cold]
-pub(crate) fn async_flush_unsupported() -> std::task::Poll<io::Result<()>> {
-	flush_unsupported().into()
-}

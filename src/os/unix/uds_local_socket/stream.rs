@@ -2,7 +2,6 @@ use super::name_to_addr;
 use crate::{
 	error::ReuniteError,
 	local_socket::{
-		flush_unsupported,
 		traits::{self, ReuniteResult},
 		ConcurrencyDetector, LocalSocketSite, Name,
 	},
@@ -69,7 +68,7 @@ impl Write for &Stream {
 	}
 	#[inline]
 	fn flush(&mut self) -> io::Result<()> {
-		flush_unsupported()
+		Ok(())
 	}
 	// FUTURE is_write_vectored
 }

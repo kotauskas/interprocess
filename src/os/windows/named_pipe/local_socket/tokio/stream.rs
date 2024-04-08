@@ -1,7 +1,6 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
 	local_socket::{
-		async_flush_unsupported,
 		traits::tokio::{self as traits, ReuniteResult},
 		Name,
 	},
@@ -65,7 +64,7 @@ impl AsyncWrite for &Stream {
 	}
 	#[inline]
 	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-		async_flush_unsupported()
+		Poll::Ready(Ok(()))
 	}
 	#[inline]
 	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -132,7 +131,7 @@ impl AsyncWrite for &SendHalf {
 	}
 	#[inline]
 	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-		async_flush_unsupported()
+		Poll::Ready(Ok(()))
 	}
 	#[inline]
 	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {

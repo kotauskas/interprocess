@@ -1,7 +1,6 @@
 use crate::{
 	error::{FromHandleError, ReuniteError},
 	local_socket::{
-		flush_unsupported,
 		traits::{self, ReuniteResult},
 		Name,
 	},
@@ -68,7 +67,7 @@ impl Write for &Stream {
 
 	#[inline]
 	fn flush(&mut self) -> io::Result<()> {
-		flush_unsupported()
+		Ok(())
 	}
 	// FUTURE is_write_vectored
 }
@@ -145,7 +144,7 @@ impl Write for &SendHalf {
 
 	#[inline]
 	fn flush(&mut self) -> io::Result<()> {
-		flush_unsupported()
+		Ok(())
 	}
 	// FUTURE is_write_vectored
 }

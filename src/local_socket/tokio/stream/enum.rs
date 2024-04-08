@@ -1,5 +1,5 @@
 use super::r#trait;
-use crate::local_socket::{async_flush_unsupported, Name};
+use crate::local_socket::Name;
 #[cfg(unix)]
 use crate::os::unix::uds_local_socket::tokio as uds_impl;
 #[cfg(windows)]
@@ -37,7 +37,7 @@ macro_rules! dispatch_write {
 		}
 		#[inline]
 		fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-			async_flush_unsupported()
+			Poll::Ready(Ok(()))
 		}
 		#[inline]
 		fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -45,9 +45,11 @@ macro_rules! dispatch_write {
 		}
 	};
 	($ty:ident) => {
+		/// Flushing is an always successful no-op.
 		impl AsyncWrite for &$ty {
 			dispatch_write!(@iw $ty);
 		}
+		/// Flushing is an always successful no-op.
 		impl AsyncWrite for $ty {
 			dispatch_write!(@iw $ty);
 		}

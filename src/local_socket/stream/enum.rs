@@ -3,10 +3,7 @@ use super::r#trait;
 use crate::os::unix::uds_local_socket as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket as np_impl;
-use crate::{
-	local_socket::{flush_unsupported, Name},
-	TryClone,
-};
+use crate::{local_socket::Name, TryClone};
 use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 
 impmod! {local_socket::dispatch_sync}
@@ -39,7 +36,7 @@ macro_rules! dispatch_write {
 		}
 		#[inline]
 		fn flush(&mut self) -> io::Result<()> {
-			flush_unsupported()
+			Ok(())
 		}
 		#[inline]
 		fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -47,11 +44,11 @@ macro_rules! dispatch_write {
 		}
 	};
 	($ty:ident) => {
-		/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
+		/// Flushing is an always successful no-op.
 		impl Write for &$ty {
 			dispatch_write!(@iw $ty);
 		}
-		/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
+		/// Flushing is an always successful no-op.
 		impl Write for $ty {
 			dispatch_write!(@iw $ty);
 		}
