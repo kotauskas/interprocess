@@ -1,7 +1,7 @@
 use super::*;
 use crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*};
 use std::{ffi::OsStr, path::Path};
-use widestring::{U16CStr, U16CString};
+use widestring::U16CStr;
 use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
 impl RawPipeStream {
@@ -21,11 +21,7 @@ impl RawPipeStream {
 	}
 
 	fn connect(path: &Path, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
-		Self::_connect(
-			&U16CString::from_os_str_truncate(path.as_os_str()),
-			recv,
-			send,
-		)
+		Self::_connect(&convert_path(path)?, recv, send)
 	}
 
 	fn connect_with_prepend(
@@ -34,7 +30,7 @@ impl RawPipeStream {
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
-		Self::_connect(&convert_and_encode_path(pipename, hostname), recv, send)
+		Self::_connect(&convert_and_encode_path(pipename, hostname)?, recv, send)
 	}
 
 	fn _connect(

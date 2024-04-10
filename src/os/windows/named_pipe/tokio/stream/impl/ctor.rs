@@ -36,12 +36,7 @@ impl RawPipeStream {
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
-		Self::_connect(
-			U16CString::from_os_str_truncate(path.as_os_str()),
-			recv,
-			send,
-		)
-		.await
+		Self::_connect(convert_path(path)?, recv, send).await
 	}
 
 	async fn connect_with_prepend(
@@ -50,7 +45,7 @@ impl RawPipeStream {
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
-		Self::_connect(convert_and_encode_path(pipename, hostname), recv, send).await
+		Self::_connect(convert_and_encode_path(pipename, hostname)?, recv, send).await
 	}
 
 	async fn _connect(

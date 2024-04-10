@@ -10,7 +10,7 @@ use crate::{
 	},
 	AtomicEnum,
 };
-use std::{io, os::windows::prelude::*, path::Path, sync::atomic::Ordering::SeqCst};
+use std::{borrow::Cow, io, os::windows::prelude::*, path::Path, sync::atomic::Ordering::SeqCst};
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
@@ -33,9 +33,7 @@ impl traits::Listener for Listener {
 				.to_wtf_16()
 				.map_err(to_io_error)?
 		} else {
-			convert_and_encode_path(options.name.raw(), None)
-				.to_wtf_16()
-				.map_err(to_io_error)?
+			convert_and_encode_path(options.name.raw(), None).map(Cow::Owned)?
 		};
 		impl_options.nonblocking = options.nonblocking.accept_nonblocking();
 		impl_options.security_descriptor = options.security_descriptor;
