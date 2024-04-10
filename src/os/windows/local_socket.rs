@@ -3,11 +3,12 @@
 pub(crate) mod dispatch_sync;
 #[cfg(feature = "tokio")]
 pub(crate) mod dispatch_tokio;
-pub(crate) mod name;
+pub(crate) mod name_type;
 
-use crate::{local_socket::ListenerOptions, Sealed};
+pub use name_type::*;
 
 use super::SecurityDescriptor;
+use crate::{local_socket::ListenerOptions, Sealed};
 
 /// Windows-specific [listener options](ListenerOptions).
 #[allow(private_bounds)]

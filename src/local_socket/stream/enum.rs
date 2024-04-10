@@ -63,20 +63,17 @@ mkenum!(
 ///
 /// ## Basic client
 /// ```no_run
-/// use interprocess::local_socket::{prelude::*, Stream, NameTypeSupport, ToFsName, ToNsName};
+/// use interprocess::local_socket::{
+/// 	prelude::*, Stream,
+/// 	GenericFilePath, GenericNamespaced,
+/// };
 /// use std::io::{prelude::*, BufReader};
 ///
-/// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
-/// // in Rust, `match` is your concise, readable and expressive decision making construct.
-/// let name = {
-/// 	// This scoping trick allows us to nicely contain the import inside the `match`, so that if
-/// 	// any imports of variants named `Both` happen down the line, they won't collide with the
-/// 	// enum we're working with here. Maybe someone should make a macro for this.
-/// 	use NameTypeSupport::*;
-/// 	match NameTypeSupport::query() {
-/// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
-/// 		OnlyNs | Both => "example.sock".to_ns_name()?,
-/// 	}
+/// // Pick a name.
+/// let name = if GenericNamespaced::is_supported() {
+/// 	"example.sock".to_ns_name::<GenericNamespaced>()?
+/// } else {
+/// 	"/tmp/example.sock".to_fs_name::<GenericFilePath>()?
 /// };
 ///
 /// // Preemptively allocate a sizeable buffer for receiving.

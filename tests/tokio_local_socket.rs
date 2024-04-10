@@ -5,7 +5,7 @@ mod no_server;
 mod stream;
 
 use crate::{
-	local_socket::{tokio::Stream, Name, NameTypeSupport},
+	local_socket::{tokio::Stream, Name},
 	tests::util::{self, tokio::test_wrapper, TestResult},
 };
 use std::{future::Future, pin::Pin, sync::Arc};
@@ -30,15 +30,8 @@ async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 }
 
 macro_rules! matrix {
-	(@querymethod true $e:expr) => { NameTypeSupport::fs_supported($e) };
-	(@querymethod false $e:expr) => { NameTypeSupport::ns_supported($e) };
 	(@body $split:ident $path:ident) => {
-		test_wrapper(async {
-			if matrix!(@querymethod $path NameTypeSupport::query()) {
-				test_stream(make_id!(), $split, $path).await?;
-			}
-			Ok(())
-		})
+		test_wrapper(test_stream(make_id!(), $split, $path))
 	};
 	($nm:ident false $path:ident) => {
 		#[test]
@@ -61,19 +54,9 @@ matrix! {
 
 #[test]
 fn no_server_file() -> TestResult {
-	test_wrapper(async {
-		if NameTypeSupport::query().fs_supported() {
-			no_server::run_and_verify_error(true).await?;
-		}
-		Ok(())
-	})
+	test_wrapper(no_server::run_and_verify_error(true))
 }
 #[test]
 fn no_server_namespaced() -> TestResult {
-	test_wrapper(async {
-		if NameTypeSupport::query().ns_supported() {
-			no_server::run_and_verify_error(false).await?;
-		}
-		Ok(())
-	})
+	test_wrapper(no_server::run_and_verify_error(false))
 }

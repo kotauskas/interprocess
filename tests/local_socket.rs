@@ -3,7 +3,7 @@
 mod no_server;
 mod stream;
 
-use crate::{local_socket::NameTypeSupport, tests::util::*};
+use crate::tests::util::*;
 
 fn test_stream(id: &'static str, path: bool) -> TestResult {
 	use stream::*;
@@ -19,19 +19,11 @@ fn test_no_server(id: &'static str, path: bool) -> TestResult {
 }
 
 macro_rules! tests {
-	(@querymethod true $e:expr) => { NameTypeSupport::fs_supported($e) };
-	(@querymethod false $e:expr) => { NameTypeSupport::ns_supported($e) };
-	(@body $fn:ident $path:ident) => {
-		test_wrapper(|| {
-			if tests!(@querymethod $path NameTypeSupport::query()) {
-				$fn(make_id!(), $path)?;
-			}
-			Ok(())
-		})
-	};
 	($fn:ident $nm:ident $path:ident) => {
 		#[test]
-		fn $nm() -> TestResult { tests!(@body $fn $path) }
+		fn $nm() -> TestResult {
+			test_wrapper(|| { $fn(make_id!(), $path) })
+		}
 	};
 	($fn:ident $($nm:ident $path:ident)+) => { $(tests!($fn $nm $path);)+ };
 }

@@ -8,6 +8,8 @@ use std::io;
 
 impmod! {local_socket::dispatch_sync as dispatch}
 
+// TODO the doctest shouldn't check for support at all
+
 mkenum!(
 /// Local socket server, listening for connections.
 ///
@@ -48,7 +50,7 @@ mkenum!(
 /// use interprocess::local_socket::{
 /// 	prelude::*,
 /// 	Listener, ListenerOptions, Stream,
-/// 	NameTypeSupport, ToFsName, ToNsName,
+/// 	GenericFilePath, GenericNamespaced,
 /// };
 /// use std::io::{self, prelude::*, BufReader};
 ///
@@ -63,23 +65,14 @@ mkenum!(
 /// 		}
 /// 	}
 /// }
-/// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
-/// // in Rust, `match` is your concise, readable and expressive decision making construct.
-/// let (name, printname) = {
-/// 	// This scoping trick allows us to nicely contain the import inside the `match`, so that if
-/// 	// any imports of variants named `Both` happen down the line, they won't collide with the
-/// 	// enum we're working with here. Maybe someone should make a macro for this.
-/// 	use NameTypeSupport::*;
-/// 	match NameTypeSupport::query() {
-/// 		OnlyFs => {
-/// 			let pn = "/tmp/example.sock";
-/// 			(pn.to_fs_name()?, pn)
-/// 		},
-/// 		OnlyNs | Both => {
-/// 			let pn = "example.sock";
-/// 			(pn.to_ns_name()?, pn)
-/// 		},
-/// 	}
+///
+/// // Pick a name.
+/// let (name, printname) = if GenericNamespaced::is_supported() {
+/// 	let pn = "example.sock";
+/// 	(pn.to_ns_name::<GenericNamespaced>()?, pn)
+/// } else {
+/// 	let pn = "/tmp/example.sock";
+/// 	(pn.to_fs_name::<GenericFilePath>()?, pn)
 /// };
 ///
 /// // Configure our listener...

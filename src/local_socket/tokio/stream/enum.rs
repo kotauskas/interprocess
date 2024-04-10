@@ -68,21 +68,15 @@ mkenum!(
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// use interprocess::local_socket::{
 /// 	tokio::{prelude::*, Stream},
-/// 	NameTypeSupport, ToFsName, ToNsName,
+/// 	GenericFilePath, GenericNamespaced,
 /// };
 /// use tokio::{io::{AsyncBufReadExt, AsyncWriteExt, BufReader}, try_join};
 ///
-/// // Pick a name. There isn't a helper function for this, mostly because it's largely unnecessary:
-/// // in Rust, `match` is your concise, readable and expressive decision making construct.
-/// let name = {
-/// 	// This scoping trick allows us to nicely contain the import inside the `match`, so that if
-/// 	// any imports of variants named `Both` happen down the line, they won't collide with the
-/// 	// enum we're working with here. Maybe someone should make a macro for this.
-/// 	use NameTypeSupport::*;
-/// 	match NameTypeSupport::query() {
-/// 		OnlyFs => "/tmp/example.sock".to_fs_name()?,
-/// 		OnlyNs | Both => "example.sock".to_ns_name()?,
-/// 	}
+/// // Pick a name.
+/// let name = if GenericNamespaced::is_supported() {
+/// 	"example.sock".to_ns_name::<GenericNamespaced>()?
+/// } else {
+/// 	"/tmp/example.sock".to_fs_name::<GenericFilePath>()?
 /// };
 ///
 /// // Await this here since we can't do a whole lot without a connection.

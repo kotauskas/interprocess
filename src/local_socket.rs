@@ -46,7 +46,6 @@
 mod enumdef;
 
 mod name;
-mod name_type_support;
 mod to_name;
 mod stream {
 	pub(super) mod r#enum;
@@ -58,14 +57,7 @@ mod listener {
 	pub(super) mod r#trait;
 }
 
-pub use {
-	listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
-	name::*,
-	name_type_support::*,
-	stream::r#enum::*,
-	to_name::*,
-	traits::ListenerNonblockingMode,
-};
+pub mod name_type;
 
 /// Traits representing the interface of local sockets.
 pub mod traits {
@@ -84,10 +76,21 @@ pub mod traits {
 	}
 }
 
+pub use {
+	listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
+	name::*,
+	name_type::*,
+	stream::r#enum::*,
+	to_name::*,
+	traits::ListenerNonblockingMode,
+};
+
 /// Re-exports of [traits] done in a way that doesn't pollute the scope, as well as of the
 /// enum-dispatch types with their names prefixed with `LocalSocket`.
 pub mod prelude {
 	pub use super::{
+		name_type::NameType as _,
+		to_name::{ToFsName as _, ToNsName as _},
 		traits::{Listener as _, ListenerExt as _, Stream as _},
 		Listener as LocalSocketListener, Stream as LocalSocketStream,
 	};
@@ -121,7 +124,11 @@ pub mod tokio {
 	/// Like the [sync local socket prelude](super::prelude), but for Tokio local sockets.
 	pub mod prelude {
 		pub use super::{
-			super::traits::tokio::{Listener as _, ListenerExt as _, Stream as _},
+			super::{
+				name_type::NameType as _,
+				to_name::{ToFsName as _, ToNsName as _},
+				traits::tokio::{Listener as _, ListenerExt as _, Stream as _},
+			},
 			Listener as LocalSocketListener, Stream as LocalSocketStream,
 		};
 	}

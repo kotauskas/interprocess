@@ -2,9 +2,10 @@ use std::{
 	borrow::Cow,
 	ffi::{OsStr, OsString},
 	fmt::Debug,
+	path::Path,
 };
 
-impmod! {local_socket::name, is_namespaced}
+impmod! {local_socket::name_type, is_namespaced}
 
 // TODO maybe emulate NS on FS-only via tmpfs?
 // TODO better PartialEq
@@ -46,8 +47,8 @@ impl<'s> Name<'s> {
 	/// return `true` simultaneously:
 	/// ```
 	/// # #[cfg(windows)] {
-	/// # use interprocess::local_socket::{ToFsName, ToNsName};
-	/// let name = r"\\.\pipe\example".to_fs_name().unwrap();
+	/// # use interprocess::local_socket::{ToFsName, ToNsName, GenericFilePath};
+	/// let name = r"\\.\pipe\example".to_fs_name::<GenericFilePath>().unwrap();
 	/// assert!(name.is_namespaced());	// \\.\pipe\ is a namespace
 	/// assert!(name.is_path());		// \\.\pipe\example is a path
 	/// }
@@ -108,7 +109,16 @@ impl<'s> Name<'s> {
 		}
 	}
 
-	pub(crate) const fn new(raw: Cow<'s, OsStr>, path: bool) -> Self {
-		Self { raw, path }
+	pub(crate) fn path(raw: Cow<'s, Path>) -> Self {
+		Self {
+			raw: match raw {
+				Cow::Borrowed(p) => Cow::Borrowed(p.as_os_str()),
+				Cow::Owned(pb) => Cow::Owned(pb.into_os_string()),
+			},
+			path: true,
+		}
+	}
+	pub(crate) const fn nonpath(raw: Cow<'s, OsStr>) -> Self {
+		Self { raw, path: false }
 	}
 }

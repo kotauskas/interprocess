@@ -1,4 +1,4 @@
-use crate::local_socket::{Name, ToFsName, ToNsName};
+use crate::local_socket::{GenericFilePath, GenericNamespaced, Name, ToFsName, ToNsName};
 
 use super::Xorshift32;
 use std::{io, sync::Arc};
@@ -43,10 +43,10 @@ fn next_fs(rn: u32) -> io::Result<Name<'static>> {
 	} else {
 		unreachable!()
 	}
-	.to_fs_name()
+	.to_fs_name::<GenericFilePath>()
 }
 fn next_ns(rn: u32) -> io::Result<Name<'static>> {
-	format!("@interprocess-test-{:08x}", rn).to_ns_name()
+	format!("@interprocess-test-{:08x}", rn).to_ns_name::<GenericNamespaced>()
 }
 
 pub fn namegen_named_pipe(id: &'static str) -> NameGen<str, impl FnMut(u32) -> NameResult<str>> {
