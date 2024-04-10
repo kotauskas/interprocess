@@ -30,10 +30,10 @@ impl traits::Stream for Stream {
 	type SendHalf = SendHalf;
 
 	async fn connect(name: Name<'_>) -> io::Result<Self> {
-		if name.is_namespaced() {
-			StreamImpl::connect_with_prepend(name.raw(), None).await
-		} else {
+		if name.is_path() {
 			StreamImpl::connect_by_path(name.raw()).await
+		} else {
+			StreamImpl::connect_with_prepend(name.raw(), None).await
 		}
 		.map(Self)
 	}

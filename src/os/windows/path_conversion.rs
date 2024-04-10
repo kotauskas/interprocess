@@ -161,15 +161,12 @@ fn pathcvt<'a>(
 	let userlen = hostname.len().saturate() + pipe_name.len().saturate();
 	(components.into_iter(), (BASE_LEN + userlen).0)
 }
-pub(crate) fn convert_and_encode_path(pipename: &OsStr, hostname: Option<&OsStr>) -> Vec<u16> {
+pub(crate) fn convert_and_encode_path(pipename: &OsStr, hostname: Option<&OsStr>) -> U16CString {
 	let (i, cap) = pathcvt(pipename, hostname);
 	let mut path = Vec::with_capacity((cap.saturate() + 1.saturate()).0);
 	i.for_each(|c| path.extend(c.encode_wide()));
 	path.push(0); // Don't forget the nul terminator!
-	path
-}
-pub(crate) fn encode_to_wtf16(s: &OsStr) -> Vec<u16> {
-	let mut path = s.encode_wide().collect::<Vec<u16>>();
-	path.push(0);
-	path
+
+	// FIXME maybe we don't want to implicitly truncate
+	U16CString::from_vec_truncate(path)
 }

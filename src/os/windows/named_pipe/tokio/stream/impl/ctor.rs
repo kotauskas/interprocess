@@ -1,3 +1,5 @@
+use widestring::U16CString;
+
 use super::*;
 use crate::os::windows::{
 	named_pipe::{NeedsFlushVal, WaitTimeout},
@@ -20,7 +22,7 @@ impl RawPipeStream {
 		Self::new(InnerTokio::Client(client))
 	}
 
-	async fn wait_for_server(path: Vec<u16>) -> io::Result<Vec<u16>> {
+	async fn wait_for_server(path: U16CString) -> io::Result<U16CString> {
 		tokio::task::spawn_blocking(move || {
 			c_wrappers::block_for_server(&path, WaitTimeout::DEFAULT)?;
 			Ok(path)
@@ -34,7 +36,12 @@ impl RawPipeStream {
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {
-		Self::_connect(encode_to_wtf16(path.as_os_str()), recv, send).await
+		Self::_connect(
+			U16CString::from_os_str_truncate(path.as_os_str()),
+			recv,
+			send,
+		)
+		.await
 	}
 
 	async fn connect_with_prepend(
@@ -47,7 +54,7 @@ impl RawPipeStream {
 	}
 
 	async fn _connect(
-		mut path: Vec<u16>,
+		mut path: U16CString,
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
 	) -> io::Result<Self> {

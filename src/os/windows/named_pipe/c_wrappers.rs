@@ -7,6 +7,7 @@ use crate::{
 	HandleOrErrno, OrErrno,
 };
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
+use widestring::U16CStr;
 use windows_sys::Win32::{
 	Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},
 	Storage::FileSystem::{
@@ -155,17 +156,16 @@ fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 
 }
 
 pub(crate) fn connect_without_waiting(
-	path: &[u16],
+	path: &U16CStr,
 	recv: Option<PipeMode>,
 	send: Option<PipeMode>,
 	overlapped: bool,
 ) -> io::Result<FileHandle> {
-	assert_nts(path)?;
 	let access_flags = modes_to_access_flags(recv, send);
 	let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
 	match unsafe {
 		CreateFileW(
-			path.as_ptr().cast(),
+			path.as_ptr(),
 			access_flags,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			ptr::null_mut(),
@@ -198,15 +198,6 @@ pub(crate) fn set_nonblocking_given_readmode(
 	set_np_handle_state(handle, Some(mode), None, None)
 }
 
-pub(crate) fn block_for_server(path: &[u16], timeout: WaitTimeout) -> io::Result<()> {
-	assert_nts(path)?;
+pub(crate) fn block_for_server(path: &U16CStr, timeout: WaitTimeout) -> io::Result<()> {
 	unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.to_raw()) }.true_val_or_errno(())
-}
-
-fn assert_nts(s: &[u16]) -> io::Result<()> {
-	if s.last() != Some(&0) {
-		Err(io::Error::other("nul terminator not found"))
-	} else {
-		Ok(())
-	}
 }

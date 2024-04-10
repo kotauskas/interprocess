@@ -27,10 +27,10 @@ impl traits::Stream for Stream {
 	type SendHalf = SendHalf;
 
 	fn connect(name: Name<'_>) -> io::Result<Self> {
-		if name.is_namespaced() {
-			StreamImpl::connect_with_prepend(name.raw(), None)
-		} else {
+		if name.is_path() {
 			StreamImpl::connect_by_path(name.raw())
+		} else {
+			StreamImpl::connect_with_prepend(name.raw(), None)
 		}
 		.map(Self)
 	}
