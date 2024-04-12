@@ -30,21 +30,6 @@ pub(crate) fn to_io_error(err: ContainsNul<u16>) -> io::Error {
 	io::Error::new(io::ErrorKind::InvalidInput, err)
 }
 
-macro_rules! same_cow {
-	($($(#[$($attr:tt)+])* $cowinner:ty),+ $(,)?) => {$(
-		$(#[$($attr)+])*
-		impl<'enc> ToWtf16<'enc> for Cow<'enc, $cowinner> {
-			#[inline]
-			fn to_wtf_16(self) -> Result<Cow<'enc, U16CStr>, ContainsNul<u16>> {
-				match self {
-					Cow::Borrowed(borrow) => borrow.to_wtf_16(),
-					Cow::Owned(own) => own.to_wtf_16(),
-				}
-			}
-		}
-	)+};
-}
-
 /// Trivial and infallible.
 impl<'enc> ToWtf16<'enc> for &'enc U16CStr {
 	#[inline]
@@ -125,20 +110,18 @@ impl<'enc> ToWtf16<'enc> for String {
 	}
 }
 
-same_cow! {
-	/// May entail a memory allocation if the slice isn't nul-terminated. See implementations on
-	/// [`[u16]`](ToWtf16#impl-ToWtf16<'enc>-for-[u16]) and
-	/// [`Vec<u16>`](ToWtf16#impl-ToWtf16<'enc>-for-Vec<u16>).
-	[u16],
-
-	/// Always reallocates, because `OsStr` and `OsString` are WTF-8.
-	OsStr,
-
-	/// Always reallocates, because `Path` and `PathBuf` are WTF-8.
-	Path,
-
-	/// Always reallocates, because `str` and `String` are UTF-8.
-	str,
+impl<'enc, T: ?Sized, O> ToWtf16<'enc> for Cow<'enc, T>
+where
+	T: ToOwned<Owned = O>,
+	&'enc T: ToWtf16<'enc>,
+	O: ToWtf16<'enc>,
+{
+	fn to_wtf_16(self) -> Result<Cow<'enc, U16CStr>, ContainsNul<u16>> {
+		match self {
+			Cow::Borrowed(b) => b.to_wtf_16(),
+			Cow::Owned(o) => o.to_wtf_16(),
+		}
+	}
 }
 
 fn pathcvt<'a>(
