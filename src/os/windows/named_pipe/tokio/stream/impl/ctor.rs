@@ -5,7 +5,7 @@ use crate::os::windows::{
 	named_pipe::{NeedsFlushVal, WaitTimeout},
 	path_conversion::*,
 };
-use std::{ffi::OsStr, mem::take, path::Path};
+use std::{borrow::Cow, mem::take};
 
 impl RawPipeStream {
 	pub(super) fn new(inner: InnerTokio) -> Self {
@@ -32,23 +32,6 @@ impl RawPipeStream {
 	}
 
 	async fn connect(
-		path: &Path,
-		recv: Option<PipeMode>,
-		send: Option<PipeMode>,
-	) -> io::Result<Self> {
-		Self::_connect(convert_path(path)?, recv, send).await
-	}
-
-	async fn connect_with_prepend(
-		pipename: &OsStr,
-		hostname: Option<&OsStr>,
-		recv: Option<PipeMode>,
-		send: Option<PipeMode>,
-	) -> io::Result<Self> {
-		Self::_connect(convert_and_encode_path(pipename, hostname)?, recv, send).await
-	}
-
-	async fn _connect(
 		mut path: U16CString,
 		recv: Option<PipeMode>,
 		send: Option<PipeMode>,
@@ -77,20 +60,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	/// Connects to the specified named pipe at the specified path (the `\\<hostname>\pipe\` prefix
 	/// is not added automatically), waiting until a server instance is dispatched.
 	#[inline]
-	pub async fn connect_by_path(path: impl AsRef<Path>) -> io::Result<Self> {
-		RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE)
-			.await
-			.map(Self::new)
-	}
-
-	#[inline]
-	pub(crate) async fn connect_with_prepend(
-		pipename: &OsStr,
-		hostname: Option<&OsStr>,
-	) -> io::Result<Self> {
-		RawPipeStream::connect_with_prepend(pipename, hostname, Rm::MODE, Sm::MODE)
-			.await
-			.map(Self::new)
+	pub async fn connect_by_path<'s>(path: impl ToWtf16<'s>) -> io::Result<Self> {
+		RawPipeStream::connect(
+			path.to_wtf_16().map(Cow::into_owned).map_err(to_io_error)?,
+			Rm::MODE,
+			Sm::MODE,
+		)
+		.await
+		.map(Self::new)
 	}
 
 	/// Internal constructor used by the listener. It's a logic error, but not UB, to create the

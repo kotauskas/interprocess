@@ -1,4 +1,7 @@
-use crate::local_socket::{Name, NameType, PathNameType};
+use crate::{
+	local_socket::{Name, NameInner, NameType, PathNameType},
+	os::windows::{convert_and_encode_path, convert_path},
+};
 use std::{borrow::Cow, ffi::OsStr, io, path::Path};
 
 tag_enum!(
@@ -25,12 +28,8 @@ impl PathNameType for NamedPipe {
 				"not a named pipe path",
 			));
 		}
-		Ok(Name::path(path))
+		Ok(Name(NameInner::NamedPipe(Cow::Owned(convert_path(&path)?))))
 	}
-}
-
-pub(crate) fn is_namespaced(_: &Name<'_>) -> bool {
-	true
 }
 
 pub(crate) fn map_generic_path(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
@@ -40,7 +39,9 @@ pub(crate) fn map_generic_path(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
 
 pub(crate) fn map_generic_namespaced(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
 	// The prepending currently happens at a later point.
-	Ok(Name::nonpath(name))
+	Ok(Name(NameInner::NamedPipe(Cow::Owned(
+		convert_and_encode_path(&name, None)?,
+	))))
 }
 
 #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)] // minlen check

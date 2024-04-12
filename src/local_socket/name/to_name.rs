@@ -1,5 +1,5 @@
 use super::{
-	name_type::{NamespacedNameType, PathNameType},
+	r#type::{NamespacedNameType, PathNameType},
 	Name,
 };
 use std::{

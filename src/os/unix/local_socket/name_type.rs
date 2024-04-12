@@ -1,5 +1,11 @@
-use crate::local_socket::{Name, NameType, NamespacedNameType, PathNameType};
-use std::{borrow::Cow, ffi::OsStr, io, os::unix::ffi::OsStrExt, path::Path};
+use crate::local_socket::{Name, NameInner, NameType, NamespacedNameType, PathNameType};
+use std::{
+	borrow::Cow,
+	ffi::OsStr,
+	io,
+	os::unix::ffi::{OsStrExt, OsStringExt},
+	path::Path,
+};
 
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
@@ -24,7 +30,7 @@ impl PathNameType for FilesystemUdSocket {
 				));
 			}
 		}
-		Ok(Name::path(path))
+		Ok(Name(NameInner::UdSocketPath(path)))
 	}
 }
 
@@ -43,7 +49,11 @@ impl NameType for AbstractNsUdSocket {
 impl NamespacedNameType for AbstractNsUdSocket {
 	#[inline]
 	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
-		Ok(Name::nonpath(name))
+		let name = match name {
+			Cow::Borrowed(b) => Cow::Borrowed(b.as_bytes()),
+			Cow::Owned(o) => Cow::Owned(o.into_vec()),
+		};
+		Ok(Name(NameInner::UdSocketNs(name)))
 	}
 }
 
@@ -60,8 +70,4 @@ pub(crate) fn map_generic_namespaced(name: Cow<'_, OsStr>) -> io::Result<Name<'_
 	{
 		todo!()
 	}
-}
-
-pub(crate) fn is_namespaced(slf: &Name<'_>) -> bool {
-	!slf.is_path()
 }

@@ -1,11 +1,16 @@
 use crate::{
-	local_socket::{traits::Stream as _, Listener, ListenerOptions, Stream},
+	local_socket::{traits::Stream as _, Listener, ListenerOptions, Name, NameInner, Stream},
 	os::unix::local_socket::ListenerOptionsExt,
 	tests::util::*,
 	OrErrno,
 };
 use libc::mode_t;
-use std::{ffi::{CString, OsStr}, mem::zeroed, os::unix::prelude::*, sync::Arc};
+use std::{
+	ffi::{CString, OsStr},
+	mem::zeroed,
+	os::unix::prelude::*,
+	sync::Arc,
+};
 
 fn get_file_mode(fname: &OsStr) -> TestResult<mode_t> {
 	let mut cfname = fname.as_bytes().to_owned();
@@ -37,14 +42,15 @@ fn test_inner(path: bool) -> TestResult {
 		})?;
 	let name = Arc::try_unwrap(name).unwrap();
 	let _ = Stream::connect(name.borrow()).opname("client connect")?;
-	let actual_mode = if path {
-		get_file_mode(name.raw())
+	let actual_mode = if let Name(NameInner::UdSocketPath(path)) = name {
+		get_file_mode(path.as_os_str())
 	} else {
 		let fd = match &listener {
 			Listener::UdSocket(l) => l.as_fd(),
 		};
 		get_fd_mode(fd)
-	}.opname("get mode")?;
+	}
+	.opname("get mode")?;
 	if actual_mode != 0 {
 		// FreeBSD refuses to fstat sockets for reasons I cannot even begin to fathom
 		ensure_eq!(actual_mode, MODE);

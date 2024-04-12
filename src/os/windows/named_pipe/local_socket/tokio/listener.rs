@@ -1,17 +1,14 @@
 use super::Stream;
 use crate::{
-	local_socket::{traits::tokio as traits, ListenerOptions},
-	os::windows::{
-		named_pipe::{
-			pipe_mode,
-			tokio::{PipeListener as GenericPipeListener, PipeListenerOptionsExt as _},
-			PipeListenerOptions,
-		},
-		path_conversion::*,
+	local_socket::{traits::tokio as traits, ListenerOptions, NameInner},
+	os::windows::named_pipe::{
+		pipe_mode,
+		tokio::{PipeListener as GenericPipeListener, PipeListenerOptionsExt as _},
+		PipeListenerOptions,
 	},
 	Sealed,
 };
-use std::{borrow::Cow, io, path::Path};
+use std::io;
 
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
@@ -23,13 +20,8 @@ impl traits::Listener for Listener {
 
 	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
 		let mut impl_options = PipeListenerOptions::new();
-		impl_options.path = if options.name.is_path() {
-			Path::new(options.name.raw())
-				.to_wtf_16()
-				.map_err(to_io_error)?
-		} else {
-			convert_and_encode_path(options.name.raw(), None).map(Cow::Owned)?
-		};
+		let NameInner::NamedPipe(path) = options.name.0;
+		impl_options.path = path;
 		impl_options.security_descriptor = options.security_descriptor;
 		impl_options.create_tokio().map(Self)
 	}

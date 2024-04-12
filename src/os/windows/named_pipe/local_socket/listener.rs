@@ -2,15 +2,12 @@ use super::stream::Stream;
 use crate::{
 	local_socket::{
 		traits::{self, ListenerNonblockingMode, Stream as _},
-		ListenerOptions,
+		ListenerOptions, NameInner,
 	},
-	os::windows::{
-		named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
-		path_conversion::*,
-	},
+	os::windows::named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
 	AtomicEnum,
 };
-use std::{borrow::Cow, io, os::windows::prelude::*, path::Path, sync::atomic::Ordering::SeqCst};
+use std::{io, os::windows::prelude::*, sync::atomic::Ordering::SeqCst};
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
@@ -28,13 +25,8 @@ impl traits::Listener for Listener {
 
 	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
 		let mut impl_options = PipeListenerOptions::new();
-		impl_options.path = if options.name.is_path() {
-			Path::new(options.name.raw())
-				.to_wtf_16()
-				.map_err(to_io_error)?
-		} else {
-			convert_and_encode_path(options.name.raw(), None).map(Cow::Owned)?
-		};
+		let NameInner::NamedPipe(path) = options.name.0;
+		impl_options.path = path;
 		impl_options.nonblocking = options.nonblocking.accept_nonblocking();
 		impl_options.security_descriptor = options.security_descriptor;
 

@@ -1,6 +1,5 @@
 use super::*;
 use crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*};
-use std::{ffi::OsStr, path::Path};
 use widestring::U16CStr;
 use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
@@ -19,25 +18,7 @@ impl RawPipeStream {
 	fn new_client(handle: FileHandle) -> Self {
 		Self::new(handle, false)
 	}
-
-	fn connect(path: &Path, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
-		Self::_connect(&convert_path(path)?, recv, send)
-	}
-
-	fn connect_with_prepend(
-		pipename: &OsStr,
-		hostname: Option<&OsStr>,
-		recv: Option<PipeMode>,
-		send: Option<PipeMode>,
-	) -> io::Result<Self> {
-		Self::_connect(&convert_and_encode_path(pipename, hostname)?, recv, send)
-	}
-
-	fn _connect(
-		path: &U16CStr,
-		recv: Option<PipeMode>,
-		send: Option<PipeMode>,
-	) -> io::Result<Self> {
+	fn connect(path: &U16CStr, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
 		let handle = loop {
 			match c_wrappers::connect_without_waiting(path, recv, send, false) {
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -64,16 +45,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	/// Connects to the specified named pipe at the specified path (the `\\<hostname>\pipe\` prefix
 	/// is not added automatically), blocking until a server instance is dispatched.
 	#[inline]
-	pub fn connect_by_path(path: impl AsRef<Path>) -> io::Result<Self> {
-		RawPipeStream::connect(path.as_ref(), Rm::MODE, Sm::MODE).map(Self::new)
-	}
-
-	#[inline]
-	pub(crate) fn connect_with_prepend(
-		pipename: &OsStr,
-		hostname: Option<&OsStr>,
-	) -> io::Result<Self> {
-		RawPipeStream::connect_with_prepend(pipename, hostname, Rm::MODE, Sm::MODE).map(Self::new)
+	pub fn connect_by_path<'p>(path: impl ToWtf16<'p>) -> io::Result<Self> {
+		RawPipeStream::connect(&path.to_wtf_16().map_err(to_io_error)?, Rm::MODE, Sm::MODE)
+			.map(Self::new)
 	}
 
 	/// Internal constructor used by the listener. It's a logic error, but not UB, to create the

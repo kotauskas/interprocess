@@ -11,26 +11,18 @@ pub(crate) mod tokio {
 	pub use {listener::*, stream::*};
 }
 
-use crate::local_socket::Name;
+use crate::local_socket::{Name, NameInner};
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use std::os::{linux::net::SocketAddrExt, unix::ffi::OsStrExt};
-use std::{io, os::unix::net::SocketAddr, path::Path};
+use std::os::linux::net::SocketAddrExt;
+use std::{io, os::unix::net::SocketAddr};
 
 #[allow(clippy::indexing_slicing)]
 fn name_to_addr(name: Name<'_>) -> io::Result<SocketAddr> {
-	let is_ns = name.is_namespaced();
-	let name = name.into_raw_cow();
-	if is_ns {
+	match name.0 {
+		NameInner::UdSocketPath(path) => SocketAddr::from_pathname(path),
 		#[cfg(any(target_os = "linux", target_os = "android"))]
-		{
-			return SocketAddr::from_abstract_name(name.as_bytes());
-		}
-		#[cfg(not(any(target_os = "linux", target_os = "android")))]
-		{
-			unreachable!();
-		}
+		NameInner::UdSocketNs(name) => SocketAddr::from_abstract_name(name),
 	}
-	SocketAddr::from_pathname(Path::new(&name))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -49,10 +41,8 @@ impl ReclaimGuard {
 }
 impl Drop for ReclaimGuard {
 	fn drop(&mut self) {
-		if let Self(Some(name)) = self {
-			if name.is_path() {
-				let _ = std::fs::remove_file(name.raw());
-			}
+		if let Self(Some(Name(NameInner::UdSocketPath(path)))) = self {
+			let _ = std::fs::remove_file(path);
 		}
 	}
 }

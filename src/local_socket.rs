@@ -46,7 +46,6 @@
 mod enumdef;
 
 mod name;
-mod to_name;
 mod stream {
 	pub(super) mod r#enum;
 	pub(super) mod r#trait;
@@ -56,8 +55,6 @@ mod listener {
 	pub(super) mod options;
 	pub(super) mod r#trait;
 }
-
-pub mod name_type;
 
 /// Traits representing the interface of local sockets.
 pub mod traits {
@@ -79,9 +76,7 @@ pub mod traits {
 pub use {
 	listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
 	name::*,
-	name_type::*,
 	stream::r#enum::*,
-	to_name::*,
 	traits::ListenerNonblockingMode,
 };
 
@@ -89,8 +84,7 @@ pub use {
 /// enum-dispatch types with their names prefixed with `LocalSocket`.
 pub mod prelude {
 	pub use super::{
-		name_type::NameType as _,
-		to_name::{ToFsName as _, ToNsName as _},
+		name::{NameType as _, ToFsName as _, ToNsName as _},
 		traits::{Listener as _, ListenerExt as _, Stream as _},
 		Listener as LocalSocketListener, Stream as LocalSocketStream,
 	};
@@ -125,8 +119,7 @@ pub mod tokio {
 	pub mod prelude {
 		pub use super::{
 			super::{
-				name_type::NameType as _,
-				to_name::{ToFsName as _, ToNsName as _},
+				name::{NameType as _, ToFsName as _, ToNsName as _},
 				traits::tokio::{Listener as _, ListenerExt as _, Stream as _},
 			},
 			Listener as LocalSocketListener, Stream as LocalSocketStream,

@@ -2,7 +2,7 @@ use crate::{
 	error::{FromHandleError, ReuniteError},
 	local_socket::{
 		traits::{self, ReuniteResult},
-		Name,
+		Name, NameInner,
 	},
 	os::windows::named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
 	Sealed,
@@ -27,12 +27,8 @@ impl traits::Stream for Stream {
 	type SendHalf = SendHalf;
 
 	fn connect(name: Name<'_>) -> io::Result<Self> {
-		if name.is_path() {
-			StreamImpl::connect_by_path(name.raw())
-		} else {
-			StreamImpl::connect_with_prepend(name.raw(), None)
-		}
-		.map(Self)
+		let NameInner::NamedPipe(path) = name.0;
+		StreamImpl::connect_by_path(path).map(Self)
 	}
 
 	#[inline]

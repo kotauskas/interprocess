@@ -45,7 +45,7 @@ impl<'n> ListenerOptions<'n> {
 	#[inline]
 	pub fn new() -> Self {
 		Self {
-			name: Name::default(),
+			name: Name::invalid(),
 			nonblocking: ListenerNonblockingMode::Neither,
 			reclaim_name: true,
 			#[cfg(unix)]
