@@ -34,6 +34,33 @@ impl PathNameType for FilesystemUdSocket {
 	}
 }
 
+tag_enum!(
+/// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
+/// special locations in the filesystems that are interpreted as dedicated namespaces.
+///
+/// This is the substitute for `AbstractNsUdSocket` on non-Linux Unices, and is the only available
+/// [namespaced name type](NamespacedNameType) on those systems.
+SpecialDirUdSocket);
+impl NameType for SpecialDirUdSocket {
+	fn is_supported() -> bool {
+		true
+	}
+}
+impl NamespacedNameType for SpecialDirUdSocket {
+	#[inline]
+	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
+		for b in name.as_bytes() {
+			if *b == 0 {
+				return Err(io::Error::new(
+					io::ErrorKind::InvalidInput,
+					"special directory-bound names cannot contain interior nuls",
+				));
+			}
+		}
+		Ok(Name(NameInner::UdSocketPseudoNs(name)))
+	}
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
@@ -70,6 +97,6 @@ pub(crate) fn map_generic_namespaced(name: Cow<'_, OsStr>) -> io::Result<Name<'_
 	}
 	#[cfg(not(any(target_os = "linux", target_os = "android")))]
 	{
-		todo!()
+		SpecialDirUdSocket::map(name)
 	}
 }

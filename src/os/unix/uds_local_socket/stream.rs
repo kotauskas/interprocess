@@ -23,7 +23,7 @@ impl traits::Stream for Stream {
 	type SendHalf = SendHalf;
 
 	fn connect(name: Name<'_>) -> io::Result<Self> {
-		UnixStream::connect_addr(&name_to_addr(name)?).map(Self::from)
+		UnixStream::connect_addr(&name_to_addr(name, false)?).map(Self::from)
 	}
 	#[inline]
 	fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {

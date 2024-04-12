@@ -1,15 +1,18 @@
 use std::borrow::Cow;
 #[cfg(unix)]
-use std::path::Path;
+use std::{ffi::OsStr, path::Path};
 #[cfg(windows)]
 use widestring::U16CStr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 pub(crate) enum NameInner<'s> {
 	#[cfg(windows)]
 	NamedPipe(Cow<'s, U16CStr>),
 	#[cfg(unix)]
 	UdSocketPath(Cow<'s, Path>),
+	#[cfg(unix)]
+	UdSocketPseudoNs(Cow<'s, OsStr>),
 	#[cfg(any(target_os = "linux", target_os = "android"))]
 	UdSocketNs(Cow<'s, [u8]>),
 }
@@ -34,6 +37,8 @@ macro_rules! map_cow {
 			NameInner::NamedPipe($nm) => NameInner::NamedPipe($e),
 			#[cfg(unix)]
 			NameInner::UdSocketPath($nm) => NameInner::UdSocketPath($e),
+			#[cfg(unix)]
+			NameInner::UdSocketPseudoNs($nm) => NameInner::UdSocketPseudoNs($e),
 			#[cfg(any(target_os = "linux", target_os = "android"))]
 			NameInner::UdSocketNs($nm) => NameInner::UdSocketNs($e),
 		}
@@ -46,7 +51,9 @@ impl<'s> NameInner<'s> {
 			#[cfg(windows)]
 			Self::NamedPipe(..) => true,
 			#[cfg(unix)]
-			Self::UdSocketPath(..) => todo!(),
+			Self::UdSocketPath(..) => false,
+			#[cfg(unix)]
+			Self::UdSocketPseudoNs(..) => false,
 			#[cfg(any(target_os = "linux", target_os = "android"))]
 			Self::UdSocketNs(..) => true,
 		}
@@ -57,6 +64,8 @@ impl<'s> NameInner<'s> {
 			Self::NamedPipe(..) => true,
 			#[cfg(unix)]
 			Self::UdSocketPath(..) => true,
+			#[cfg(unix)]
+			Self::UdSocketPseudoNs(..) => false,
 			#[cfg(any(target_os = "linux", target_os = "android"))]
 			Self::UdSocketNs(..) => false,
 		}

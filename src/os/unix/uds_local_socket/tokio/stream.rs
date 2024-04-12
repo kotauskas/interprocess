@@ -59,7 +59,9 @@ impl traits::Stream for Stream {
 	type SendHalf = SendHalf;
 
 	async fn connect(name: Name<'_>) -> io::Result<Self> {
-		Self::_connect(name_to_addr(name)?).await.map(Self::from)
+		Self::_connect(name_to_addr(name, false)?)
+			.await
+			.map(Self::from)
 	}
 	fn split(self) -> (RecvHalf, SendHalf) {
 		let (r, w) = self.0.into_split();

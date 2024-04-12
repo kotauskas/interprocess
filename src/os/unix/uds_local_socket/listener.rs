@@ -40,7 +40,7 @@ impl traits::Listener for Listener {
 
 		let listener = c_wrappers::bind_and_listen_with_mode(
 			libc::SOCK_STREAM,
-			&name_to_addr(options.name.borrow())?,
+			&name_to_addr(options.name.borrow(), true)?,
 			nonblocking,
 			options.mode,
 		)
