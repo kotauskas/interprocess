@@ -34,18 +34,20 @@ impl PathNameType for FilesystemUdSocket {
 	}
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
 /// the Linux abstract namespace.
-#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(feature = "cfg_doc", doc(cfg(any(target_os = "linux", target_os = "android"))))]
 AbstractNsUdSocket);
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl NameType for AbstractNsUdSocket {
 	fn is_supported() -> bool {
 		// TODO maybe check Linux version here
 		true
 	}
 }
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl NamespacedNameType for AbstractNsUdSocket {
 	#[inline]
 	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
