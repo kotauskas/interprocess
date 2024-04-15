@@ -10,7 +10,7 @@ pub struct NameGen<T: ?Sized, F: FnMut(u32) -> NameResult<T>> {
 	name_fn: F,
 }
 impl<T: ?Sized, F: FnMut(u32) -> NameResult<T>> NameGen<T, F> {
-	pub fn new(id: &'static str, name_fn: F) -> Self {
+	pub fn new(id: &str, name_fn: F) -> Self {
 		Self {
 			rng: Xorshift32::from_id(id),
 			name_fn,

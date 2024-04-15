@@ -10,7 +10,7 @@ use std::{
 #[derive(Copy, Clone, Debug)]
 pub struct Xorshift32(pub u32);
 impl Xorshift32 {
-	pub fn from_id(id: &'static str) -> Self {
+	pub fn from_id(id: &str) -> Self {
 		let mut hasher = DefaultHasher::new();
 		id.hash(&mut hasher);
 		let hash64 = hasher.finish();

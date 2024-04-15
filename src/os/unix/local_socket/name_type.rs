@@ -1,11 +1,5 @@
 use crate::local_socket::{Name, NameInner, NameType, NamespacedNameType, PathNameType};
-use std::{
-	borrow::Cow,
-	ffi::OsStr,
-	io,
-	os::unix::ffi::{OsStrExt, OsStringExt},
-	path::Path,
-};
+use std::{borrow::Cow, ffi::OsStr, io, os::unix::prelude::*, path::Path};
 
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
