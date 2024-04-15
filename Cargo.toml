@@ -75,6 +75,7 @@ missing_docs = "warn"
 [lints.clippy]
 exit = "forbid"
 get_unwrap = "deny"
+dbg_macro = "warn"
 arithmetic_side_effects = "warn"
 indexing_slicing = "warn"
 missing_assert_message = "warn"

@@ -21,7 +21,11 @@ const NUM_CLIENTS: u32 = 80;
 const NUM_CONCURRENT_CLIENTS: u32 = 6;
 
 use color_eyre::eyre::WrapErr;
-use std::{fmt::Arguments, io, sync::Arc};
+use std::{
+	fmt::{Arguments, Debug},
+	io,
+	sync::Arc,
+};
 
 pub fn test_wrapper(f: impl (FnOnce() -> TestResult) + Send + 'static) -> TestResult {
 	eyre::install();
@@ -38,24 +42,30 @@ pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char
 	msg.into()
 }
 
-pub fn listen_and_pick_name<L, N: ?Sized, F: FnMut(u32) -> NameResult<N>>(
+pub fn listen_and_pick_name<L: Debug, N: Debug + ?Sized, F: FnMut(u32) -> NameResult<N>>(
 	namegen: &mut NameGen<N, F>,
 	mut bindfn: impl FnMut(&N) -> io::Result<L>,
 ) -> TestResult<(Arc<N>, L)> {
 	use std::io::ErrorKind::*;
-	namegen
+	let listener = namegen
 		.find_map(|nm| {
+			eprintln!("Trying name {nm:?}...");
 			let nm = match nm {
 				Ok(ok) => ok,
 				Err(e) => return Some(Err(e)),
 			};
 			let l = match bindfn(&nm) {
 				Ok(l) => l,
-				Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied) => return None,
+				Err(e) if matches!(e.kind(), AddrInUse | PermissionDenied) => {
+					eprintln!("\"{}\", skipping", e.kind());
+					return None;
+				}
 				Err(e) => return Some(Err(e)),
 			};
 			Some(Ok((nm, l)))
 		})
 		.unwrap() // Infinite iterator
-		.context("listener bind failed")
+		.context("listener bind failed")?;
+	eprintln!("Listener successfully created: {listener:#?}");
+	Ok(listener)
 }
