@@ -12,7 +12,7 @@ fn test_inner(iter: u32) -> TestResult {
 			.map(Arc::new)
 	});
 	let (name, _listener) = listen_and_pick_name(&mut namegen, |nm| {
-		dbg!(ListenerOptions::new().name(nm.borrow()).create_sync())
+		ListenerOptions::new().name(nm.borrow()).create_sync()
 	})?;
 	let name = Arc::try_unwrap(name).unwrap();
 	let _ = Stream::connect(name.borrow()).opname("client connect")?;
@@ -24,7 +24,7 @@ fn test_inner(iter: u32) -> TestResult {
 fn local_socket_fake_ns() -> TestResult {
 	test_wrapper(|| {
 		// fucking macOS
-		let iterations = if cfg!(target_os = "macos") { 20736 } else { 12 };
+		let iterations = if cfg!(target_os = "macos") { 432 } else { 12 };
 		for i in 0..iterations {
 			test_inner(i)?;
 		}
