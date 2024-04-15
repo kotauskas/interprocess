@@ -5,6 +5,7 @@ mod msg;
 
 use crate::{os::windows::named_pipe::PipeListenerOptions, tests::util::*};
 use std::{
+	fmt::Debug,
 	io,
 	path::Path,
 	sync::{mpsc::Sender, Arc},

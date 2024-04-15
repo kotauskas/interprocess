@@ -8,6 +8,7 @@ mod recv_msg;
 mod send;
 mod send_off;
 
+#[cfg_attr(not(feature = "tokio"), allow(unused_imports))]
 pub(crate) use send_off::{LIMBO_ERR, REBURY_ERR};
 
 use super::*;

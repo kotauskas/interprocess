@@ -4,6 +4,7 @@ pub use {enums::*, error::*};
 
 mod r#impl;
 mod limbo;
+#[cfg(feature = "tokio")]
 pub(super) use r#impl::*;
 
 use super::{MaybeArc, NeedsFlush};

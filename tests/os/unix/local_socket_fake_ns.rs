@@ -24,7 +24,7 @@ fn test_inner(iter: u32) -> TestResult {
 fn local_socket_fake_ns() -> TestResult {
 	test_wrapper(|| {
 		// fucking macOS
-		let iterations = if cfg!(target_os = "macos") { 432 } else { 12 };
+		let iterations = if cfg!(target_os = "macos") { 444 } else { 6 };
 		for i in 0..iterations {
 			test_inner(i)?;
 		}

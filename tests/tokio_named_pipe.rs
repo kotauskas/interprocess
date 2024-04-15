@@ -11,7 +11,7 @@ use crate::{
 	},
 };
 use color_eyre::eyre::WrapErr;
-use std::{future::Future, io, path::Path, sync::Arc};
+use std::{fmt::Debug, future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
 
 use super::util::namegen_named_pipe;
@@ -40,7 +40,7 @@ matrix! {
 	bytes stc	bytes_unidir_server_to_client
 }
 
-async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
+async fn drive_server<L: Debug, T: Future<Output = TestResult> + Send + 'static>(
 	id: &str,
 	name_sender: Sender<Arc<str>>,
 	num_clients: u32,
