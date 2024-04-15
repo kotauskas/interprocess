@@ -14,7 +14,7 @@ fn msg(server: bool, nts: bool) -> Box<str> {
 }
 
 pub fn server(
-	id: &'static str,
+	id: &str,
 	handle_client: fn(Stream) -> TestResult,
 	name_sender: Sender<Arc<Name<'static>>>,
 	num_clients: u32,

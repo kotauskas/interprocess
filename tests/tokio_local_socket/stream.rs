@@ -18,7 +18,7 @@ fn msg(server: bool, nts: bool) -> Box<str> {
 }
 
 pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
-	id: &'static str,
+	id: &str,
 	mut handle_client: impl FnMut(Stream) -> HCF,
 	name_sender: Sender<Arc<Name<'static>>>,
 	num_clients: u32,

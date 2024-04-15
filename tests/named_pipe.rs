@@ -37,8 +37,8 @@ matrix! {
 	msg		stc		msg_unidir_server_to_client
 }
 
-fn drive_server<L>(
-	id: &'static str,
+fn drive_server<L: Debug>(
+	id: &str,
 	name_sender: Sender<Arc<str>>,
 	num_clients: u32,
 	mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),

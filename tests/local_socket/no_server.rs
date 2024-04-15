@@ -7,7 +7,7 @@ use crate::{
 use color_eyre::eyre::{bail, ensure};
 use std::io;
 
-pub fn run_and_verify_error(id: &'static str, path: bool) -> TestResult {
+pub fn run_and_verify_error(id: &str, path: bool) -> TestResult {
 	use io::ErrorKind::*;
 	let err = match client(id, path) {
 		Err(e) => e,
@@ -20,7 +20,7 @@ pub fn run_and_verify_error(id: &'static str, path: bool) -> TestResult {
 	);
 	Ok(())
 }
-fn client(id: &'static str, path: bool) -> io::Result<()> {
+fn client(id: &str, path: bool) -> io::Result<()> {
 	let nm = namegen_local_socket(id, path).next().unwrap();
 	Stream::connect(nm?.borrow())?;
 	Ok(())

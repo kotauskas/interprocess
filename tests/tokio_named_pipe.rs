@@ -41,7 +41,7 @@ matrix! {
 }
 
 async fn drive_server<L, T: Future<Output = TestResult> + Send + 'static>(
-	id: &'static str,
+	id: &str,
 	name_sender: Sender<Arc<str>>,
 	num_clients: u32,
 	mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),

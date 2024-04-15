@@ -27,7 +27,7 @@ impl<T: ?Sized, F: FnMut(u32) -> NameResult<T>> Iterator for NameGen<T, F> {
 pub type NameResult<T> = io::Result<Arc<T>>;
 
 pub fn namegen_local_socket(
-	id: &'static str,
+	id: &str,
 	path: bool,
 ) -> NameGen<Name<'static>, impl FnMut(u32) -> io::Result<Arc<Name<'static>>>> {
 	NameGen::new(id, move |rn| {
@@ -49,7 +49,7 @@ fn next_ns(rn: u32) -> io::Result<Name<'static>> {
 	format!("@interprocess-test-{:08x}", rn).to_ns_name::<GenericNamespaced>()
 }
 
-pub fn namegen_named_pipe(id: &'static str) -> NameGen<str, impl FnMut(u32) -> NameResult<str>> {
+pub fn namegen_named_pipe(id: &str) -> NameGen<str, impl FnMut(u32) -> NameResult<str>> {
 	NameGen::new(id, move |rn| Ok(windows_path(rn).into()))
 }
 

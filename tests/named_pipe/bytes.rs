@@ -32,11 +32,7 @@ fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Bytes
 	send(&mut sender, msg(true))
 }
 
-pub fn server_duplex(
-	id: &'static str,
-	name_sender: Sender<Arc<str>>,
-	num_clients: u32,
-) -> TestResult {
+pub fn server_duplex(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
 	drive_server(
 		id,
 		name_sender,
@@ -45,7 +41,7 @@ pub fn server_duplex(
 		handle_conn_duplex,
 	)
 }
-pub fn server_cts(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_cts(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
 	drive_server(
 		id,
 		name_sender,
@@ -54,7 +50,7 @@ pub fn server_cts(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: 
 		handle_conn_cts,
 	)
 }
-pub fn server_stc(id: &'static str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_stc(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
 	drive_server(
 		id,
 		name_sender,

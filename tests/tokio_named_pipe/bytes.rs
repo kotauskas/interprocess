@@ -20,7 +20,7 @@ fn msg(server: bool) -> Box<str> {
 }
 
 pub async fn server_duplex(
-	id: &'static str,
+	id: &str,
 	name_sender: Sender<Arc<str>>,
 	num_clients: u32,
 ) -> TestResult {
@@ -33,11 +33,7 @@ pub async fn server_duplex(
 	)
 	.await
 }
-pub async fn server_cts(
-	id: &'static str,
-	name_sender: Sender<Arc<str>>,
-	num_clients: u32,
-) -> TestResult {
+pub async fn server_cts(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
 	drive_server(
 		id,
 		name_sender,
@@ -47,11 +43,7 @@ pub async fn server_cts(
 	)
 	.await
 }
-pub async fn server_stc(
-	id: &'static str,
-	name_sender: Sender<Arc<str>>,
-	num_clients: u32,
-) -> TestResult {
+pub async fn server_stc(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
 	drive_server(
 		id,
 		name_sender,
