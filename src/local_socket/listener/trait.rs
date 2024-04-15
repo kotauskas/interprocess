@@ -40,7 +40,6 @@ pub trait Listener: Sized + Sealed {
 
 	/// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
 	fn do_not_reclaim_name_on_drop(&mut self);
-	// TODO ImplProperties type of thing
 }
 
 /// The manner in which a [listener](Listener) is to be nonblocking.

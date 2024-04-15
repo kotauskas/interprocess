@@ -3,35 +3,14 @@
 //! that server.
 //!
 //! ## Implementation types
-//! Local sockets are not a real IPC method implemented by the OS – they exist to smooth out the
-//! difference between two types of underlying implementation: **Unix domain sockets** and
-//! **Windows named pipes**. The [`ImplType`] enumeration documents them and provides methods to
-//! query whether they are available and their implementation specifics.
+//! Local sockets are not a real IPC method implemented by the OS – they exist to paper over the
+//! differences between the two underlying implementations currently in use: Unix domain sockets and
+//! Windows named pipes.
 //!
-//! ### Implementation properties
-//! Implementations of the exact same IPC primitive can have subtly different feature sets on
-//! different platforms and even on different versions of the same OS. For example, only on Linux
-//! and Windows do Unix-domain sockets support the "anonymous namespace" (and thus feature
-//! [`NameTypeSupport::Both`]); on FreeBSD, macOS and the likes, only file paths are available.
-//!
-//! The [`ImplProperties`] struct, as obtained through [`ImplType`]'s methods, is a source of
-//! information on all possible differences between different implementations of local sockets. This
-//! is to say that equal [`ImplProperties`] correspond to the same observable behavior of the IPC
-//! primitive – if there are any other differences that affect the public API but are not documented
-//! by [`ImplProperties`] (besides the mere fact that different IPC primitives use different system
-//! APIs), that's a bug in Interprocess!
-//!
-//! ### Platform-specific namespaces
-//! Since only Linux supports putting Unix-domain sockets in a separate namespace which is isolated
-//! from the filesystem, the [`Name`] type is used to identify local sockets rather than `OsStr` or
-//! `OsString`: on Unix platforms other than Linux, which includes macOS, all flavors of BSD and
-//! possibly other Unix-like systems, the only way to name a Unix-domain socket is to use a
-//! filesystem path. As such, those platforms don't have the namespaced socket creation method
-//! available. Complicatng matters further, Windows does not support named pipes in the normal
-//! filesystem, meaning that namespaced local sockets are the only available method on Windows.
-//!
-//! To solve this issue, [`Name`] has to be created with a specific name type in mind, with a
-//! [`NameTypeSupport`] query being necessary to decide on an appropriate socket name.
+//! Interprocess defines [traits] that implementations of local sockets implement, and enums that
+//! constitute devirtualized trait objects (not unlike those provided by the `enum_dispatch` crate)
+//! for those traits. The implementation used, in cases where multiple options apply, is chosen at
+//! construction via the [name](Name) and [name type](NameType) infrastructure.
 //!
 //! ## Differences from regular sockets
 //! A few missing features, primarily on Windows, require local sockets to omit some important

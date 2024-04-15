@@ -75,7 +75,16 @@ tag_enum!(
 /// whatever it takes. What follows below is a complete description of how that is implemented.
 ///
 /// ## Platform-specific behavior
-// TODO
+/// ### Windows
+/// Resolves to named pipe names by prepending `\\.\pipe\` (thus, only local named pipes are
+/// addressable).
+///
+/// ### Linux
+/// Resolves to the abstract namespace with no string transformations and thus has a maximum length
+/// of 107 bytes.
+///
+/// ### Other Unices
+/// Resolves to filesystem paths by prepending `/tmp/`.
 GenericNamespaced);
 impl NameType for GenericNamespaced {
 	fn is_supported() -> bool {

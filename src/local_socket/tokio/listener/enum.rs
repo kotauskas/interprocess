@@ -54,13 +54,8 @@ mkenum!(
 /// }
 ///
 /// // Pick a name.
-/// let (name, printname) = if GenericNamespaced::is_supported() {
-/// 	let pn = "example.sock";
-/// 	(pn.to_ns_name::<GenericNamespaced>()?, pn)
-/// } else {
-/// 	let pn = "/tmp/example.sock";
-/// 	(pn.to_fs_name::<GenericFilePath>()?, pn)
-/// };
+/// let printname = "example.sock";
+/// let name = printname.to_ns_name::<GenericNamespaced>()?;
 ///
 /// // Configure our listener...
 /// let opts = ListenerOptions::new()

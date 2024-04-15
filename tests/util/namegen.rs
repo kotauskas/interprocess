@@ -3,7 +3,6 @@ use crate::local_socket::{GenericFilePath, GenericNamespaced, Name, ToFsName, To
 use super::Xorshift32;
 use std::{io, sync::Arc};
 
-// TODO adjust
 #[derive(Copy, Clone, Debug)]
 pub struct NameGen<T: ?Sized, F: FnMut(u32) -> NameResult<T>> {
 	rng: Xorshift32,
