@@ -1,5 +1,4 @@
 #![allow(unused_macros)]
-// TODO more internal docs
 
 /// Dispatches to a symmetrically named submodule in the target OS module.
 macro_rules! impmod {
@@ -65,12 +64,12 @@ macro_rules! forward_rbv {
 	};
 }
 
-#[rustfmt::skip] macro_rules! builder_must_use {
-	() => {
+#[rustfmt::skip] macro_rules! builder_must_use {() => {
 "builder setters take the entire structure and return it with the corresponding field modified"
-	};
-}
+};}
 
+/// Generates public self-by-value setters for builder structures. Assumes that a field of the same
+/// name is public on `Self`.
 macro_rules! builder_setters {
 	($(#[doc = $($doc:expr)+])+ $name:ident : $ty:ty) => {
 		$(#[doc = $($doc)+])+
@@ -98,6 +97,7 @@ macro_rules! builder_setters {
 	};
 }
 
+/// Creates a public sealed uninhabited type with a bunch of unnecessary trait implementations.
 macro_rules! tag_enum {
 	($($(#[$attr:meta])* $tag:ident),+ $(,)?) => {$(
 		$( #[$attr] )*

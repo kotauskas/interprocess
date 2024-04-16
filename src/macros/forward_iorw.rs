@@ -1,3 +1,6 @@
+//! Forwarding of `Read` and `Write` (and their Tokio counterparts) for newtypes. Allows attributes
+//! on the impl block and on every individual method – only one attribute per type, comma-separated.
+
 macro_rules! forward_sync_read {
 	($({$($lt:tt)*})? $ty:ty $(, #[$a1:meta] $(, #[$a2:meta] $(, #[$a3:meta])?)?)?) => {
 		$(#[$a1])?

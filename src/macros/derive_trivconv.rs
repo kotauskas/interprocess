@@ -1,3 +1,6 @@
+//! Derive macros for trivial `From`. Rust 1.63+. Lifetime arguments on impls can be specified in
+//! curly braces.
+
 macro_rules! derive_trivial_from {
 	($({$($forcl:tt)*})? $dst:ty, $src:ty) => {
 		impl $(<$($forcl)*>)? ::std::convert::From<$src> for $dst {

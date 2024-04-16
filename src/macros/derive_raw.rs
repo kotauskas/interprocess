@@ -1,5 +1,5 @@
 //! Derive macros that implement raw handle manipulation in terms of safe handle manipulation from
-//! Rust 1.63+.
+//! Rust 1.63+. Lifetime arguments on impls can be specified in curly braces.
 
 macro_rules! derive_asraw {
 	(@impl

@@ -1,3 +1,6 @@
+//! Macros that derive `Read` and `Write` (and their Tokio counterparts) on all `T` that satisfy
+//! `for<'a> &'a T: Trait` for the corresponding trait.
+
 macro_rules! derive_sync_mut_read {
 	($({$($lt:tt)*})? $ty:ty) => {
 		impl $(<$($lt)*>)? ::std::io::Read for $ty {

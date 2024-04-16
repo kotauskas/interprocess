@@ -1,3 +1,5 @@
+//! Forwarding of `Debug` for newtypes that allows specifying a descriptive typename.
+
 use std::fmt::{self, Debug, Formatter};
 #[allow(dead_code)]
 pub(crate) fn debug_forward_with_custom_name(
