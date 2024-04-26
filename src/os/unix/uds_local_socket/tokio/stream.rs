@@ -142,7 +142,6 @@ impl AsyncWrite for &Stream {
 	}
 }
 impl TryFrom<Stream> for OwnedFd {
-	// TODO(2.0.0) use FromFdError
 	type Error = io::Error;
 	#[inline]
 	fn try_from(slf: Stream) -> io::Result<Self> {
@@ -150,7 +149,6 @@ impl TryFrom<Stream> for OwnedFd {
 	}
 }
 impl TryFrom<OwnedFd> for Stream {
-	// TODO(2.0.0) use FromFdError
 	type Error = io::Error;
 	#[inline]
 	fn try_from(fd: OwnedFd) -> io::Result<Self> {
