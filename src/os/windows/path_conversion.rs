@@ -155,8 +155,8 @@ pub(crate) fn convert_and_encode_path(
 	U16CString::from_vec(path).map_err(contains_nul_error_to_io)
 }
 
-pub(crate) fn convert_path(path: &Path) -> io::Result<U16CString> {
-	U16CString::from_os_str(path.as_os_str()).map_err(contains_nul_error_to_io)
+pub(crate) fn convert_osstr(str: &OsStr) -> io::Result<U16CString> {
+	U16CString::from_os_str(str).map_err(contains_nul_error_to_io)
 }
 
 fn contains_nul_error_to_io(e: ContainsNul<u16>) -> io::Error {

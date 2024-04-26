@@ -1,5 +1,17 @@
 use crate::local_socket::{Name, NameInner, NameType, NamespacedNameType, PathNameType};
-use std::{borrow::Cow, ffi::OsStr, io, os::unix::prelude::*, path::Path};
+use std::{
+	borrow::Cow,
+	ffi::{CStr, OsStr, OsString},
+	io,
+	os::unix::prelude::*,
+};
+
+fn c2os(ccow: Cow<'_, CStr>) -> Cow<'_, OsStr> {
+	match ccow {
+		Cow::Borrowed(cstr) => Cow::Borrowed(OsStr::from_bytes(cstr.to_bytes())),
+		Cow::Owned(cstring) => Cow::Owned(OsString::from_vec(cstring.into_bytes())),
+	}
+}
 
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
@@ -13,10 +25,10 @@ impl NameType for FilesystemUdSocket {
 		true
 	}
 }
-impl PathNameType for FilesystemUdSocket {
+impl PathNameType<OsStr> for FilesystemUdSocket {
 	#[inline]
-	fn map(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
-		for b in path.as_os_str().as_bytes() {
+	fn map(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
+		for b in path.as_bytes() {
 			if *b == 0 {
 				return Err(io::Error::new(
 					io::ErrorKind::InvalidInput,
@@ -25,6 +37,12 @@ impl PathNameType for FilesystemUdSocket {
 			}
 		}
 		Ok(Name(NameInner::UdSocketPath(path)))
+	}
+}
+impl PathNameType<CStr> for FilesystemUdSocket {
+	#[inline]
+	fn map(path: Cow<'_, CStr>) -> io::Result<Name<'_>> {
+		Self::map(c2os(path))
 	}
 }
 
@@ -40,7 +58,7 @@ impl NameType for SpecialDirUdSocket {
 		true
 	}
 }
-impl NamespacedNameType for SpecialDirUdSocket {
+impl NamespacedNameType<OsStr> for SpecialDirUdSocket {
 	#[inline]
 	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
 		for b in name.as_bytes() {
@@ -52,6 +70,12 @@ impl NamespacedNameType for SpecialDirUdSocket {
 			}
 		}
 		Ok(Name(NameInner::UdSocketPseudoNs(name)))
+	}
+}
+impl NamespacedNameType<CStr> for SpecialDirUdSocket {
+	#[inline]
+	fn map(name: Cow<'_, CStr>) -> io::Result<Name<'_>> {
+		Self::map(c2os(name))
 	}
 }
 
@@ -69,7 +93,7 @@ impl NameType for AbstractNsUdSocket {
 	}
 }
 #[cfg(any(target_os = "linux", target_os = "android"))]
-impl NamespacedNameType for AbstractNsUdSocket {
+impl NamespacedNameType<OsStr> for AbstractNsUdSocket {
 	#[inline]
 	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
 		let name = match name {
@@ -79,18 +103,40 @@ impl NamespacedNameType for AbstractNsUdSocket {
 		Ok(Name(NameInner::UdSocketNs(name)))
 	}
 }
-
-pub(crate) fn map_generic_path(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
-	FilesystemUdSocket::map(path)
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl NamespacedNameType<CStr> for AbstractNsUdSocket {
+	#[inline]
+	fn map(name: Cow<'_, CStr>) -> io::Result<Name<'_>> {
+		Self::map(c2os(name))
+	}
 }
 
-pub(crate) fn map_generic_namespaced(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
-	#[cfg(any(target_os = "linux", target_os = "android"))]
-	{
-		AbstractNsUdSocket::map(name)
-	}
-	#[cfg(not(any(target_os = "linux", target_os = "android")))]
-	{
-		SpecialDirUdSocket::map(name)
-	}
+macro_rules! map_generic {
+	(path $name:ident for $str:ident) => {
+		pub(crate) fn $name(path: Cow<'_, $str>) -> io::Result<Name<'_>> {
+			FilesystemUdSocket::map(path)
+		}
+	};
+	(namespaced $name:ident for $str:ident) => {
+		pub(crate) fn $name(name: Cow<'_, $str>) -> io::Result<Name<'_>> {
+			#[cfg(any(target_os = "linux", target_os = "android"))]
+			{
+				AbstractNsUdSocket::map(name)
+			}
+			#[cfg(not(any(target_os = "linux", target_os = "android")))]
+			{
+				SpecialDirUdSocket::map(name)
+			}
+		}
+	};
+	($($type:ident $name:ident for $str:ident)+) => {$(
+		map_generic!($type $name for $str);
+	)+};
+}
+
+map_generic! {
+	path		map_generic_path_osstr			for OsStr
+	path		map_generic_path_cstr			for CStr
+	namespaced	map_generic_namespaced_osstr	for OsStr
+	namespaced	map_generic_namespaced_cstr		for CStr
 }

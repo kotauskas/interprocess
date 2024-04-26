@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 #[cfg(unix)]
-use std::{ffi::OsStr, path::Path};
+use std::ffi::OsStr;
 #[cfg(windows)]
 use widestring::U16CStr;
 
@@ -10,7 +10,7 @@ pub(crate) enum NameInner<'s> {
 	#[cfg(windows)]
 	NamedPipe(Cow<'s, U16CStr>),
 	#[cfg(unix)]
-	UdSocketPath(Cow<'s, Path>),
+	UdSocketPath(Cow<'s, OsStr>),
 	#[cfg(unix)]
 	UdSocketPseudoNs(Cow<'s, OsStr>),
 	#[cfg(any(target_os = "linux", target_os = "android"))]

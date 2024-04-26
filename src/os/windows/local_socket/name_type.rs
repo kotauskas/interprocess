@@ -1,8 +1,8 @@
 use crate::{
 	local_socket::{Name, NameInner, NameType, PathNameType},
-	os::windows::{convert_and_encode_path, convert_path},
+	os::windows::{convert_and_encode_path, convert_osstr},
 };
-use std::{borrow::Cow, ffi::OsStr, io, path::Path};
+use std::{borrow::Cow, ffi::OsStr, io};
 
 tag_enum!(
 /// [Mapping](NameType) that produces
@@ -20,24 +20,26 @@ impl NameType for NamedPipe {
 		true
 	}
 }
-impl PathNameType for NamedPipe {
-	fn map(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
-		if !is_pipefs(path.as_os_str()) {
+impl PathNameType<OsStr> for NamedPipe {
+	fn map(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
+		if !is_pipefs(&path) {
 			return Err(io::Error::new(
 				io::ErrorKind::Unsupported,
 				"not a named pipe path",
 			));
 		}
-		Ok(Name(NameInner::NamedPipe(Cow::Owned(convert_path(&path)?))))
+		Ok(Name(NameInner::NamedPipe(Cow::Owned(convert_osstr(
+			&path,
+		)?))))
 	}
 }
 
-pub(crate) fn map_generic_path(path: Cow<'_, Path>) -> io::Result<Name<'_>> {
+pub(crate) fn map_generic_path_osstr(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
 	// TODO do something meaningful for non-NPFS paths instead of rejecting them
 	NamedPipe::map(path)
 }
 
-pub(crate) fn map_generic_namespaced(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
+pub(crate) fn map_generic_namespaced_osstr(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
 	// The prepending currently happens at a later point.
 	Ok(Name(NameInner::NamedPipe(Cow::Owned(
 		convert_and_encode_path(&name, None)?,

@@ -43,7 +43,7 @@ fn test_inner(path: bool) -> TestResult {
 	let name = Arc::try_unwrap(name).unwrap();
 	let _ = Stream::connect(name.borrow()).opname("client connect")?;
 	let actual_mode = if let Name(NameInner::UdSocketPath(path)) = name {
-		get_file_mode(path.as_os_str())
+		get_file_mode(&path)
 	} else {
 		let fd = match &listener {
 			Listener::UdSocket(l) => l.as_fd(),
