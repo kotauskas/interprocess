@@ -1,5 +1,5 @@
 use super::{c_wrappers, downgrade_eof, winprelude::*};
-use crate::{OrErrno, TryClone};
+use crate::{AsMutPtr, OrErrno, SubUsizeExt, TryClone};
 use std::{io, mem::MaybeUninit, ptr};
 use windows_sys::Win32::{
 	Foundation::MAX_PATH,
@@ -19,11 +19,11 @@ impl FileHandle {
 				self.as_int_handle(),
 				buf.as_mut_ptr().cast(),
 				len,
-				&mut bytes_read as *mut _,
+				bytes_read.as_mut_ptr(),
 				ptr::null_mut(),
 			)
 		}
-		.true_val_or_errno(bytes_read as usize)
+		.true_val_or_errno(bytes_read.to_usize())
 	}
 	pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
 		let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
@@ -34,11 +34,11 @@ impl FileHandle {
 				self.as_int_handle(),
 				buf.as_ptr().cast(),
 				len,
-				&mut bytes_written as *mut _,
+				bytes_written.as_mut_ptr(),
 				ptr::null_mut(),
 			)
 		}
-		.true_val_or_errno(bytes_written as usize)
+		.true_val_or_errno(bytes_written.to_usize())
 	}
 	#[inline(always)]
 	pub fn flush(&self) -> io::Result<()> {
@@ -52,7 +52,7 @@ impl FileHandle {
 	// The second arm is unreachable if cap > len.
 	#[allow(dead_code, clippy::arithmetic_side_effects)]
 	pub fn path(handle: BorrowedHandle<'_>) -> io::Result<Vec<u16>> {
-		let mut buf = Vec::with_capacity((MAX_PATH + 1) as usize);
+		let mut buf = Vec::with_capacity((MAX_PATH + 1).to_usize());
 		match Self::_path(handle.as_int_handle(), &mut buf) {
 			(_, Ok(true)) => Ok(buf),
 			(len, Ok(false)) => {
@@ -71,14 +71,14 @@ impl FileHandle {
 		buf.clear();
 		let buflen = buf.capacity().try_into().unwrap_or(u32::MAX);
 		let rslt = unsafe { GetFinalPathNameByHandleW(handle, buf.as_mut_ptr(), buflen, 0) };
-		let len = rslt as usize;
+		let len = rslt.to_usize();
 		let e = if rslt >= buflen {
 			Ok(false)
 		} else if rslt == 0 {
 			Err(io::Error::last_os_error())
 		} else {
 			// +1 to include the nul terminator in the size.
-			unsafe { buf.set_len(rslt as usize + 1) }
+			unsafe { buf.set_len(rslt.to_usize() + 1) }
 			Ok(true)
 		};
 		(len, e)

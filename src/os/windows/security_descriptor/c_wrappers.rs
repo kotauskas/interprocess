@@ -1,5 +1,5 @@
 use super::LocalBox;
-use crate::OrErrno;
+use crate::{BoolExt, OrErrno, SubUsizeExt};
 use std::{ffi::c_void, io, ptr};
 use widestring::U16CStr;
 use windows_sys::Win32::{
@@ -55,11 +55,11 @@ pub(super) unsafe fn set_acl(
 	defaulted: bool,
 	f: unsafe extern "system" fn(*mut c_void, BOOL, *const ACL, BOOL) -> BOOL,
 ) -> io::Result<()> {
-	let has_acl = acl.is_some() as i32;
+	let has_acl = acl.is_some().to_i32();
 	// Note that the null ACL is a valid value that does not represent the lack of an ACL. The null
 	// pointer this defaults to will be ignored by Windows because has_acl == false.
 	let acl = acl.unwrap_or(ptr::null_mut());
-	unsafe { f(sd.cast_mut(), has_acl, acl, defaulted as i32) }.true_val_or_errno(())
+	unsafe { f(sd.cast_mut(), has_acl, acl, defaulted.to_i32()) }.true_val_or_errno(())
 }
 pub(super) unsafe fn set_sid(
 	sd: *const c_void,
@@ -67,7 +67,7 @@ pub(super) unsafe fn set_sid(
 	defaulted: bool,
 	f: unsafe extern "system" fn(*mut c_void, PSID, BOOL) -> BOOL,
 ) -> io::Result<()> {
-	unsafe { f(sd.cast_mut(), sid, defaulted as i32) }.true_val_or_errno(())
+	unsafe { f(sd.cast_mut(), sid, defaulted.to_i32()) }.true_val_or_errno(())
 }
 
 pub(super) unsafe fn set_control(
@@ -128,7 +128,7 @@ pub(super) unsafe fn serialize(
 	.true_val_or_errno(())?;
 	Ok((
 		unsafe { LocalBox::from_raw(localboxed_string.cast()) },
-		buflen as usize,
+		buflen.to_usize(),
 	))
 }
 

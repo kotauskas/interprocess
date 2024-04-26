@@ -4,6 +4,7 @@ use crate::{
 		pipe_mode, DuplexPipeStream, PipeListener, PipeMode, RecvPipeStream, SendPipeStream,
 	},
 	tests::util::*,
+	SubUsizeExt,
 };
 use color_eyre::eyre::{ensure, WrapErr};
 use recvmsg::{MsgBuf, RecvMsg, RecvResult};
@@ -128,7 +129,7 @@ fn recv(
 	exp: impl AsRef<str>,
 	nr: u8,
 ) -> TestResult {
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 	let exp_ = exp.as_ref();
 	let mut len = exp_.len();
 	if nr == 2 {
@@ -155,7 +156,7 @@ fn send(
 	nr: u8,
 ) -> TestResult {
 	let msg_ = msg.as_ref();
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 
 	let sent = conn
 		.send(msg_.as_bytes())

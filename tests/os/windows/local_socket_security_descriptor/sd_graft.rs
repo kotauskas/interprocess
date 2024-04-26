@@ -10,7 +10,7 @@ use crate::{
 		AsRawHandleExt as _,
 	},
 	tests::util::*,
-	OrErrno, TryClone,
+	OrErrno, SubUsizeExt, TryClone,
 };
 use std::{ffi::OsString, fs::File, io, mem::MaybeUninit, os::windows::prelude::*, ptr, sync::Arc};
 use widestring::{U16CStr, U16Str};
@@ -38,7 +38,13 @@ fn get_sd(handle: BorrowedHandle<'_>, ot: SE_OBJECT_TYPE) -> TestResult<Security
 			ptr::null_mut(),
 			ptr::null_mut(),
 			&mut sdptr,
-		) as i32
+		)
+	};
+	let errno = {
+		#[allow(clippy::as_conversions)]
+		{
+			errno as i32
+		}
 	};
 	(errno == STATUS_SUCCESS)
 		.then_some(())
@@ -54,7 +60,7 @@ fn get_sd(handle: BorrowedHandle<'_>, ot: SE_OBJECT_TYPE) -> TestResult<Security
 fn count_opening_parentheses(s: &U16Str) -> u32 {
 	let mut cpa = 0;
 	for c in s.as_slice().iter().copied() {
-		if c == '(' as u16 {
+		if c == b'('.into() {
 			cpa += 1;
 		}
 	}
@@ -76,7 +82,7 @@ fn ensure_equal_non_acl_part(a: &U16CStr, b: &U16CStr) -> TestResult<usize> {
 		.enumerate()
 	{
 		idx = i;
-		if ca == 'D' as u16 {
+		if ca == b'D'.into() {
 			break;
 		}
 		ensure_eq!(ca, cb);
@@ -93,10 +99,11 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
 	unsafe { GetModuleFileNameW(0, base, cap) != 0 }
 		.true_val_or_errno(())
 		.and_then(|()| unsafe {
-			U16CStr::from_ptr_truncate(base.cast_const(), cap as usize).map_err(io::Error::other)
+			U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize()).map_err(io::Error::other)
 		})
 }
 
+#[allow(clippy::as_conversions)]
 pub(super) fn test_main() -> TestResult {
 	let sd = {
 		let mut pathbuf = [MaybeUninit::uninit(); MAX_PATH as _];

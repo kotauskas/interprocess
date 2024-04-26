@@ -4,7 +4,7 @@ use crate::{
 		winprelude::*,
 		FileHandle,
 	},
-	HandleOrErrno, OrErrno,
+	AsMutPtr, HandleOrErrno, OrErrno, RawOsErrorExt, SubUsizeExt,
 };
 use std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr};
 use widestring::U16CStr;
@@ -22,7 +22,7 @@ use windows_sys::Win32::{
 
 fn optional_out_ptr<T>(outref: Option<&mut T>) -> *mut T {
 	match outref {
-		Some(outref) => outref as *mut T,
+		Some(outref) => outref.as_mut_ptr(),
 		None => ptr::null_mut(),
 	}
 }
@@ -33,7 +33,7 @@ pub(crate) unsafe fn hget(
 	f: unsafe extern "system" fn(HANDLE, *mut u32) -> i32,
 ) -> io::Result<u32> {
 	let mut x: u32 = 0;
-	unsafe { f(handle.as_int_handle(), &mut x as *mut _) }.true_val_or_errno(x)
+	unsafe { f(handle.as_int_handle(), x.as_mut_ptr()) }.true_val_or_errno(x)
 }
 
 pub(crate) fn get_np_info(
@@ -98,14 +98,13 @@ pub(crate) fn set_np_handle_state(
 		collect_data_timeout.unwrap_or_default(),
 		collect_data_timeout.is_some(),
 	);
-	let toptr = |r: &mut u32| r as *mut u32;
 	let null = ptr::null_mut();
 	unsafe {
 		SetNamedPipeHandleState(
 			handle.as_int_handle(),
-			if has_mode { toptr(&mut mode_) } else { null },
-			if has_mcc { toptr(&mut mcc) } else { null },
-			if has_cdt { toptr(&mut cdt) } else { null },
+			if has_mode { mode_.as_mut_ptr() } else { null },
+			if has_mcc { mcc.as_mut_ptr() } else { null },
+			if has_cdt { cdt.as_mut_ptr() } else { null },
 		)
 	}
 	.true_val_or_errno(())
@@ -135,10 +134,10 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 			0,
 			ptr::null_mut(),
 			ptr::null_mut(),
-			&mut msglen as *mut _,
+			msglen.as_mut_ptr(),
 		)
 	}
-	.true_val_or_errno(msglen as usize)
+	.true_val_or_errno(msglen.to_usize())
 }
 
 fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {
@@ -176,11 +175,9 @@ pub(crate) fn connect_without_waiting(
 		.handle_or_errno()
 		.map(|h|
 			// SAFETY: we just created this handle
-			FileHandle::from(OwnedHandle::from_raw_handle(h as RawHandle)))
+			FileHandle::from(OwnedHandle::from_raw_handle(h.to_std())))
 	} {
-		Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as _) => {
-			Err(io::ErrorKind::WouldBlock.into())
-		}
+		Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => Err(io::ErrorKind::WouldBlock.into()),
 		els => els,
 	}
 }
@@ -199,5 +196,5 @@ pub(crate) fn set_nonblocking_given_readmode(
 }
 
 pub(crate) fn block_for_server(path: &U16CStr, timeout: WaitTimeout) -> io::Result<()> {
-	unsafe { WaitNamedPipeW(path.as_ptr() as *mut _, timeout.to_raw()) }.true_val_or_errno(())
+	unsafe { WaitNamedPipeW(path.as_ptr().cast_mut(), timeout.to_raw()) }.true_val_or_errno(())
 }

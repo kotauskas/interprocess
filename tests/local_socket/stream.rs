@@ -1,6 +1,7 @@
 use crate::{
 	local_socket::{prelude::*, ListenerOptions, Name, Stream},
 	tests::util::*,
+	BoolExt, SubUsizeExt,
 };
 use color_eyre::eyre::WrapErr;
 use std::{
@@ -10,7 +11,7 @@ use std::{
 };
 
 fn msg(server: bool, nts: bool) -> Box<str> {
-	message(None, server, Some(['\n', '\0'][nts as usize]))
+	message(None, server, Some(['\n', '\0'][nts.to_usize()]))
 }
 
 pub fn server(
@@ -50,7 +51,7 @@ pub fn client(name: &Name<'_>) -> TestResult {
 
 fn recv(conn: &mut dyn BufRead, exp: &str, nr: u8) -> TestResult {
 	let term = *exp.as_bytes().last().unwrap();
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 
 	let mut buffer = Vec::with_capacity(exp.len());
 	conn.read_until(term, &mut buffer)
@@ -62,7 +63,7 @@ fn recv(conn: &mut dyn BufRead, exp: &str, nr: u8) -> TestResult {
 	Ok(())
 }
 fn send(conn: &mut dyn Write, msg: &str, nr: u8) -> TestResult {
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 	conn.write_all(msg.as_bytes())
 		.with_context(|| format!("{} socket send failed", fs))
 }

@@ -27,7 +27,7 @@ pub trait ShareHandle: AsHandle {
 	/// require unsafe code since `DuplicateHandle` never leads to undefined behavior if the
 	/// `lpTargetHandle` parameter is a valid pointer, only creates an error.
 	fn share(&self, receiver: BorrowedHandle<'_>) -> io::Result<RawHandle> {
-		c_wrappers::duplicate_handle_to_foreign(self.as_handle(), receiver)
+		c_wrappers::duplicate_handle_to_foreign(self.as_handle(), receiver).map(HANDLE::to_std)
 	}
 }
 impl ShareHandle for crate::unnamed_pipe::Recver {}

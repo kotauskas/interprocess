@@ -34,6 +34,6 @@ impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
 impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
 	#[inline(always)]
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-		(self as &PipeStream<_, _>).read(buf)
+		(&*self).read(buf)
 	}
 }

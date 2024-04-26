@@ -1,5 +1,5 @@
 use super::*;
-use crate::OrErrno;
+use crate::{AsMutPtr, OrErrno};
 use std::{
 	marker::PhantomData,
 	mem::{size_of, size_of_val, zeroed, ManuallyDrop},
@@ -42,7 +42,7 @@ pub(super) unsafe fn clone(sd: *const c_void) -> io::Result<SecurityDescriptor> 
 			unsafe { new_sd.set_dacl(ptr::null_mut(), dfl)? };
 		} else {
 			let mut acl = ManuallyDrop::new(unsafe { clone_acl(acl)? });
-			unsafe { new_sd.set_dacl(acl.as_mut_ptr(), dfl)? };
+			unsafe { new_sd.set_dacl((*acl).as_mut_ptr(), dfl)? };
 		}
 	}
 	if let Some((acl, dfl)) = sacl {
@@ -50,7 +50,7 @@ pub(super) unsafe fn clone(sd: *const c_void) -> io::Result<SecurityDescriptor> 
 			unsafe { new_sd.set_sacl(ptr::null_mut(), dfl)? };
 		} else {
 			let mut acl = ManuallyDrop::new(unsafe { clone_acl(acl)? });
-			unsafe { new_sd.set_sacl(acl.as_mut_ptr(), dfl)? };
+			unsafe { new_sd.set_sacl((*acl).as_mut_ptr(), dfl)? };
 		}
 	}
 
@@ -117,15 +117,15 @@ unsafe fn get_acl_info<T>(
 	unsafe {
 		GetAclInformation(
 			acl.cast_mut(),
-			(&mut info as *mut T).cast(),
-			size_of_val(&info) as u32,
+			info.as_mut_ptr().cast(),
+			size_of_val(&info).try_into().unwrap(),
 			information_class,
 		)
 		.true_val_or_errno(info)
 	}
 }
 
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::as_conversions)]
 fn create_acl(sz: u32, rev: u32) -> io::Result<LocalBox<ACL>> {
 	const ALIGN: u32 = size_of::<u32>() as u32; // 100₂
 	const ALIGN_MASK: u32 = ALIGN - 1; // 011₂
@@ -159,7 +159,7 @@ unsafe fn clone_acl(acl: *const ACL) -> io::Result<LocalBox<ACL>> {
 				rev,
 				MAXDWORD,
 				ace.cast_const(),
-				(*ace.cast_const().cast::<ACE_HEADER>()).AceSize as _,
+				(*ace.cast_const().cast::<ACE_HEADER>()).AceSize.into(),
 			)
 			.true_val_or_errno(())?;
 		}

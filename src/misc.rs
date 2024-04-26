@@ -96,7 +96,36 @@ impl ToBool for i32 {
 	}
 }
 
-// TODO(2.0.1) add a helper for casting references to pointers and then forbid all as casts
+pub(crate) trait BoolExt {
+	fn to_i32(self) -> i32;
+	fn to_usize(self) -> usize;
+}
+impl BoolExt for bool {
+	#[inline(always)] #[rustfmt::skip] // oh come on now
+	fn to_i32(self) -> i32 {
+		if self { 1 } else { 0 }
+	}
+	#[inline(always)] #[rustfmt::skip]
+	fn to_usize(self) -> usize {
+		if self { 1 } else { 0 }
+	}
+}
+
+pub(crate) trait AsPtr {
+	#[inline(always)]
+	fn as_ptr(&self) -> *const Self {
+		self
+	}
+}
+impl<T: ?Sized> AsPtr for T {}
+
+pub(crate) trait AsMutPtr {
+	#[inline(always)]
+	fn as_mut_ptr(&mut self) -> *mut Self {
+		self
+	}
+}
+impl<T: ?Sized> AsMutPtr for T {}
 
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
 	#[inline]
@@ -124,6 +153,62 @@ pub(crate) trait NumExt: Sized {
 	}
 }
 impl<T> NumExt for T {}
+
+pub(crate) trait SubUsizeExt: TryInto<usize> + Sized {
+	fn to_usize(self) -> usize;
+}
+pub(crate) trait SubIsizeExt: TryInto<usize> + Sized {
+	fn to_isize(self) -> isize;
+}
+macro_rules! impl_subsize {
+	($src:ident to usize) => {
+		impl SubUsizeExt for $src {
+			#[inline(always)]
+			#[allow(clippy::as_conversions)]
+			fn to_usize(self) -> usize {
+				self as usize
+			}
+		}
+	};
+	($src:ident to isize) => {
+		impl SubIsizeExt for $src {
+			#[inline(always)]
+			#[allow(clippy::as_conversions)]
+			fn to_isize(self) -> isize {
+				self as isize
+			}
+		}
+	};
+	($($src:ident to $dst:ident)+) => {$(
+		impl_subsize!($src to $dst);
+	)+};
+}
+// See platform_check.rs.
+impl_subsize! {
+	u8	to usize
+	u16	to usize
+	u32	to usize
+	i8	to isize
+	i16	to isize
+	i32	to isize
+	u8	to isize
+	u16	to isize
+}
+
+// TODO(2.3.0) find a more elegant way
+pub(crate) trait RawOsErrorExt {
+	fn eeq(self, other: u32) -> bool;
+}
+impl RawOsErrorExt for Option<i32> {
+	#[inline(always)]
+	#[allow(clippy::as_conversions)]
+	fn eeq(self, other: u32) -> bool {
+		match self {
+			Some(n) => n as u32 == other,
+			None => false,
+		}
+	}
+}
 
 #[inline(always)]
 pub(crate) fn weaken_buf_init<T>(r: &[T]) -> &[MaybeUninit<T>] {

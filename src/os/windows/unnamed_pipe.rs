@@ -8,14 +8,14 @@
 use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{
 	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
-	weaken_buf_init_mut,
+	weaken_buf_init_mut, AsPtr,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
 	io::{self, Read, Write},
 	num::NonZeroUsize,
 };
-use windows_sys::Win32::{Security::SECURITY_ATTRIBUTES, System::Pipes::CreatePipe};
+use windows_sys::Win32::System::Pipes::CreatePipe;
 
 /// Builder used to create unnamed pipes while supplying additional options.
 ///
@@ -82,24 +82,20 @@ impl<'sd> CreationOptions<'sd> {
 		let hint_raw = match self.buffer_size_hint {
 			Some(num) => num.get(),
 			None => 0,
-		} as u32;
+		}
+		.try_into()
+		.unwrap();
 
 		let sd = create_security_attributes(self.security_descriptor, self.inheritable);
 
 		let [mut w, mut r] = [INVALID_HANDLE_VALUE; 2];
-		let success = unsafe {
-			CreatePipe(
-				&mut r,
-				&mut w,
-				(&sd as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
-				hint_raw,
-			)
-		} != 0;
+		let success =
+			unsafe { CreatePipe(&mut r, &mut w, sd.as_ptr().cast_mut().cast(), hint_raw) } != 0;
 		if success {
 			let (w, r) = unsafe {
 				// SAFETY: we just created those handles which means that we own them
-				let w = OwnedHandle::from_raw_handle(w as RawHandle);
-				let r = OwnedHandle::from_raw_handle(r as RawHandle);
+				let w = OwnedHandle::from_raw_handle(w.to_std());
+				let r = OwnedHandle::from_raw_handle(r.to_std());
 				(w, r)
 			};
 			let w = PubSender(Sender(FileHandle::from(w)));

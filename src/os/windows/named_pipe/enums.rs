@@ -187,6 +187,8 @@ pub enum PipeMode {
 impl PipeMode {
 	/// Converts the value into a raw `u32`-typed constant, either `PIPE_TYPE_BYTE` or
 	/// `PIPE_TYPE_MESSAGE` depending on the value.
+	#[inline]
+	#[allow(clippy::as_conversions)]
 	pub const fn to_pipe_type(self) -> u32 {
 		self as _
 	}

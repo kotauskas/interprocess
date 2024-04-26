@@ -3,11 +3,10 @@ use crate::{
 	os::windows::{
 		named_pipe::PipeMode, security_descriptor::create_security_attributes, winprelude::*,
 	},
-	HandleOrErrno,
+	AsPtr, HandleOrErrno,
 };
 use std::num::NonZeroU8;
 use windows_sys::Win32::{
-	Security::SECURITY_ATTRIBUTES,
 	Storage::FileSystem::{
 		FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, FILE_FLAG_WRITE_THROUGH,
 	},
@@ -66,19 +65,19 @@ cannot create pipe server that has byte type but receives messages – have you 
 
 		unsafe {
 			CreateNamedPipeW(
-				self.path.as_ptr(),
+				(*self.path).as_ptr(),
 				open_mode,
 				pipe_mode,
 				max_instances,
 				self.output_buffer_size_hint,
 				self.input_buffer_size_hint,
 				self.wait_timeout.to_raw(),
-				(&sa as *const SECURITY_ATTRIBUTES).cast_mut().cast(),
+				sa.as_ptr().cast_mut().cast(),
 			)
 			.handle_or_errno()
 			.map(|h|
 				// SAFETY: we just made it and received ownership
-				OwnedHandle::from_raw_handle(h as RawHandle))
+				OwnedHandle::from_raw_handle(h.to_std()))
 		}
 	}
 

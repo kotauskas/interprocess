@@ -1,3 +1,5 @@
+use crate::AsPtr;
+
 use super::{validate, AsSecurityDescriptor, AsSecurityDescriptorMut};
 use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 use windows_sys::Win32::Security::SECURITY_DESCRIPTOR;
@@ -35,7 +37,7 @@ impl<'a> BorrowedSecurityDescriptor<'a> {
 	/// The [safety constraints](AsSecurityDescriptor#safety-constraints) must be upheld.
 	#[inline]
 	pub unsafe fn from_ref(r: &'a SECURITY_DESCRIPTOR) -> Self {
-		unsafe { Self::from_ptr((r as *const SECURITY_DESCRIPTOR).cast()) }
+		unsafe { Self::from_ptr(r.as_ptr().cast()) }
 	}
 
 	/// Wraps the given raw pointer to a security descriptor.

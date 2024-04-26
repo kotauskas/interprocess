@@ -1,5 +1,5 @@
 use super::*;
-use crate::{DebugExpectExt, OrErrno, TryClone};
+use crate::{AsMutPtr, AsPtr, DebugExpectExt, OrErrno, TryClone};
 use std::{
 	fmt::{self, Debug, Formatter},
 	mem::MaybeUninit,
@@ -28,7 +28,7 @@ unsafe impl Send for SecurityDescriptor {}
 unsafe impl AsSecurityDescriptor for SecurityDescriptor {
 	#[inline(always)]
 	fn as_sd(&self) -> *const c_void {
-		(self as *const Self).cast()
+		self.as_ptr().cast()
 	}
 }
 unsafe impl AsSecurityDescriptorMut for SecurityDescriptor {
@@ -71,7 +71,7 @@ impl SecurityDescriptor {
 	pub unsafe fn from_owned(mut sd: SECURITY_DESCRIPTOR) -> Self {
 		debug_assert!(
 			unsafe {
-				c_wrappers::control_and_revision((&sd as *const SECURITY_DESCRIPTOR).cast())
+				c_wrappers::control_and_revision(sd.as_ptr().cast())
 					.expect("failed to verify that security descriptor is not self-relative")
 					.0 & SE_SELF_RELATIVE
 					== 0
@@ -79,7 +79,7 @@ impl SecurityDescriptor {
 			"self-relative security descriptor not allowed here"
 		);
 		unsafe {
-			validate((&mut sd as *mut SECURITY_DESCRIPTOR).cast());
+			validate(sd.as_mut_ptr().cast());
 		}
 		Self(sd)
 	}
@@ -103,19 +103,19 @@ impl SecurityDescriptor {
 	/// Borrows immutably. The returned type is also a safe wrapper around security descriptors.
 	#[inline(always)]
 	pub fn borrow(&self) -> BorrowedSecurityDescriptor<'_> {
-		unsafe { BorrowedSecurityDescriptor::from_ptr((self as *const Self).cast()) }
+		unsafe { BorrowedSecurityDescriptor::from_ptr(self.as_ptr().cast()) }
 	}
 	/// Borrows mutably. The returned type is also a safe wrapper around security descriptors.
 	#[inline(always)]
 	pub fn borrow_mut(&mut self) -> MutBorrowedSecurityDescriptor<'_> {
-		unsafe { MutBorrowedSecurityDescriptor::from_ptr((self as *mut Self).cast()) }
+		unsafe { MutBorrowedSecurityDescriptor::from_ptr(self.as_mut_ptr().cast()) }
 	}
 }
 
 impl Debug for SecurityDescriptor {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		f.debug_tuple("SecurityDescriptor")
-			.field(&(self as *const Self))
+			.field(&(self.as_ptr()))
 			.finish()
 	}
 }

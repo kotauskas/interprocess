@@ -6,13 +6,13 @@ macro_rules! derive_sync_mut_read {
 		impl $(<$($lt)*>)? ::std::io::Read for $ty {
 			#[inline(always)]
 			fn read(&mut self, buf: &mut [u8]) -> ::std::io::Result<usize> {
-				(self as &Self).read(buf)
+				(&*self).read(buf)
 			}
 			#[inline(always)]
 			fn read_vectored(
 				&mut self,
 				bufs: &mut [::std::io::IoSliceMut<'_>],
-			) -> ::std::io::Result<usize> { (self as &Self).read_vectored(bufs) }
+			) -> ::std::io::Result<usize> { (&*self).read_vectored(bufs) }
 			// read_to_end isn't here because this macro isn't supposed to be used on Chain-like
 			// adapters
 			// FUTURE is_read_vectored
@@ -25,17 +25,17 @@ macro_rules! derive_sync_mut_write {
 		impl $(<$($lt)*>)? ::std::io::Write for $ty {
 			#[inline(always)]
 			fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
-				(self as &Self).write(buf)
+				(&*self).write(buf)
 			}
 			#[inline(always)]
 			fn flush(&mut self) -> ::std::io::Result<()> {
-				(self as &Self).flush()
+				(&*self).flush()
 			}
 			#[inline(always)]
 			fn write_vectored(
 				&mut self,
 				bufs: &[::std::io::IoSlice<'_>],
-			) -> ::std::io::Result<usize> { (self as &Self).write_vectored(bufs) }
+			) -> ::std::io::Result<usize> { (&*self).write_vectored(bufs) }
 			// FUTURE is_write_vectored
 		}
 	};

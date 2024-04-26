@@ -83,10 +83,10 @@ impl<Rm: PipeModeTag> Write for &PipeStream<Rm, pipe_mode::Bytes> {
 impl<Rm: PipeModeTag> Write for PipeStream<Rm, pipe_mode::Bytes> {
 	#[inline(always)]
 	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-		(self as &PipeStream<_, _>).write(buf)
+		(&*self).write(buf)
 	}
 	#[inline(always)]
 	fn flush(&mut self) -> io::Result<()> {
-		(self as &PipeStream<_, _>).flush()
+		(&mut &*self).flush()
 	}
 }

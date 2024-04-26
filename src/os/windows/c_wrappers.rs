@@ -8,19 +8,19 @@ use windows_sys::Win32::{
 
 pub fn duplicate_handle(handle: BorrowedHandle<'_>) -> io::Result<OwnedHandle> {
 	let raw = duplicate_handle_inner(handle, None)?;
-	unsafe { Ok(OwnedHandle::from_raw_handle(raw as RawHandle)) }
+	unsafe { Ok(OwnedHandle::from_raw_handle(raw.to_std())) }
 }
 pub fn duplicate_handle_to_foreign(
 	handle: BorrowedHandle<'_>,
 	other_process: BorrowedHandle<'_>,
-) -> io::Result<RawHandle> {
+) -> io::Result<HANDLE> {
 	duplicate_handle_inner(handle, Some(other_process))
 }
 
 fn duplicate_handle_inner(
 	handle: BorrowedHandle<'_>,
 	other_process: Option<BorrowedHandle<'_>>,
-) -> io::Result<RawHandle> {
+) -> io::Result<HANDLE> {
 	let mut new_handle = INVALID_HANDLE_VALUE;
 	unsafe {
 		let proc = GetCurrentProcess();
@@ -34,5 +34,5 @@ fn duplicate_handle_inner(
 			DUPLICATE_SAME_ACCESS,
 		)
 	}
-	.true_val_or_errno(new_handle as _)
+	.true_val_or_errno(new_handle)
 }

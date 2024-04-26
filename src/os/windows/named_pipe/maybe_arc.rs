@@ -1,3 +1,4 @@
+use crate::AsMutPtr;
 use std::{mem::ManuallyDrop, ops::Deref, ptr, sync::Arc};
 
 /// Inlining optimization for `Arc`.
@@ -15,7 +16,7 @@ impl<T> MaybeArc<T> {
 				let x = unsafe {
 					// SAFETY: generally a no-op from a safety perspective; the ManuallyDrop ensures
 					// that it stays that way in the event of a panic in Arc::new
-					ptr::read((mx as *mut T).cast::<ManuallyDrop<T>>())
+					ptr::read(mx.as_mut_ptr().cast::<ManuallyDrop<T>>())
 				};
 				let arc = Arc::new(x);
 

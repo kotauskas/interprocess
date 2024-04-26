@@ -4,6 +4,7 @@ use crate::{
 		ListenerOptions, Name,
 	},
 	tests::util::*,
+	BoolExt, SubUsizeExt,
 };
 use ::tokio::{
 	io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
@@ -14,7 +15,7 @@ use color_eyre::eyre::WrapErr;
 use std::{future::Future, str, sync::Arc};
 
 fn msg(server: bool, nts: bool) -> Box<str> {
-	message(None, server, Some(['\n', '\0'][nts as usize]))
+	message(None, server, Some(['\n', '\0'][nts.to_usize()]))
 }
 
 pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
@@ -117,7 +118,7 @@ pub async fn client_split(name: Arc<Name<'_>>) -> TestResult {
 
 async fn recv(conn: &mut (dyn AsyncBufRead + Unpin + Send), exp: &str, nr: u8) -> TestResult {
 	let term = *exp.as_bytes().last().unwrap();
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 
 	let mut buffer = Vec::with_capacity(exp.len());
 	conn.read_until(term, &mut buffer)
@@ -131,7 +132,7 @@ async fn recv(conn: &mut (dyn AsyncBufRead + Unpin + Send), exp: &str, nr: u8) -
 }
 
 async fn send(conn: &mut (dyn AsyncWrite + Unpin + Send), msg: &str, nr: u8) -> TestResult {
-	let fs = ["first", "second"][nr as usize];
+	let fs = ["first", "second"][nr.to_usize()];
 	conn.write_all(msg.as_bytes())
 		.await
 		.with_context(|| format!("{} socket send failed", fs))

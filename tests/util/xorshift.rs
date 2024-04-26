@@ -15,7 +15,7 @@ impl Xorshift32 {
 		id.hash(&mut hasher);
 		let hash64 = hasher.finish();
 		let hash32 = ((hash64 & 0xFFFF_FFFF_0000_0000) >> 32) ^ (hash64 & 0xFFFF_FFFF);
-		Self(hash32 as u32)
+		Self(hash32.try_into().unwrap())
 	}
 	pub fn next(&mut self) -> u32 {
 		self.0 ^= self.0 << 13;

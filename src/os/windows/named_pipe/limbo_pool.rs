@@ -4,12 +4,15 @@
 //! the portability-conscious local socket interface requires this additional feature to allow for
 //! the common use case of dropping right after sending a graceful shutdown message.
 
+use crate::SubUsizeExt;
+
 const LIMBO_SLOTS: u8 = 16;
 
 /// Common result type for operations that complete with no output but may reject their input,
 /// requiring some form of retry.
 pub(crate) type MaybeReject<T> = Result<(), T>;
 
+#[allow(clippy::as_conversions)]
 pub(crate) struct LimboPool<S> {
 	senders: [Option<S>; LIMBO_SLOTS as _],
 	count: u8,
@@ -23,7 +26,7 @@ impl<S> LimboPool<S> {
 		self.incr_count_including_overflow();
 		#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 		if self.count < LIMBO_SLOTS {
-			self.senders[self.count as usize] = Some(s);
+			self.senders[self.count.to_usize()] = Some(s);
 			self.count += 1;
 			Ok(())
 		} else {

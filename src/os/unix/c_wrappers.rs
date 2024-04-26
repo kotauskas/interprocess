@@ -1,4 +1,5 @@
 use super::unixprelude::*;
+use crate::AsPtr;
 #[allow(unused_imports)]
 use crate::{FdOrErrno, OrErrno};
 use libc::{sockaddr_un, AF_UNIX};
@@ -114,6 +115,7 @@ fn addr_to_slice(addr: &SocketAddr) -> (&[u8], usize) {
 	}
 }
 
+#[allow(clippy::as_conversions)]
 const SUN_PATH_OFFSET: usize = unsafe {
 	// This code may or may not have been copied from the standard library
 	let addr = zeroed::<sockaddr_un>();
@@ -122,7 +124,11 @@ const SUN_PATH_OFFSET: usize = unsafe {
 	path.byte_offset_from(base) as usize
 };
 
-#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+#[allow(
+	clippy::indexing_slicing,
+	clippy::arithmetic_side_effects,
+	clippy::as_conversions
+)]
 fn bind(fd: BorrowedFd<'_>, addr: &SocketAddr) -> io::Result<()> {
 	let (path, extra) = addr_to_slice(addr);
 	let path = unsafe { transmute::<&[u8], &[i8]>(path) };
@@ -136,7 +142,7 @@ fn bind(fd: BorrowedFd<'_>, addr: &SocketAddr) -> io::Result<()> {
 	unsafe {
 		libc::bind(
 			fd.as_raw_fd(),
-			(&addr as *const sockaddr_un).cast(),
+			addr.as_ptr().cast(),
 			// It's impossible for this to exceed socklen_t::MAX, since it came from a valid
 			// SocketAddr
 			len as _,

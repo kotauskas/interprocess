@@ -7,7 +7,7 @@ pub use {incoming::*, options::*};
 use super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
 use crate::{
 	os::windows::{winprelude::*, FileHandle},
-	poison_error, LOCK_POISON,
+	poison_error, RawOsErrorExt, LOCK_POISON,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -148,7 +148,7 @@ fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
 		Ok(())
 	} else {
 		let last_error = io::Error::last_os_error();
-		if last_error.raw_os_error() == Some(ERROR_PIPE_CONNECTED as i32) {
+		if last_error.raw_os_error().eeq(ERROR_PIPE_CONNECTED) {
 			Ok(())
 		} else {
 			Err(last_error)

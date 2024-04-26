@@ -1,5 +1,5 @@
 use super::*;
-use crate::os::windows::downgrade_eof;
+use crate::{os::windows::downgrade_eof, RawOsErrorExt};
 use recvmsg::{prelude::*, NoAddrBuf, RecvResult};
 use windows_sys::Win32::Foundation::ERROR_MORE_DATA;
 
@@ -22,7 +22,7 @@ impl RawPipeStream {
 		loop {
 			match downgrade_eof(fh.read(&mut buf)) {
 				Ok(..) => break Ok(()),
-				Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {}
+				Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {}
 				Err(e) => break Err(e),
 			}
 		}
@@ -67,7 +67,7 @@ impl RawPipeStream {
 
 			let incr = match decode_eof(rslt) {
 				Ok(incr) => incr,
-				Err(e) if e.raw_os_error() == Some(ERROR_MORE_DATA as _) => {
+				Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {
 					more_data = true;
 					partial = true;
 					slice.len()

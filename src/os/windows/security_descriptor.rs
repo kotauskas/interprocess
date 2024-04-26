@@ -17,6 +17,8 @@ mod try_clone;
 #[allow(unused_imports)] // this is literally a false positive
 pub(crate) use try_clone::LocalBox;
 
+use crate::BoolExt;
+
 pub use {as_security_descriptor::*, borrowed::*, ext::*, owned::*};
 
 use try_clone::clone;
@@ -42,7 +44,9 @@ pub(super) fn create_security_attributes(
 	if let Some(sd) = sd {
 		sd.write_to_security_attributes(&mut attrs);
 	}
-	attrs.nLength = std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32;
-	attrs.bInheritHandle = inheritable as i32;
+	attrs.nLength = std::mem::size_of::<SECURITY_ATTRIBUTES>()
+		.try_into()
+		.unwrap();
+	attrs.bInheritHandle = inheritable.to_i32();
 	attrs
 }
