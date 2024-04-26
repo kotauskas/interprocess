@@ -22,7 +22,7 @@ use std::{
 };
 use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
 
-// TODO finish collect_options and add conversion from handles after all
+// TODO(2.3.0) finish collect_options and add conversion from handles after all
 
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
@@ -31,7 +31,7 @@ use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::Connec
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
 /// for more.
-// TODO examples
+// TODO(2.0.1) examples
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 	config: PipeListenerOptions<'static>, // We need the options to create new instances
 	nonblocking: AtomicBool,
@@ -93,7 +93,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 	///
 	/// The options are necessary to provide because the listener needs to create new instances of
 	/// the named pipe server in `.accept()`.
-	// TODO mention TryFrom<OwnedHandle> here
+	// TODO(2.3.0) mention TryFrom<OwnedHandle> here
 	pub fn from_handle_and_options(
 		handle: OwnedHandle,
 		options: PipeListenerOptions<'static>,

@@ -12,7 +12,7 @@ use widestring::{u16cstr, U16CStr, U16CString};
 use windows_sys::Win32::System::Pipes::{PIPE_NOWAIT, PIPE_TYPE_MESSAGE};
 
 impl PipeListenerOptions<'_> {
-	// TODO detailed error information like with streams
+	// TODO(2.2.0) detailed error information like with streams
 	#[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
 	pub fn collect_from_handle(handle: BorrowedHandle<'_>) -> io::Result<Self> {
 		let mut rslt = Self::default();
@@ -32,7 +32,7 @@ impl PipeListenerOptions<'_> {
 		}
 		rslt.instance_limit = NonZeroU8::new(u8::try_from(max_instances).unwrap_or(0));
 
-		// TODO error out if PIPE_SERVER_END in flags, check for REJECT_REMOTE_CLIENTS (its presence
+		// TODO(2.2.0) error out if PIPE_SERVER_END in flags, check for REJECT_REMOTE_CLIENTS (its presence
 		// in the flags is not documented)
 
 		let mode = c_wrappers::get_np_handle_mode(handle)?;
@@ -43,7 +43,7 @@ impl PipeListenerOptions<'_> {
 			// SAFETY: Windows will never write interior nuls there.
 			U16CString::from_vec_unchecked(path)
 		});
-		// TODO security descriptor, inheritable
+		// TODO(2.2.0) security descriptor, inheritable
 
 		Ok(rslt)
 	}
@@ -52,7 +52,7 @@ impl PipeListenerOptions<'_> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	// TODO
+	// TODO(2.2.0)
 	fn check_collect<Rm: PipeModeTag, Sm: PipeModeTag>(original: PipeListenerOptions<'_>) {
 		let listener = original.create::<Rm, Sm>();
 		let collected = PipeListenerOptions::collect_from_handle(todo!("as_handle"))
@@ -71,7 +71,7 @@ mod tests {
 			collected.output_buffer_size_hint,
 			original.output_buffer_size_hint
 		);
-		// FIXME can't PartialEq security descriptors
+		// FIXME(2.2.0) can't PartialEq security descriptors
 		assert!(collected.security_descriptor.is_some());
 		assert_eq!(collected.inheritable, original.inheritable);
 	}
@@ -79,7 +79,7 @@ mod tests {
 	#[test]
 	fn collect_duplex_byte() {
 		let opts = PipeListenerOptions {
-			path: todo!(),
+			path: todo!(), // (2.2.0)
 			mode: PipeMode::Bytes,
 			nonblocking: true,
 			instance_limit: NonZeroU8::new(250),
@@ -88,7 +88,7 @@ mod tests {
 			input_buffer_size_hint: 420,
 			output_buffer_size_hint: 228,
 			wait_timeout: WaitTimeout::from_raw(1987),
-			security_descriptor: todo!(),
+			security_descriptor: todo!(), // (2.2.0)
 			inheritable: true,
 			..Default::default()
 		};

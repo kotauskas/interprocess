@@ -8,7 +8,7 @@ use std::io;
 
 impmod! {local_socket::dispatch_tokio as dispatch}
 
-// TODO borrowed split in examples
+// TODO(2.0.1) borrowed split in examples
 
 mkenum!(
 /// Tokio-based local socket server, listening for connections.

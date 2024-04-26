@@ -2,8 +2,7 @@
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 mod platform_check;
 
-// TODO add OS-specific ext-traits
-// TODO inspect panic points
+// TODO(2.1.0) inspect panic points
 
 #[macro_use]
 mod macros;

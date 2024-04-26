@@ -15,7 +15,7 @@ use try_clone::clone;
 use std::{ffi::c_void, io};
 use windows_sys::Win32::Security::{IsValidSecurityDescriptor, SECURITY_ATTRIBUTES};
 
-// TODO maybe make public and remove reexport
+// TODO(2.0.0) maybe make public and remove reexport
 
 unsafe fn validate(ptr: *mut c_void) {
 	unsafe {

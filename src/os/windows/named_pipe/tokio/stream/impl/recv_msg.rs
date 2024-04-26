@@ -91,8 +91,8 @@ impl RawPipeStream {
 					more_data = false;
 
 					if matches!(&rslt, Ok(0)) {
-						// FIXME Mio sometimes does broken pipe thunking (this is a bug that breaks
-						// zero-sized messages)
+						// FIXME(2.2.0) Mio sometimes does broken pipe thunking (this is a bug that
+						// breaks zero-sized messages)
 						rslt = Err(io::Error::from(io::ErrorKind::BrokenPipe));
 					}
 					let incr = match decode_eof(rslt) {

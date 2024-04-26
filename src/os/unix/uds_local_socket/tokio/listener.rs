@@ -71,7 +71,7 @@ impl TryFrom<Listener> for OwnedFd {
 	}
 }
 impl TryFrom<OwnedFd> for Listener {
-	// TODO use FromFdError
+	// TODO(2.0.0) use FromFdError
 	type Error = io::Error;
 	fn try_from(fd: OwnedFd) -> io::Result<Self> {
 		Self::try_from(SyncListener::from(fd))

@@ -54,7 +54,7 @@ impl<B: ToBool, T> OrErrno<T> for B {
 	}
 }
 
-// TODO nonzero_or_errno
+// TODO(2.0.1) nonzero_or_errno
 
 #[cfg(unix)]
 pub(crate) trait FdOrErrno: Sized {
@@ -96,7 +96,7 @@ impl ToBool for i32 {
 	}
 }
 
-// TODO add a helper for casting references to pointers and then forbid all as casts
+// TODO(2.0.1) add a helper for casting references to pointers and then forbid all as casts
 
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
 	#[inline]

@@ -1,5 +1,5 @@
-// TODO message reading disabled due to a lack of support in Mio; we should try to figure something
-// out, they need to add first-class message pipe support and handling of ERROR_MORE_DATA
+// TODO(2.2.0) message reading disabled due to a lack of support in Mio; we should try to figure
+// something out, they need to add first-class message pipe support and handling of ERROR_MORE_DATA
 
 mod error;
 pub use error::*;
@@ -91,13 +91,13 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
 	inner: Option<InnerTokio>,
-	// TODO crackhead specialization
+	// TODO(2.0.1) crackhead specialization
 	// Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
 	needs_flush: NeedsFlush,
 	// MESSAGE READING DISABLED
 	//recv_msg_state: Mutex<RecvMsgState>,
 }
-// TODO maybe concurrency detection?
+// TODO(2.0.0) am I sure I don't need concurrency detection here?
 enum InnerTokio {
 	Server(TokioNPServer),
 	Client(TokioNPClient),

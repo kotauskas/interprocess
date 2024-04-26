@@ -1,5 +1,5 @@
 //! Construction of local socket names, facilitating local socket implementation dispatch.
-// TODO write more stuff here, maybe
+// TODO(2.0.1) write more stuff here, maybe
 
 use super::Name;
 use crate::Sealed;
@@ -60,7 +60,13 @@ tag_enum!(
 /// whatever it takes. What follows below is a complete description of how that is implemented.
 ///
 /// ## Platform-specific behavior
-// TODO
+/// ### Windows
+/// For paths that start with `\\.\pipe\`, maps them to named pipe names without performing any
+/// transformations. Attempting to map any other type of path, including a normalization-bypassing
+/// path (`\\?\`) currently returns an error.
+///
+/// ### Unix
+/// Resolves to filesystem paths to Unix domain sockets without performing any transformations.
 GenericFilePath);
 impl NameType for GenericFilePath {
 	fn is_supported() -> bool {

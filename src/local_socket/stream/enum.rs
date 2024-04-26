@@ -155,7 +155,7 @@ multimacro! {
 	dispatch_write,
 }
 
-// TODO maybe adjust the Debug of halves to mention that they're local sockets
+// TODO(2.0.1) maybe adjust the Debug of halves to mention that they're local sockets
 
 mkenum!(
 /// Receive half of a local socket stream, obtained by splitting a [`Stream`].

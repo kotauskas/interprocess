@@ -4,7 +4,7 @@ use std::io::prelude::*;
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite};
 
-// TODO macro..?
+// TODO(2.0.1) macro..?
 
 /// [`Read`] by reference.
 pub trait RefRead {

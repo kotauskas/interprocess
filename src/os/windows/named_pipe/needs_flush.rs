@@ -19,7 +19,7 @@ impl NeedsFlush {
 	}
 	#[inline]
 	pub fn on_flush(&self) -> bool {
-		// TODO verify necessity of orderings
+		// TODO(2.2.0) verify necessity of orderings
 		match self
 			.0
 			.compare_exchange(NeedsFlushVal::Once, NeedsFlushVal::No, AcqRel, Acquire)

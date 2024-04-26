@@ -120,7 +120,7 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
 	}
 	#[inline]
 	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-		// TODO actually close connection here
+		// TODO(2.0.0) actually close connection here
 		AsyncWrite::poll_flush(self, cx)
 	}
 }
