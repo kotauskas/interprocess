@@ -97,7 +97,6 @@ pub(crate) struct RawPipeStream {
 	// MESSAGE READING DISABLED
 	//recv_msg_state: Mutex<RecvMsgState>,
 }
-// TODO(2.0.0) am I sure I don't need concurrency detection here?
 enum InnerTokio {
 	Server(TokioNPServer),
 	Client(TokioNPClient),
