@@ -1,7 +1,8 @@
 use crate::{
 	local_socket::{prelude::*, ListenerOptions, Stream},
 	os::windows::{
-		local_socket::ListenerOptionsExt, AsSecurityDescriptorMutExt, SecurityDescriptor,
+		local_socket::ListenerOptionsExt,
+		security_descriptor::{AsSecurityDescriptorMutExt, SecurityDescriptor},
 	},
 	tests::util::*,
 	TryClone,

@@ -1,6 +1,8 @@
 use super::*;
 use crate::{
-	os::windows::{create_security_attributes, named_pipe::PipeMode, winprelude::*},
+	os::windows::{
+		named_pipe::PipeMode, security_descriptor::create_security_attributes, winprelude::*,
+	},
 	HandleOrErrno,
 };
 use std::num::NonZeroU8;

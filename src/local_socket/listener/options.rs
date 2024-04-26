@@ -1,7 +1,7 @@
 #[cfg(feature = "tokio")]
 use crate::local_socket::tokio::Listener as TokioListener;
 #[cfg(windows)]
-use crate::os::windows::SecurityDescriptor;
+use crate::os::windows::security_descriptor::SecurityDescriptor;
 use crate::{
 	local_socket::{traits, Listener, ListenerNonblockingMode, Name},
 	Sealed, TryClone,

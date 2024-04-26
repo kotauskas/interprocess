@@ -3,7 +3,7 @@ use crate::{
 	os::windows::{
 		named_pipe::{pipe_mode, PipeMode, WaitTimeout},
 		path_conversion::*,
-		SecurityDescriptor,
+		security_descriptor::SecurityDescriptor,
 	},
 	TryClone,
 };

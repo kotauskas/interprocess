@@ -7,7 +7,7 @@ pub(crate) mod name_type;
 
 pub use name_type::*;
 
-use super::SecurityDescriptor;
+use super::security_descriptor::SecurityDescriptor;
 use crate::{local_socket::ListenerOptions, Sealed};
 
 /// Windows-specific [listener options](ListenerOptions).

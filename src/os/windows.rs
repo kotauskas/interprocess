@@ -3,14 +3,14 @@
 
 pub mod local_socket;
 pub mod named_pipe;
+pub mod security_descriptor;
 pub mod unnamed_pipe;
 //pub mod mailslot;
 
 mod path_conversion;
-mod security_descriptor;
 mod share_handle;
 
-pub use {path_conversion::*, security_descriptor::*, share_handle::*};
+pub use {path_conversion::*, share_handle::*};
 
 mod file_handle;
 pub(crate) use file_handle::*;

@@ -3,8 +3,11 @@
 use crate::{
 	local_socket::{prelude::*, Listener, ListenerOptions, Stream},
 	os::windows::{
-		local_socket::ListenerOptionsExt, AsRawHandleExt as _, AsSecurityDescriptorExt,
-		BorrowedSecurityDescriptor, LocalBox, SecurityDescriptor,
+		local_socket::ListenerOptionsExt,
+		security_descriptor::{
+			AsSecurityDescriptorExt, BorrowedSecurityDescriptor, LocalBox, SecurityDescriptor,
+		},
+		AsRawHandleExt as _,
 	},
 	tests::util::*,
 	OrErrno, TryClone,
