@@ -1,14 +1,21 @@
 //! Creation and usage of unnamed pipes.
 //!
-//! The distinction between named and unnamed pipes is very clear given their names: named pipes
-//! have names in their special named pipe filesystem, while unnamed pipes only have handles. This
-//! can both be useful or problematic, depending on the use case. Unnamed pipes work best when a
-//! child process is used. With the fork model on Unix-like systems, the handle can be transferred
-//! to the child process thanks to the cloned address space; on Windows, inheritable handles (the
-//! default for unnamed pipes in this crate) can be used.
+//! The primary distinction between named and unnamed pipes is rather trivial: named pipes have
+//! names in their special named pipe filesystem, while unnamed pipes only have handles. This can
+//! both be useful or problematic, depending on the use case. Unnamed pipes work best when
+//! communicating with child processes.
 //!
-//! Another way to use unnamed pipes is to use a named pipe or a Unix domain socket to establish an
-//! unnamed pipe connection. It just so happens that this crate supports all three.
+//! The handles and file descriptors are inheritable by default. The `AsRawHandle` and `AsRawFd`
+//! traits can be used to get a numeric handle value which can then be communicated to a child
+//! process using a command-line argument, environment variable or some other program startup IPC
+//! method. The numeric value can then be reconstructed into an I/O object using
+//! `FromRawHandle`/`FromRawFd`. Interprocess does not concern itself with how this is done.
+//!
+//! Note
+//! [the standard library's support for piping `stdin`, `stdout` and `stderr`](std::process::Stdio),
+//! which can be used in simple cases instead. Making use of that feature is advisable if the
+//! program of the child process can be modified to communicate with its parent via standard I/O
+//! streams.
 
 impmod! {unnamed_pipe,
 	Recver as RecverImpl,
@@ -34,6 +41,9 @@ pub fn pipe() -> io::Result<(Sender, Recver)> {
 /// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
 /// implemented; same for [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
 ///
+/// The handle/file descriptor is inheritable. See [module-level documentation](self) for more on
+/// how this can be used.
+///
 /// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
 /// [IRH]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
 /// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
@@ -57,6 +67,9 @@ multimacro! {
 /// The core functionality is exposed in a [`Write`](io::Write) interface. On Windows, the
 /// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
 /// implemented; same for [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
+///
+/// The handle/file descriptor is inheritable. See [module-level documentation](self) for more on
+/// how this can be used.
 ///
 /// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
 /// [IRH]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
