@@ -18,8 +18,7 @@ use std::{
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub(super) unsafe fn fcntl_int(fd: BorrowedFd<'_>, cmd: c_int, val: c_int) -> io::Result<c_int> {
-	let val = unsafe { libc::fcntl(fd.as_raw_fd(), cmd, val) };
-	(val != -1).true_val_or_errno(val)
+	unsafe { libc::fcntl(fd.as_raw_fd(), cmd, val) }.fd_or_errno()
 }
 
 pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
@@ -42,8 +41,7 @@ pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
-	let val = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0) };
-	(val != -1).true_val_or_errno(val)
+	unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0) }.fd_or_errno()
 }
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn set_fdflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
@@ -51,8 +49,7 @@ fn set_fdflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
 }
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn set_cloexec(fd: BorrowedFd<'_>) -> io::Result<()> {
-	set_fdflags(fd, get_fdflags(fd)? | libc::FD_CLOEXEC)?;
-	Ok(())
+	set_fdflags(fd, get_fdflags(fd)? | libc::FD_CLOEXEC)
 }
 
 pub(super) fn set_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
@@ -93,9 +90,8 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
 			flags
 		}
 	};
-	let val = unsafe { libc::socket(AF_UNIX, ty | flags, 0) };
-	let fd = (val != -1)
-		.true_val_or_errno(val)
+	let fd = unsafe { libc::socket(AF_UNIX, ty | flags, 0) }
+		.fd_or_errno()
 		.map(|fd| unsafe { OwnedFd::from_raw_fd(fd) })?;
 
 	#[cfg(not(any(target_os = "linux", target_os = "android")))]
