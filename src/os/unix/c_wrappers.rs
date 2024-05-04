@@ -5,7 +5,9 @@ use crate::{FdOrErrno, OrErrno};
 use libc::{sockaddr_un, AF_UNIX};
 #[cfg(feature = "tokio")]
 use std::net::Shutdown;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
 use std::{
 	io,
@@ -119,7 +121,7 @@ fn addr_to_slice(addr: &SocketAddr) -> (&[u8], usize) {
 const SUN_PATH_OFFSET: usize = unsafe {
 	// This code may or may not have been copied from the standard library
 	let addr = zeroed::<sockaddr_un>();
-	let base = (&addr as *const sockaddr_un).cast::<i8>();
+	let base = (&addr as *const sockaddr_un).cast::<libc::c_char>();
 	let path = &addr.sun_path as *const c_char;
 	path.byte_offset_from(base) as usize
 };
@@ -131,7 +133,7 @@ const SUN_PATH_OFFSET: usize = unsafe {
 )]
 fn bind(fd: BorrowedFd<'_>, addr: &SocketAddr) -> io::Result<()> {
 	let (path, extra) = addr_to_slice(addr);
-	let path = unsafe { transmute::<&[u8], &[i8]>(path) };
+	let path = unsafe { transmute::<&[u8], &[libc::c_char]>(path) };
 
 	let mut addr = unsafe { zeroed::<sockaddr_un>() };
 	addr.sun_family = AF_UNIX as _;
