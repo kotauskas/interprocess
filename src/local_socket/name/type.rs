@@ -1,5 +1,11 @@
 //! Construction of local socket names, facilitating local socket implementation dispatch.
-// TODO(2.0.1) write more stuff here, maybe
+//!
+//! The traits [`PathNameType`] and [`NamespacedNameType`] are implemented on uninhabited tag types
+//! and are to be used via [`ToFsName`](super::ToFsName) and [`ToNsName`](super::ToNsName)
+//! respectively. They are also sealed (cannot be implemented outside of Interprocess).
+//!
+//! The name type you choose affects what local socket implementation will be used. See the
+//! documentation on the tag types to learn more.
 
 use super::Name;
 use crate::Sealed;
@@ -42,7 +48,7 @@ pub trait PathNameType<S: ToOwned + ?Sized>: NameType {
 	/// The idiomatic way to use this is [`ToFsName::to_fs_name()`](super::ToFsName::to_fs_name).
 	fn map(path: Cow<'_, S>) -> io::Result<Name<'_>>;
 }
-/// [Mappings](NameType) from [OS strings](OsStr) to [local socket names](Name).
+/// [Mappings](NameType) from strings to [local socket names](Name).
 ///
 /// See [`ToNsName::to_ns_name()`](super::ToNsName::to_ns_name).
 pub trait NamespacedNameType<S: ToOwned + ?Sized>: NameType {
