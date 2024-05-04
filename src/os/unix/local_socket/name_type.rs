@@ -88,8 +88,7 @@ AbstractNsUdSocket);
 #[cfg(any(target_os = "linux", target_os = "android"))]
 impl NameType for AbstractNsUdSocket {
 	fn is_supported() -> bool {
-		// TODO(2.0.1) maybe check Linux version here
-		true
+		true // Rust is unsupported on Linux below version 3.2
 	}
 }
 #[cfg(any(target_os = "linux", target_os = "android"))]
