@@ -1,4 +1,4 @@
-// TODO(2.0.1) test various error conditions
+// TODO(2.0.2) test various error conditions
 #![cfg(feature = "tokio")]
 
 mod no_server;

@@ -91,7 +91,7 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
 	inner: Option<InnerTokio>,
-	// TODO(2.0.1) crackhead specialization
+	// TODO(2.0.2) crackhead specialization
 	// Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
 	needs_flush: NeedsFlush,
 	// MESSAGE READING DISABLED

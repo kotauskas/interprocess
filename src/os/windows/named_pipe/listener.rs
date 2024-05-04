@@ -31,7 +31,7 @@ use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::Connec
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
 /// for more.
-// TODO(2.0.1) examples
+// TODO(2.0.2) examples
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 	config: PipeListenerOptions<'static>, // We need the options to create new instances
 	nonblocking: AtomicBool,

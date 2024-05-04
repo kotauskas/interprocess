@@ -3,7 +3,7 @@
 //! Currently, this consists of only the [`CreationOptions`] builder, but more might be
 //! added.
 
-// TODO(2.0.1) add examples and tests
+// TODO(2.0.2) add examples and tests
 
 use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{
@@ -44,7 +44,7 @@ impl<'sd> CreationOptions<'sd> {
 			buffer_size_hint: None,
 		}
 	}
-	// TODO(2.0.1) use macro
+	// TODO(2.0.2) use macro
 	/// Specifies the pointer to the security descriptor for the pipe.
 	///
 	/// See the [associated field](#structfield.security_descriptor) for more.
