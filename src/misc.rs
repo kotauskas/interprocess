@@ -54,8 +54,6 @@ impl<B: ToBool, T> OrErrno<T> for B {
 	}
 }
 
-// TODO(2.0.1) nonzero_or_errno
-
 #[cfg(unix)]
 pub(crate) trait FdOrErrno: Sized {
 	fn fd_or_errno(self) -> io::Result<Self>;
