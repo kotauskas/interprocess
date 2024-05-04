@@ -56,7 +56,11 @@ fn windows_path(rn: u32) -> String {
 	format!(r"\\.\pipe\interprocess-test-{rn:08x}")
 }
 fn unix_path(rn: u32) -> String {
-	format!("/tmp/interprocess-test-{rn:08x}.sock")
+	let tmpdir = std::env::var("TMPDIR").ok();
+	format!(
+		"{}/interprocess-test-{rn:08x}.sock",
+		tmpdir.as_deref().unwrap_or("/tmp")
+	)
 }
 
 macro_rules! make_id {

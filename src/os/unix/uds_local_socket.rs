@@ -16,9 +16,17 @@ use crate::{
 	local_socket::{Name, NameInner},
 	os::unix::unixprelude::*,
 };
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
-use std::{borrow::Cow, ffi::OsStr, fs, io, mem, os::unix::net::SocketAddr, path::Path};
+use std::{
+	borrow::Cow,
+	ffi::{OsStr, OsString},
+	fs, io, mem,
+	os::unix::net::SocketAddr,
+	path::Path,
+};
 
 #[derive(Clone, Debug, Default)]
 struct ReclaimGuard(Option<Name<'static>>);
@@ -61,13 +69,20 @@ const NMCAP: usize = SUN_LEN - "/run/user/18446744073709551614/".len();
 static TOOLONG: &str = "local socket name length exceeds capacity of sun_path of sockaddr_un";
 
 /// Checks if `/run/user/<ruid>` exists, returning that path if it does.
-fn get_run_user() -> io::Result<Option<String>> {
-	let path = format!("/run/user/{}", unsafe { libc::getuid() });
+fn get_run_user() -> io::Result<Option<OsString>> {
+	let path = format!("/run/user/{}", unsafe { libc::getuid() }).into();
 	match fs::metadata(&path) {
 		Ok(..) => Ok(Some(path)),
 		Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
 		Err(e) => Err(e),
 	}
+}
+
+/// Gets the `TMPDIR` environment variable, or returns `/tmp` if it doesn't exist
+fn get_tmpdir() -> Cow<'static, OsStr> {
+	std::env::var_os("TMPDIR")
+		.map(|dir| Cow::Owned(dir.into()))
+		.unwrap_or(Cow::Borrowed(OsStr::new("/tmp")))
 }
 
 #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
@@ -80,7 +95,7 @@ fn construct_and_prepare_pseudo_ns(
 		return Err(io::Error::new(io::ErrorKind::InvalidInput, TOOLONG));
 	}
 	let run_user = get_run_user()?;
-	let pfx = run_user.as_deref().unwrap_or("/tmp");
+	let pfx = run_user.map(Cow::Owned).unwrap_or_else(|| get_tmpdir());
 	let pl = pfx.len();
 	let mut path = [0; SUN_LEN];
 	path[..pl].copy_from_slice(pfx.as_bytes());
