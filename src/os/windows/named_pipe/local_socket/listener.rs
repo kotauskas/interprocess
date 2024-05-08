@@ -5,9 +5,9 @@ use crate::{
 		ListenerOptions, NameInner,
 	},
 	os::windows::named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
-	AtomicEnum,
+	AtomicEnum, Sealed,
 };
-use std::{io, os::windows::prelude::*, sync::atomic::Ordering::SeqCst};
+use std::{io, iter::FusedIterator, os::windows::prelude::*, sync::atomic::Ordering::SeqCst};
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
@@ -18,7 +18,7 @@ pub struct Listener {
 	listener: ListenerImpl,
 	nonblocking: AtomicEnum<ListenerNonblockingMode>,
 }
-impl crate::Sealed for Listener {}
+impl Sealed for Listener {}
 
 impl traits::Listener for Listener {
 	type Stream = Stream;
@@ -55,6 +55,14 @@ impl traits::Listener for Listener {
 	}
 	fn do_not_reclaim_name_on_drop(&mut self) {}
 }
+impl Iterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn next(&mut self) -> Option<Self::Item> {
+		Some(traits::Listener::accept(self))
+	}
+}
+impl FusedIterator for Listener {}
 
 impl From<Listener> for OwnedHandle {
 	#[inline]

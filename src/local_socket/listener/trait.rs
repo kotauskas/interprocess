@@ -11,7 +11,9 @@ use std::{io, iter::FusedIterator};
 /// which makes it a trait object of sorts. See its documentation for more on the semantics of the
 /// methods seen here.
 #[allow(private_bounds)]
-pub trait Listener: Sized + Sealed {
+pub trait Listener:
+	Iterator<Item = io::Result<Self::Stream>> + FusedIterator + Sized + Sealed
+{
 	/// The stream type associated with this listener.
 	type Stream: Stream;
 

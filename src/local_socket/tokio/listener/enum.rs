@@ -4,7 +4,13 @@ use crate::local_socket::{tokio::Stream, ListenerOptions};
 use crate::os::unix::uds_local_socket::tokio as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
-use std::io;
+use futures_core::{FusedStream as FusedAsyncIterator, Stream as AsyncIterator};
+use std::{
+	future::Future,
+	io,
+	pin::{pin, Pin},
+	task::{Context, Poll},
+};
 
 impmod! {local_socket::dispatch_tokio as dispatch}
 
@@ -130,5 +136,20 @@ impl r#trait::Listener for Listener {
 	#[inline]
 	fn do_not_reclaim_name_on_drop(&mut self) {
 		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
+	}
+}
+impl AsyncIterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		pin!(r#trait::Listener::accept(self.get_mut()))
+			.poll(cx)
+			.map(Some)
+	}
+}
+impl FusedAsyncIterator for Listener {
+	#[inline(always)]
+	fn is_terminated(&self) -> bool {
+		false
 	}
 }

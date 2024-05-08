@@ -4,10 +4,14 @@ use crate::{
 	os::unix::uds_local_socket::{listener::Listener as SyncListener, ReclaimGuard},
 	Sealed,
 };
+use futures_core::{FusedStream as FusedAsyncIterator, Stream as AsyncIterator};
 use std::{
 	fmt::{self, Debug, Formatter},
+	future::Future,
 	io,
 	os::unix::prelude::*,
+	pin::{pin, Pin},
+	task::{Context, Poll},
 };
 use tokio::net::UnixListener;
 
@@ -32,6 +36,21 @@ impl traits::Listener for Listener {
 
 	fn do_not_reclaim_name_on_drop(&mut self) {
 		self.reclaim.forget();
+	}
+}
+impl AsyncIterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		pin!(traits::Listener::accept(self.get_mut()))
+			.poll(cx)
+			.map(Some)
+	}
+}
+impl FusedAsyncIterator for Listener {
+	#[inline(always)]
+	fn is_terminated(&self) -> bool {
+		false
 	}
 }
 

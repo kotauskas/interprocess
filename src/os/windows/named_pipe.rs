@@ -10,9 +10,9 @@
 //! 	**F**ile**s**ystem), while Unix FIFO files live in the shared filesystem tree together with
 //! 	all other files
 //! 	-	On Linux, the implementation of Unix domain sockets exposes a similar feature: by setting
-//! 		the first byte in the socket file path to `NULL` (`\0`), the socket is placed into a
-//! 		separate namespace instead of being placed on the filesystem; this is a non-standard
-//! 		extension to POSIX and is not available on other Unix systems
+//! 		the first byte in the socket file path to 0, the socket is placed into a separate
+//! 		namespace instead of being placed on the filesystem; this is a non-standard extension to
+//! 		POSIX and is not available on other Unix systems
 //!
 //! 	-	Windows named pipes have a server and an arbitrary number of clients, meaning that the
 //! 		separate processes connecting to a named pipe have separate connections to the server, while

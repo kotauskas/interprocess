@@ -8,7 +8,13 @@ use crate::{
 	},
 	Sealed,
 };
-use std::io;
+use futures_core::{FusedStream as FusedAsyncIterator, Stream as AsyncIterator};
+use std::{
+	future::Future,
+	io,
+	pin::{pin, Pin},
+	task::{Context, Poll},
+};
 
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
@@ -30,4 +36,19 @@ impl traits::Listener for Listener {
 		Ok(Stream(inner))
 	}
 	fn do_not_reclaim_name_on_drop(&mut self) {}
+}
+impl AsyncIterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		pin!(traits::Listener::accept(self.get_mut()))
+			.poll(cx)
+			.map(Some)
+	}
+}
+impl FusedAsyncIterator for Listener {
+	#[inline(always)]
+	fn is_terminated(&self) -> bool {
+		false
+	}
 }

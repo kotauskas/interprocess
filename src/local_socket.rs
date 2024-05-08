@@ -1,6 +1,6 @@
 //! Local sockets, an IPC primitive featuring a server and multiple clients connecting to that
-//! server using a filesystem path inside a special namespace, each having a private connection to
-//! that server.
+//! server using a filesystem path or an identifier inside a special namespace, each having a
+//! private connection to that server.
 //!
 //! ## Implementation types
 //! Local sockets are not a real IPC method implemented by the OS – they exist to paper over the

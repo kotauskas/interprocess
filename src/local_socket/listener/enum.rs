@@ -4,7 +4,7 @@ use crate::local_socket::{ListenerNonblockingMode, Stream};
 use crate::os::unix::uds_local_socket as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket as np_impl;
-use std::io;
+use std::{io, iter::FusedIterator};
 
 impmod! {local_socket::dispatch_sync as dispatch}
 
@@ -156,3 +156,11 @@ impl r#trait::Listener for Listener {
 		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
 	}
 }
+impl Iterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn next(&mut self) -> Option<Self::Item> {
+		Some(r#trait::Listener::accept(self))
+	}
+}
+impl FusedIterator for Listener {}

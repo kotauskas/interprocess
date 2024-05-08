@@ -8,6 +8,7 @@ use crate::{
 };
 use std::{
 	io,
+	iter::FusedIterator,
 	os::{
 		fd::{AsFd, BorrowedFd, OwnedFd},
 		unix::net::UnixListener,
@@ -83,6 +84,14 @@ impl traits::Listener for Listener {
 		self.reclaim.forget();
 	}
 }
+impl Iterator for Listener {
+	type Item = io::Result<Stream>;
+	#[inline(always)]
+	fn next(&mut self) -> Option<Self::Item> {
+		Some(traits::Listener::accept(self))
+	}
+}
+impl FusedIterator for Listener {}
 
 impl From<Listener> for UnixListener {
 	fn from(mut l: Listener) -> Self {
