@@ -14,7 +14,7 @@ use color_eyre::eyre::WrapErr;
 use std::{fmt::Debug, future::Future, io, path::Path, sync::Arc};
 use tokio::{sync::oneshot::Sender, task};
 
-use super::util::namegen_named_pipe;
+use crate::tests::util::namegen_named_pipe;
 
 macro_rules! matrix {
 	(@dir_s duplex) => {server_duplex}; (@dir_s stc) => {server_stc}; (@dir_s cts) => {server_cts};
