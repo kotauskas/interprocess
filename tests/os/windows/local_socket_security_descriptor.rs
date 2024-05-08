@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 mod null_dacl;
 mod sd_graft;
 
