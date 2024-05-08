@@ -92,7 +92,7 @@ macro_rules! builder_setters {
 			$name : $ty
 		);
 	};
-	($($(#[doc = $($doc:tt)+])* $name:ident : $ty:ty),+ $(,)?) => {
+	($($(#[doc = $($doc:expr)+])* $name:ident : $ty:ty),+ $(,)?) => {
 		$(builder_setters!($(#[doc = $($doc)+])* $name: $ty);)+
 	};
 }
