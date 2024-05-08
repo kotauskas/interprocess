@@ -7,7 +7,7 @@ pub use {incoming::*, options::*};
 use super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream};
 use crate::{
 	os::windows::{winprelude::*, FileHandle},
-	poison_error, RawOsErrorExt, LOCK_POISON,
+	poison_error, OrErrno, RawOsErrorExt, LOCK_POISON,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -20,7 +20,10 @@ use std::{
 		Mutex,
 	},
 };
-use windows_sys::Win32::{Foundation::ERROR_PIPE_CONNECTED, System::Pipes::ConnectNamedPipe};
+use windows_sys::Win32::{
+	Foundation::{ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING},
+	System::Pipes::ConnectNamedPipe,
+};
 
 // TODO(2.3.0) finish collect_options and add conversion from handles after all
 
@@ -143,15 +146,17 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
 }
 
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
-	let success = unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 };
-	if success {
+	unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 }
+		.true_val_or_errno(())
+		.or_else(thunk_accept_error)
+}
+
+fn thunk_accept_error(e: io::Error) -> io::Result<()> {
+	if e.raw_os_error().eeq(ERROR_PIPE_CONNECTED) {
 		Ok(())
+	} else if e.raw_os_error().eeq(ERROR_PIPE_LISTENING) {
+		Err(io::Error::from(io::ErrorKind::WouldBlock))
 	} else {
-		let last_error = io::Error::last_os_error();
-		if last_error.raw_os_error().eeq(ERROR_PIPE_CONNECTED) {
-			Ok(())
-		} else {
-			Err(last_error)
-		}
+		Err(e)
 	}
 }

@@ -1,5 +1,6 @@
 // TODO(2.0.2) test various error conditions
 
+mod no_client;
 mod no_server;
 mod stream;
 
@@ -16,6 +17,10 @@ fn test_stream(id: &'static str, path: bool) -> TestResult {
 
 fn test_no_server(id: &'static str, path: bool) -> TestResult {
 	test_wrapper(move || no_server::run_and_verify_error(id, path))
+}
+
+fn test_no_client(id: &'static str, path: bool) -> TestResult {
+	test_wrapper(move || no_client::run_and_verify_error(id, path))
 }
 
 macro_rules! tests {
@@ -36,4 +41,9 @@ tests! {test_stream
 tests! {test_no_server
 	no_server_file			true
 	no_server_namespaced	false
+}
+
+tests! {test_no_client
+	no_client_file			true
+	no_client_namespaced	false
 }
