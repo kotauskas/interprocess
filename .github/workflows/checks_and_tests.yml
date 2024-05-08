@@ -20,7 +20,7 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy --no-self-update
           rustup default ${{ matrix.toolchain }}
 
       - name: Run Clippy for default configuration
