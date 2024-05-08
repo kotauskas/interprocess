@@ -3,7 +3,7 @@
 //! Currently, this consists of only the [`CreationOptions`] builder, but more might be
 //! added.
 
-// TODO(2.0.2) add examples and tests
+// TODO(2.2.0) add examples and tests
 
 use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{

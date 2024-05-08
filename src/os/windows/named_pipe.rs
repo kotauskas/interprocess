@@ -34,10 +34,10 @@
 //! counterparts, list important behavior implemented by Interprocess in their item-level
 //! documentation.
 
-// TODO(2.0.2) improve docs and add examples
-// TODO(2.1.0) client impersonation
-// TODO(2.2.0) raw instance functionality
-// TODO(2.2.0) transactions
+// TODO(2.2.0) improve docs and add examples
+// TODO(2.2.0) client impersonation
+// TODO(2.3.0) raw instance functionality
+// TODO(2.3.0) transactions
 
 mod enums;
 mod listener;
