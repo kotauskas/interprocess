@@ -59,71 +59,12 @@ use std::{marker::PhantomData, os::windows::prelude::*};
 ///
 /// ## Basic bytestream client
 /// ```no_run
-/// use interprocess::os::windows::named_pipe::*;
-/// use std::io::{BufReader, prelude::*};
-///
-/// // Preemptively allocate a sizeable buffer for receiving.
-/// // This size should be enough and should be easy to find for the allocator.
-/// let mut buffer = String::with_capacity(128);
-///
-/// // Create our connection. This will block until the server accepts our connection, but will fail
-/// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
-/// // where connecting to a port that's not bound to any server will send a "connection refused"
-/// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(r"\\.\pipe\Example")?;
-/// // Wrap it into a buffered reader right away so that we could receive a single line out of it.
-/// let mut conn = BufReader::new(conn);
-///
-/// // Send our message into the stream. This will finish either when the whole message has been
-/// // sent or if a send operation returns an error. (`.get_mut()` is to get the sender,
-/// // `BufReader` doesn't implement a pass-through `Write`.)
-/// conn.get_mut().write_all(b"Hello from client!\n")?;
-///
-/// // We now employ the buffer we allocated prior and receive a single line, interpreting a newline
-/// // character as an end-of-file (because local sockets cannot be portably shut down), verifying
-/// // validity of UTF-8 on the fly.
-/// conn.read_line(&mut buffer)?;
-///
-/// // Print out the result, getting the newline for free!
-/// print!("Server answered: {buffer}");
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs")]
 /// ```
 ///
 /// ## Basic message stream client
 /// ```no_run
-/// use recvmsg::prelude::*;
-/// use interprocess::os::windows::named_pipe::*;
-///
-/// // Preemptively allocate a sizeable buffer for receiving. Keep in mind that this will depend on
-/// // the specifics of the protocol you're using.
-/// let mut buffer = MsgBuf::from(Vec::with_capacity(128));
-///
-/// // Create our connection. This will block until the server accepts our connection, but will fail
-/// // immediately if the server hasn't even started yet; somewhat similar to how happens with TCP,
-/// // where connecting to a port that's not bound to any server will send a "connection refused"
-/// // response, but that will take twice the ping, the roundtrip time, to reach the client.
-/// let mut conn = DuplexPipeStream::<pipe_mode::Messages>::connect_by_path(r"\\.\pipe\Example")?;
-///
-/// // Here's our message so that we could check its length later.
-/// static MESSAGE: &[u8] = b"Hello from client!";
-/// // Send the message, getting the amount of bytes that was actually sent in return.
-/// let sent = conn.send(MESSAGE)?;
-/// assert_eq!(sent, MESSAGE.len()); // If it doesn't match, something's seriously wrong.
-///
-/// // Use the reliable message receive API, which gets us a `RecvResult` from the
-/// // `reliable_recv_msg` module.
-/// conn.recv_msg(&mut buffer, None)?;
-///
-/// // Convert the data that's been received into a string. This checks for UTF-8
-/// // validity, and if invalid characters are found, a new buffer is
-/// // allocated to house a modified version of the received data, where
-/// // decoding errors are replaced with those diamond-shaped question mark
-/// // U+FFFD REPLACEMENT CHARACTER thingies: �.
-/// let received_string = String::from_utf8_lossy(buffer.filled_part());
-///
-/// // Print out the result!
-/// println!("Server answered: {received_string}");
-/// # Ok::<(), Box<dyn std::error::Error>>(())
+#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/msg.rs")]
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
 	raw: MaybeArc<RawPipeStream>,

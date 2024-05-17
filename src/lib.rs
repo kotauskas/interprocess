@@ -1,8 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
+#![warn(missing_docs)] // If this was in Cargo.toml, it would cover examples as well
 mod platform_check;
 
-// TODO(2.1.0) inspect panic points
+// TODO(2.3.0) inspect panic points
 
 #[macro_use]
 mod macros;

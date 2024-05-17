@@ -14,6 +14,7 @@ categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
 keywords = ["ipc", "pipe"]
 
 autotests = false
+autoexamples = false
 
 exclude = [
 	"/.github/",
@@ -23,6 +24,38 @@ exclude = [
 	"/Cargo.lock",
 ]
 
+[[example]]
+name = "local_socket_sync_server"
+path = "examples/local_socket/sync/listener.rs"
+
+[[example]]
+name = "local_socket_sync_client"
+path = "examples/local_socket/sync/stream.rs"
+
+[[example]]
+name = "local_socket_tokio_server"
+path = "examples/local_socket/tokio/listener.rs"
+
+[[example]]
+name = "local_socket_tokio_client"
+path = "examples/local_socket/tokio/stream.rs"
+
+[[example]]
+name = "named_pipe_sync_server"
+path = "examples/named_pipe/sync/listener.rs"
+
+[[example]]
+name = "named_pipe_sync_client"
+path = "examples/named_pipe/sync/stream.rs"
+
+[[example]]
+name = "named_pipe_tokio_server"
+path = "examples/named_pipe/tokio/listener.rs"
+
+[[example]]
+name = "named_pipe_tokio_client"
+path = "examples/named_pipe/tokio/stream.rs"
+
 [features]
 default = []
 async = ["futures-core"]
@@ -30,6 +63,7 @@ tokio = ["dep:tokio", "async"]
 doc_cfg = []
 
 [dependencies]
+doctest-file = "1.0.0"
 tokio = { version = "1.36.0", features = [
 	"sync",
 	"rt-multi-thread",
@@ -70,7 +104,6 @@ color-eyre = "0.6.2"
 [lints.rust]
 unsafe_op_in_unsafe_fn = "forbid"
 rust_2018_idioms = { level = "deny", priority = -1 }
-missing_docs = "warn"
 
 [lints.clippy]
 exit = "forbid"
