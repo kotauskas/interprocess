@@ -14,8 +14,6 @@ use std::{
 
 impmod! {local_socket::dispatch_tokio as dispatch}
 
-// TODO(2.2.0) owned split in examples
-
 mkenum!(
 /// Tokio-based local socket server, listening for connections.
 ///
