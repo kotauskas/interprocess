@@ -11,7 +11,7 @@ use std::{borrow::Cow, num::NonZeroU8};
 use widestring::{u16cstr, U16CStr};
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
-// TODO(2.1.0) allow partial modification for later instances
+// TODO(2.3.0) allow partial modification for later instances
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'path> {

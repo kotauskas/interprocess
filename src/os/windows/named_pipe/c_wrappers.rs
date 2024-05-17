@@ -63,7 +63,7 @@ pub(crate) fn get_np_handle_state(
 	collect_data_timeout: Option<&mut u32>,
 	mut username: Option<&mut [MaybeUninit<u16>]>,
 ) -> io::Result<()> {
-	// TODO(2.1.0) expose the rest of the owl as public API
+	// TODO(2.3.0) expose the rest of the owl as public API
 	unsafe {
 		GetNamedPipeHandleStateW(
 			handle.as_int_handle(),
@@ -124,7 +124,7 @@ pub(crate) fn get_np_handle_mode(handle: BorrowedHandle<'_>) -> io::Result<u32> 
 	Ok(mode)
 }
 
-#[allow(dead_code)] // TODO(2.1.0) give this thing a public API
+#[allow(dead_code)] // TODO(2.3.0) give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 	let mut msglen: u32 = 0;
 	unsafe {

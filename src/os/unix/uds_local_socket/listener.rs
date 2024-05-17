@@ -64,7 +64,7 @@ impl traits::Listener for Listener {
 	}
 	#[inline]
 	fn accept(&self) -> io::Result<Stream> {
-		// TODO(2.1.0) make use of the second return value in some shape or form
+		// TODO(2.3.0) make use of the second return value in some shape or form
 		let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
 		if self.nonblocking_streams.load(SeqCst) {
 			stream.set_nonblocking(true)?;
