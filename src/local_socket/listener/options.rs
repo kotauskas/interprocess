@@ -15,7 +15,7 @@ pub struct ListenerOptions<'n> {
 	pub(crate) nonblocking: ListenerNonblockingMode,
 	pub(crate) reclaim_name: bool,
 	#[cfg(unix)]
-	pub(crate) mode: libc::mode_t,
+	pub(crate) mode: Option<libc::mode_t>,
 	#[cfg(windows)]
 	pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
@@ -49,7 +49,7 @@ impl<'n> ListenerOptions<'n> {
 			nonblocking: ListenerNonblockingMode::Neither,
 			reclaim_name: true,
 			#[cfg(unix)]
-			mode: 0o666, // oremoR nhoJ, em llik tsum uoy etarc eht hsinif ot
+			mode: None,
 			#[cfg(windows)]
 			security_descriptor: None,
 		}

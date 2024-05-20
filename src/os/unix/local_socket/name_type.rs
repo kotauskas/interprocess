@@ -83,7 +83,7 @@ impl NamespacedNameType<CStr> for SpecialDirUdSocket {
 tag_enum!(
 /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
 /// the Linux abstract namespace.
-#[cfg_attr(feature = "cfg_doc", doc(cfg(any(target_os = "linux", target_os = "android"))))]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(any(target_os = "linux", target_os = "android"))))]
 AbstractNsUdSocket);
 #[cfg(any(target_os = "linux", target_os = "android"))]
 impl NameType for AbstractNsUdSocket {
