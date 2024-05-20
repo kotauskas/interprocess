@@ -6,7 +6,7 @@ use futures_core::{FusedStream as FusedAsyncIterator, Stream as AsyncIterator};
 use std::{
 	future::Future,
 	io,
-	pin::Pin,
+	pin::{pin, Pin},
 	task::{Context, Poll},
 };
 
@@ -69,13 +69,7 @@ impl<'a, L: Listener> From<&'a L> for Incoming<'a, L> {
 impl<L: Listener> AsyncIterator for Incoming<'_, L> {
 	type Item = io::Result<L::Stream>;
 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		let mut fut = self.get_mut().listener.accept();
-		unsafe {
-			// SAFETY: we aren't moving the future anywhere
-			Pin::new_unchecked(&mut fut)
-		}
-		.poll(cx)
-		.map(Some)
+		pin!(self.get_mut().listener.accept()).poll(cx).map(Some)
 	}
 	#[inline]
 	fn size_hint(&self) -> (usize, Option<usize>) {
