@@ -1,7 +1,7 @@
 //{
-#[cfg(not(windows))]
+#[cfg(not(all(windows, feature = "tokio")))]
 fn main() {}
-#[cfg(windows)]
+#[cfg(all(windows, feature = "tokio"))]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	//}

@@ -1,4 +1,7 @@
 //{
+#[cfg(not(feature = "tokio"))]
+fn main() {}
+#[cfg(feature = "tokio")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	//}

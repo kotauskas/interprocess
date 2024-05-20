@@ -1,8 +1,8 @@
 //{
 // TODO(2.3.0)..?
-#[cfg(not(windows))]
+#[cfg(not(all(windows, feature = "tokio")))]
 fn main() {}
-#[cfg(windows)]
+#[cfg(all(windows, feature = "tokio"))]
 fn main() -> std::io::Result<()> {
 	//}
 	//{
