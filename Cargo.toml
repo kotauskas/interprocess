@@ -45,16 +45,24 @@ name = "named_pipe_sync_server"
 path = "examples/named_pipe/sync/listener.rs"
 
 [[example]]
-name = "named_pipe_sync_client"
-path = "examples/named_pipe/sync/stream.rs"
+name = "named_pipe_sync_client_bytes"
+path = "examples/named_pipe/sync/stream/bytes.rs"
+
+[[example]]
+name = "named_pipe_sync_client_msg"
+path = "examples/named_pipe/sync/stream/msg.rs"
 
 [[example]]
 name = "named_pipe_tokio_server"
 path = "examples/named_pipe/tokio/listener.rs"
 
 [[example]]
-name = "named_pipe_tokio_client"
-path = "examples/named_pipe/tokio/stream.rs"
+name = "named_pipe_tokio_client_bytes"
+path = "examples/named_pipe/tokio/stream/bytes.rs"
+
+[[example]]
+name = "named_pipe_tokio_client_msg"
+path = "examples/named_pipe/tokio/stream/msg.rs"
 
 [features]
 default = []
