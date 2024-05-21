@@ -12,7 +12,7 @@ use std::{io, iter::FusedIterator};
 /// methods seen here.
 #[allow(private_bounds)]
 pub trait Listener:
-	Iterator<Item = io::Result<Self::Stream>> + FusedIterator + Sized + Sealed
+	Iterator<Item = io::Result<Self::Stream>> + FusedIterator + Send + Sync + Sized + Sealed
 {
 	/// The stream type associated with this listener.
 	type Stream: Stream;

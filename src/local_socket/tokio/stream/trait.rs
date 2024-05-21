@@ -15,7 +15,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
 pub trait Stream:
-	Sized + AsyncRead + RefTokioAsyncRead + AsyncWrite + RefTokioAsyncWrite + Sealed
+	AsyncRead + RefTokioAsyncRead + AsyncWrite + RefTokioAsyncWrite + Send + Sync + Sized + Sealed
 {
 	/// Receive half type returned by [`.split()`](Stream::split).
 	type RecvHalf: RecvHalf<Stream = Self>;

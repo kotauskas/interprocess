@@ -13,7 +13,7 @@ use std::io::{self, prelude::*};
 /// [`Stream` enum](super::enum::Stream). In addition, it is implemented on `Stream` itself, which
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
-pub trait Stream: Sized + Read + RefRead + Write + RefWrite + Sealed {
+pub trait Stream: Read + RefRead + Write + RefWrite + Send + Sync + Sized + Sealed {
 	/// Receive half type returned by [`.split()`](Stream::split).
 	type RecvHalf: RecvHalf<Stream = Self>;
 	/// Send half type returned by [`.split()`](Stream::split).
