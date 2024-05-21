@@ -45,10 +45,7 @@ pub mod traits {
 	#[cfg(feature = "tokio")]
 	#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 	pub mod tokio {
-		pub use super::super::tokio::{
-			listener::r#trait::{Listener, ListenerExt},
-			stream::r#trait::*,
-		};
+		pub use super::super::tokio::{listener::r#trait::*, stream::r#trait::*};
 	}
 }
 
@@ -89,17 +86,14 @@ pub mod tokio {
 		pub(in super::super) mod r#enum;
 		pub(in super::super) mod r#trait;
 	}
-	pub use {
-		listener::{r#enum::*, r#trait::Incoming},
-		stream::r#enum::*,
-	};
+	pub use {listener::r#enum::*, stream::r#enum::*};
 
 	/// Like the [sync local socket prelude](super::prelude), but for Tokio local sockets.
 	pub mod prelude {
 		pub use super::{
 			super::{
 				name::{NameType as _, ToFsName as _, ToNsName as _},
-				traits::tokio::{Listener as _, ListenerExt as _, Stream as _},
+				traits::tokio::{Listener as _, Stream as _},
 			},
 			Listener as LocalSocketListener, Stream as LocalSocketStream,
 		};
