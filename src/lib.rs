@@ -1,6 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
-#![warn(missing_docs)] // If this was in Cargo.toml, it would cover examples as well
+// If this was in Cargo.toml, it would cover examples as well
+#![warn(
+	missing_docs,
+	clippy::panic_in_result_fn,
+	clippy::missing_assert_message,
+	clippy::indexing_slicing,
+	clippy::arithmetic_side_effects
+)]
+
 mod platform_check;
 
 // TODO(2.3.0) inspect panic points

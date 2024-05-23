@@ -118,10 +118,6 @@ ptr_as_ptr = "forbid"
 get_unwrap = "deny"
 as_conversions = "deny"
 dbg_macro = "warn"
-arithmetic_side_effects = "warn"
-indexing_slicing = "warn"
-missing_assert_message = "warn"
-panic_in_result_fn = "warn"
 tabs_in_doc_comments = "allow"
 
 [package.metadata.docs.rs]
