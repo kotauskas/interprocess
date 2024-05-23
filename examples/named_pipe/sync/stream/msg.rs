@@ -2,7 +2,7 @@
 #[cfg(not(windows))]
 fn main() {}
 #[cfg(windows)]
-fn main() -> io::Result<()> {
+fn main() -> std::io::Result<()> {
 	//}
 	use interprocess::os::windows::named_pipe::*;
 	use recvmsg::prelude::*;
