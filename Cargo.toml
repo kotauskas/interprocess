@@ -73,7 +73,6 @@ doc_cfg = []
 doctest-file = "1.0.0"
 tokio = { version = "1.36.0", features = [
 	"sync",
-	"rt-multi-thread",
 	"net",
 	"time",
 	"io-util",
@@ -93,6 +92,13 @@ windows-sys = { version = "0.52.0", features = [
 	"Win32_System_SystemServices",
 	"Win32_System_LibraryLoader",
 ] }
+tokio = { version = "1.36.0", features = [
+	"sync",
+	"fs",
+	"net",
+	"time",
+	"io-util",
+], optional = true }
 recvmsg = "1.0.0"
 widestring = "1.0.2"
 
@@ -101,9 +107,9 @@ libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [dev-dependencies]
 tokio = { version = "1.36.0", features = [
+	"sync",
 	"rt-multi-thread",
 	"io-util",
-	"sync",
 	"macros",
 ] }
 color-eyre = "0.6.2"

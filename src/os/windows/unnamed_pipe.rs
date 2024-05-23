@@ -1,14 +1,15 @@
 //! Platform-specific functionality for unnamed pipes.
-//!
-//! Currently, this consists of only the [`CreationOptions`] builder, but more might be
-//! added.
 
 // TODO(2.2.0) add examples and tests
+
+#[cfg(feature = "tokio")]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
+pub mod tokio;
 
 use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{
 	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
-	weaken_buf_init_mut, AsPtr,
+	weaken_buf_init_mut, AsPtr, Sealed,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -31,10 +32,11 @@ pub struct CreationOptions<'sd> {
 	/// The default value is `true`.
 	pub inheritable: bool,
 	/// Hint on the buffer size for the pipe. There is no way to ensure or check that the system
-	/// actually uses this exact size, since it's only a hint. Set to `None` to disable the hint and
-	/// rely entirely on the system's default buffer size.
+	/// actually uses this exact size, since it's only a hint. Set to `None` to disable the hint
+	/// and rely entirely on the system's default buffer size.
 	pub buffer_size_hint: Option<NonZeroUsize>,
 }
+impl Sealed for CreationOptions<'_> {}
 impl<'sd> CreationOptions<'sd> {
 	/// Starts with the default parameters for the pipe. Identical to `Default::default()`.
 	pub const fn new() -> Self {
@@ -60,9 +62,8 @@ impl<'sd> CreationOptions<'sd> {
 		buffer_size_hint: Option<NonZeroUsize>,
 	}
 
-	/// Creates the pipe and returns its sending and receiving ends, or the error if one
-	/// occurred.
-	pub fn build(self) -> io::Result<(PubSender, PubRecver)> {
+	/// Creates the pipe and returns its sending and receiving ends, or an error if one occurred.
+	pub fn create(self) -> io::Result<(PubSender, PubRecver)> {
 		let hint_raw = match self.buffer_size_hint {
 			Some(num) => num.get(),
 			None => 0,
@@ -88,6 +89,12 @@ impl<'sd> CreationOptions<'sd> {
 		} else {
 			Err(io::Error::last_os_error())
 		}
+	}
+
+	/// Synonymous with [`.create()`](Self::create).
+	#[inline]
+	pub fn build(self) -> io::Result<(PubSender, PubRecver)> {
+		self.create()
 	}
 }
 impl Default for CreationOptions<'_> {

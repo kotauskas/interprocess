@@ -17,6 +17,10 @@
 //! program of the child process can be modified to communicate with its parent via standard I/O
 //! streams.
 
+#[cfg(feature = "tokio")]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
+pub mod tokio;
+
 impmod! {unnamed_pipe,
 	Recver as RecverImpl,
 	Sender as SenderImpl,
@@ -27,8 +31,8 @@ use std::io;
 /// Creates a new pipe with the default creation settings and returns the handles to its sending end
 /// and receiving end.
 ///
-/// The platform-specific builders in the `os` module of the crate might be more helpful if a
-/// configuration process for the pipe is needed.
+/// The platform-specific builders in the `os` module of the crate might be more helpful if extra
+/// configuration for the pipe is needed.
 #[inline]
 pub fn pipe() -> io::Result<(Sender, Recver)> {
 	pipe_impl()
@@ -37,26 +41,18 @@ pub fn pipe() -> io::Result<(Sender, Recver)> {
 /// Handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
 /// with the [sending end](Sender).
 ///
-/// The core functionality is exposed in a [`Read`](io::Read) interface. On Windows, the
-/// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
-/// implemented; same for [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
+/// The core functionality is exposed via the [`Read`](io::Read) trait. The type is convertible to
+/// and from handles/file descriptors and allows its internal handle/FD to be borrowed. On
+/// Windows, the `ShareHandle` trait is also implemented.
 ///
 /// The handle/file descriptor is inheritable. See [module-level documentation](self) for more on
 /// how this can be used.
-///
-/// [ARH]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawHandle.html
-/// [IRH]: https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html
-/// [`FromRawHandle`]: https://doc.rust-lang.org/std/os/windows/io/trait.FromRawHandle.html
-/// [ARF]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
-/// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
-/// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 // field is pub(crate) to allow platform builders to create the public-facing pipe types
 pub struct Recver(pub(crate) RecverImpl);
 multimacro! {
 	Recver,
 	forward_sync_read,
 	forward_handle,
-	forward_try_clone,
 	forward_debug,
 	derive_raw,
 }
@@ -64,9 +60,9 @@ multimacro! {
 /// Handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
 /// the [receiving end](Recver).
 ///
-/// The core functionality is exposed in a [`Write`](io::Write) interface. On Windows, the
-/// `ShareHandle` and [`As-`][ARH]/[`Into-`][IRH]/[`FromRawHandle`] traits are also
-/// implemented; same for [`As-`][ARF]/[`Into-`][IRF]/[`FromRawFd`] on Unix.
+/// The core functionality is exposed via the [`Write`](io::Write) trait. The type is convertible
+/// to and from handles/file descriptors and allows its internal handle/FD to be borrowed. On
+/// Windows, the `ShareHandle` trait is also implemented.
 ///
 /// The handle/file descriptor is inheritable. See [module-level documentation](self) for more on
 /// how this can be used.
@@ -82,7 +78,6 @@ multimacro! {
 	Sender,
 	forward_sync_write,
 	forward_handle,
-	forward_try_clone,
 	forward_debug,
 	derive_raw,
 }
