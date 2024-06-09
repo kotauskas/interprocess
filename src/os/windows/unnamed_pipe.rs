@@ -1,4 +1,4 @@
-//! Platform-specific functionality for unnamed pipes.
+//! Windows-specific functionality for unnamed pipes.
 
 // TODO(2.2.0) add examples and tests
 
@@ -103,7 +103,7 @@ impl Default for CreationOptions<'_> {
 	}
 }
 
-pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
+pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
 	CreationOptions::default().build()
 }
 

@@ -5,7 +5,7 @@
 impmod! {unnamed_pipe::tokio,
 	Recver as RecverImpl,
 	Sender as SenderImpl,
-	pipe as pipe_impl,
+	pipe_impl,
 }
 use std::io;
 

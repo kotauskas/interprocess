@@ -17,8 +17,8 @@ fn pair2pair((tx, rx): (SyncSender, SyncRecver)) -> io::Result<(PubSender, PubRe
 }
 
 #[inline]
-pub(crate) fn pipe() -> io::Result<(PubSender, PubRecver)> {
-	pair2pair(super::pipe()?)
+pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
+	pair2pair(super::pipe_impl()?)
 }
 
 /// Tokio-specific extensions to [`CreationOptions`].
@@ -56,9 +56,9 @@ multimacro! {
 pub(crate) struct Sender(File);
 impl TryFrom<SyncSender> for Sender {
 	type Error = io::Error;
-	fn try_from(rx: SyncSender) -> io::Result<Self> {
+	fn try_from(tx: SyncSender) -> io::Result<Self> {
 		Ok(Self(File::from_std(
-			<std::fs::File as From<OwnedHandle>>::from(rx.into()),
+			<std::fs::File as From<OwnedHandle>>::from(tx.into()),
 		)))
 	}
 }
@@ -69,3 +69,5 @@ multimacro! {
 	forward_tokio_write,
 	forward_as_handle,
 }
+
+// TODO do something about flushing

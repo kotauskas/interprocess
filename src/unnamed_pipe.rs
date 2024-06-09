@@ -24,8 +24,9 @@ pub mod tokio;
 impmod! {unnamed_pipe,
 	Recver as RecverImpl,
 	Sender as SenderImpl,
-	pipe as pipe_impl,
+	pipe_impl,
 }
+use crate::Sealed;
 use std::io;
 
 /// Creates a new pipe with the default creation settings and returns the handles to its sending end
@@ -49,6 +50,7 @@ pub fn pipe() -> io::Result<(Sender, Recver)> {
 /// how this can be used.
 // field is pub(crate) to allow platform builders to create the public-facing pipe types
 pub struct Recver(pub(crate) RecverImpl);
+impl Sealed for Recver {}
 multimacro! {
 	Recver,
 	forward_sync_read,
@@ -74,6 +76,7 @@ multimacro! {
 /// [IRF]: https://doc.rust-lang.org/std/os/unix/io/trait.IntoRawFd.html
 /// [`FromRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.FromRawFd.html
 pub struct Sender(pub(crate) SenderImpl);
+impl Sealed for Sender {}
 multimacro! {
 	Sender,
 	forward_sync_write,

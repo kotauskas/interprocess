@@ -19,8 +19,7 @@ use fdops::*;
 pub mod fifo_file;
 pub mod local_socket;
 pub mod uds_local_socket;
-
-pub(crate) mod unnamed_pipe;
+pub mod unnamed_pipe;
 
 mod unixprelude {
 	#[allow(unused_imports)]

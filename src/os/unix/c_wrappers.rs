@@ -76,6 +76,20 @@ pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
 	}}
 }
 
+fn get_flflags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
+	unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFL, 0) }.fd_or_errno()
+}
+fn set_flflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
+	unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFL, flags) != -1 }.true_val_or_errno(())
+}
+pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
+	let old_flags = get_flflags(fd)? & libc::O_NONBLOCK;
+	set_flflags(
+		fd,
+		old_flags | if nonblocking { libc::O_NONBLOCK } else { 0 },
+	)
+}
+
 cfg_no_atomic_cloexec! {
 	fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
 		unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0) }.fd_or_errno()
