@@ -2,12 +2,10 @@ use super::super::name_to_addr;
 use crate::{
 	error::ReuniteError,
 	local_socket::{traits::tokio as traits, Name},
-	os::unix::c_wrappers,
 	Sealed,
 };
 use std::{
 	io::{self, ErrorKind::WouldBlock},
-	net::Shutdown,
 	os::{
 		fd::{AsFd, OwnedFd},
 		unix::{
@@ -25,10 +23,6 @@ use tokio::{
 		UnixStream,
 	},
 };
-
-fn shutdown(slf: impl AsFd) -> Poll<io::Result<()>> {
-	c_wrappers::shutdown(slf.as_fd(), Shutdown::Write).into()
-}
 
 #[derive(Debug)]
 pub struct Stream(pub(super) UnixStream);
@@ -138,7 +132,7 @@ impl AsyncWrite for &Stream {
 	}
 	#[inline]
 	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-		shutdown(self.get_mut())
+		Poll::Ready(Ok(()))
 	}
 }
 impl TryFrom<Stream> for OwnedFd {
@@ -233,7 +227,7 @@ impl AsyncWrite for &SendHalf {
 	}
 	#[inline]
 	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-		shutdown(self.get_mut())
+		Poll::Ready(Ok(()))
 	}
 }
 impl AsFd for SendHalf {

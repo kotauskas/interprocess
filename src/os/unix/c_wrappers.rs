@@ -303,7 +303,7 @@ pub(super) fn bind_and_listen_with_mode(
 	}
 }
 
-#[cfg(feature = "tokio")]
+#[allow(dead_code)]
 pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
 	let how = match how {
 		Shutdown::Read => libc::SHUT_RD,

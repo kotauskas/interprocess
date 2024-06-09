@@ -40,16 +40,16 @@ macro_rules! dispatch_write {
 			Poll::Ready(Ok(()))
 		}
 		#[inline]
-		fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-			dispatch!($ty: x in self.get_mut() => Pin::new(x).poll_shutdown(cx))
+		fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+			Poll::Ready(Ok(()))
 		}
 	};
 	($ty:ident) => {
-		/// Flushing is an always successful no-op.
+		/// Flushing and shutdown are always successful no-ops.
 		impl AsyncWrite for &$ty {
 			dispatch_write!(@iw $ty);
 		}
-		/// Flushing is an always successful no-op.
+		/// Flushing and shutdown are always successful no-ops.
 		impl AsyncWrite for $ty {
 			dispatch_write!(@iw $ty);
 		}

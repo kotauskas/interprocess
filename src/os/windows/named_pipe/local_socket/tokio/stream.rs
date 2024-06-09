@@ -63,8 +63,8 @@ impl AsyncWrite for &Stream {
 		Poll::Ready(Ok(()))
 	}
 	#[inline]
-	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-		Pin::new(&mut &self.get_mut().0).poll_shutdown(cx)
+	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		Poll::Ready(Ok(()))
 	}
 }
 
@@ -130,8 +130,8 @@ impl AsyncWrite for &SendHalf {
 		Poll::Ready(Ok(()))
 	}
 	#[inline]
-	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-		Pin::new(&mut &self.get_mut().0).poll_shutdown(cx)
+	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		Poll::Ready(Ok(()))
 	}
 }
 
