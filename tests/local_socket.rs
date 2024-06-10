@@ -8,20 +8,15 @@ use crate::tests::util::*;
 
 fn test_stream(id: &'static str, path: bool) -> TestResult {
 	use stream::*;
-	test_wrapper(move || {
-		let scl = |s, n| server(id, handle_client, s, n, path);
-		drive_server_and_multiple_clients(scl, client)?;
-		Ok(())
-	})
+	let scl = |s, n| server(id, handle_client, s, n, path);
+	drive_server_and_multiple_clients(scl, client)?;
+	Ok(())
 }
 
-fn test_no_server(id: &'static str, path: bool) -> TestResult {
-	test_wrapper(move || no_server::run_and_verify_error(id, path))
-}
-
-fn test_no_client(id: &'static str, path: bool) -> TestResult {
-	test_wrapper(move || no_client::run_and_verify_error(id, path))
-}
+use {
+	no_client::run_and_verify_error as test_no_client,
+	no_server::run_and_verify_error as test_no_server,
+};
 
 macro_rules! tests {
 	($fn:ident $nm:ident $path:ident) => {
