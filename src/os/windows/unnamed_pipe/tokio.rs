@@ -1,17 +1,19 @@
 //! Windows-specific functionality for Tokio-based unnamed pipes.
 
 use crate::{
-	os::windows::{unnamed_pipe::CreationOptions, winprelude::*},
+	os::windows::{
+		limbo_pool::LIMBO_ERR, unnamed_pipe::CreationOptions, winprelude::*, TokioFlusher,
+	},
 	unnamed_pipe::{
 		tokio::{Recver as PubRecver, Sender as PubSender},
 		Recver as SyncRecver, Sender as SyncSender,
 	},
-	Sealed,
+	Sealed, UnpinExt,
 };
 use std::{
 	io,
 	pin::Pin,
-	task::{Context, Poll},
+	task::{ready, Context, Poll},
 };
 use tokio::{fs::File, io::AsyncWrite};
 
@@ -56,7 +58,11 @@ multimacro! {
 }
 
 #[derive(Debug)]
-pub(crate) struct Sender(File);
+pub(crate) struct Sender {
+	io: Option<File>,
+	flusher: TokioFlusher,
+	needs_flush: bool,
+}
 
 impl AsyncWrite for Sender {
 	#[inline]
@@ -65,7 +71,12 @@ impl AsyncWrite for Sender {
 		cx: &mut Context<'_>,
 		buf: &[u8],
 	) -> Poll<io::Result<usize>> {
-		Pin::new(&mut self.0).poll_write(cx, buf)
+		self.needs_flush = true;
+		let rslt = ready!(self.io.as_mut().expect(LIMBO_ERR).pin().poll_write(cx, buf));
+		if rslt.is_err() {
+			self.needs_flush = false;
+		}
+		Poll::Ready(rslt)
 	}
 	#[inline]
 	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -73,18 +84,38 @@ impl AsyncWrite for Sender {
 		Poll::Ready(Ok(()))
 	}
 	#[inline]
-	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-		Poll::Ready(Ok(()))
+	fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+		// For limbo elision given cooperative downstream
+		let slf = self.get_mut();
+		slf.flusher.poll_flush_mut(
+			slf.io.as_ref().expect(LIMBO_ERR).as_handle(),
+			&mut slf.needs_flush,
+			cx,
+		)
+	}
+}
+
+impl Drop for Sender {
+	fn drop(&mut self) {
+		todo!()
 	}
 }
 
 impl TryFrom<SyncSender> for Sender {
 	type Error = io::Error;
 	fn try_from(tx: SyncSender) -> io::Result<Self> {
-		Ok(Self(File::from_std(
-			<std::fs::File as From<OwnedHandle>>::from(tx.into()),
-		)))
+		Ok(Self {
+			io: Some(File::from_std(<std::fs::File as From<OwnedHandle>>::from(
+				tx.into(),
+			))),
+			flusher: TokioFlusher::new(),
+			needs_flush: false,
+		})
 	}
 }
 
-forward_as_handle!(Sender);
+impl AsHandle for Sender {
+	fn as_handle(&self) -> BorrowedHandle<'_> {
+		self.io.as_ref().expect(LIMBO_ERR).as_handle()
+	}
+}

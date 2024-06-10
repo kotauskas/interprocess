@@ -28,7 +28,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
 	#[inline]
 	pub async fn flush(&self) -> io::Result<()> {
 		self.flusher
-			.flush(self.as_handle(), &self.raw.needs_flush)
+			.flush_atomic(self.as_handle(), &self.raw.needs_flush)
 			.await
 	}
 
@@ -36,7 +36,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
 	#[inline]
 	pub fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
 		self.flusher
-			.poll_flush(self.as_handle(), &self.raw.needs_flush, cx)
+			.poll_flush_atomic(self.as_handle(), &self.raw.needs_flush, cx)
 	}
 
 	/// Marks the stream as unflushed, preventing elision of the next flush operation (which

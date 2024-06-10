@@ -6,7 +6,7 @@ use std::{
 	future::{self, Future},
 	io,
 	sync::{atomic::Ordering::*, Mutex},
-	task::{Context, Poll},
+	task::{ready, Context, Poll},
 };
 use tokio::task::JoinHandle;
 
@@ -24,14 +24,15 @@ impl TokioFlusher {
 		}
 	}
 	#[inline]
-	pub(crate) async fn flush(
+	pub(crate) async fn flush_atomic(
 		&self,
 		file_handle: BorrowedHandle<'_>,
 		needs_flush: &NeedsFlush,
 	) -> io::Result<()> {
-		future::poll_fn(|cx| self.poll_flush(file_handle, needs_flush, cx)).await
+		future::poll_fn(|cx| self.poll_flush_atomic(file_handle, needs_flush, cx)).await
 	}
-	pub(crate) fn poll_flush(
+
+	pub(crate) fn poll_flush_atomic(
 		&self,
 		file_handle: BorrowedHandle<'_>,
 		needs_flush: &NeedsFlush,
@@ -52,21 +53,36 @@ impl TokioFlusher {
 		}
 
 		let jh = Self::ensure_flush_start(&mut flush, file_handle);
-		match jh.pin().poll(cx) {
-			Poll::Ready(rslt) => {
-				let rslt = rslt.unwrap();
-				if rslt.is_ok() {
-					needs_flush.clear();
-				}
-				*flush = None;
-				Poll::Ready(rslt)
-			}
-			Poll::Pending => {
-				needs_flush.mark_dirty();
-				Poll::Pending
-			}
+		let rslt = ready!(jh.pin().poll(cx)).unwrap();
+		if rslt.is_ok() {
+			needs_flush.clear();
 		}
+		*flush = None;
+		Poll::Ready(rslt)
 	}
+
+	pub(crate) fn poll_flush_mut(
+		&self,
+		file_handle: BorrowedHandle<'_>,
+		needs_flush: &mut bool,
+		cx: &mut Context<'_>,
+	) -> Poll<io::Result<()>> {
+		if !*needs_flush {
+			// Idempotency optimization — don't flush unless there have been unflushed writes
+			return Poll::Ready(Ok(()));
+		}
+
+		let mut flush = self.join_handle.lock().expect(LOCK_POISON);
+
+		let jh = Self::ensure_flush_start(&mut flush, file_handle);
+		let rslt = ready!(jh.pin().poll(cx)).unwrap();
+		if rslt.is_ok() {
+			*needs_flush = false;
+		}
+		*flush = None;
+		Poll::Ready(rslt)
+	}
+
 	fn ensure_flush_start<'opt>(
 		join_handle: &'opt mut Option<FlushJH>,
 		file_handle: BorrowedHandle<'_>,
