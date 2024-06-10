@@ -1,6 +1,6 @@
 use crate::{
 	os::windows::{
-		named_pipe::limbo_pool::{LimboPool, MaybeReject},
+		limbo_pool::{LimboPool, MaybeReject},
 		winprelude::*,
 		FileHandle,
 	},

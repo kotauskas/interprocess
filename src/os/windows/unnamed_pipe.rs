@@ -6,10 +6,16 @@
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
 pub mod tokio;
 
-use super::{security_descriptor::*, winprelude::*, FileHandle};
 use crate::{
+	os::windows::{
+		limbo_pool::{LIMBO_ERR, REBURY_ERR},
+		security_descriptor::*,
+		sync_pipe_limbo::{send_off, Corpse},
+		winprelude::*,
+		FileHandle,
+	},
 	unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
-	weaken_buf_init_mut, AsPtr, Sealed,
+	weaken_buf_init_mut, AsPtr, Sealed, TryClone,
 };
 use std::{
 	fmt::{self, Debug, Formatter},
@@ -83,7 +89,10 @@ impl<'sd> CreationOptions<'sd> {
 				let r = OwnedHandle::from_raw_handle(r.to_std());
 				(w, r)
 			};
-			let w = PubSender(Sender(FileHandle::from(w)));
+			let w = PubSender(Sender {
+				io: Some(FileHandle::from(w)),
+				needs_flush: false,
+			});
 			let r = PubRecver(Recver(FileHandle::from(r)));
 			Ok((w, r))
 		} else {
@@ -109,6 +118,7 @@ pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
 
 pub(crate) struct Recver(FileHandle);
 impl Read for Recver {
+	#[inline]
 	fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
 		self.0.read(weaken_buf_init_mut(buf))
 	}
@@ -126,24 +136,70 @@ multimacro! {
 	forward_try_clone,
 }
 
-pub(crate) struct Sender(FileHandle);
+#[derive(Debug)]
+pub(crate) struct Sender {
+	io: Option<FileHandle>,
+	needs_flush: bool,
+}
 impl Write for Sender {
+	#[inline]
 	fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-		self.0.write(buf)
+		let rslt = self.io.as_mut().expect(LIMBO_ERR).write(buf);
+		if rslt.is_ok() {
+			self.needs_flush = true;
+		}
+		rslt
 	}
+	#[inline]
 	fn flush(&mut self) -> io::Result<()> {
-		self.0.flush()
+		if self.needs_flush {
+			let rslt = self.io.as_mut().expect(LIMBO_ERR).flush();
+			if rslt.is_ok() {
+				self.needs_flush = false;
+			}
+			rslt
+		} else {
+			Ok(())
+		}
 	}
 }
-impl Debug for Sender {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("Sender")
-			.field(&self.0.as_raw_handle())
-			.finish()
+impl Drop for Sender {
+	fn drop(&mut self) {
+		let corpse = Corpse {
+			handle: self.io.take().expect(REBURY_ERR),
+			is_server: false,
+		};
+		if self.needs_flush {
+			send_off(corpse);
+		}
 	}
 }
-multimacro! {
-	Sender,
-	forward_handle,
-	forward_try_clone,
+impl TryClone for Sender {
+	fn try_clone(&self) -> io::Result<Self> {
+		Ok(Self {
+			io: self.io.as_ref().map(TryClone::try_clone).transpose()?,
+			needs_flush: self.needs_flush,
+		})
+	}
+}
+impl AsHandle for Sender {
+	#[inline]
+	fn as_handle(&self) -> BorrowedHandle<'_> {
+		self.io.as_ref().map(AsHandle::as_handle).expect(LIMBO_ERR)
+	}
+}
+impl From<OwnedHandle> for Sender {
+	#[inline]
+	fn from(handle: OwnedHandle) -> Self {
+		Self {
+			io: Some(handle.into()),
+			needs_flush: true,
+		}
+	}
+}
+impl From<Sender> for OwnedHandle {
+	#[inline]
+	fn from(mut tx: Sender) -> Self {
+		tx.io.take().expect(LIMBO_ERR).into()
+	}
 }

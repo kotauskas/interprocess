@@ -2,7 +2,7 @@ use super::{
 	super::limbo::{send_off, Corpse},
 	*,
 };
-use crate::os::windows::named_pipe::{LIMBO_ERR, REBURY_ERR};
+use crate::os::windows::limbo_pool::{LIMBO_ERR, REBURY_ERR};
 
 impl RawPipeStream {
 	pub(super) fn inner(&self) -> &InnerTokio {

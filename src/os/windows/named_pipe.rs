@@ -63,7 +63,6 @@ pub mod local_socket {
 }
 
 mod c_wrappers;
-mod limbo_pool;
 mod maybe_arc;
 
 use maybe_arc::*;

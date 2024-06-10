@@ -12,6 +12,10 @@ const LIMBO_SLOTS: u8 = 16;
 /// requiring some form of retry.
 pub(crate) type MaybeReject<T> = Result<(), T>;
 
+pub(crate) static LIMBO_ERR: &str =
+	"attempt to perform operation on pipe stream which has been sent off to limbo";
+pub(crate) static REBURY_ERR: &str = "attempt to bury same pipe stream twice";
+
 #[allow(clippy::as_conversions)]
 pub(crate) struct LimboPool<S> {
 	senders: [Option<S>; LIMBO_SLOTS as _],

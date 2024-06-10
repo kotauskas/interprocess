@@ -1,9 +1,8 @@
 use super::*;
-use crate::os::windows::named_pipe::stream::limbo::{send_off, Corpse};
-
-pub(crate) static LIMBO_ERR: &str =
-	"attempt to perform operation on pipe stream which has been sent off to limbo";
-pub(crate) static REBURY_ERR: &str = "attempt to bury same pipe stream twice";
+use crate::os::windows::{
+	limbo_pool::{LIMBO_ERR, REBURY_ERR},
+	sync_pipe_limbo::{send_off, Corpse},
+};
 
 impl RawPipeStream {
 	pub(super) fn file_handle(&self) -> &FileHandle {
