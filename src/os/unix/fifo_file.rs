@@ -1,5 +1,4 @@
-//! Creating and using FIFO files, which are also known as "named pipes" but totally different from
-//! named pipes on Windows.
+//! Creation of FIFO files.
 //!
 //! On Windows, named pipes can be compared to Unix domain sockets: they can have multiple duplex
 //! connections on a single path, and the data can be chosen to either preserve or erase the message
