@@ -16,10 +16,9 @@ use crate::os::windows::{
 	decode_eof,
 	named_pipe::{
 		c_wrappers::{self as c_wrappers, hget},
-		needs_flush::NeedsFlushVal,
 		PipeMode,
 	},
-	FileHandle,
+	FileHandle, NeedsFlushVal,
 };
 use std::{
 	io::{self, prelude::*},

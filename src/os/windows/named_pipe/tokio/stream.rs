@@ -7,9 +7,12 @@ pub use error::*;
 mod r#impl;
 mod limbo;
 
-use crate::os::windows::named_pipe::{
-	stream::{pipe_mode, PipeModeTag},
-	MaybeArc, NeedsFlush,
+use crate::os::windows::{
+	named_pipe::{
+		stream::{pipe_mode, PipeModeTag},
+		MaybeArc,
+	},
+	NeedsFlush, TokioFlusher,
 };
 use std::{io, marker::PhantomData, sync::Mutex};
 use tokio::net::windows::named_pipe::{
@@ -35,10 +38,9 @@ use tokio::net::windows::named_pipe::{
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
 	raw: MaybeArc<RawPipeStream>,
-	flush: Mutex<Option<FlushJH>>,
+	flusher: TokioFlusher,
 	_phantom: PhantomData<(Rm, Sm)>,
 }
-type FlushJH = tokio::task::JoinHandle<io::Result<()>>;
 
 /// Type alias for a Tokio-based pipe stream with the same receive mode and send mode.
 pub type DuplexPipeStream<M> = PipeStream<M, M>;

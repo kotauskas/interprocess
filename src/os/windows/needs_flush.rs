@@ -1,11 +1,11 @@
 use crate::{AtomicEnum, ReprU8};
-use std::sync::atomic::Ordering::*;
+use std::sync::atomic::Ordering::{self, *};
 
 #[derive(Debug)]
-pub struct NeedsFlush(AtomicEnum<NeedsFlushVal>);
+pub(crate) struct NeedsFlush(AtomicEnum<NeedsFlushVal>);
 impl NeedsFlush {
 	#[inline]
-	pub fn mark_dirty(&self) {
+	pub(crate) fn mark_dirty(&self) {
 		let _ = self.0.compare_exchange(
 			NeedsFlushVal::No,
 			NeedsFlushVal::Once,
@@ -14,12 +14,11 @@ impl NeedsFlush {
 		);
 	}
 	#[inline]
-	pub fn on_clone(&self) {
+	pub(crate) fn on_clone(&self) {
 		self.0.store(NeedsFlushVal::Always, Release);
 	}
 	#[inline]
-	pub fn on_flush(&self) -> bool {
-		// TODO(2.2.0) verify necessity of orderings
+	pub(crate) fn take(&self) -> bool {
 		match self
 			.0
 			.compare_exchange(NeedsFlushVal::Once, NeedsFlushVal::No, AcqRel, Acquire)
@@ -30,7 +29,20 @@ impl NeedsFlush {
 		}
 	}
 	#[inline]
-	pub fn get(&mut self) -> bool {
+	pub(crate) fn clear(&self) {
+		let _ = self
+			.0
+			.compare_exchange(NeedsFlushVal::Once, NeedsFlushVal::No, AcqRel, Relaxed);
+	}
+	#[inline]
+	pub(crate) fn get(&self, ordering: Ordering) -> bool {
+		matches!(
+			self.0.load(ordering),
+			NeedsFlushVal::Once | NeedsFlushVal::Always
+		)
+	}
+	#[inline]
+	pub(crate) fn get_mut(&mut self) -> bool {
 		matches!(
 			self.0.get_mut(),
 			NeedsFlushVal::Once | NeedsFlushVal::Always
@@ -46,7 +58,7 @@ impl From<NeedsFlushVal> for NeedsFlush {
 
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum NeedsFlushVal {
+pub(crate) enum NeedsFlushVal {
 	No,
 	Once,
 	Always,

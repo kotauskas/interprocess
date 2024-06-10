@@ -17,7 +17,7 @@ impl Drop for RawPipeStream {
 			handle: self.handle.take().expect(REBURY_ERR),
 			is_server: self.is_server,
 		};
-		if self.needs_flush.get() {
+		if self.needs_flush.get_mut() {
 			send_off(corpse);
 		}
 	}

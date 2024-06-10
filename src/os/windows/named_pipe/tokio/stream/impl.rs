@@ -25,7 +25,7 @@ use crate::os::windows::{
 	winprelude::*,
 };
 use std::{
-	future::{self, Future},
+	future::Future,
 	pin::Pin,
 	task::{ready, Context, Poll},
 };
@@ -43,12 +43,12 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 		(
 			RecvPipeStream {
 				raw: raw_a,
-				flush: None.into(), // PERF(2.2.0) the mutex is unnecessary for receivers
+				flusher: TokioFlusher::new(), // PERF(2.2.0) the mutex is unnecessary for receivers
 				_phantom: PhantomData,
 			},
 			SendPipeStream {
 				raw: raw_ac,
-				flush: self.flush,
+				flusher: self.flusher,
 				_phantom: PhantomData,
 			},
 		)
@@ -60,12 +60,14 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 		if !MaybeArc::ptr_eq(&rh.raw, &sh.raw) {
 			return Err(ReuniteError { rh, sh });
 		}
-		let PipeStream { mut raw, flush, .. } = sh;
+		let PipeStream {
+			mut raw, flusher, ..
+		} = sh;
 		drop(rh);
 		raw.try_make_owned();
 		Ok(PipeStream {
 			raw,
-			flush,
+			flusher,
 			_phantom: PhantomData,
 		})
 	}

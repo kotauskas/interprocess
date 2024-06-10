@@ -29,7 +29,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
 		let mut dbst = f.debug_struct("PipeStream");
 		self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE);
 		if Sm::MODE.is_some() {
-			dbst.field("flush", &self.flush);
+			dbst.field("flusher", &self.flusher);
 		}
 		dbst.finish()
 	}

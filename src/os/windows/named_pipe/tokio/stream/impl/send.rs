@@ -1,9 +1,8 @@
 use super::*;
 use crate::{
-	os::windows::{named_pipe::PmtNotNone, winprelude::*, FileHandle},
-	UnpinExt, LOCK_POISON,
+	os::windows::{named_pipe::PmtNotNone, winprelude::*},
+	UnpinExt,
 };
-use std::sync::MutexGuard;
 use tokio::io::AsyncWrite;
 
 impl RawPipeStream {
@@ -22,44 +21,22 @@ impl RawPipeStream {
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
-	fn ensure_flush_start(&self, slf_flush: &mut MutexGuard<'_, Option<FlushJH>>) {
-		if slf_flush.is_some() {
-			return;
-		}
-
-		let handle = self.as_int_handle();
-		let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl(handle));
-
-		**slf_flush = Some(task);
-	}
 	/// Flushes the stream, waiting until the send buffer is empty (has been received by the other
 	/// end in its entirety).
 	///
 	/// Only available on streams that have a send mode.
 	#[inline]
 	pub async fn flush(&self) -> io::Result<()> {
-		future::poll_fn(|cx| self.poll_flush(cx)).await
+		self.flusher
+			.flush(self.as_handle(), &self.raw.needs_flush)
+			.await
 	}
 
 	/// Polls the future of `.flush()`.
+	#[inline]
 	pub fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-		if !self.raw.needs_flush.on_flush() {
-			// No flush required.
-			return Poll::Ready(Ok(()));
-		}
-
-		let mut flush = self.flush.lock().expect(LOCK_POISON);
-		let rslt = loop {
-			match flush.as_mut() {
-				Some(fl) => break ready!(fl.pin().poll(cx)).unwrap(),
-				None => self.ensure_flush_start(&mut flush),
-			}
-		};
-		*flush = None;
-		if rslt.is_err() {
-			self.raw.needs_flush.mark_dirty();
-		}
-		Poll::Ready(rslt)
+		self.flusher
+			.poll_flush(self.as_handle(), &self.raw.needs_flush, cx)
 	}
 
 	/// Marks the stream as unflushed, preventing elision of the next flush operation (which
@@ -75,7 +52,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
 	/// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
 	#[inline]
 	pub fn assume_flushed(&self) {
-		self.raw.needs_flush.on_flush();
+		self.raw.needs_flush.take();
 	}
 	/// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()`
 	/// right before dropping it.

@@ -65,9 +65,8 @@ pub mod local_socket {
 mod c_wrappers;
 mod limbo_pool;
 mod maybe_arc;
-mod needs_flush;
 
-use {maybe_arc::*, needs_flush::*};
+use maybe_arc::*;
 
 /// Asynchronous named pipes which work with the Tokio runtime and event loop.
 ///

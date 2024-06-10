@@ -15,7 +15,7 @@ impl RawPipeStream {
 
 	#[track_caller]
 	fn flush(&self) -> io::Result<()> {
-		if self.needs_flush.on_flush() {
+		if self.needs_flush.take() {
 			let r = self.file_handle().flush();
 			if r.is_err() {
 				self.needs_flush.mark_dirty();
@@ -47,7 +47,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
 	/// stream is closed, since it won't be sent to limbo.
 	#[inline]
 	pub fn assume_flushed(&self) {
-		self.raw.needs_flush.on_flush();
+		self.raw.needs_flush.take();
 	}
 	/// Drops the stream without sending it to limbo. This is the same as calling
 	/// `assume_flushed()` right before dropping it.

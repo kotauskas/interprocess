@@ -1,10 +1,7 @@
 use widestring::U16CString;
 
 use super::*;
-use crate::os::windows::{
-	named_pipe::{NeedsFlushVal, WaitTimeout},
-	path_conversion::*,
-};
+use crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*, NeedsFlushVal};
 use std::{borrow::Cow, mem::take};
 
 impl RawPipeStream {
@@ -75,7 +72,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	pub(crate) fn new(raw: RawPipeStream) -> Self {
 		Self {
 			raw: MaybeArc::Inline(raw),
-			flush: Mutex::new(None),
+			flusher: TokioFlusher::new(),
 			_phantom: PhantomData,
 		}
 	}

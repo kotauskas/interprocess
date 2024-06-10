@@ -13,9 +13,11 @@ mod share_handle;
 pub use {path_conversion::*, share_handle::*};
 
 mod file_handle;
-pub(crate) use file_handle::*;
+pub(crate) mod misc;
+#[cfg(feature = "tokio")]
+mod needs_flush;
+#[cfg(feature = "tokio")]
+mod tokio_flusher;
+pub(crate) use {file_handle::*, misc::*, needs_flush::*, tokio_flusher::*};
 
 mod c_wrappers;
-pub(crate) mod misc;
-
-pub(crate) use misc::*;

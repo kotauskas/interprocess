@@ -13,7 +13,7 @@ impl RawPipeStream {
 impl Drop for RawPipeStream {
 	fn drop(&mut self) {
 		let corpse = self.inner.take().map(Corpse).expect(REBURY_ERR);
-		if self.needs_flush.get() {
+		if self.needs_flush.get_mut() {
 			send_off(corpse);
 		}
 	}

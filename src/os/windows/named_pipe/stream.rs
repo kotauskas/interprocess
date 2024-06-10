@@ -7,10 +7,10 @@ mod limbo;
 #[cfg(feature = "tokio")]
 pub(super) use r#impl::*;
 
-use super::{MaybeArc, NeedsFlush};
+use super::MaybeArc;
 use crate::{
 	local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-	os::windows::FileHandle,
+	os::windows::{FileHandle, NeedsFlush},
 };
 use std::{marker::PhantomData, os::windows::prelude::*};
 
