@@ -1,7 +1,7 @@
 use super::*;
-use crate::os::windows::{
-	limbo_pool::{LIMBO_ERR, REBURY_ERR},
-	sync_pipe_limbo::{send_off, Corpse},
+use crate::os::windows::limbo::{
+	sync::{send_off, Corpse},
+	LIMBO_ERR, REBURY_ERR,
 };
 
 impl RawPipeStream {

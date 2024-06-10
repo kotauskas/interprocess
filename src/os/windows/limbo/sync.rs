@@ -16,7 +16,7 @@ use std::{
 };
 use windows_sys::Win32::System::Pipes::DisconnectNamedPipe;
 
-pub(super) struct Corpse {
+pub(crate) struct Corpse {
 	pub handle: FileHandle,
 	pub is_server: bool,
 }
@@ -45,7 +45,7 @@ fn limbo_keeper_name(idx: usize) -> String {
 	}
 }
 
-pub(super) fn send_off(c: Corpse) {
+pub(crate) fn send_off(c: Corpse) {
 	fn bury(c: Corpse) {
 		c.handle.flush().debug_expect("limbo flush failed");
 	}

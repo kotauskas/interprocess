@@ -5,16 +5,16 @@ mod error;
 pub use error::*;
 
 mod r#impl;
-mod limbo;
 
 use crate::os::windows::{
+	limbo::tokio::Corpse,
 	named_pipe::{
 		stream::{pipe_mode, PipeModeTag},
 		MaybeArc,
 	},
 	NeedsFlush, TokioFlusher,
 };
-use std::{io, marker::PhantomData, sync::Mutex};
+use std::{io, marker::PhantomData};
 use tokio::net::windows::named_pipe::{
 	NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
 };
@@ -65,6 +65,14 @@ pub(crate) struct RawPipeStream {
 enum InnerTokio {
 	Server(TokioNPServer),
 	Client(TokioNPClient),
+}
+impl From<InnerTokio> for Corpse {
+	fn from(it: InnerTokio) -> Self {
+		match it {
+			InnerTokio::Server(o) => Corpse::NpServer(o),
+			InnerTokio::Client(o) => Corpse::NpClient(o),
+		}
+	}
 }
 
 /* MESSAGE READING DISABLED

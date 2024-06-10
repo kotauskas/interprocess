@@ -1,24 +1,38 @@
 //! Does not use the limbo pool.
 
-use super::*;
 use crate::{
 	os::windows::{winprelude::*, FileHandle},
 	DebugExpectExt, LOCK_POISON,
 };
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use tokio::{
+	fs::File,
+	net::windows::named_pipe::{NamedPipeClient, NamedPipeServer},
 	runtime::{self, Handle as RuntimeHandle, Runtime},
 	sync::mpsc::{unbounded_channel, UnboundedSender},
 	task,
 };
 
-pub(super) struct Corpse(pub InnerTokio);
+pub(crate) enum Corpse {
+	NpServer(NamedPipeServer),
+	NpClient(NamedPipeClient),
+	Unnamed(File),
+}
 impl Drop for Corpse {
 	fn drop(&mut self) {
-		if let InnerTokio::Server(server) = &self.0 {
+		if let Self::NpServer(server) = self {
 			server
 				.disconnect()
 				.debug_expect("named pipe server disconnect failed");
+		}
+	}
+}
+impl AsRawHandle for Corpse {
+	fn as_raw_handle(&self) -> RawHandle {
+		match self {
+			Corpse::NpServer(o) => o.as_raw_handle(),
+			Corpse::NpClient(o) => o.as_raw_handle(),
+			Corpse::Unnamed(o) => o.as_raw_handle(),
 		}
 	}
 }
@@ -38,8 +52,8 @@ fn static_runtime_handle() -> &'static RuntimeHandle {
 				.build()
 				.expect(
 					"\
-failed to build Tokio limbo helper (only necessary if the first named pipe to be dropped happens \
-to go out of scope outside of another Tokio runtime)",
+failed to build Tokio limbo helper (only necessary if the first pipe to be dropped happens to go \
+out of scope outside of another Tokio runtime)",
 				)
 		})
 		.handle()
@@ -47,7 +61,7 @@ to go out of scope outside of another Tokio runtime)",
 
 fn bury(c: Corpse) {
 	task::spawn_blocking(move || {
-		let handle = c.0.as_int_handle();
+		let handle = c.as_int_handle();
 		FileHandle::flush_hndl(handle).debug_expect("limbo flush failed");
 	});
 }
@@ -68,7 +82,7 @@ fn create_limbo() -> Limbo {
 	tx
 }
 
-pub(super) fn send_off(c: Corpse) {
+pub(crate) fn send_off(c: Corpse) {
 	let mutex = LIMBO.get_or_init(|| Mutex::new(create_limbo()));
 	let mut limbo = mutex.lock().expect(LOCK_POISON);
 	if let Err(c) = limbo.send(c) {

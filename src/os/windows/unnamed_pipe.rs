@@ -8,9 +8,11 @@ pub mod tokio;
 
 use crate::{
 	os::windows::{
-		limbo_pool::{LIMBO_ERR, REBURY_ERR},
+		limbo::{
+			sync::{send_off, Corpse},
+			LIMBO_ERR, REBURY_ERR,
+		},
 		security_descriptor::*,
-		sync_pipe_limbo::{send_off, Corpse},
 		winprelude::*,
 		FileHandle,
 	},

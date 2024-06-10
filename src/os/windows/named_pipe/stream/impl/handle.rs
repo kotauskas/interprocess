@@ -2,7 +2,7 @@ use windows_sys::Win32::System::Pipes::{PIPE_SERVER_END, PIPE_TYPE_MESSAGE};
 
 use super::*;
 use crate::{
-	os::windows::{c_wrappers::duplicate_handle, limbo_pool::LIMBO_ERR},
+	os::windows::{c_wrappers::duplicate_handle, limbo::LIMBO_ERR},
 	TryClone,
 };
 use std::mem::ManuallyDrop;
