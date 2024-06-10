@@ -2,7 +2,13 @@
 
 use crate::{
 	os::windows::{
-		limbo_pool::LIMBO_ERR, unnamed_pipe::CreationOptions, winprelude::*, TokioFlusher,
+		limbo::{
+			tokio::{send_off, Corpse},
+			LIMBO_ERR, REBURY_ERR,
+		},
+		unnamed_pipe::CreationOptions,
+		winprelude::*,
+		TokioFlusher,
 	},
 	unnamed_pipe::{
 		tokio::{Recver as PubRecver, Sender as PubSender},
@@ -97,7 +103,10 @@ impl AsyncWrite for Sender {
 
 impl Drop for Sender {
 	fn drop(&mut self) {
-		todo!()
+		let corpse = Corpse::Unnamed(self.io.take().expect(REBURY_ERR));
+		if self.needs_flush {
+			send_off(corpse);
+		}
 	}
 }
 
