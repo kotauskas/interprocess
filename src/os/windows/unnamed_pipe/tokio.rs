@@ -1,16 +1,19 @@
 //! Windows-specific functionality for Tokio-based unnamed pipes.
 
-use super::CreationOptions;
 use crate::{
-	os::windows::winprelude::*,
+	os::windows::{unnamed_pipe::CreationOptions, winprelude::*},
 	unnamed_pipe::{
 		tokio::{Recver as PubRecver, Sender as PubSender},
 		Recver as SyncRecver, Sender as SyncSender,
 	},
 	Sealed,
 };
-use std::io;
-use tokio::fs::File;
+use std::{
+	io,
+	pin::Pin,
+	task::{Context, Poll},
+};
+use tokio::{fs::File, io::AsyncWrite};
 
 fn pair2pair((tx, rx): (SyncSender, SyncRecver)) -> io::Result<(PubSender, PubRecver)> {
 	Ok((PubSender(tx.try_into()?), PubRecver(rx.try_into()?)))
@@ -54,6 +57,27 @@ multimacro! {
 
 #[derive(Debug)]
 pub(crate) struct Sender(File);
+
+impl AsyncWrite for Sender {
+	#[inline]
+	fn poll_write(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+		buf: &[u8],
+	) -> Poll<io::Result<usize>> {
+		Pin::new(&mut self.0).poll_write(cx, buf)
+	}
+	#[inline]
+	fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		// Unnamed pipes on Unix can't be flushed
+		Poll::Ready(Ok(()))
+	}
+	#[inline]
+	fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+		Poll::Ready(Ok(()))
+	}
+}
+
 impl TryFrom<SyncSender> for Sender {
 	type Error = io::Error;
 	fn try_from(tx: SyncSender) -> io::Result<Self> {
@@ -62,12 +86,5 @@ impl TryFrom<SyncSender> for Sender {
 		)))
 	}
 }
-multimacro! {
-	Sender,
-	pinproj_for_unpin(File),
-	forward_rbv(File, &),
-	forward_tokio_write,
-	forward_as_handle,
-}
 
-// TODO do something about flushing
+forward_as_handle!(Sender);
