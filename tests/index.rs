@@ -17,4 +17,7 @@ mod os {
 }
 
 mod local_socket;
+#[cfg(feature = "tokio")]
 mod tokio_local_socket;
+
+mod unnamed_pipe;

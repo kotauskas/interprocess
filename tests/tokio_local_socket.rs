@@ -1,5 +1,4 @@
 // TODO(2.2.0) test various error conditions
-#![cfg(feature = "tokio")]
 
 mod no_server;
 mod stream;
@@ -25,8 +24,11 @@ async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
 	} else {
 		Box::new(|conn| Box::pin(client_nosplit(conn)))
 	};
-	util::tokio::drive_server_and_multiple_clients(move |s, n| server(id, hcl, s, n, path), client)
-		.await
+	util::tokio::drive_server_and_multiple_clients(
+		move |s, n| server(id, hcl, s, n, path),
+		client,
+	)
+	.await
 }
 
 macro_rules! matrix {
