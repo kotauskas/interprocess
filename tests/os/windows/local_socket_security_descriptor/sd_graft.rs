@@ -12,7 +12,9 @@ use crate::{
 	tests::util::*,
 	OrErrno, SubUsizeExt, TryClone,
 };
-use std::{ffi::OsString, fs::File, io, mem::MaybeUninit, os::windows::prelude::*, ptr, sync::Arc};
+use std::{
+	ffi::OsString, fs::File, io, mem::MaybeUninit, os::windows::prelude::*, ptr, sync::Arc,
+};
 use widestring::{U16CStr, U16Str};
 use windows_sys::Win32::{
 	Foundation::{MAX_PATH, STATUS_SUCCESS},
@@ -99,7 +101,8 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
 	unsafe { GetModuleFileNameW(0, base, cap) != 0 }
 		.true_val_or_errno(())
 		.and_then(|()| unsafe {
-			U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize()).map_err(io::Error::other)
+			U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize())
+				.map_err(io::Error::other)
 		})
 }
 

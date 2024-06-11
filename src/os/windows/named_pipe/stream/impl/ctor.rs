@@ -18,7 +18,11 @@ impl RawPipeStream {
 	fn new_client(handle: FileHandle) -> Self {
 		Self::new(handle, false)
 	}
-	fn connect(path: &U16CStr, recv: Option<PipeMode>, send: Option<PipeMode>) -> io::Result<Self> {
+	fn connect(
+		path: &U16CStr,
+		recv: Option<PipeMode>,
+		send: Option<PipeMode>,
+	) -> io::Result<Self> {
 		let handle = loop {
 			match c_wrappers::connect_without_waiting(path, recv, send, false) {
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {

@@ -4,7 +4,9 @@ use crate::{
 		traits::{self, ReuniteResult},
 		Name, NameInner,
 	},
-	os::windows::named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
+	os::windows::named_pipe::{
+		pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream,
+	},
 	Sealed,
 };
 use std::{

@@ -49,7 +49,8 @@ impl Display for FromHandleErrorKind {
 pub type FromHandleError = ConversionError<OwnedHandle, FromHandleErrorKind>;
 
 /// [`ReuniteError`](crate::error::ReuniteError) for Tokio named pipe streams.
-pub type ReuniteError<Rm, Sm> = crate::error::ReuniteError<RecvPipeStream<Rm>, SendPipeStream<Sm>>;
+pub type ReuniteError<Rm, Sm> =
+	crate::error::ReuniteError<RecvPipeStream<Rm>, SendPipeStream<Sm>>;
 
 /// Result type for [`PipeStream::reunite()`].
 pub type ReuniteResult<Rm, Sm> = Result<PipeStream<Rm, Sm>, ReuniteError<Rm, Sm>>;

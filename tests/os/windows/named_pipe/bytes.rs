@@ -70,11 +70,13 @@ pub fn client_duplex(name: &str) -> TestResult {
 	Ok(())
 }
 pub fn client_cts(name: &str) -> TestResult {
-	let mut sender = SendPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
+	let mut sender =
+		SendPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
 	send(&mut sender, msg(false))
 }
 pub fn client_stc(name: &str) -> TestResult {
-	let mut recver = RecvPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
+	let mut recver =
+		RecvPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
 	recv(&mut recver, msg(true))
 }
 
