@@ -34,7 +34,7 @@ use windows_sys::Win32::{
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
 /// for more.
-// TODO(2.2.0) examples
+// TODO(2.3.0) examples
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
 	config: PipeListenerOptions<'static>, // We need the options to create new instances
 	nonblocking: AtomicBool,

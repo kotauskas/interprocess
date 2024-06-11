@@ -38,7 +38,7 @@ impl traits::Listener for Listener {
 	fn accept(&self) -> io::Result<Stream> {
 		use ListenerNonblockingMode as LNM;
 		let stream = self.listener.accept().map(Stream)?;
-		// TODO(2.2.0) verify necessity of orderings
+		// TODO(2.3.0) verify necessity of orderings
 		let nonblocking = self.nonblocking.load(SeqCst);
 		if matches!(nonblocking, LNM::Accept) {
 			stream.set_nonblocking(false)?;

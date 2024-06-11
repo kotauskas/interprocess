@@ -1,4 +1,4 @@
-// TODO(2.2.0) message reading disabled due to a lack of support in Mio; we should try to figure
+// TODO(2.x.0) message reading disabled due to a lack of support in Mio; we should try to figure
 // something out, they need to add first-class message pipe support and handling of ERROR_MORE_DATA
 
 mod error;
@@ -56,7 +56,7 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
 	inner: Option<InnerTokio>,
-	// TODO(2.2.0) crackhead specialization
+	// TODO(2.3.0) crackhead specialization
 	// Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
 	needs_flush: NeedsFlush,
 	// MESSAGE READING DISABLED

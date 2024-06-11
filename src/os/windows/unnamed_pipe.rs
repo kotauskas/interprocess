@@ -1,6 +1,6 @@
 //! Windows-specific functionality for unnamed pipes.
 
-// TODO(2.2.0) add examples and tests
+// TODO(2.2.0) add examples
 
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
