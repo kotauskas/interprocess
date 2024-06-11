@@ -20,4 +20,6 @@ mod local_socket;
 #[cfg(feature = "tokio")]
 mod tokio_local_socket;
 
+#[cfg(feature = "tokio")]
+mod tokio_unnamed_pipe;
 mod unnamed_pipe;
