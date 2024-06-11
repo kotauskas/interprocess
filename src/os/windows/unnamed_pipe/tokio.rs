@@ -113,10 +113,9 @@ impl Drop for Sender {
 impl TryFrom<SyncSender> for Sender {
 	type Error = io::Error;
 	fn try_from(tx: SyncSender) -> io::Result<Self> {
+		let handle = OwnedHandle::from(tx);
 		Ok(Self {
-			io: Some(File::from_std(<std::fs::File as From<OwnedHandle>>::from(
-				tx.into(),
-			))),
+			io: Some(File::from_std(std::fs::File::from(handle))),
 			flusher: TokioFlusher::new(),
 			needs_flush: false,
 		})

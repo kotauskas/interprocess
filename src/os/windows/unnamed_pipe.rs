@@ -22,6 +22,7 @@ use crate::{
 use std::{
 	fmt::{self, Debug, Formatter},
 	io::{self, Read, Write},
+	mem::ManuallyDrop,
 	num::NonZeroUsize,
 };
 use windows_sys::Win32::System::Pipes::CreatePipe;
@@ -201,7 +202,7 @@ impl From<OwnedHandle> for Sender {
 }
 impl From<Sender> for OwnedHandle {
 	#[inline]
-	fn from(mut tx: Sender) -> Self {
-		tx.io.take().expect(LIMBO_ERR).into()
+	fn from(tx: Sender) -> Self {
+		ManuallyDrop::new(tx).io.take().expect(LIMBO_ERR).into()
 	}
 }
