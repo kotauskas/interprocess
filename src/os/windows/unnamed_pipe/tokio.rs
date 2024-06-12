@@ -6,9 +6,9 @@ use crate::{
 			tokio::{send_off, Corpse},
 			LIMBO_ERR, REBURY_ERR,
 		},
+		tokio_flusher::TokioFlusher,
 		unnamed_pipe::CreationOptions,
 		winprelude::*,
-		TokioFlusher,
 	},
 	unnamed_pipe::{
 		tokio::{Recver as PubRecver, Sender as PubSender},

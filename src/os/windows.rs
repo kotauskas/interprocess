@@ -15,9 +15,8 @@ pub use {path_conversion::*, share_handle::*};
 mod file_handle;
 mod limbo_pool;
 pub(crate) mod misc;
-
-#[cfg(feature = "tokio")]
 mod needs_flush;
+
 #[cfg(feature = "tokio")]
 mod tokio_flusher;
 
@@ -31,6 +30,6 @@ mod limbo {
 	pub(crate) static REBURY_ERR: &str = "attempt to bury same pipe stream twice";
 }
 
-pub(crate) use {file_handle::*, misc::*, needs_flush::*, tokio_flusher::*};
+pub(crate) use {file_handle::*, misc::*, needs_flush::*};
 
 mod c_wrappers;

@@ -12,7 +12,8 @@ use crate::os::windows::{
 		stream::{pipe_mode, PipeModeTag},
 		MaybeArc,
 	},
-	NeedsFlush, TokioFlusher,
+	tokio_flusher::TokioFlusher,
+	NeedsFlush,
 };
 use std::{io, marker::PhantomData};
 use tokio::net::windows::named_pipe::{
