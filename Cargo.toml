@@ -24,6 +24,10 @@ exclude = [
 ]
 
 [[example]]
+name = "unnamed_pipe_sync"
+path = "examples/unnamed_pipe/sync/main.rs"
+
+[[example]]
 name = "local_socket_sync_server"
 path = "examples/local_socket/sync/listener.rs"
 
@@ -73,6 +77,7 @@ doc_cfg = []
 doctest-file = "1.0.0"
 tokio = { version = "1.36.0", features = [
 	"sync",
+	"rt",
 	"net",
 	"time",
 	"io-util",
@@ -94,6 +99,7 @@ windows-sys = { version = "0.52.0", features = [
 ] }
 tokio = { version = "1.36.0", features = [
 	"sync",
+	"rt-multi-thread",
 	"fs",
 	"net",
 	"time",
