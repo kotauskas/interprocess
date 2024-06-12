@@ -4,7 +4,7 @@ use std::{io, os, sync::mpsc};
 type Handle = os::windows::io::OwnedHandle;
 #[cfg(unix)]
 type Handle = os::unix::io::OwnedFd;
-pub(super) fn main(handle_sender: mpsc::SyncSender<Handle>) -> io::Result<()> {
+pub(crate) fn emain(handle_sender: mpsc::SyncSender<Handle>) -> io::Result<()> {
 	//}
 	use interprocess::unnamed_pipe::pipe;
 	use std::io::{prelude::*, BufReader};
@@ -33,3 +33,5 @@ pub(super) fn main(handle_sender: mpsc::SyncSender<Handle>) -> io::Result<()> {
 	//{
 	Ok(())
 } //}
+#[allow(dead_code)]
+fn main() {}

@@ -4,7 +4,7 @@ use std::{io, os};
 type Handle = os::windows::io::OwnedHandle;
 #[cfg(unix)]
 type Handle = os::unix::io::OwnedFd;
-pub(super) fn main(handle: Handle) -> io::Result<()> {
+pub(crate) fn emain(handle: Handle) -> io::Result<()> {
 	//}
 	use interprocess::unnamed_pipe;
 	use std::io::prelude::*;
@@ -20,3 +20,5 @@ pub(super) fn main(handle: Handle) -> io::Result<()> {
 	//{
 	Ok(())
 } //}
+#[allow(dead_code)]
+fn main() {}
