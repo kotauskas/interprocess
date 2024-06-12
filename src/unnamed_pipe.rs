@@ -15,6 +15,9 @@
 //! which can be used in simple cases instead of unnamed pipes. Making use of that feature is
 //! advisable if the program of the child process can be modified to communicate with its parent
 //! via standard I/O streams.
+//!
+//! # Examples
+//! See [`pipe()`].
 
 #[cfg(feature = "tokio")]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "tokio")))]
@@ -33,6 +36,17 @@ use std::io;
 ///
 /// The platform-specific builders in the `os` module of the crate might be more helpful if extra
 /// configuration for the pipe is needed.
+///
+/// # Examples
+/// ## Basic communication
+/// In a parent process:
+/// ```no_run
+#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_a.rs")]
+/// ```
+/// In a child process:
+/// ```no_run
+#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs")]
+/// ```
 #[inline]
 pub fn pipe() -> io::Result<(Sender, Recver)> {
 	pipe_impl()
