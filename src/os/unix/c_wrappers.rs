@@ -3,8 +3,6 @@ use crate::AsPtr;
 #[allow(unused_imports)]
 use crate::{FdOrErrno, OrErrno};
 use libc::{sockaddr_un, AF_UNIX};
-#[cfg(feature = "tokio")]
-use std::net::Shutdown;
 #[cfg(target_os = "android")]
 use std::os::android::net::SocketAddrExt;
 #[cfg(target_os = "linux")]
@@ -304,11 +302,12 @@ pub(super) fn bind_and_listen_with_mode(
 }
 
 #[allow(dead_code)]
-pub(super) fn shutdown(fd: BorrowedFd<'_>, how: Shutdown) -> io::Result<()> {
+pub(super) fn shutdown(fd: BorrowedFd<'_>, how: std::net::Shutdown) -> io::Result<()> {
+	use std::net::Shutdown::*;
 	let how = match how {
-		Shutdown::Read => libc::SHUT_RD,
-		Shutdown::Write => libc::SHUT_WR,
-		Shutdown::Both => libc::SHUT_RDWR,
+		Read => libc::SHUT_RD,
+		Write => libc::SHUT_WR,
+		Both => libc::SHUT_RDWR,
 	};
 	unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 }.true_val_or_errno(())
 }
