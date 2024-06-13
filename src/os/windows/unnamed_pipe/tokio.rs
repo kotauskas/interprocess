@@ -67,7 +67,6 @@ impl TryFrom<Recver> for OwnedHandle {
 			.map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
 	}
 }
-// TODO can this be infallible?
 impl TryFrom<OwnedHandle> for Recver {
 	type Error = io::Error;
 	fn try_from(handle: OwnedHandle) -> io::Result<Self> {
@@ -147,7 +146,6 @@ impl TryFrom<Sender> for OwnedHandle {
 			.map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
 	}
 }
-// TODO can this be infallible?
 impl TryFrom<OwnedHandle> for Sender {
 	type Error = io::Error;
 	fn try_from(handle: OwnedHandle) -> io::Result<Self> {
