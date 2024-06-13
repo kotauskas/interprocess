@@ -9,13 +9,16 @@ mod send;
 mod send_off;
 
 use super::*;
-use crate::os::windows::{
-	decode_eof,
-	named_pipe::{
-		c_wrappers::{self as c_wrappers, hget},
-		PipeMode,
+use crate::{
+	os::windows::{
+		decode_eof,
+		named_pipe::{
+			c_wrappers::{self as c_wrappers, hget},
+			PipeMode,
+		},
+		AsRawHandleExt, FileHandle, ImpersonationGuard, NeedsFlushVal,
 	},
-	FileHandle, NeedsFlushVal,
+	OrErrno, ToBool,
 };
 use std::{
 	io::{self, prelude::*},
@@ -110,5 +113,17 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	#[inline]
 	pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
 		c_wrappers::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
+	}
+
+	/// [Impersonates the client][imp] of the named pipe.
+	///
+	/// The returned impersonation guard automatically reverts impersonation when it goes out of
+	/// scope.
+	///
+	/// [imp]: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-impersonatenamedpipeclient
+	pub fn impersonate_client(&self) -> io::Result<ImpersonationGuard> {
+		unsafe { Pipes::ImpersonateNamedPipeClient(self.as_int_handle()) }
+			.to_bool()
+			.true_or_errno(|| ImpersonationGuard(()))
 	}
 }

@@ -7,10 +7,11 @@ pub mod security_descriptor;
 pub mod unnamed_pipe;
 //pub mod mailslot;
 
+mod impersonation_guard;
 mod path_conversion;
 mod share_handle;
 
-pub use {path_conversion::*, share_handle::*};
+pub use {impersonation_guard::*, path_conversion::*, share_handle::*};
 
 mod file_handle;
 mod limbo_pool;
