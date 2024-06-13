@@ -28,6 +28,10 @@ name = "unnamed_pipe_sync"
 path = "examples/unnamed_pipe/sync/main.rs"
 
 [[example]]
+name = "unnamed_pipe_tokio"
+path = "examples/unnamed_pipe/tokio/main.rs"
+
+[[example]]
 name = "local_socket_sync_server"
 path = "examples/local_socket/sync/listener.rs"
 
