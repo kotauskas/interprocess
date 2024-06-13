@@ -71,7 +71,7 @@ mod tests {
 			collected.output_buffer_size_hint,
 			original.output_buffer_size_hint
 		);
-		// FIXME(2.2.0) can't PartialEq security descriptors
+		// FIXME(2.3.0) can't PartialEq security descriptors
 		assert!(collected.security_descriptor.is_some());
 		assert_eq!(collected.inheritable, original.inheritable);
 	}
@@ -79,7 +79,7 @@ mod tests {
 	#[test]
 	fn collect_duplex_byte() {
 		let opts = PipeListenerOptions {
-			path: todo!(), // (2.2.0)
+			path: todo!(), // (2.3.0)
 			mode: PipeMode::Bytes,
 			nonblocking: true,
 			instance_limit: NonZeroU8::new(250),
@@ -88,7 +88,7 @@ mod tests {
 			input_buffer_size_hint: 420,
 			output_buffer_size_hint: 228,
 			wait_timeout: WaitTimeout::from_raw(1987),
-			security_descriptor: todo!(), // (2.2.0)
+			security_descriptor: todo!(), // (2.3.0)
 			inheritable: true,
 			..Default::default()
 		};

@@ -44,7 +44,7 @@ impl RawPipeStream {
 		};
 		let client = unsafe { TokioNPClient::from_raw_handle(client.into_raw_handle())? };
 		/* MESSAGE READING DISABLED
-		// FIXME(2.2.0) should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
+		// FIXME(2.3.0) should probably upstream FILE_WRITE_ATTRIBUTES for PipeMode::Messages to Tokio
 		if recv == Some(PipeMode::Messages) {
 		set_named_pipe_handle_state(client.as_handle(), Some(PIPE_READMODE_MESSAGE), None, None)?;
 		}
