@@ -10,6 +10,7 @@ impl<S: ConcurrencyDetectionSite> ConcurrencyDetector<S> {
 		Self(AtomicBool::new(false), PhantomData)
 	}
 	#[track_caller]
+	#[must_use]
 	pub fn lock(&self) -> LockDetectorGuard<'_> {
 		if self
 			.0

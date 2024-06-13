@@ -1,5 +1,6 @@
 use crate::{
 	os::windows::{
+		decode_eof,
 		named_pipe::{PipeMode, WaitTimeout},
 		winprelude::*,
 		FileHandle,
@@ -124,10 +125,9 @@ pub(crate) fn get_np_handle_mode(handle: BorrowedHandle<'_>) -> io::Result<u32> 
 	Ok(mode)
 }
 
-#[allow(dead_code)] // TODO(2.3.0) give this thing a public API
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 	let mut msglen: u32 = 0;
-	unsafe {
+	let rslt = unsafe {
 		PeekNamedPipe(
 			handle.as_int_handle(),
 			ptr::null_mut(),
@@ -137,7 +137,8 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
 			msglen.as_mut_ptr(),
 		)
 	}
-	.true_val_or_errno(msglen.to_usize())
+	.true_val_or_errno(msglen.to_usize());
+	decode_eof(rslt)
 }
 
 fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {

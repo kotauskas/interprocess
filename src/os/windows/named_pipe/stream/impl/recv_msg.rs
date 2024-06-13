@@ -1,5 +1,5 @@
 use super::*;
-use crate::{os::windows::downgrade_eof, RawOsErrorExt};
+use crate::{os::windows::downgrade_eof, RawOsErrorExt as _};
 use recvmsg::{prelude::*, NoAddrBuf, RecvResult};
 use windows_sys::Win32::Foundation::ERROR_MORE_DATA;
 
@@ -13,6 +13,11 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 };
 
 impl RawPipeStream {
+	fn peek_msg_len(&self) -> io::Result<usize> {
+		let _guard = self.concurrency_detector.lock();
+		c_wrappers::peek_msg_len(self.as_handle())
+	}
+
 	#[track_caller]
 	fn discard_msg(&self) -> io::Result<()> {
 		let _guard = self.concurrency_detector.lock();
@@ -97,6 +102,21 @@ impl RawPipeStream {
 		} else {
 			RecvResult::Fit
 		})
+	}
+}
+
+impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
+	/// Returns the length of the next incoming message without receiving it or blocking the
+	/// thread. Note that a return value of `Ok(0)` does not allow the lack of an incoming message
+	/// to be distinguished from a zero-length message.
+	///
+	/// If the message stream has been closed, this returns a
+	/// [`BrokenPipe`](io::ErrorKind::BrokenPipe) error.
+	///
+	/// Interacts with [concurrency prevention](#concurrency-prevention).
+	#[inline]
+	pub fn peek_msg_len(&self) -> io::Result<usize> {
+		self.raw.peek_msg_len()
 	}
 }
 
