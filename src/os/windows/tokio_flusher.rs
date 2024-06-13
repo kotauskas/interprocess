@@ -14,7 +14,7 @@ type FlushJH = JoinHandle<io::Result<()>>;
 
 /// Wraps `FlushFileBuffers()` ran in a `spawn_blocking()` task into a poll interface.
 #[derive(Debug)]
-pub(crate) struct TokioFlusher {
+pub struct TokioFlusher {
 	join_handle: Mutex<Option<FlushJH>>,
 }
 impl TokioFlusher {
@@ -93,5 +93,11 @@ impl TokioFlusher {
 		let handle = file_handle.as_int_handle();
 		let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl(handle));
 		join_handle.insert(task)
+	}
+}
+impl Default for TokioFlusher {
+	#[inline]
+	fn default() -> Self {
+		Self::new()
 	}
 }

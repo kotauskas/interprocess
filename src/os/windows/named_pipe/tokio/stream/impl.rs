@@ -43,7 +43,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 		(
 			RecvPipeStream {
 				raw: raw_a,
-				flusher: TokioFlusher::new(), // PERF(2.2.0) the mutex is unnecessary for receivers
+				flusher: (),
 				_phantom: PhantomData,
 			},
 			SendPipeStream {

@@ -12,7 +12,6 @@ use crate::os::windows::{
 		stream::{pipe_mode, PipeModeTag},
 		MaybeArc,
 	},
-	tokio_flusher::TokioFlusher,
 	NeedsFlush,
 };
 use std::{io, marker::PhantomData};
@@ -39,7 +38,9 @@ use tokio::net::windows::named_pipe::{
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
 	raw: MaybeArc<RawPipeStream>,
-	flusher: TokioFlusher,
+	// This specializes to TokioFlusher for non-None send modes and to () for receive-only
+	// streams, reducing the size of read halves.
+	flusher: Sm::TokioFlusher,
 	_phantom: PhantomData<(Rm, Sm)>,
 }
 
@@ -57,7 +58,6 @@ pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
 	inner: Option<InnerTokio>,
-	// TODO(2.3.0) crackhead specialization
 	// Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
 	needs_flush: NeedsFlush,
 	// MESSAGE READING DISABLED

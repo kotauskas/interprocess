@@ -19,25 +19,44 @@ pub mod pipe_mode {
 		use super::*;
 		pub trait PipeModeTag: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin {
 			const MODE: Option<PipeMode>;
+			#[cfg(feature = "tokio")]
+			type TokioFlusher: std::fmt::Debug + Default;
 		}
+		#[cfg(feature = "tokio")]
+		pub trait NotNone:
+			PipeModeTag<TokioFlusher = crate::os::windows::tokio_flusher::TokioFlusher>
+		{
+		}
+		#[cfg(not(feature = "tokio"))]
 		pub trait NotNone: PipeModeTag {}
 	}
 	pub(crate) use seal::*;
 
 	macro_rules! present_tag {
-		($($(#[$attr:meta])* $tag:ident is $mode:expr),+ $(,)?) => {
-			$(
+		($(#[$attr:meta])* $tag:ident is $mode:expr ; no_tokio_flusher) => {
 				tag_enum!($( #[$attr] )* $tag);
 				impl PipeModeTag for $tag {
 					const MODE: Option<PipeMode> = $mode;
+					#[cfg(feature = "tokio")]
+					type TokioFlusher = ();
 				}
-			)+
+		};
+		($(#[$attr:meta])* $tag:ident is $mode:expr) => {
+				tag_enum!($( #[$attr] )* $tag);
+				impl PipeModeTag for $tag {
+					const MODE: Option<PipeMode> = $mode;
+					#[cfg(feature = "tokio")]
+					type TokioFlusher = crate::os::windows::tokio_flusher::TokioFlusher;
+				}
+		};
+		($($(#[$attr:meta])* $tag:ident is $mode:expr $(; $yayornay:ident)?),+ $(,)?) => {
+			$(present_tag!($( #[$attr] )* $tag is $mode $(; $yayornay)?);)+
 		};
 	}
 
 	present_tag! {
 		/// Tags a direction of a [`PipeStream`] to be absent.
-		None is None,
+		None is None ; no_tokio_flusher,
 		/// Tags a direction of a [`PipeStream`] to be present with byte-wise semantics.
 		Bytes is Some(PipeMode::Bytes),
 		/// Tags a direction of a [`PipeStream`] to be present with message-wise semantics.

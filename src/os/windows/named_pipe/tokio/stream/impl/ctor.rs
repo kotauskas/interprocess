@@ -72,7 +72,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
 	pub(crate) fn new(raw: RawPipeStream) -> Self {
 		Self {
 			raw: MaybeArc::Inline(raw),
-			flusher: TokioFlusher::new(),
+			flusher: Sm::TokioFlusher::default(),
 			_phantom: PhantomData,
 		}
 	}
