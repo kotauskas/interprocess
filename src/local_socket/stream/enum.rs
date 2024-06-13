@@ -1,10 +1,11 @@
 use super::r#trait;
+use crate::{local_socket::Name, TryClone};
+use std::io::{self, prelude::*, IoSlice, IoSliceMut};
+
 #[cfg(unix)]
 use crate::os::unix::uds_local_socket as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket as np_impl;
-use crate::{local_socket::Name, TryClone};
-use std::io::{self, prelude::*, IoSlice, IoSliceMut};
 
 impmod! {local_socket::dispatch_sync}
 
@@ -118,29 +119,21 @@ multimacro! {
 	dispatch_write,
 }
 
-// TODO(2.3.0) maybe adjust the Debug of halves to mention that they're local sockets
-
 mkenum!(
 /// Receive half of a local socket stream, obtained by splitting a [`Stream`].
-RecvHalf);
+"local_socket::" RecvHalf);
 impl r#trait::RecvHalf for RecvHalf {
 	type Stream = Stream;
 }
-multimacro! {
-	RecvHalf,
-	dispatch_read,
-}
+dispatch_read!(RecvHalf);
 
 mkenum!(
 /// Send half of a local socket stream, obtained by splitting a [`Stream`].
-SendHalf);
+"local_socket::" SendHalf);
 impl r#trait::SendHalf for SendHalf {
 	type Stream = Stream;
 }
-multimacro! {
-	SendHalf,
-	dispatch_write,
-}
+dispatch_write!(SendHalf);
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;

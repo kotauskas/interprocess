@@ -16,9 +16,8 @@ macro_rules! dispatch {
 }
 
 macro_rules! mkenum {
-	($(#[$($attr:tt)+])* $nm:ident) => {
+	($(#[$($attr:tt)+])* $pref:literal $nm:ident) => {
 		$(#[$($attr)+])*
-		#[derive(Debug)]
 		pub enum $nm {
 			/// Makes use of Windows named pipes.
 			///
@@ -48,5 +47,15 @@ macro_rules! mkenum {
 				Self::UdSocket(x)
 			}
 		}
+		impl std::fmt::Debug for $nm {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				let mut dt = f.debug_tuple(concat!($pref, stringify!($nm)));
+				dispatch!($nm: i in self => dt.field(&i));
+				dt.finish()
+			}
+		}
+	};
+	($(#[$($attr:tt)+])* $nm:ident) => {
+		mkenum!($(#[$($attr)+])* "" $nm);
 	};
 }

@@ -113,7 +113,7 @@ multimacro! {
 
 mkenum!(
 /// Receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
-RecvHalf);
+"local_socket::tokio::" RecvHalf);
 impl r#trait::RecvHalf for RecvHalf {
 	type Stream = Stream;
 }
@@ -124,7 +124,7 @@ multimacro! {
 
 mkenum!(
 /// Send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
-SendHalf);
+"local_socket::tokio::" SendHalf);
 impl r#trait::SendHalf for SendHalf {
 	type Stream = Stream;
 }
