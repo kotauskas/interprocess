@@ -98,62 +98,62 @@ macro_rules! forward_handle {
 }
 
 macro_rules! forward_try_into_handle {
-	(@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
+	(@impl $({$($lt:tt)*})? $ty:ty, $ety:path, $hty:ident, $cfg:ident) => {
 		#[cfg($cfg)]
 		impl $(<$($lt)*>)? ::std::convert::TryFrom<$ty> for ::std::os::$cfg::io::$hty {
-			type Error = <::std::os::$cfg::io::$hty as ::std::convert::TryFrom<$fldt>>::Error;
+			type Error = $ety;
 			#[inline]
 			fn try_from(x: $ty) -> Result<Self, Self::Error> {
 				::std::convert::TryFrom::try_from(x.0)
 			}
 		}
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, windows) => {
-		forward_try_into_handle!(@impl $({$($lt)*})? $ty, $fldt, OwnedHandle, windows);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, windows) => {
+		forward_try_into_handle!(@impl $({$($lt)*})? $ty, $ety, OwnedHandle, windows);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, unix) => {
-		forward_try_into_handle!(@impl $({$($lt)*})? $ty, $fldt, OwnedFd, unix);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, unix) => {
+		forward_try_into_handle!(@impl $({$($lt)*})? $ty, $ety, OwnedFd, unix);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path) => {
+	($({$($lt:tt)*})? $ty:ty, $ety:path) => {
 		forward_try_into_handle!($({$($lt)*})? $ty, windows);
 		forward_try_into_handle!($({$($lt)*})? $ty, unix);
 	};
 }
 
 macro_rules! forward_try_from_handle {
-	(@impl $({$($lt:tt)*})? $ty:ty, $fldt:path, $hty:ident, $cfg:ident) => {
+	(@impl $({$($lt:tt)*})? $ty:ty, $ety:path, $hty:ident, $cfg:ident) => {
 		#[cfg($cfg)]
 		impl $(<$($lt)*>)? ::std::convert::TryFrom<::std::os::$cfg::io::$hty> for $ty {
-			type Error = <$fldt as ::std::convert::TryFrom<::std::os::$cfg::io::$hty>>::Error;
+			type Error = $ety;
 			#[inline]
 			fn try_from(x: ::std::os::$cfg::io::$hty) -> Result<Self, Self::Error> {
 				Ok(Self(::std::convert::TryFrom::try_from(x)?))
 			}
 		}
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, windows) => {
-		forward_try_from_handle!(@impl $({$($lt)*})? $ty, $fldt, OwnedHandle, windows);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, windows) => {
+		forward_try_from_handle!(@impl $({$($lt)*})? $ty, $ety, OwnedHandle, windows);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, unix) => {
-		forward_try_from_handle!(@impl $({$($lt)*})? $ty, $fldt, OwnedFd, unix);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, unix) => {
+		forward_try_from_handle!(@impl $({$($lt)*})? $ty, $ety, OwnedFd, unix);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path) => {
-		forward_try_from_handle!($({$($lt)*})? $ty, $fldt, windows);
-		forward_try_from_handle!($({$($lt)*})? $ty, $fldt, unix);
+	($({$($lt:tt)*})? $ty:ty, $ety:path) => {
+		forward_try_from_handle!($({$($lt)*})? $ty, $ety, windows);
+		forward_try_from_handle!($({$($lt)*})? $ty, $ety, unix);
 	};
 }
 
 macro_rules! forward_try_handle {
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, windows) => {
-		forward_try_into_handle!($({$($lt)*})? $ty, $fldt, windows);
-		forward_try_from_handle!($({$($lt)*})? $ty, $fldt, windows);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, windows) => {
+		forward_try_into_handle!($({$($lt)*})? $ty, $ety, windows);
+		forward_try_from_handle!($({$($lt)*})? $ty, $ety, windows);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path, unix) => {
-		forward_try_into_handle!($({$($lt)*})? $ty, $fldt, unix);
-		forward_try_from_handle!($({$($lt)*})? $ty, $fldt, unix);
+	($({$($lt:tt)*})? $ty:ty, $ety:path, unix) => {
+		forward_try_into_handle!($({$($lt)*})? $ty, $ety, unix);
+		forward_try_from_handle!($({$($lt)*})? $ty, $ety, unix);
 	};
-	($({$($lt:tt)*})? $ty:ty, $fldt:path) => {
-		forward_try_handle!($({$($lt)*})? $ty, $fldt, windows);
-		forward_try_handle!($({$($lt)*})? $ty, $fldt, unix);
+	($({$($lt:tt)*})? $ty:ty, $ety:path) => {
+		forward_try_handle!($({$($lt)*})? $ty, $ety, windows);
+		forward_try_handle!($({$($lt)*})? $ty, $ety, unix);
 	};
 }

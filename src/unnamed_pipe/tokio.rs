@@ -35,6 +35,7 @@ multimacro! {
 	pinproj_for_unpin(RecverImpl),
 	forward_tokio_read,
 	forward_as_handle,
+	forward_try_handle(io::Error),
 	forward_debug,
 	derive_asraw,
 }
@@ -55,6 +56,7 @@ multimacro! {
 	forward_rbv(SenderImpl, &),
 	forward_tokio_write,
 	forward_as_handle,
+	forward_try_handle(io::Error),
 	forward_debug,
 	derive_asraw,
 }

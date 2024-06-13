@@ -18,10 +18,14 @@ use crate::{
 };
 use std::{
 	io,
+	mem::ManuallyDrop,
 	pin::Pin,
 	task::{ready, Context, Poll},
 };
 use tokio::{fs::File, io::AsyncWrite};
+
+static INFLIGHT_ERR: &str =
+	"cannot deregister unnamed pipe from the Tokio runtime with in-flight operations";
 
 fn pair2pair((tx, rx): (SyncSender, SyncRecver)) -> io::Result<(PubSender, PubRecver)> {
 	Ok((PubSender(tx.try_into()?), PubRecver(rx.try_into()?)))
@@ -50,10 +54,24 @@ impl CreationOptionsExt for CreationOptions<'_> {
 pub(crate) struct Recver(File);
 impl TryFrom<SyncRecver> for Recver {
 	type Error = io::Error;
+	#[inline]
 	fn try_from(rx: SyncRecver) -> io::Result<Self> {
-		Ok(Self(File::from_std(
-			<std::fs::File as From<OwnedHandle>>::from(rx.into()),
-		)))
+		Self::try_from(OwnedHandle::from(rx.0))
+	}
+}
+impl TryFrom<Recver> for OwnedHandle {
+	type Error = io::Error;
+	fn try_from(rx: Recver) -> io::Result<Self> {
+		rx.0.try_into_std()
+			.map(OwnedHandle::from)
+			.map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
+	}
+}
+// TODO can this be infallible?
+impl TryFrom<OwnedHandle> for Recver {
+	type Error = io::Error;
+	fn try_from(handle: OwnedHandle) -> io::Result<Self> {
+		Ok(Self(File::from_std(handle.into())))
 	}
 }
 multimacro! {
@@ -112,12 +130,31 @@ impl Drop for Sender {
 
 impl TryFrom<SyncSender> for Sender {
 	type Error = io::Error;
-	fn try_from(tx: SyncSender) -> io::Result<Self> {
-		let handle = OwnedHandle::from(tx);
+	#[inline]
+	fn try_from(rx: SyncSender) -> io::Result<Self> {
+		Self::try_from(OwnedHandle::from(rx.0))
+	}
+}
+impl TryFrom<Sender> for OwnedHandle {
+	type Error = io::Error;
+	fn try_from(tx: Sender) -> io::Result<Self> {
+		ManuallyDrop::new(tx)
+			.io
+			.take()
+			.expect(LIMBO_ERR)
+			.try_into_std()
+			.map(OwnedHandle::from)
+			.map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
+	}
+}
+// TODO can this be infallible?
+impl TryFrom<OwnedHandle> for Sender {
+	type Error = io::Error;
+	fn try_from(handle: OwnedHandle) -> io::Result<Self> {
 		Ok(Self {
-			io: Some(File::from_std(std::fs::File::from(handle))),
+			io: Some(File::from_std(handle.into())),
 			flusher: TokioFlusher::new(),
-			needs_flush: false,
+			needs_flush: true,
 		})
 	}
 }
