@@ -1,6 +1,7 @@
 use windows_sys::Win32::System::Pipes::{PIPE_SERVER_END, PIPE_TYPE_MESSAGE};
 
 use super::*;
+use crate::os::windows::NeedsFlushVal;
 use std::mem::ManuallyDrop;
 
 impl AsHandle for InnerTokio {
@@ -34,7 +35,7 @@ impl RawPipeStream {
 			}
 		};
 		match tkresult {
-			Ok(s) => Ok(Self::new(s)),
+			Ok(s) => Ok(Self::new(s, NeedsFlushVal::Once)),
 			Err(e) => Err(FromHandleError {
 				details: FromHandleErrorKind::TokioError,
 				cause: Some(e),

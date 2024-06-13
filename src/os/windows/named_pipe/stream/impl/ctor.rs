@@ -4,19 +4,19 @@ use widestring::U16CStr;
 use windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
 
 impl RawPipeStream {
-	pub(super) fn new(handle: FileHandle, is_server: bool) -> Self {
+	pub(super) fn new(handle: FileHandle, is_server: bool, nfv: NeedsFlushVal) -> Self {
 		Self {
 			handle: Some(handle),
 			is_server,
-			needs_flush: NeedsFlush::from(NeedsFlushVal::No),
+			needs_flush: NeedsFlush::from(nfv),
 			concurrency_detector: ConcurrencyDetector::new(),
 		}
 	}
 	pub(crate) fn new_server(handle: FileHandle) -> Self {
-		Self::new(handle, true)
+		Self::new(handle, true, NeedsFlushVal::No)
 	}
 	fn new_client(handle: FileHandle) -> Self {
-		Self::new(handle, false)
+		Self::new(handle, false, NeedsFlushVal::No)
 	}
 	fn connect(
 		path: &U16CStr,

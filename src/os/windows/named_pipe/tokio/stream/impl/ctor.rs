@@ -5,18 +5,18 @@ use crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*, NeedsFlush
 use std::{borrow::Cow, mem::take};
 
 impl RawPipeStream {
-	pub(super) fn new(inner: InnerTokio) -> Self {
+	pub(super) fn new(inner: InnerTokio, nfv: NeedsFlushVal) -> Self {
 		Self {
 			inner: Some(inner),
-			needs_flush: NeedsFlush::from(NeedsFlushVal::No),
+			needs_flush: NeedsFlush::from(nfv),
 			//recv_msg_state: Mutex::new(RecvMsgState::NotRecving),
 		}
 	}
 	pub(crate) fn new_server(server: TokioNPServer) -> Self {
-		Self::new(InnerTokio::Server(server))
+		Self::new(InnerTokio::Server(server), NeedsFlushVal::No)
 	}
 	fn new_client(client: TokioNPClient) -> Self {
-		Self::new(InnerTokio::Client(client))
+		Self::new(InnerTokio::Client(client), NeedsFlushVal::No)
 	}
 
 	async fn wait_for_server(path: U16CString) -> io::Result<U16CString> {

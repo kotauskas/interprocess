@@ -17,7 +17,11 @@ derive_asraw!(RawPipeStream);
 
 impl RawPipeStream {
 	fn from_handle_given_flags(handle: OwnedHandle, flags: u32) -> Self {
-		Self::new(FileHandle::from(handle), flags & PIPE_SERVER_END != 0)
+		Self::new(
+			FileHandle::from(handle),
+			flags & PIPE_SERVER_END != 0,
+			NeedsFlushVal::Once,
+		)
 	}
 }
 
@@ -95,8 +99,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
 	fn try_clone(&self) -> io::Result<Self> {
 		let handle = duplicate_handle(self.as_handle())?;
 		self.raw.needs_flush.on_clone();
-		let mut new = RawPipeStream::new(handle.into(), self.is_server());
-		new.needs_flush = NeedsFlushVal::Always.into();
+		let new = RawPipeStream::new(handle.into(), self.is_server(), NeedsFlushVal::Always);
 		Ok(Self::new(new))
 	}
 }
