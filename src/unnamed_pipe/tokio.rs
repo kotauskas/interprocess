@@ -1,6 +1,9 @@
 //! Tokio-based asynchronous unnamed pipes.
 //!
 //! See the [parent-level documentation](super) for more.
+//!
+//! # Examples
+//! See [`pipe()`].
 
 impmod! {unnamed_pipe::tokio,
 	Recver as RecverImpl,
@@ -14,6 +17,17 @@ use std::io;
 ///
 /// The platform-specific builders in the `os` module of the crate might be more helpful if extra
 /// configuration for the pipe is needed.
+///
+/// # Examples
+/// ## Basic communication
+/// In a parent process, within a Tokio runtime:
+/// ```no_run
+#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_a.rs")]
+/// ```
+/// In a child process, within a Tokio runtime:
+/// ```no_run
+#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs")]
+/// ```
 #[inline]
 pub fn pipe() -> io::Result<(Sender, Recver)> {
 	pipe_impl()

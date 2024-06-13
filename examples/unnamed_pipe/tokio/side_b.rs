@@ -20,6 +20,6 @@ pub(crate) async fn emain(handle: Handle) -> io::Result<()> {
 	tx.write_all(b"Hello from side B!\n").await?;
 	//{
 	Ok(())
-} //}
+}
 #[allow(dead_code)]
-fn main() {}
+fn main() {} //}

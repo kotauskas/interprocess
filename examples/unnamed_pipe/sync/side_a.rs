@@ -32,6 +32,6 @@ pub(crate) fn emain(handle_sender: mpsc::SyncSender<Handle>) -> io::Result<()> {
 	assert_eq!(buf.trim(), "Hello from side B!");
 	//{
 	Ok(())
-} //}
+}
 #[allow(dead_code)]
-fn main() {}
+fn main() {} //}

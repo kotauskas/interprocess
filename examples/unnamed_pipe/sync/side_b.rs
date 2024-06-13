@@ -19,6 +19,6 @@ pub(crate) fn emain(handle: Handle) -> io::Result<()> {
 	tx.write_all(b"Hello from side B!\n")?;
 	//{
 	Ok(())
-} //}
+}
 #[allow(dead_code)]
-fn main() {}
+fn main() {} //}
