@@ -50,7 +50,7 @@ platform to be demoted, although promotions quite obviously can happen as minor 
 -	Interprocess is guaranteed to compile and succeed in running all tests – it would be a critical
 	bug for it not to
 -	CI, currently provided by GitHub Actions, runs on all of those platforms and displays an ugly red
-badge if anything is wrong on any of those systems
+	badge if anything is wrong on any of those systems
 -	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Explicit support without CI

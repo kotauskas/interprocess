@@ -1,6 +1,6 @@
 [package]
 name = "interprocess"
-version = "2.2.0"
+version = "2.2.1"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
 edition = "2021"
 rust-version = "1.75"

@@ -78,12 +78,16 @@ fn get_run_user() -> io::Result<Option<OsString>> {
 	}
 }
 
-/// Gets the `TMPDIR` environment variable, or returns `/tmp` if it doesn't exist.
-fn get_tmpdir() -> Cow<'static, OsStr> {
-	std::env::var_os("TMPDIR")
-		.map(Cow::Owned)
-		.unwrap_or(Cow::Borrowed(OsStr::new("/tmp")))
-}
+static TMPDIR: &str = {
+	#[cfg(target_os = "android")]
+	{
+		"/data/local/tmp"
+	}
+	#[cfg(not(target_os = "android"))]
+	{
+		"/tmp"
+	}
+};
 
 #[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
 fn construct_and_prepare_pseudo_ns(
@@ -95,7 +99,7 @@ fn construct_and_prepare_pseudo_ns(
 		return Err(io::Error::new(io::ErrorKind::InvalidInput, TOOLONG));
 	}
 	let run_user = get_run_user()?;
-	let pfx = run_user.map(Cow::Owned).unwrap_or_else(get_tmpdir);
+	let pfx = run_user.map(Cow::Owned).unwrap_or(Cow::Borrowed(OsStr::new(TMPDIR)));
 	let pl = pfx.len();
 	let mut path = [0; SUN_LEN];
 	path[..pl].copy_from_slice(pfx.as_bytes());
