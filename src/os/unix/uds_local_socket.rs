@@ -11,6 +11,8 @@ pub(crate) mod tokio {
 	mod stream;
 	pub use {listener::*, stream::*};
 }
+#[cfg(feature = "tokio")]
+pub use tokio::Listener as TokioListener;
 
 use crate::{
 	local_socket::{Name, NameInner},
