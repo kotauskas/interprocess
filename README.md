@@ -72,8 +72,8 @@ platform to be demoted, although promotions quite obviously can happen as minor 
 -	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Support by association
-*OSes at this level: **Dragonfly BSD**, **OpenBSD**, **NetBSD**, **Redox**, **Android**,
-**Fuchsia**, **iOS**, **tvOS**, **watchOS***
+*OSes at this level: **Dragonfly BSD**, **OpenBSD**, **NetBSD**, **Redox**, **Fuchsia**, **iOS**,
+**tvOS**, **watchOS***
 
 -	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
 -	No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
