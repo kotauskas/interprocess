@@ -40,3 +40,36 @@ jobs:
 
       - name: Run rustdoc for Tokio configuration
         run: cargo doc --features tokio --no-deps
+
+  xcompile:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-linux-android, x86_64-unknown-freebsd]
+        toolchain: ["1.75.0", nightly]
+
+    name: ${{ matrix.toolchain }} on ${{ matrix.target }} (no tests)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: --cfg ci
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy --no-self-update
+          rustup default ${{ matrix.toolchain }}
+          rustup target add ${{ matrix.target }}
+
+      - name: Run Clippy for default configuration
+        run: cargo clippy --target ${{ matrix.target }} -- -A unknown_lints
+
+      - name: Run rustdoc for default configuration
+        run: cargo doc --target ${{ matrix.target }} --no-deps
+
+      - name: Run Clippy for Tokio configuration
+        run: cargo clippy --target ${{ matrix.target }} --features tokio -- -A unknown_lints
+
+      - name: Run rustdoc for Tokio configuration
+        run: cargo doc --target ${{ matrix.target }} --features tokio --no-deps

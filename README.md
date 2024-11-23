@@ -53,13 +53,22 @@ platform to be demoted, although promotions quite obviously can happen as minor 
 	badge if anything is wrong on any of those systems
 -	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
-##### Explicit support without CI
-*OSes at this level: **FreeBSD***
+##### Explicit support with incomplete CI
+*OSes at this level: **FreeBSD**, **Android***
 
 -	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
 	not to
--	Manual testing on local VMs is usually done before every release; CI is not provided solely
-	because GitHub Actions selfishly ignores the existence of those wonderful systems
+-	GitHub Actions only allows Clippy and Rustdoc to be run for those targets in CI (via
+	cross-compilation) due to a lack of native VMs
+-	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
+
+##### Explicit support without CI
+*OSes at this level: currently none*
+
+-	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
+	not to
+-	Manual testing on local VMs is usually done before every release; no CI happens because those
+	targets' standard library `.rlib`s cannot be installed via `rustup target add`
 -	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Support by association
