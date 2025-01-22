@@ -2,11 +2,11 @@
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 // If this was in Cargo.toml, it would cover examples as well
 #![warn(
-	missing_docs,
-	clippy::panic_in_result_fn,
-	clippy::missing_assert_message,
-	clippy::indexing_slicing,
-	clippy::arithmetic_side_effects
+    missing_docs,
+    clippy::panic_in_result_fn,
+    clippy::missing_assert_message,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
 )]
 
 mod platform_check;
@@ -31,12 +31,12 @@ pub mod unnamed_pipe;
 /// default, with which everything platform-specific has a badge next to it which specifies the
 /// `cfg(...)` conditions for that item to be available.
 pub mod os {
-	#[cfg(unix)]
-	#[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
-	pub mod unix;
-	#[cfg(windows)]
-	#[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
-	pub mod windows;
+    #[cfg(unix)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+    pub mod unix;
+    #[cfg(windows)]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
+    pub mod windows;
 }
 
 mod try_clone;
@@ -48,9 +48,5 @@ pub(crate) use {atomic_enum::*, misc::*};
 
 #[cfg(test)]
 #[path = "../tests/index.rs"]
-#[allow(
-	clippy::unwrap_used,
-	clippy::arithmetic_side_effects,
-	clippy::indexing_slicing
-)]
+#[allow(clippy::unwrap_used, clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 mod tests;

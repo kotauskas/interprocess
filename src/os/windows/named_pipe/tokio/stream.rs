@@ -6,17 +6,19 @@ pub use error::*;
 
 mod r#impl;
 
-use crate::os::windows::{
-	limbo::tokio::Corpse,
-	named_pipe::{
-		stream::{pipe_mode, PipeModeTag},
-		MaybeArc,
-	},
-	NeedsFlush,
-};
-use std::{io, marker::PhantomData};
-use tokio::net::windows::named_pipe::{
-	NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
+use {
+    crate::os::windows::{
+        limbo::tokio::Corpse,
+        named_pipe::{
+            stream::{pipe_mode, PipeModeTag},
+            MaybeArc,
+        },
+        NeedsFlush,
+    },
+    std::{io, marker::PhantomData},
+    tokio::net::windows::named_pipe::{
+        NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
+    },
 };
 
 /// Tokio-based named pipe stream, created by a server-side listener or by connecting to a server.
@@ -37,11 +39,11 @@ use tokio::net::windows::named_pipe::{
 #[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs")]
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
-	raw: MaybeArc<RawPipeStream>,
-	// This specializes to TokioFlusher for non-None send modes and to () for receive-only
-	// streams, reducing the size of read halves.
-	flusher: Sm::TokioFlusher,
-	_phantom: PhantomData<(Rm, Sm)>,
+    raw: MaybeArc<RawPipeStream>,
+    // This specializes to TokioFlusher for non-None send modes and to () for receive-only
+    // streams, reducing the size of read halves.
+    flusher: Sm::TokioFlusher,
+    _phantom: PhantomData<(Rm, Sm)>,
 }
 
 /// Type alias for a Tokio-based pipe stream with the same receive mode and send mode.
@@ -57,38 +59,38 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-	inner: Option<InnerTokio>,
-	// Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
-	needs_flush: NeedsFlush,
-	// MESSAGE READING DISABLED
-	//recv_msg_state: Mutex<RecvMsgState>,
+    inner: Option<InnerTokio>,
+    // Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
+    needs_flush: NeedsFlush,
+    // MESSAGE READING DISABLED
+    //recv_msg_state: Mutex<RecvMsgState>,
 }
 enum InnerTokio {
-	Server(TokioNPServer),
-	Client(TokioNPClient),
+    Server(TokioNPServer),
+    Client(TokioNPClient),
 }
 impl From<InnerTokio> for Corpse {
-	fn from(it: InnerTokio) -> Self {
-		match it {
-			InnerTokio::Server(o) => Corpse::NpServer(o),
-			InnerTokio::Client(o) => Corpse::NpClient(o),
-		}
-	}
+    fn from(it: InnerTokio) -> Self {
+        match it {
+            InnerTokio::Server(o) => Corpse::NpServer(o),
+            InnerTokio::Client(o) => Corpse::NpClient(o),
+        }
+    }
 }
 
 /* MESSAGE READING DISABLED
 #[derive(Debug, Default)]
 #[repr(u8)]
 enum RecvMsgState {
-	#[default]
-	NotRecving,
-	Looping {
-		spilled: bool,
-		partial: bool,
-	},
-	Discarding {
-		result: io::Result<RecvResult>,
-	},
+    #[default]
+    NotRecving,
+    Looping {
+        spilled: bool,
+        partial: bool,
+    },
+    Discarding {
+        result: io::Result<RecvResult>,
+    },
 }
 unsafe impl ReprU8 for RecvMsgState {}
 */

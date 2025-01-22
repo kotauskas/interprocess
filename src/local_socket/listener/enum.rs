@@ -1,10 +1,12 @@
-use super::{options::ListenerOptions, r#trait};
-use crate::local_socket::{ListenerNonblockingMode, Stream};
 #[cfg(unix)]
 use crate::os::unix::uds_local_socket as uds_impl;
 #[cfg(windows)]
 use crate::os::windows::named_pipe::local_socket as np_impl;
-use std::{io, iter::FusedIterator};
+use {
+    super::{options::ListenerOptions, r#trait},
+    crate::local_socket::{ListenerNonblockingMode, Stream},
+    std::{io, iter::FusedIterator},
+};
 
 impmod! {local_socket::dispatch_sync as dispatch}
 
@@ -50,30 +52,28 @@ mkenum!(
 Listener);
 
 impl r#trait::Listener for Listener {
-	type Stream = Stream;
+    type Stream = Stream;
 
-	#[inline]
-	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
-		dispatch::from_options(options)
-	}
-	#[inline]
-	fn accept(&self) -> io::Result<Stream> {
-		dispatch!(Self: x in self => x.accept()).map(Stream::from)
-	}
-	#[inline]
-	fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
-		dispatch!(Self: x in self => x.set_nonblocking(nonblocking))
-	}
-	#[inline]
-	fn do_not_reclaim_name_on_drop(&mut self) {
-		dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
-	}
+    #[inline]
+    fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+        dispatch::from_options(options)
+    }
+    #[inline]
+    fn accept(&self) -> io::Result<Stream> {
+        dispatch!(Self: x in self => x.accept()).map(Stream::from)
+    }
+    #[inline]
+    fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
+        dispatch!(Self: x in self => x.set_nonblocking(nonblocking))
+    }
+    #[inline]
+    fn do_not_reclaim_name_on_drop(&mut self) {
+        dispatch!(Self: x in self => x.do_not_reclaim_name_on_drop())
+    }
 }
 impl Iterator for Listener {
-	type Item = io::Result<Stream>;
-	#[inline(always)]
-	fn next(&mut self) -> Option<Self::Item> {
-		Some(r#trait::Listener::accept(self))
-	}
+    type Item = io::Result<Stream>;
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> { Some(r#trait::Listener::accept(self)) }
 }
 impl FusedIterator for Listener {}

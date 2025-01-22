@@ -24,12 +24,11 @@
 pub mod tokio;
 
 impmod! {unnamed_pipe,
-	Recver as RecverImpl,
-	Sender as SenderImpl,
-	pipe_impl,
+    Recver as RecverImpl,
+    Sender as SenderImpl,
+    pipe_impl,
 }
-use crate::Sealed;
-use std::io;
+use {crate::Sealed, std::io};
 
 /// Creates a new pipe with the default creation settings and returns the handles to its sending end
 /// and receiving end.
@@ -48,9 +47,7 @@ use std::io;
 #[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs")]
 /// ```
 #[inline]
-pub fn pipe() -> io::Result<(Sender, Recver)> {
-	pipe_impl()
-}
+pub fn pipe() -> io::Result<(Sender, Recver)> { pipe_impl() }
 
 /// Handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function together
 /// with the [sending end](Sender).
@@ -65,11 +62,11 @@ pub fn pipe() -> io::Result<(Sender, Recver)> {
 pub struct Recver(pub(crate) RecverImpl);
 impl Sealed for Recver {}
 multimacro! {
-	Recver,
-	forward_sync_read,
-	forward_handle,
-	forward_debug,
-	derive_raw,
+    Recver,
+    forward_sync_read,
+    forward_handle,
+    forward_debug,
+    derive_raw,
 }
 
 /// Handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
@@ -96,9 +93,9 @@ multimacro! {
 pub struct Sender(pub(crate) SenderImpl);
 impl Sealed for Sender {}
 multimacro! {
-	Sender,
-	forward_sync_write,
-	forward_handle,
-	forward_debug,
-	derive_raw,
+    Sender,
+    forward_sync_write,
+    forward_handle,
+    forward_debug,
+    derive_raw,
 }

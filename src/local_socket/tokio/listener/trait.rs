@@ -1,8 +1,10 @@
-use crate::{
-	local_socket::{tokio::stream::r#trait::Stream, ListenerOptions},
-	Sealed,
+use {
+    crate::{
+        local_socket::{tokio::stream::r#trait::Stream, ListenerOptions},
+        Sealed,
+    },
+    std::{future::Future, io},
 };
-use std::{future::Future, io};
 
 /// Tokio local socket server implementations.
 ///
@@ -12,16 +14,16 @@ use std::{future::Future, io};
 /// methods seen here.
 #[allow(private_bounds)]
 pub trait Listener: Send + Sync + Sized + Sealed {
-	/// The stream type associated with this listener.
-	type Stream: Stream;
+    /// The stream type associated with this listener.
+    type Stream: Stream;
 
-	/// Creates a socket server using the specified options.
-	fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
+    /// Creates a socket server using the specified options.
+    fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
 
-	/// Asynchronously listens for incoming connections to the socket, returning a future that
-	/// finishes only when a client is connected.
-	fn accept(&self) -> impl Future<Output = io::Result<Self::Stream>> + Send + Sync;
+    /// Asynchronously listens for incoming connections to the socket, returning a future that
+    /// finishes only when a client is connected.
+    fn accept(&self) -> impl Future<Output = io::Result<Self::Stream>> + Send + Sync;
 
-	/// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
-	fn do_not_reclaim_name_on_drop(&mut self);
+    /// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
+    fn do_not_reclaim_name_on_drop(&mut self);
 }

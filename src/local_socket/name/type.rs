@@ -7,11 +7,13 @@
 //! The name type you choose affects what local socket implementation will be used. See the
 //! documentation on the tag types to learn more.
 
-use super::Name;
-use crate::Sealed;
 #[cfg(unix)]
 use std::ffi::CStr;
-use std::{borrow::Cow, ffi::OsStr, io};
+use {
+    super::Name,
+    crate::Sealed,
+    std::{borrow::Cow, ffi::OsStr, io},
+};
 
 impmod! {local_socket::name_type as n_impl}
 
@@ -31,32 +33,32 @@ impmod! {local_socket::name_type as n_impl}
 /// that input to the same name, for the OS's definition of "same".
 #[allow(private_bounds)]
 pub trait NameType: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin + Sealed {
-	/// Whether the name type is supported within the runtime circumstances of the program.
-	///
-	/// May entail querying support status from the OS, returning `false` in the event of an OS
-	/// error.
-	fn is_supported() -> bool;
+    /// Whether the name type is supported within the runtime circumstances of the program.
+    ///
+    /// May entail querying support status from the OS, returning `false` in the event of an OS
+    /// error.
+    fn is_supported() -> bool;
 }
 
 /// [Mappings](NameType) from paths to [local socket names](Name).
 ///
 /// See [`ToFsName::to_fs_name()`](super::ToFsName::to_fs_name).
 pub trait PathNameType<S: ToOwned + ?Sized>: NameType {
-	/// Maps the given path to a local socket name, failing if the resulting name is unsupported by
-	/// the underlying OS.
-	///
-	/// The idiomatic way to use this is [`ToFsName::to_fs_name()`](super::ToFsName::to_fs_name).
-	fn map(path: Cow<'_, S>) -> io::Result<Name<'_>>;
+    /// Maps the given path to a local socket name, failing if the resulting name is unsupported by
+    /// the underlying OS.
+    ///
+    /// The idiomatic way to use this is [`ToFsName::to_fs_name()`](super::ToFsName::to_fs_name).
+    fn map(path: Cow<'_, S>) -> io::Result<Name<'_>>;
 }
 /// [Mappings](NameType) from strings to [local socket names](Name).
 ///
 /// See [`ToNsName::to_ns_name()`](super::ToNsName::to_ns_name).
 pub trait NamespacedNameType<S: ToOwned + ?Sized>: NameType {
-	/// Maps the given string to a local socket name, failing if the resulting name is unsupported
-	/// by the underlying OS.
-	///
-	/// The idiomatic way to use this is [`ToNsName::to_ns_name()`](super::ToNsName::to_ns_name).
-	fn map(name: Cow<'_, S>) -> io::Result<Name<'_>>;
+    /// Maps the given string to a local socket name, failing if the resulting name is unsupported
+    /// by the underlying OS.
+    ///
+    /// The idiomatic way to use this is [`ToNsName::to_ns_name()`](super::ToNsName::to_ns_name).
+    fn map(name: Cow<'_, S>) -> io::Result<Name<'_>>;
 }
 
 tag_enum!(
@@ -75,23 +77,17 @@ tag_enum!(
 /// Resolves to filesystem paths to Unix domain sockets without performing any transformations.
 GenericFilePath);
 impl NameType for GenericFilePath {
-	fn is_supported() -> bool {
-		true
-	}
+    fn is_supported() -> bool { true }
 }
 impl PathNameType<OsStr> for GenericFilePath {
-	#[inline]
-	fn map(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
-		n_impl::map_generic_path_osstr(path)
-	}
+    #[inline]
+    fn map(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> { n_impl::map_generic_path_osstr(path) }
 }
 #[cfg(unix)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
 impl PathNameType<CStr> for GenericFilePath {
-	#[inline]
-	fn map(path: Cow<'_, CStr>) -> io::Result<Name<'_>> {
-		n_impl::map_generic_path_cstr(path)
-	}
+    #[inline]
+    fn map(path: Cow<'_, CStr>) -> io::Result<Name<'_>> { n_impl::map_generic_path_cstr(path) }
 }
 
 tag_enum!(
@@ -113,21 +109,19 @@ tag_enum!(
 /// Resolves to filesystem paths by prepending `/tmp/`.
 GenericNamespaced);
 impl NameType for GenericNamespaced {
-	fn is_supported() -> bool {
-		true
-	}
+    fn is_supported() -> bool { true }
 }
 impl NamespacedNameType<OsStr> for GenericNamespaced {
-	#[inline]
-	fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
-		n_impl::map_generic_namespaced_osstr(name)
-	}
+    #[inline]
+    fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
+        n_impl::map_generic_namespaced_osstr(name)
+    }
 }
 #[cfg(unix)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
 impl NamespacedNameType<CStr> for GenericNamespaced {
-	#[inline]
-	fn map(name: Cow<'_, CStr>) -> io::Result<Name<'_>> {
-		n_impl::map_generic_namespaced_cstr(name)
-	}
+    #[inline]
+    fn map(name: Cow<'_, CStr>) -> io::Result<Name<'_>> {
+        n_impl::map_generic_namespaced_cstr(name)
+    }
 }

@@ -6,9 +6,9 @@
 //! See [`pipe()`].
 
 impmod! {unnamed_pipe::tokio,
-	Recver as RecverImpl,
-	Sender as SenderImpl,
-	pipe_impl,
+    Recver as RecverImpl,
+    Sender as SenderImpl,
+    pipe_impl,
 }
 use std::io;
 
@@ -29,9 +29,7 @@ use std::io;
 #[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs")]
 /// ```
 #[inline]
-pub fn pipe() -> io::Result<(Sender, Recver)> {
-	pipe_impl()
-}
+pub fn pipe() -> io::Result<(Sender, Recver)> { pipe_impl() }
 
 /// Tokio-based handle to the receiving end of an unnamed pipe, created by the [`pipe()`] function
 /// together with the [sending end](Sender).
@@ -45,13 +43,13 @@ pub fn pipe() -> io::Result<(Sender, Recver)> {
 // field is pub(crate) to allow platform builders to create the public-facing pipe types
 pub struct Recver(pub(crate) RecverImpl);
 multimacro! {
-	Recver,
-	pinproj_for_unpin(RecverImpl),
-	forward_tokio_read,
-	forward_as_handle,
-	forward_try_handle(io::Error),
-	forward_debug,
-	derive_asraw,
+    Recver,
+    pinproj_for_unpin(RecverImpl),
+    forward_tokio_read,
+    forward_as_handle,
+    forward_try_handle(io::Error),
+    forward_debug,
+    derive_asraw,
 }
 
 /// Handle to the sending end of an unnamed pipe, created by the [`pipe()`] function together with
@@ -65,12 +63,12 @@ multimacro! {
 /// how this can be used.
 pub struct Sender(pub(crate) SenderImpl);
 multimacro! {
-	Sender,
-	pinproj_for_unpin(SenderImpl),
-	forward_rbv(SenderImpl, &),
-	forward_tokio_write,
-	forward_as_handle,
-	forward_try_handle(io::Error),
-	forward_debug,
-	derive_asraw,
+    Sender,
+    pinproj_for_unpin(SenderImpl),
+    forward_rbv(SenderImpl, &),
+    forward_tokio_write,
+    forward_as_handle,
+    forward_try_handle(io::Error),
+    forward_debug,
+    derive_asraw,
 }

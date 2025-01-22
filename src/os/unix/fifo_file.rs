@@ -19,9 +19,11 @@
 //! Deletion works the same way as with any regular file, via
 //! [`remove_file()`](std::fs::remove_file).
 
-use super::unixprelude::*;
-use crate::OrErrno;
-use std::{ffi::CString, io, path::Path};
+use {
+    super::unixprelude::*,
+    crate::OrErrno,
+    std::{ffi::CString, io, path::Path},
+};
 
 /// Creates a FIFO file at the specified path with the specified permissions.
 ///
@@ -29,15 +31,15 @@ use std::{ffi::CString, io, path::Path};
 /// a different value is desired.
 ///
 /// ## System calls
-/// -	[`mkfifo`]
+/// - [`mkfifo`]
 ///
 /// [`mkfifo`]: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/mkfifo.html
 /// [`umask`]: https://en.wikipedia.org/wiki/Umask
 pub fn create_fifo<P: AsRef<Path>>(path: P, mode: mode_t) -> io::Result<()> {
-	_create_fifo(path.as_ref(), mode)
+    _create_fifo(path.as_ref(), mode)
 }
 fn _create_fifo(path: &Path, mode: mode_t) -> io::Result<()> {
-	let path = CString::new(path.as_os_str().as_bytes())?;
-	unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr().cast(), mode) != -1 }
-		.true_val_or_errno(())
+    let path = CString::new(path.as_os_str().as_bytes())?;
+    unsafe { libc::mkfifo(path.as_bytes_with_nul().as_ptr().cast(), mode) != -1 }
+        .true_val_or_errno(())
 }

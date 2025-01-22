@@ -16,11 +16,11 @@ autotests = false
 autoexamples = false
 
 exclude = [
-	"/.github/",
-	"/.gitignore",
-	"/.editorconfig",
-	"interprocess.code-workspace",
-	"/Cargo.lock",
+    "/.github/",
+    "/.gitignore",
+    "/.editorconfig",
+    "interprocess.code-workspace",
+    "/Cargo.lock",
 ]
 
 [[example]]
@@ -80,34 +80,34 @@ doc_cfg = []
 [dependencies]
 doctest-file = "1.0.0"
 tokio = { version = "1.36.0", features = [
-	"sync",
-	"rt",
-	"net",
-	"time",
-	"io-util",
+    "sync",
+    "rt",
+    "net",
+    "time",
+    "io-util",
 ], optional = true }
 futures-core = { version = "0.3.28", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52.0", features = [
-	"Win32_Foundation",
-	"Win32_Security",
-	"Win32_Security_Authorization",
-	"Win32_Storage_FileSystem",
-	"Win32_System_IO",
-	"Win32_System_Pipes",
-	"Win32_System_Threading",
-	"Win32_System_Memory",
-	"Win32_System_SystemServices",
-	"Win32_System_LibraryLoader",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+    "Win32_System_Memory",
+    "Win32_System_SystemServices",
+    "Win32_System_LibraryLoader",
 ] }
 tokio = { version = "1.36.0", features = [
-	"sync",
-	"rt-multi-thread",
-	"fs",
-	"net",
-	"time",
-	"io-util",
+    "sync",
+    "rt-multi-thread",
+    "fs",
+    "net",
+    "time",
+    "io-util",
 ], optional = true }
 recvmsg = "1.0.0"
 widestring = "1.0.2"
@@ -117,10 +117,10 @@ libc = { version = "0.2.137", features = ["extra_traits"] }
 
 [dev-dependencies]
 tokio = { version = "1.36.0", features = [
-	"sync",
-	"rt-multi-thread",
-	"io-util",
-	"macros",
+    "sync",
+    "rt-multi-thread",
+    "io-util",
+    "macros",
 ] }
 color-eyre = "0.6.2"
 
@@ -139,8 +139,8 @@ tabs_in_doc_comments = "allow"
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]
 targets = [
-	"x86_64-unknown-linux-gnu",
-	"x86_64-pc-windows-msvc",
-	"aarch64-apple-darwin",
-	"x86_64-unknown-freebsd",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-freebsd",
 ]

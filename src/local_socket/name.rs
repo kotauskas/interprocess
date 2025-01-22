@@ -3,7 +3,6 @@ pub(super) mod to_name;
 pub(super) mod r#type;
 
 pub(crate) use self::inner::*;
-
 pub use {r#type::*, to_name::*};
 
 /// Name for a local socket.
@@ -28,42 +27,32 @@ pub use {r#type::*, to_name::*};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Name<'s>(pub(crate) NameInner<'s>);
 impl Name<'_> {
-	/// Returns `true` if the name points to a dedicated local socket namespace, `false` otherwise.
-	#[inline]
-	pub fn is_namespaced(&self) -> bool {
-		self.0.is_namespaced()
-	}
+    /// Returns `true` if the name points to a dedicated local socket namespace, `false` otherwise.
+    #[inline]
+    pub fn is_namespaced(&self) -> bool { self.0.is_namespaced() }
 
-	/// Returns `true` if the name is stored as a filesystem path, `false` otherwise.
-	///
-	/// Note that it is possible for [`.is_namespaced()`](Self::is_namespaced) and `.is_path()` to
-	/// return `true` simultaneously:
-	/// ```
-	/// # #[cfg(windows)] {
-	/// use interprocess::{local_socket::ToFsName, os::windows::local_socket::NamedPipe};
-	/// let name = r"\\.\pipe\example".to_fs_name::<NamedPipe>().unwrap();
-	/// assert!(name.is_namespaced());	// \\.\pipe\ is a namespace
-	/// assert!(name.is_path());		// \\.\pipe\example is a path
-	/// # }
-	/// ```
-	#[inline]
-	pub const fn is_path(&self) -> bool {
-		self.0.is_path()
-	}
+    /// Returns `true` if the name is stored as a filesystem path, `false` otherwise.
+    ///
+    /// Note that it is possible for [`.is_namespaced()`](Self::is_namespaced) and `.is_path()` to
+    /// return `true` simultaneously:
+    /// ```
+    /// # #[cfg(windows)] {
+    /// use interprocess::{local_socket::ToFsName, os::windows::local_socket::NamedPipe};
+    /// let name = r"\\.\pipe\example".to_fs_name::<NamedPipe>().unwrap();
+    /// assert!(name.is_namespaced()); // \\.\pipe\ is a namespace
+    /// assert!(name.is_path());       // \\.\pipe\example is a path
+    /// # }
+    /// ```
+    #[inline]
+    pub const fn is_path(&self) -> bool { self.0.is_path() }
 
-	/// Produces a `Name` that borrows from `self`.
-	#[inline]
-	pub fn borrow(&self) -> Name<'_> {
-		Name(self.0.borrow())
-	}
+    /// Produces a `Name` that borrows from `self`.
+    #[inline]
+    pub fn borrow(&self) -> Name<'_> { Name(self.0.borrow()) }
 
-	/// Extends the lifetime to `'static`, cloning if necessary.
-	#[inline]
-	pub fn into_owned(self) -> Name<'static> {
-		Name(self.0.into_owned())
-	}
+    /// Extends the lifetime to `'static`, cloning if necessary.
+    #[inline]
+    pub fn into_owned(self) -> Name<'static> { Name(self.0.into_owned()) }
 
-	pub(crate) fn invalid() -> Self {
-		Self(NameInner::default())
-	}
+    pub(crate) fn invalid() -> Self { Self(NameInner::default()) }
 }

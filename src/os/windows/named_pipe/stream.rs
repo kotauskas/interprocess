@@ -4,12 +4,14 @@ pub use {enums::*, error::*};
 
 mod r#impl;
 
-use super::MaybeArc;
-use crate::{
-	local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-	os::windows::{FileHandle, NeedsFlush},
+use {
+    super::MaybeArc,
+    crate::{
+        local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
+        os::windows::{FileHandle, NeedsFlush},
+    },
+    std::{marker::PhantomData, os::windows::prelude::*},
 };
-use std::{marker::PhantomData, os::windows::prelude::*};
 
 /// Named pipe stream, created by a server-side listener or by connecting to a server.
 ///
@@ -64,8 +66,8 @@ use std::{marker::PhantomData, os::windows::prelude::*};
 #[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/msg.rs")]
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
-	raw: MaybeArc<RawPipeStream>,
-	_phantom: PhantomData<(Rm, Sm)>,
+    raw: MaybeArc<RawPipeStream>,
+    _phantom: PhantomData<(Rm, Sm)>,
 }
 
 /// Type alias for a pipe stream with the same receive mode and send mode.
@@ -81,15 +83,15 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-	handle: Option<FileHandle>,
-	is_server: bool,
-	needs_flush: NeedsFlush,
-	concurrency_detector: ConcurrencyDetector<NamedPipeSite>,
+    handle: Option<FileHandle>,
+    is_server: bool,
+    needs_flush: NeedsFlush,
+    concurrency_detector: ConcurrencyDetector<NamedPipeSite>,
 }
 
 #[derive(Default)]
 struct NamedPipeSite;
 impl ConcurrencyDetectionSite for NamedPipeSite {
-	const NAME: &'static str = "named pipe";
-	const WOULD_ACTUALLY_DEADLOCK: bool = true;
+    const NAME: &'static str = "named pipe";
+    const WOULD_ACTUALLY_DEADLOCK: bool = true;
 }

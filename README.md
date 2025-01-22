@@ -12,23 +12,23 @@ encouraging portable, correct code.
 Interprocess provides both OS-specific IPC interfaces and cross-platform abstractions for them.
 
 ##### Cross-platform IPC APIs
--	**Local sockets** – similar to TCP sockets, but use filesystem or namespaced paths instead of
-	ports on `localhost`, depending on the OS, bypassing the network stack entirely; implemented
-	using named pipes on Windows and Unix domain sockets on Unix
+- **Local sockets** – similar to TCP sockets, but use filesystem or namespaced paths instead of
+  ports on `localhost`, depending on the OS, bypassing the network stack entirely; implemented
+  using named pipes on Windows and Unix domain sockets on Unix
 
 ##### Platform-specific, but present on both Unix-like systems and Windows
--	**Unnamed pipes** – anonymous file-like objects for communicating privately in one direction,
-	most commonly used to communicate between a child process and its parent
+- **Unnamed pipes** – anonymous file-like objects for communicating privately in one direction,
+  most commonly used to communicate between a child process and its parent
 
 ##### Unix-only
--	**FIFO files** – special type of file which is similar to unnamed pipes but exists on the
-	filesystem, often referred to as "named pipes" but completely different from Windows named pipes
--	*Unix domain sockets* – Interprocess no longer provides those, as they are present in the
-	standard library; they are, however, exposed as local sockets
+- **FIFO files** – special type of file which is similar to unnamed pipes but exists on the
+  filesystem, often referred to as "named pipes" but completely different from Windows named pipes
+- *Unix domain sockets* – Interprocess no longer provides those, as they are present in the
+  standard library; they are, however, exposed as local sockets
 
 ##### Windows-only
--	**Named pipes** – resemble Unix domain sockets, use a separate namespace instead of on-drive
-	paths
+- **Named pipes** – resemble Unix domain sockets, use a separate namespace instead of on-drive
+  paths
 
 ## Asynchronous I/O
 Currently, only Tokio for local sockets, Unix domain sockets and Windows named pipes is supported.
@@ -47,50 +47,50 @@ platform to be demoted, although promotions quite obviously can happen as minor 
 ##### Explicit support
 *OSes at this level: **Windows**, **Linux**, **macOS***
 
--	Interprocess is guaranteed to compile and succeed in running all tests – it would be a critical
-	bug for it not to
--	CI, currently provided by GitHub Actions, runs on all of those platforms and displays an ugly red
-	badge if anything is wrong on any of those systems
--	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
+- Interprocess is guaranteed to compile and succeed in running all tests – it would be a critical
+  bug for it not to
+- CI, currently provided by GitHub Actions, runs on all of those platforms and displays an ugly red
+  badge if anything is wrong on any of those systems
+- Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Explicit support with incomplete CI
 *OSes at this level: **FreeBSD**, **Android***
 
--	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
-	not to
--	GitHub Actions only allows Clippy and Rustdoc to be run for those targets in CI (via
-	cross-compilation) due to a lack of native VMs
--	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
+- Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
+  not to
+- GitHub Actions only allows Clippy and Rustdoc to be run for those targets in CI (via
+  cross-compilation) due to a lack of native VMs
+- Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Explicit support without CI
 *OSes at this level: currently none*
 
--	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
-	not to
--	Manual testing on local VMs is usually done before every release; no CI happens because those
-	targets' standard library `.rlib`s cannot be installed via `rustup target add`
--	Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
+- Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
+  not to
+- Manual testing on local VMs is usually done before every release; no CI happens because those
+  targets' standard library `.rlib`s cannot be installed via `rustup target add`
+- Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Support by association
 *OSes at this level: **Dragonfly BSD**, **OpenBSD**, **NetBSD**, **Redox**, **Fuchsia**, **iOS**,
 **tvOS**, **watchOS***
 
--	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
--	No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
--	Certain `#[cfg]`-gated platform-specific features that originate from other platforms are
-	supported with stable public APIs because they behave here identically to how they do on an OS with
-	a higher support level
+- Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
+- No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
+- Certain `#[cfg]`-gated platform-specific features that originate from other platforms are
+  supported with stable public APIs because they behave here identically to how they do on an OS with
+  a higher support level
 
 ##### Assumed support
 *OSes at this level: POSIX-conformant `#[cfg(unix)]` systems not listed above for which the `libc` crate compiles*
 
--	Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
-	not to
--	Because this level encompasses a practically infinite amount of systems, no manual testing or CI
-	can exist
+- Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
+  not to
+- Because this level encompasses a practically infinite amount of systems, no manual testing or CI
+  can exist
 
 ## Feature gates
--	**`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
+- **`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
 
 ## License
 This crate, along with all community contributions made to it, is dual-licensed under [MIT] and
