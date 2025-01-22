@@ -45,7 +45,7 @@ macro_rules! map_cow {
 	};
 }
 
-impl<'s> NameInner<'s> {
+impl NameInner<'_> {
 	pub const fn is_namespaced(&self) -> bool {
 		match self {
 			#[cfg(windows)]

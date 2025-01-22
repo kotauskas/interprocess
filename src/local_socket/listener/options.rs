@@ -40,7 +40,7 @@ impl TryClone for ListenerOptions<'_> {
 }
 
 /// Creation.
-impl<'n> ListenerOptions<'n> {
+impl ListenerOptions<'_> {
 	/// Creates an options table with default values.
 	#[inline]
 	pub fn new() -> Self {
@@ -106,7 +106,7 @@ impl ListenerOptions<'_> {
 	}
 }
 
-impl<'n> Default for ListenerOptions<'n> {
+impl Default for ListenerOptions<'_> {
 	#[inline]
 	fn default() -> Self {
 		Self::new()
