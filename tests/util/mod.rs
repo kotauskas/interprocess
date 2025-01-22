@@ -17,9 +17,6 @@ pub use {drive::*, eyre::*, namegen::*, xorshift::*};
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
-const NUM_CLIENTS: u32 = 80;
-const NUM_CONCURRENT_CLIENTS: u32 = 6;
-
 use {
     color_eyre::eyre::WrapErr,
     std::{
@@ -28,6 +25,17 @@ use {
         sync::Arc,
     },
 };
+
+fn intvar(nam: &str) -> Option<u32> {
+    let val = std::env::var(nam).ok()?;
+    val.trim().parse().ok()
+}
+pub fn num_clients() -> u32 {
+    intvar("INTERPROCESS_TEST_NUM_CLIENTS").filter(|n| *n > 0).unwrap_or(80)
+}
+pub fn num_concurrent_clients() -> u32 {
+    intvar("INTERPROCESS_TEST_NUM_CONCURRENT_CLIENTS").filter(|n| *n > 0).unwrap_or(6)
+}
 
 pub fn test_wrapper(f: impl (FnOnce() -> TestResult) + Send + 'static) -> TestResult {
     eyre::install();

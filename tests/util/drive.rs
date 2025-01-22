@@ -1,12 +1,12 @@
-use std::{
-    borrow::Borrow,
-    io,
-    sync::mpsc::{channel, /*Receiver,*/ Sender},
-    thread,
-};
 use {
-    super::{choke::*, TestResult, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS},
+    super::{choke::*, num_clients, num_concurrent_clients, TestResult},
     color_eyre::eyre::{bail, Context},
+    std::{
+        borrow::Borrow,
+        io,
+        sync::mpsc::{channel, /*Receiver,*/ Sender},
+        thread,
+    },
 };
 
 /// Waits for the leader closure to reach a point where it sends a message for the follower closure,
@@ -75,12 +75,13 @@ where
     Srv: FnOnce(Sender<T>, u32) -> TestResult + Send,
     Clt: Fn(&B) -> TestResult + Send + Sync,
 {
-    let choke = Choke::new(NUM_CONCURRENT_CLIENTS);
+    let choke = Choke::new(num_concurrent_clients());
 
+    let num_clients = num_clients();
     let client_wrapper = |msg: T| {
         thread::scope(|scope| {
-            let mut client_threads = Vec::with_capacity(usize::try_from(NUM_CLIENTS).unwrap());
-            for n in 1..=NUM_CLIENTS {
+            let mut client_threads = Vec::with_capacity(usize::try_from(num_clients).unwrap());
+            for n in 1..=num_clients {
                 let tname = format!("client {n}");
 
                 let choke_guard = choke.take();
@@ -105,7 +106,7 @@ where
             Ok(())
         })
     };
-    let server_wrapper = move |sender: Sender<T>| server(sender, NUM_CLIENTS);
+    let server_wrapper = move |sender: Sender<T>| server(sender, num_clients);
 
     drive_pair(server_wrapper, "server", client_wrapper, "client")
 }

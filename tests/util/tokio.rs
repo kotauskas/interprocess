@@ -1,5 +1,5 @@
 use {
-    super::{TestResult, WrapErrExt, NUM_CLIENTS, NUM_CONCURRENT_CLIENTS},
+    super::{num_clients, num_concurrent_clients, TestResult, WrapErrExt},
     color_eyre::eyre::{bail, Context},
     std::{future::Future, sync::Arc},
     tokio::{
@@ -59,12 +59,13 @@ where
     Clt: Fn(Arc<T>) -> Cltf + Send + Sync + 'static,
     Cltf: Future<Output = TestResult> + Send,
 {
+    let num_clients = num_clients();
     let client_wrapper = |msg| async move {
         let client = Arc::new(client);
-        let choke = Arc::new(Semaphore::new(NUM_CONCURRENT_CLIENTS.try_into().unwrap()));
+        let choke = Arc::new(Semaphore::new(num_concurrent_clients().try_into().unwrap()));
 
-        let mut client_tasks = Vec::with_capacity(NUM_CLIENTS.try_into().unwrap());
-        for _ in 0..NUM_CLIENTS {
+        let mut client_tasks = Vec::with_capacity(num_clients.try_into().unwrap());
+        for _ in 0..num_clients {
             let permit = Arc::clone(&choke).acquire_owned().await.unwrap();
             let clientc = Arc::clone(&client);
             let msgc = Arc::clone(&msg);
@@ -82,7 +83,7 @@ where
         }
         Ok::<(), color_eyre::eyre::Error>(())
     };
-    let server_wrapper = move |sender: Sender<Arc<T>>| server(sender, NUM_CLIENTS);
+    let server_wrapper = move |sender: Sender<Arc<T>>| server(sender, num_clients);
 
     drive_pair(server_wrapper, "server", client_wrapper, "client").await
 }
