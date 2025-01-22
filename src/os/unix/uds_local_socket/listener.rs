@@ -41,7 +41,7 @@ impl traits::Listener for Listener {
     fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
         let nonblocking = options.nonblocking.accept_nonblocking();
 
-        let listener = c_wrappers::bind_and_listen_with_mode(
+        let listener = c_wrappers::create_server(
             libc::SOCK_STREAM,
             &name_to_addr(options.name.borrow(), true)?,
             nonblocking,

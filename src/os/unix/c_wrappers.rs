@@ -12,7 +12,6 @@ use {
         io,
         mem::{transmute, zeroed},
         os::unix::net::SocketAddr,
-        sync::atomic::{AtomicBool, Ordering::Relaxed},
     },
 };
 
@@ -110,7 +109,30 @@ pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()
 pub(super) const CAN_CREATE_NONBLOCKING: bool =
     cfg!(any(target_os = "linux", target_os = "android"));
 
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 static CAN_FCHMOD_SOCKETS: AtomicBool = AtomicBool::new(true);
+fn can_fchmod_sockets() -> bool {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        true
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        CAN_FCHMOD_SOCKETS.load(Relaxed)
+    }
+}
+fn can_not_fchmod_sockets() {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        unreachable!()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        CAN_FCHMOD_SOCKETS.store(Relaxed)
+    }
+}
 
 /// Creates a Unix domain socket of the given type. If on Linux or Android and `nonblocking` is
 /// `true`, also makes it nonblocking.
@@ -224,37 +246,25 @@ impl WithUmask {
 impl Drop for WithUmask {
     fn drop(&mut self) {
         let expected_new = Self::umask(self.old);
-        assert_eq!(self.new, expected_new, "concurrent umask use detected");
+        assert_eq!(self.new, expected_new, "parallel umask use detected");
     }
 }
 
-pub(super) fn bind_and_listen_with_mode(
+pub(super) fn create_server(
     ty: c_int,
     addr: &SocketAddr,
     nonblocking: bool,
     mode: Option<mode_t>,
 ) -> io::Result<OwnedFd> {
-    let mut unset_can_fchmod = false;
+    let dg = if let Some(mode) = mode {
+        // This used to forbid modes with the executable bit set, but no longer does. That is the
+        // OS's business, not ours.
 
-    let _dg = if let Some(mode) = mode {
-        if mode & 0o111 != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "sockets can not be marked executable",
-            ));
-        }
-
-        if CAN_FCHMOD_SOCKETS.load(Relaxed) {
+        if can_fchmod_sockets() {
             let sock = create_socket(ty, nonblocking)?;
             match set_socket_mode(sock.as_fd(), mode) {
-                Ok(()) => {
-                    bind(sock.as_fd(), addr)?;
-                    listen(sock.as_fd())?;
-                    return Ok(sock);
-                }
-                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                    unset_can_fchmod = true;
-                }
+                Ok(()) => return bind_and_listen(sock, addr, ()),
+                Err(e) if e.kind() == io::ErrorKind::InvalidInput => can_not_fchmod_sockets(),
                 Err(e) => return Err(e),
             }
         }
@@ -266,27 +276,20 @@ pub(super) fn bind_and_listen_with_mode(
         // If no file mode had to be set, we don't get a umask drop guard.
         None
     };
-    // All of the below calls happen under umask if necessary (we race in this muthafucka, better
-    // get yo secure code ass back to Linux)
+    // The below code runs under umask if necessary (we race in this muthafucka, better get yo
+    // secure code ass back to Linux). To be clear, if a mode for the socket isn't specified, the
+    // below code runs on both fchmod and non-fchmod platforms; the unifying property here is that
+    // the socket gets its mode solely from the umask.
 
-    let rslt = (|| {
-        let sock = create_socket(ty, nonblocking)?;
-        bind(sock.as_fd(), addr)?;
-        listen(sock.as_fd())?;
-        io::Result::Ok(sock)
-    })();
+    let sock = create_socket(ty, nonblocking)?;
+    bind_and_listen(sock, addr, dg)
+}
 
-    // If we're sure that the EINVAL is our fault, unset the global variable.
-    match rslt {
-        Ok(sock) => Ok(sock),
-        Err(e) if e.kind() == io::ErrorKind::InvalidInput => Err(e),
-        Err(e) => {
-            if unset_can_fchmod {
-                CAN_FCHMOD_SOCKETS.store(false, Relaxed);
-            }
-            Err(e)
-        }
-    }
+fn bind_and_listen<T>(sock: OwnedFd, addr: &SocketAddr, drop_guard: T) -> io::Result<OwnedFd> {
+    bind(sock.as_fd(), addr)?;
+    drop(drop_guard); // Revert umask as soon as possible
+    listen(sock.as_fd())?;
+    Ok(sock)
 }
 
 #[allow(dead_code)]

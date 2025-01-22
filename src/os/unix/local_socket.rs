@@ -13,6 +13,12 @@ pub use name_type::*;
 pub trait ListenerOptionsExt: Sized + Sealed {
     /// Sets the file mode (Unix permissions) to be applied to the socket file.
     ///
+    /// **Not all Unix systems respect this mode when checking permissions in `connect()`!** Linux
+    /// is known to perform full permission checks for all directories along the path to the
+    /// socket file in addition to checking permissions on the socket file itself, while FreeBSD
+    /// only checks directories but not the socket file itself. If you expect your program to be
+    /// used on a wide range of Unix systems, do not rely on this as a security mechanism.
+    ///
     /// # Implementation notes
     /// An opportunistic `fchmod()` is performed on the socket. If the system responds with a
     /// `EINVAL`, Interprocess concludes that `fchmod()` on sockets is not supported on the
