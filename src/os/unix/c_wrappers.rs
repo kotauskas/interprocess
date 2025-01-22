@@ -87,18 +87,8 @@ pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Resu
 }
 
 cfg_no_atomic_cloexec! {
-    fn get_fdflags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
-        unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFD, 0) }.fd_or_errno()
-    }
-}
-cfg_no_atomic_cloexec! {
-    fn set_fdflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
-        unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, flags) != -1 }.true_val_or_errno(())
-    }
-}
-cfg_no_atomic_cloexec! {
     fn set_cloexec(fd: BorrowedFd<'_>) -> io::Result<()> {
-        set_fdflags(fd, get_fdflags(fd)? | libc::FD_CLOEXEC)
+        unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC) != -1 }.true_val_or_errno(())
     }
 }
 
