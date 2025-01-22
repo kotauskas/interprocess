@@ -120,7 +120,7 @@ fn can_not_fchmod_sockets() {
     }
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
     {
-        CAN_FCHMOD_SOCKETS.store(Relaxed)
+        CAN_FCHMOD_SOCKETS.store(false, Relaxed)
     }
 }
 
