@@ -24,7 +24,7 @@ jobs:
           rustup default ${{ matrix.toolchain }}
 
       - name: Run Clippy for default configuration
-        run: cargo clippy -- -A unknown_lints
+        run: cargo clippy --all-targets -- -A unknown_lints -D warnings
 
       - name: Run tests for default configuration
         run: cargo test
@@ -33,7 +33,7 @@ jobs:
         run: cargo doc --no-deps
 
       - name: Run Clippy for Tokio configuration
-        run: cargo clippy --features tokio -- -A unknown_lints
+        run: cargo clippy --all-targets --features tokio -- -A unknown_lints -D warnings
 
       - name: Run tests for Tokio configuration
         run: cargo test --features tokio
@@ -63,13 +63,13 @@ jobs:
           rustup target add ${{ matrix.target }}
 
       - name: Run Clippy for default configuration
-        run: cargo clippy --target ${{ matrix.target }} -- -A unknown_lints
+        run: cargo clippy --all-targets --target ${{ matrix.target }} -- -A unknown_lints -D warnings
 
       - name: Run rustdoc for default configuration
         run: cargo doc --target ${{ matrix.target }} --no-deps
 
       - name: Run Clippy for Tokio configuration
-        run: cargo clippy --target ${{ matrix.target }} --features tokio -- -A unknown_lints
+        run: cargo clippy --all-targets --target ${{ matrix.target }} --features tokio -- -A unknown_lints -D warnings
 
       - name: Run rustdoc for Tokio configuration
         run: cargo doc --target ${{ matrix.target }} --features tokio --no-deps
