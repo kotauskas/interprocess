@@ -1,6 +1,8 @@
 //{
 #[cfg(not(feature = "tokio"))]
-fn main() {}
+fn main() {
+    eprintln!("This example is not available when the Tokio feature is disabled.");
+}
 #[cfg(feature = "tokio")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

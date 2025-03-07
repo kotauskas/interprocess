@@ -16,4 +16,6 @@ async fn main() -> std::io::Result<()> {
     jh.await.unwrap()
 }
 #[cfg(not(feature = "tokio"))]
-fn main() {}
+fn main() {
+    eprintln!("This example is not available when the Tokio feature is disabled.");
+}
