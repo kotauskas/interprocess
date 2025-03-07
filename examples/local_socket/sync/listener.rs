@@ -39,8 +39,8 @@ fn main() -> std::io::Result<()> {
             // either has crashed or simply hasn't exited yet. In this example, we leave cleanup
             // up to the user, but in a real application, you usually don't want to do that.
             eprintln!(
-                "Error: could not start server because the socket file is occupied. Please check if
-                {printname} is in use by another process and try again."
+                "Error: could not start server because the socket file is occupied. Please check
+                if {printname} is in use by another process and try again."
             );
             return Err(e);
         }
