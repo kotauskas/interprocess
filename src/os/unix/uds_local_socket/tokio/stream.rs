@@ -73,6 +73,17 @@ impl traits::Stream for Stream {
     }
 }
 
+/// Access to the underlying implementation.
+impl Stream {
+    /// Borrows the [`UnixStream`] contained within, granting access to operations defined on it.
+    #[inline(always)]
+    pub fn inner(&self) -> &UnixStream { &self.0 }
+    /// Mutably borrows the [`UnixStream`] contained within, granting access to operations defined
+    /// on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut UnixStream { &mut self.0 }
+}
+
 fn ioloop(
     mut try_io: impl FnMut() -> io::Result<usize>,
     mut poll_read_ready: impl FnMut() -> Poll<io::Result<()>>,
@@ -144,6 +155,20 @@ impl TryFrom<OwnedFd> for Stream {
     }
 }
 
+macro_rules! tokio_accessors {
+    ($ty:ty, $inner:ty) => {
+        /// Tokio accessors.
+        impl $ty {
+            /// Borrows the underlying Tokio object, granting access to its methods.
+            #[inline]
+            pub fn as_tokio(&self) -> &$inner { &self.0 }
+            /// Extracts the underlying Tokio object.
+            #[inline]
+            pub fn into_tokio(self) -> $inner { self.0 }
+        }
+    };
+}
+
 /// [`Stream`]'s receive half, internally implemented using [`Arc`](std::sync::Arc) by Tokio.
 pub struct RecvHalf(RecvHalfImpl);
 impl Sealed for RecvHalf {}
@@ -153,6 +178,7 @@ impl traits::RecvHalf for RecvHalf {
 multimacro! {
     RecvHalf,
     pinproj_for_unpin(RecvHalfImpl),
+    tokio_accessors(RecvHalfImpl),
     forward_debug("local_socket::RecvHalf"),
     forward_tokio_read,
 }
@@ -181,6 +207,7 @@ impl traits::SendHalf for SendHalf {
 multimacro! {
     SendHalf,
     pinproj_for_unpin(SendHalfImpl),
+    tokio_accessors(SendHalfImpl),
     forward_rbv(SendHalfImpl, &),
     forward_debug("local_socket::SendHalf"),
     forward_tokio_write,

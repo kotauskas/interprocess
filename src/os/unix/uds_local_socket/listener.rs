@@ -14,7 +14,10 @@ use {
             fd::{AsFd, BorrowedFd, OwnedFd},
             unix::net::UnixListener,
         },
-        sync::atomic::{AtomicBool, Ordering::SeqCst},
+        sync::atomic::{
+            AtomicBool,
+            Ordering::{Acquire, Release},
+        },
     },
 };
 
@@ -67,7 +70,7 @@ impl traits::Listener for Listener {
     fn accept(&self) -> io::Result<Stream> {
         // TODO(2.3.0) make use of the second return value in some shape or form
         let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
-        if self.nonblocking_streams.load(SeqCst) {
+        if self.nonblocking_streams.load(Acquire) {
             stream.set_nonblocking(true)?;
         }
         Ok(stream)
@@ -76,7 +79,7 @@ impl traits::Listener for Listener {
     fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
         use ListenerNonblockingMode::*;
         self.listener.set_nonblocking(matches!(nonblocking, Accept | Both))?;
-        self.nonblocking_streams.store(matches!(nonblocking, Stream | Both), SeqCst);
+        self.nonblocking_streams.store(matches!(nonblocking, Stream | Both), Release);
         Ok(())
     }
     fn do_not_reclaim_name_on_drop(&mut self) { self.reclaim.forget(); }
@@ -88,6 +91,37 @@ impl Iterator for Listener {
 }
 impl FusedIterator for Listener {}
 
+/// Unix-specific features.
+impl Listener {
+    /// Sets whether newly created streams will have the nonblocking flag set by default or not.
+    ///
+    /// This exists due to a quirk of local socket listener nonblocking mode on Windows.
+    pub fn set_new_stream_nonblocking(&self, nonblocking: bool) {
+        self.nonblocking_streams.store(nonblocking, Release);
+    }
+}
+
+/// Access to the underlying implementation.
+impl Listener {
+    /// Borrows the [`UnixListener`] contained within, granting access to operations defined on it.
+    #[inline(always)]
+    pub fn inner(&self) -> &UnixListener { &self.listener }
+    /// Mutably borrows the [`UnixListener`] contained within, granting access to operations
+    /// defined on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut UnixListener { &mut self.listener }
+}
+
+/// Has no name reclamation and defaults to blocking mode for resulting streams.
+impl From<UnixListener> for Listener {
+    fn from(listener: UnixListener) -> Self {
+        Self {
+            listener,
+            reclaim: ReclaimGuard::default(),
+            nonblocking_streams: AtomicBool::new(false),
+        }
+    }
+}
 impl From<Listener> for UnixListener {
     fn from(mut l: Listener) -> Self {
         l.reclaim.forget();
