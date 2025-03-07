@@ -5,8 +5,9 @@ mod stream;
 
 pub use {listener::*, stream::*};
 
+/// Async Local sockets for Tokio implemented using Unix domain sockets.
 #[cfg(feature = "tokio")]
-pub(crate) mod tokio {
+pub mod tokio {
     mod listener;
     mod stream;
     pub use {listener::*, stream::*};

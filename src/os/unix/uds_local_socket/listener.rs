@@ -18,8 +18,7 @@ use {
     },
 };
 
-/// Wrapper around [`UnixListener`] that implements
-/// [`Listener`](crate::local_socket::traits::Listener).
+/// Wrapper around [`UnixListener`] that implements [`Listener`](traits::Listener).
 #[derive(Debug)]
 pub struct Listener {
     pub(super) listener: UnixListener,

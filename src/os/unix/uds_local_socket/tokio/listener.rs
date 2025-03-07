@@ -15,6 +15,7 @@ use {
     tokio::net::UnixListener,
 };
 
+/// Wrapper around [`UnixListener`] that implements [`Listener`](traits::Listener).
 pub struct Listener {
     listener: UnixListener,
     reclaim: ReclaimGuard,

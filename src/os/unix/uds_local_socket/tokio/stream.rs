@@ -26,6 +26,7 @@ use {
     },
 };
 
+/// Wrapper around [`UnixStream`] that implements [`Stream`](traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) UnixStream);
 impl Sealed for Stream {}
@@ -143,6 +144,7 @@ impl TryFrom<OwnedFd> for Stream {
     }
 }
 
+/// [`Stream`]'s receive half, internally implemented using [`Arc`](std::sync::Arc) by Tokio.
 pub struct RecvHalf(RecvHalfImpl);
 impl Sealed for RecvHalf {}
 impl traits::RecvHalf for RecvHalf {
@@ -170,6 +172,7 @@ impl AsFd for RecvHalf {
     fn as_fd(&self) -> BorrowedFd<'_> { self.0.as_ref().as_fd() }
 }
 
+/// [`Stream`]'s send half, internally implemented using [`Arc`](std::sync::Arc) by Tokio.
 pub struct SendHalf(SendHalfImpl);
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {

@@ -15,8 +15,7 @@ use {
     },
 };
 
-/// Wrapper around [`UnixStream`] that implements
-/// [`Stream`](crate::local_socket::traits::Stream).
+/// Wrapper around [`UnixStream`] that implements [`Stream`](traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) UnixStream, ConcurrencyDetector<LocalSocketSite>);
 impl Sealed for Stream {}
