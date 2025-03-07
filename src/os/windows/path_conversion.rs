@@ -65,7 +65,7 @@ impl<'enc> ToWtf16<'enc> for Vec<u16> {
 }
 
 /// Always reallocates, because `OsStr` is WTF-8.
-impl<'enc, 'src> ToWtf16<'enc> for &'src OsStr {
+impl<'enc> ToWtf16<'enc> for &OsStr {
     fn to_wtf_16(self) -> Result<Cow<'enc, U16CStr>, ContainsNul<u16>> {
         Ok(Cow::Owned(U16CString::from_os_str(self)?))
     }
@@ -79,7 +79,7 @@ impl<'enc> ToWtf16<'enc> for OsString {
 }
 
 /// Always reallocates, because `Path` is WTF-8.
-impl<'enc, 'src> ToWtf16<'enc> for &'src Path {
+impl<'enc> ToWtf16<'enc> for &Path {
     #[inline]
     fn to_wtf_16(self) -> Result<Cow<'enc, U16CStr>, ContainsNul<u16>> {
         self.as_os_str().to_wtf_16()
@@ -94,7 +94,7 @@ impl<'enc> ToWtf16<'enc> for PathBuf {
 }
 
 /// Always reallocates, because `str` is UTF-8.
-impl<'enc, 'src> ToWtf16<'enc> for &'src str {
+impl<'enc> ToWtf16<'enc> for &str {
     #[inline]
     fn to_wtf_16(self) -> Result<Cow<'enc, U16CStr>, ContainsNul<u16>> {
         Ok(Cow::Owned(U16CString::from_str(self)?))
