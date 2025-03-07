@@ -50,10 +50,15 @@ tag_enum!(
 ///
 /// This is the substitute for `AbstractNsUdSocket` on non-Linux Unices, and is the only available
 /// [namespaced name type](NamespacedNameType) on those systems.
+#[deprecated = "\
+    inconsistent and suboptimal selection of temporary directory, may not work on Android; use \
+    FilesystemUdSocket directly instead"]
 SpecialDirUdSocket);
+#[allow(deprecated)]
 impl NameType for SpecialDirUdSocket {
     fn is_supported() -> bool { true }
 }
+#[allow(deprecated)]
 impl NamespacedNameType<OsStr> for SpecialDirUdSocket {
     #[inline]
     fn map(name: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
@@ -68,6 +73,7 @@ impl NamespacedNameType<OsStr> for SpecialDirUdSocket {
         Ok(Name(NameInner::UdSocketPseudoNs(name)))
     }
 }
+#[allow(deprecated)]
 impl NamespacedNameType<CStr> for SpecialDirUdSocket {
     #[inline]
     fn map(name: Cow<'_, CStr>) -> io::Result<Name<'_>> { Self::map(c2os(name)) }
@@ -109,6 +115,7 @@ macro_rules! map_generic {
         }
     };
     (namespaced $name:ident for $str:ident) => {
+        #[allow(deprecated)]
         pub(crate) fn $name(name: Cow<'_, $str>) -> io::Result<Name<'_>> {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             {

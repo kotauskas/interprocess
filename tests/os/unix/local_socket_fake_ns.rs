@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use {
     crate::{
         local_socket::{prelude::*, ListenerOptions, Stream},

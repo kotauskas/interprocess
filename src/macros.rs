@@ -105,6 +105,7 @@ macro_rules! tag_enum {
         $( #[$attr] )*
         #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub enum $tag {}
+        #[allow(deprecated)]
         impl $crate::Sealed for $tag {}
     )+};
 }

@@ -103,10 +103,11 @@ tag_enum!(
 ///
 /// ### Linux
 /// Resolves to the abstract namespace with no string transformations and thus has a maximum length
-/// of 107 bytes.
+/// of 107 bytes. (This is the behavior of `AbstractNsUdSocket.`)
 ///
 /// ### Other Unices
-/// Resolves to filesystem paths by prepending `/tmp/`.
+/// Resolves to filesystem paths by prepending `/tmp/` (but see `SpecialDirUdSocket` and its
+/// deprecation warning).
 GenericNamespaced);
 impl NameType for GenericNamespaced {
     fn is_supported() -> bool { true }
