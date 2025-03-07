@@ -20,8 +20,7 @@ type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
-/// Wrapper around [`DuplexPipeStream`] that implements
-/// [`Stream`](crate::local_socket::traits::Stream).
+/// Wrapper around [`DuplexPipeStream`] that implements [`Stream`](traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
 
@@ -51,7 +50,6 @@ impl traits::Stream for Stream {
     }
 }
 
-/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
 impl Write for &Stream {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> { (&self.0).write(buf) }
@@ -99,8 +97,7 @@ multimacro! {
     derive_trivial_conv(StreamImpl),
 }
 
-/// Wrapper around [`RecvPipeStream`] that implements
-/// [`RecvHalf`](crate::local_socket::traits::RecvHalf).
+/// Wrapper around [`RecvPipeStream`] that implements [`RecvHalf`](traits::RecvHalf).
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
     RecvHalf,
@@ -112,8 +109,7 @@ multimacro! {
     derive_trivial_conv(RecvHalfImpl),
 }
 
-/// Wrapper around [`SendPipeStream`] that implements
-/// [`SendHalf`](crate::local_socket::traits::SendHalf).
+/// Wrapper around [`SendPipeStream`] that implements [`SendHalf`](traits::SendHalf).
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
     SendHalf,
@@ -123,7 +119,6 @@ multimacro! {
     derive_trivial_conv(SendHalfImpl),
 }
 
-/// Flushing fails with [`Unsupported`](io::ErrorKind::Unsupported).
 impl Write for &SendHalf {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> { (&self.0).write(buf) }

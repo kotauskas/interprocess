@@ -14,6 +14,7 @@ use {
 
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
+/// Wrapper around [`PipeListener`] that implements [`Listener`](traits::Listener).
 #[derive(Debug)]
 pub struct Listener(PipeListener);
 impl Sealed for Listener {}

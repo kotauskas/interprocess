@@ -24,6 +24,7 @@ type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
+/// Wrapper around [`DuplexPipeStream`] that implements [`Stream`](traits::Stream).
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
 impl Sealed for Stream {}
@@ -93,6 +94,7 @@ multimacro! {
     derive_trivial_conv(StreamImpl),
 }
 
+/// Wrapper around [`RecvPipeStream`] that implements [`RecvHalf`](traits::RecvHalf).
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 impl Sealed for RecvHalf {}
 impl traits::RecvHalf for RecvHalf {
@@ -109,6 +111,7 @@ multimacro! {
     derive_trivial_conv(RecvHalfImpl),
 }
 
+/// Wrapper around [`SendPipeStream`] that implements [`SendHalf`](traits::SendHalf).
 pub struct SendHalf(pub(super) SendHalfImpl);
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {

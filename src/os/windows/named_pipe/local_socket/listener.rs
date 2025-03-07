@@ -13,8 +13,7 @@ use {
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
 
-/// Wrapper around [`PipeListener`] that implements
-/// [`Listener`](crate::local_socket::traits::Listener).
+/// Wrapper around [`PipeListener`] that implements [`Listener`](traits::Listener).
 #[derive(Debug)]
 pub struct Listener {
     listener: ListenerImpl,
