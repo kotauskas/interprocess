@@ -30,7 +30,7 @@ impl FromHandleErrorKind {
     }
 }
 impl From<FromHandleErrorKind> for io::Error {
-    fn from(e: FromHandleErrorKind) -> Self { io::Error::new(io::ErrorKind::Other, e.msg()) }
+    fn from(e: FromHandleErrorKind) -> Self { io::Error::other(e.msg()) }
 }
 impl Display for FromHandleErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { f.write_str(self.msg()) }

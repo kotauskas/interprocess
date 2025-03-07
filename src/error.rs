@@ -82,10 +82,7 @@ impl<S, E> ConversionError<S, E> {
 }
 impl<S, E: Display> ConversionError<S, E> {
     /// Boxes the error into an `io::Error`.
-    pub fn to_io_error(&self) -> io::Error {
-        let msg = self.to_string();
-        io::Error::new(io::ErrorKind::Other, msg)
-    }
+    pub fn to_io_error(&self) -> io::Error { io::Error::other(self.to_string()) }
 }
 /// Boxes the error into an `io::Error`, dropping the retained file descriptor in the process.
 impl<S, E: Display> From<ConversionError<S, E>> for io::Error {

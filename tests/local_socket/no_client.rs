@@ -29,9 +29,7 @@ fn server(id: &str, path: bool) -> io::Result<Stream> {
             .nonblocking(ListenerNonblockingMode::Accept)
             .create_sync()
     })
-    .map_err(|e| {
-        e.downcast::<io::Error>().unwrap_or_else(|e| io::Error::new(io::ErrorKind::Other, e))
-    })?
+    .map_err(|e| e.downcast::<io::Error>().unwrap_or_else(io::Error::other))?
     .1;
     listener.accept()
 }

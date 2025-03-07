@@ -1,16 +1,16 @@
 [package]
-name = "interprocess"
-version = "2.2.3"
-authors = ["Kotauskas <v.toncharov@gmail.com>"]
-edition = "2021"
+name         = "interprocess"
+version      = "2.2.3"
 rust-version = "1.75"
-license = "MIT OR Apache-2.0"
-readme = "README.md"
-repository = "https://github.com/kotauskas/interprocess"
+edition      = "2021"
+authors      = ["Goat <v.toncharov@gmail.com>"]
+license      = "MIT OR Apache-2.0"
+readme       = "README.md"
+repository   = "https://github.com/kotauskas/interprocess"
 
 description = "Interprocess communication toolkit"
-categories = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
-keywords = ["ipc", "pipe"]
+categories  = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
+keywords    = ["ipc", "pipe"]
 
 autotests = false
 autoexamples = false
@@ -127,13 +127,17 @@ color-eyre = "0.6.2"
 [lints.rust]
 unsafe_op_in_unsafe_fn = "forbid"
 rust_2018_idioms = { level = "deny", priority = -1 }
+dead_code = "allow"
 
 [lints.clippy]
-exit = "forbid"
+exit       = "forbid"
 ptr_as_ptr = "forbid"
-get_unwrap = "deny"
+
+get_unwrap     = "deny"
 as_conversions = "deny"
+
 dbg_macro = "warn"
+
 tabs_in_doc_comments = "allow"
 
 [package.metadata.docs.rs]

@@ -60,7 +60,7 @@ impl TryFrom<Recver> for OwnedHandle {
     fn try_from(rx: Recver) -> io::Result<Self> {
         rx.0.try_into_std()
             .map(OwnedHandle::from)
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
+            .map_err(|_| io::Error::other(INFLIGHT_ERR))
     }
 }
 impl TryFrom<OwnedHandle> for Recver {
@@ -137,7 +137,7 @@ impl TryFrom<Sender> for OwnedHandle {
             .expect(LIMBO_ERR)
             .try_into_std()
             .map(OwnedHandle::from)
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, INFLIGHT_ERR))
+            .map_err(|_| io::Error::other(INFLIGHT_ERR))
     }
 }
 impl TryFrom<OwnedHandle> for Sender {

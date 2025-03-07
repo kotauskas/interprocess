@@ -103,7 +103,7 @@ pub(super) unsafe fn free_sid(sid: *mut c_void) -> io::Result<()> {
     if unsafe { FreeSid(sid) }.is_null() {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, "failed to deallocate SID"))
+        Err(io::Error::other("failed to deallocate SID"))
     }
 }
 
