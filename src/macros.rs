@@ -1,4 +1,4 @@
-#![allow(unused_macros)]
+#![allow(unused_macros, unused_imports)]
 
 /// Dispatches to a symmetrically named submodule in the target OS module.
 macro_rules! impmod {
@@ -114,7 +114,6 @@ macro_rules! tag_enum {
 macro_rules! make_macro_modules {
     ($($modname:ident),+ $(,)?) => {$(
         #[macro_use] mod $modname;
-        #[allow(unused_imports)]
         pub(crate) use $modname::*;
     )+};
 }
