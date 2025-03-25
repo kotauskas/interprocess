@@ -63,6 +63,18 @@ impl Write for &Stream {
     // FUTURE is_write_vectored
 }
 
+/// Access to the underlying implementation.
+impl Stream {
+    /// Borrows the [`DuplexPipeStream`] contained within, granting access to operations defined
+    /// on it.
+    #[inline(always)]
+    pub fn inner(&self) -> &StreamImpl { &self.0 }
+    /// Mutably borrows the [`DuplexPipeStream`] contained within, granting access to operations
+    /// defined on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut StreamImpl { &mut self.0 }
+}
+
 impl From<Stream> for OwnedHandle {
     fn from(s: Stream) -> Self {
         // The outer local socket interface has receive and send halves and is always duplex in the
@@ -89,6 +101,8 @@ impl TryFrom<OwnedHandle> for Stream {
 multimacro! {
     Stream,
     forward_rbv(StreamImpl, &),
+    forward_as_ref(StreamImpl),
+    forward_as_mut(StreamImpl),
     forward_sync_read,
     forward_sync_ref_read,
     forward_as_handle,
@@ -102,6 +116,8 @@ pub struct RecvHalf(pub(super) RecvHalfImpl);
 multimacro! {
     RecvHalf,
     forward_rbv(RecvHalfImpl, &),
+    forward_as_ref(RecvHalfImpl),
+    forward_as_mut(RecvHalfImpl),
     forward_sync_read,
     forward_sync_ref_read,
     forward_as_handle,
@@ -113,6 +129,8 @@ multimacro! {
 pub struct SendHalf(pub(super) SendHalfImpl);
 multimacro! {
     SendHalf,
+    forward_as_ref(SendHalfImpl),
+    forward_as_mut(SendHalfImpl),
     forward_as_handle,
     forward_debug("local_socket::SendHalf"),
     derive_sync_mut_write,

@@ -55,6 +55,19 @@ impl traits::Listener for Listener {
     }
     fn do_not_reclaim_name_on_drop(&mut self) {}
 }
+
+/// Access to the underlying implementation.
+impl Listener {
+    /// Borrows the [`PipeListener`] contained within, granting access to operations defined on
+    /// it.
+    #[inline(always)]
+    pub fn inner(&self) -> &ListenerImpl { &self.listener }
+    /// Mutably borrows the [`PipeListener`] contained within, granting access to operations
+    /// defined on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut ListenerImpl { &mut self.listener }
+}
+
 impl Iterator for Listener {
     type Item = io::Result<Stream>;
     #[inline(always)]
@@ -65,4 +78,10 @@ impl FusedIterator for Listener {}
 impl From<Listener> for OwnedHandle {
     #[inline]
     fn from(l: Listener) -> Self { l.listener.into() }
+}
+
+multimacro! {
+    Listener,
+    forward_as_ref(ListenerImpl),
+    forward_as_mut(ListenerImpl),
 }

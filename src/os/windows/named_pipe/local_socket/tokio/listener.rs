@@ -34,3 +34,30 @@ impl traits::Listener for Listener {
     }
     fn do_not_reclaim_name_on_drop(&mut self) {}
 }
+
+/// Access to the underlying implementation.
+impl Listener {
+    /// Borrows the [`PipeListener`] contained within, granting access to operations defined on
+    /// it.
+    #[inline(always)]
+    pub fn inner(&self) -> &ListenerImpl { &self.listener }
+    /// Mutably borrows the [`PipeListener`] contained within, granting access to operations
+    /// defined on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut ListenerImpl { &mut self.listener }
+}
+
+impl From<PipeListener> for Listener {
+    #[inline(always)]
+    fn from(l: PipeListener) -> Self { Self(l) }
+}
+impl From<Listener> for PipeListener {
+    #[inline(always)]
+    fn from(l: Listener) -> Self { l.0 }
+}
+
+multimacro! {
+    Listener,
+    forward_as_ref(PipeListener),
+    forward_as_mut(PipeListener),
+}

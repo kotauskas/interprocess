@@ -28,6 +28,7 @@ type SendHalfImpl = SendPipeStream<Bytes>;
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
 impl Sealed for Stream {}
+
 impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
@@ -47,6 +48,18 @@ impl traits::Stream for Stream {
             ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) }
         })
     }
+}
+
+/// Access to the underlying implementation.
+impl Stream {
+    /// Borrows the [`DuplexPipeStream`] contained within, granting access to operations defined
+    /// on it.
+    #[inline(always)]
+    pub fn inner(&self) -> &StreamImpl { &self.0 }
+    /// Mutably borrows the [`DuplexPipeStream`] contained within, granting access to operations
+    /// defined on it.
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut StreamImpl { &mut self.0 }
 }
 
 impl AsyncWrite for &Stream {
@@ -87,6 +100,8 @@ multimacro! {
     Stream,
     pinproj_for_unpin(StreamImpl),
     forward_rbv(StreamImpl, &),
+    forward_as_ref(StreamImpl),
+    forward_as_mut(StreamImpl),
     forward_tokio_read,
     forward_tokio_ref_read,
     forward_as_handle,
@@ -104,6 +119,8 @@ multimacro! {
     RecvHalf,
     pinproj_for_unpin(RecvHalfImpl),
     forward_rbv(RecvHalfImpl, &),
+    forward_as_ref(RecvHalfImpl),
+    forward_as_mut(RecvHalfImpl),
     forward_tokio_read,
     forward_tokio_ref_read,
     forward_as_handle,
@@ -140,6 +157,8 @@ impl AsyncWrite for &SendHalf {
 multimacro! {
     SendHalf,
     forward_rbv(SendHalfImpl, &),
+    forward_as_ref(SendHalfImpl),
+    forward_as_mut(SendHalfImpl),
     forward_as_handle,
     forward_debug("local_socket::SendHalf"),
     derive_tokio_mut_write,
