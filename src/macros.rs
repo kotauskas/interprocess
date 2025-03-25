@@ -120,5 +120,6 @@ macro_rules! make_macro_modules {
 
 make_macro_modules! {
     derive_raw, derive_mut_iorw, derive_trivconv,
-    forward_handle_and_fd, forward_try_clone, forward_to_self, forward_iorw, forward_fmt,
+    forward_as_ref, forward_fmt, forward_handle_and_fd, forward_iorw, forward_to_self,
+    forward_try_clone,
 }
