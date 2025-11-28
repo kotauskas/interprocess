@@ -92,10 +92,4 @@ platform to be demoted, although promotions quite obviously can happen as minor 
 ## Feature gates
 - **`tokio`**, *off* by default – enables support for Tokio-powered efficient asynchronous IPC.
 
-## License
-This crate, along with all community contributions made to it, is dual-licensed under [MIT] and
-[Apache 2.0].
-
-[MIT]: https://choosealicense.com/licenses/mit/
-[Apache 2.0]: https://choosealicense.com/licenses/apache-2.0/
 [blogpost]: https://blog.rust-lang.org/2023/12/28/Rust-1.75.0.html

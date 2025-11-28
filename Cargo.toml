@@ -3,8 +3,8 @@ name         = "interprocess"
 version      = "2.2.3"
 rust-version = "1.75"
 edition      = "2021"
-authors      = ["Goat <v.toncharov@gmail.com>"]
-license      = "MIT OR Apache-2.0"
+authors      = ["Goat"]
+license      = "0BSD"
 readme       = "README.md"
 repository   = "https://github.com/kotauskas/interprocess"
 
