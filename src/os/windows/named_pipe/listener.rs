@@ -6,7 +6,7 @@ use {
     super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream},
     crate::{
         os::windows::{winprelude::*, FileHandle},
-        poison_error, OrErrno, RawOsErrorExt, LOCK_POISON,
+        poison_error, DebugExpectExt, OrErrno, RawOsErrorExt, LOCK_POISON,
     },
     std::{
         fmt::{self, Debug, Formatter},
@@ -20,8 +20,8 @@ use {
         },
     },
     windows_sys::Win32::{
-        Foundation::{ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING},
-        System::Pipes::ConnectNamedPipe,
+        Foundation::{ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING},
+        System::Pipes::{ConnectNamedPipe, DisconnectNamedPipe},
     },
 };
 pub use {incoming::*, options::*};
@@ -55,7 +55,23 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
             // Doesn't actually even need to be atomic to begin with, but it's simpler and more
             // convenient to do this instead. The mutex takes care of ordering.
             let nonblocking = self.nonblocking.load(Relaxed);
-            block_on_connect(stored_instance.as_handle())?;
+
+            if let Err(e) = block_on_connect(stored_instance.as_handle()) {
+                if e.raw_os_error().eeq(ERROR_NO_DATA) {
+                    // Client disconnected, but we haven't. We have to discard this instance.
+                    // https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe#remarks
+
+                    let new_instance = self.create_instance(nonblocking)?;
+                    let broken_instance = replace(&mut *stored_instance, new_instance);
+
+                    unsafe { DisconnectNamedPipe(broken_instance.as_int_handle()) }
+                        .true_val_or_errno(())
+                        .debug_expect("Failed to disconnect broken pipe");
+                }
+
+                return Err(e);
+            }
+
             let new_instance = self.create_instance(nonblocking)?;
             replace(&mut *stored_instance, new_instance)
         };
