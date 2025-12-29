@@ -80,8 +80,11 @@ impl From<Listener> for OwnedHandle {
     fn from(l: Listener) -> Self { l.listener.into() }
 }
 
-multimacro! {
-    Listener,
-    forward_as_ref(ListenerImpl),
-    forward_as_mut(ListenerImpl),
+impl AsRef<ListenerImpl> for Listener {
+    #[inline(always)]
+    fn as_ref(&self) -> &ListenerImpl { &self.listener }
+}
+impl AsMut<ListenerImpl> for Listener {
+    #[inline(always)]
+    fn as_mut(&mut self) -> &mut ListenerImpl { &mut self.listener }
 }
