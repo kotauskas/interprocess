@@ -58,12 +58,12 @@ use {
 ///
 /// ## Basic bytestream client
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs"))]
 /// ```
 ///
 /// ## Basic message stream client
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/msg.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/msg.rs"))]
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: MaybeArc<RawPipeStream>,

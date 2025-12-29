@@ -33,7 +33,7 @@ use {
 ///
 /// ## Basic server
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs"))]
 /// ```
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances

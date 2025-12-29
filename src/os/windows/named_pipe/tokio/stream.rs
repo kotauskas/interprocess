@@ -36,7 +36,7 @@ use {
 ///
 /// ## Basic bytestream client
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/named_pipe/sync/stream/bytes.rs"))]
 /// ```
 pub struct PipeStream<Rm: PipeModeTag, Sm: PipeModeTag> {
     raw: MaybeArc<RawPipeStream>,

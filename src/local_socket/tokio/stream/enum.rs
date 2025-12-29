@@ -66,7 +66,7 @@ mkenum!(
 ///
 /// ## Basic client
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
 /// ```
 Stream);
 

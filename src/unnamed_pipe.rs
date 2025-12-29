@@ -40,11 +40,11 @@ use {crate::Sealed, std::io};
 /// ## Basic communication
 /// In a parent process:
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_a.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_a.rs"))]
 /// ```
 /// In a child process:
 /// ```no_run
-#[doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs")]
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/unnamed_pipe/sync/side_b.rs"))]
 /// ```
 #[inline]
 pub fn pipe() -> io::Result<(Sender, Recver)> { pipe_impl() }
