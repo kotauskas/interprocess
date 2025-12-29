@@ -44,7 +44,7 @@ async fn drive_server<L: Debug, T: Future<Output = TestResult> + Send + 'static>
     id: &str,
     name_sender: Sender<Arc<str>>,
     num_clients: u32,
-    mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
+    mut createfn: impl FnMut(PipeListenerOptions<'_>) -> io::Result<L>,
     mut acceptfut: impl FnMut(Arc<L>) -> T,
 ) -> TestResult {
     let (name, listener) = listen_and_pick_name(&mut namegen_named_pipe(id), |nm| {

@@ -44,7 +44,7 @@ fn drive_server<L: Debug>(
     id: &str,
     name_sender: Sender<Arc<str>>,
     num_clients: u32,
-    mut createfn: impl (FnMut(PipeListenerOptions<'_>) -> io::Result<L>),
+    mut createfn: impl FnMut(PipeListenerOptions<'_>) -> io::Result<L>,
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
 ) -> TestResult {
     let (name, mut listener) = listen_and_pick_name(&mut namegen_named_pipe(id), |nm| {

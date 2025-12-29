@@ -40,11 +40,11 @@ impl Listener {
     /// Borrows the [`PipeListener`] contained within, granting access to operations defined on
     /// it.
     #[inline(always)]
-    pub fn inner(&self) -> &ListenerImpl { &self.listener }
+    pub fn inner(&self) -> &PipeListener { &self.0 }
     /// Mutably borrows the [`PipeListener`] contained within, granting access to operations
     /// defined on it.
     #[inline(always)]
-    pub fn inner_mut(&mut self) -> &mut ListenerImpl { &mut self.listener }
+    pub fn inner_mut(&mut self) -> &mut PipeListener { &mut self.0 }
 }
 
 impl From<PipeListener> for Listener {
