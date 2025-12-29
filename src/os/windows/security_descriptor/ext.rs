@@ -167,8 +167,28 @@ pub trait AsSecurityDescriptorExt: AsSecurityDescriptor {
 
     /// Sets the security descriptor pointer of the given `SECURITY_ATTRIBUTES` structure to the
     /// security descriptor borrow of `self`.
+    ///
+    /// Beware of the fact that the `SECURITY_ATTRIBUTES` does not own, or extend the lifetime
+    /// of, the security descriptor. Put another way, if `SECURITY_ATTRIBUTES` was lifetime-aware,
+    /// the parameter list would be `(&'a self, attributes: SECURITY_ATTRIBUTES<'a>)`.
+    ///
+    /// You may want to use `write_to_security_attributes_ptr` instead.
     fn write_to_security_attributes(&self, attributes: &mut SECURITY_ATTRIBUTES) {
         attributes.lpSecurityDescriptor = self.as_sd().cast_mut();
+    }
+    /// Like `write_to_security_attributes`, but does not mention the type `SECURITY_ATTRIBUTES`
+    /// by name. You can use this to combat the versioning churn of the `windows-sys` crate, or
+    /// when borrowing the `SECURITY_ATTRIBUTES` struct would violate the aliasing rules.
+    ///
+    /// # Safety
+    /// `attributes` must point to a `SECURITY_ATTRIBUTES` struct (even though the signature does
+    /// not express this so as to avoid mentioning `SECURITY_ATTRIBUTES` by name) whose
+    /// `lpSecurityDescriptor` field must be in-bounds and [valid for writes](std::ptr::write).
+    unsafe fn write_to_security_attributes_ptr(&self, attributes: *mut ()) {
+        unsafe {
+            let ptr = &raw mut (*attributes.cast::<SECURITY_ATTRIBUTES>()).lpSecurityDescriptor;
+            ptr.cast::<*const c_void>().write(self.as_sd());
+        };
     }
 
     /// Serializes the security descriptor into [the security descriptor string format][sdsf] for
