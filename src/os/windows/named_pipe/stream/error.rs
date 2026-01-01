@@ -1,10 +1,9 @@
 use {
     super::*,
-    crate::error::ConversionError,
+    crate::{error::ConversionError, os::windows::winprelude::*},
     std::{
         fmt::{self, Debug, Display, Formatter},
         io,
-        os::windows::prelude::*,
     },
 };
 

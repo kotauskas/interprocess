@@ -5,10 +5,13 @@ use {
             traits::{self, ListenerNonblockingMode, Stream as _},
             ListenerOptions, NameInner,
         },
-        os::windows::named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
+        os::windows::{
+            named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
+            winprelude::*,
+        },
         AtomicEnum, Sealed,
     },
-    std::{io, iter::FusedIterator, os::windows::prelude::*, sync::atomic::Ordering::SeqCst},
+    std::{io, iter::FusedIterator, sync::atomic::Ordering::SeqCst},
 };
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;

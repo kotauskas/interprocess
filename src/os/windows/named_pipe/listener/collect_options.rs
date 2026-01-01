@@ -4,11 +4,12 @@ use {
         os::windows::{
             named_pipe::{pipe_mode, PipeMode, WaitTimeout},
             path_conversion::*,
+            winprelude::*,
             SecurityDescriptor,
         },
         TryClone,
     },
-    std::{borrow::Cow, num::NonZeroU8, os::windows::prelude::*},
+    std::{borrow::Cow, num::NonZeroU8},
     widestring::{u16cstr, U16CStr, U16CString},
     windows_sys::Win32::System::Pipes::{PIPE_NOWAIT, PIPE_TYPE_MESSAGE},
 };

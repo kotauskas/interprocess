@@ -8,7 +8,7 @@ use {
         },
         AsMutPtr, HandleOrErrno, OrErrno, RawOsErrorExt, SubUsizeExt,
     },
-    std::{io, mem::MaybeUninit, os::windows::prelude::*, ptr},
+    std::{io, mem::MaybeUninit, ptr},
     widestring::U16CStr,
     windows_sys::Win32::{
         Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},

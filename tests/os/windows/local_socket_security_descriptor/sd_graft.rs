@@ -8,14 +8,12 @@ use {
             security_descriptor::{
                 AsSecurityDescriptorExt, BorrowedSecurityDescriptor, LocalBox, SecurityDescriptor,
             },
-            AsRawHandleExt as _,
+            winprelude::*,
         },
         tests::util::*,
         OrErrno, SubUsizeExt, TryClone,
     },
-    std::{
-        ffi::OsString, fs::File, io, mem::MaybeUninit, os::windows::prelude::*, ptr, sync::Arc,
-    },
+    std::{ffi::OsString, fs::File, io, mem::MaybeUninit, ptr, sync::Arc},
     widestring::{U16CStr, U16Str},
     windows_sys::Win32::{
         Foundation::{MAX_PATH, STATUS_SUCCESS},

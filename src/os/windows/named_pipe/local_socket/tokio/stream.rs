@@ -5,15 +5,17 @@ use {
             traits::tokio::{self as traits, ReuniteResult},
             Name, NameInner,
         },
-        os::windows::named_pipe::{
-            pipe_mode::Bytes,
-            tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
+        os::windows::{
+            named_pipe::{
+                pipe_mode::Bytes,
+                tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
+            },
+            winprelude::*,
         },
         Sealed,
     },
     std::{
         io,
-        os::windows::prelude::*,
         pin::Pin,
         task::{Context, Poll},
     },
