@@ -2,6 +2,7 @@
 
 mod no_server;
 mod stream;
+mod off_runtime_drop;
 
 use {
     crate::{
