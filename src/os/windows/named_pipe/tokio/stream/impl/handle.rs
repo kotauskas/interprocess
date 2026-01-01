@@ -13,7 +13,7 @@ derive_asraw!(InnerTokio);
 
 impl AsHandle for RawPipeStream {
     #[inline]
-    fn as_handle(&self) -> BorrowedHandle<'_> { self.inner().as_handle() }
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.inner.as_handle() }
 }
 derive_asraw!(RawPipeStream);
 

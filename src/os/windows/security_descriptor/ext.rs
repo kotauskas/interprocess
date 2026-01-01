@@ -185,8 +185,9 @@ pub trait AsSecurityDescriptorExt: AsSecurityDescriptor {
     /// not express this so as to avoid mentioning `SECURITY_ATTRIBUTES` by name) whose
     /// `lpSecurityDescriptor` field must be in-bounds and [valid for writes](std::ptr::write).
     unsafe fn write_to_security_attributes_ptr(&self, attributes: *mut ()) {
+        let attributes = attributes.cast::<SECURITY_ATTRIBUTES>();
         unsafe {
-            let ptr = &raw mut (*attributes.cast::<SECURITY_ATTRIBUTES>()).lpSecurityDescriptor;
+            let ptr = std::ptr::addr_of_mut!((*attributes).lpSecurityDescriptor);
             ptr.cast::<*const c_void>().write(self.as_sd());
         };
     }

@@ -2,7 +2,7 @@
 
 macro_rules! same_clsrv {
     ($nm:ident in $var:expr => $e:expr) => {
-        match $var {
+        match &*$var {
             InnerTokio::Server($nm) => $e,
             InnerTokio::Client($nm) => $e,
         }
@@ -14,7 +14,6 @@ mod debug;
 mod handle;
 mod recv_bytes;
 mod send;
-mod send_off;
 
 use {
     super::*,
@@ -83,7 +82,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was
     /// created by connecting to a server (server-side).
     #[inline]
-    pub fn is_server(&self) -> bool { matches!(self.raw.inner(), &InnerTokio::Server(..)) }
+    pub fn is_server(&self) -> bool { matches!(*self.raw.inner, InnerTokio::Server(..)) }
     /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if
     /// it was created by a listener (server-side).
     #[inline]

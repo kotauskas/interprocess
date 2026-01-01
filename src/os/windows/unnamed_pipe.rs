@@ -6,15 +6,7 @@ pub mod tokio;
 
 use {
     crate::{
-        os::windows::{
-            limbo::{
-                sync::{send_off, Corpse},
-                LIMBO_ERR, REBURY_ERR,
-            },
-            security_descriptor::*,
-            winprelude::*,
-            FileHandle,
-        },
+        os::windows::{security_descriptor::*, winprelude::*, FileHandle},
         unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
         weaken_buf_init_mut, AsPtr, Sealed, TryClone,
     },
@@ -88,7 +80,10 @@ impl<'sd> CreationOptions<'sd> {
                 let r = OwnedHandle::from_raw_handle(r.to_std());
                 (w, r)
             };
-            let w = PubSender(Sender { io: Some(FileHandle::from(w)), needs_flush: false });
+            let w = PubSender(Sender {
+                io: ManuallyDrop::new(FileHandle::from(w)),
+                needs_flush: false,
+            });
             let r = PubRecver(Recver(FileHandle::from(r)));
             Ok((w, r))
         } else {
@@ -128,13 +123,13 @@ multimacro! {
 
 #[derive(Debug)]
 pub(crate) struct Sender {
-    io: Option<FileHandle>,
+    io: ManuallyDrop<FileHandle>,
     needs_flush: bool,
 }
 impl Write for Sender {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let rslt = self.io.as_mut().expect(LIMBO_ERR).write(buf);
+        let rslt = self.io.write(buf);
         if rslt.is_ok() {
             self.needs_flush = true;
         }
@@ -143,7 +138,7 @@ impl Write for Sender {
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         if self.needs_flush {
-            let rslt = self.io.as_mut().expect(LIMBO_ERR).flush();
+            let rslt = self.io.flush();
             if rslt.is_ok() {
                 self.needs_flush = false;
             }
@@ -155,31 +150,30 @@ impl Write for Sender {
 }
 impl Drop for Sender {
     fn drop(&mut self) {
-        let corpse = Corpse { handle: self.io.take().expect(REBURY_ERR), is_server: false };
+        let h = unsafe { ManuallyDrop::take(&mut self.io) };
         if self.needs_flush {
-            send_off(corpse);
+            linger_pool::linger(h);
         }
     }
 }
 impl TryClone for Sender {
     fn try_clone(&self) -> io::Result<Self> {
-        Ok(Self {
-            io: self.io.as_ref().map(TryClone::try_clone).transpose()?,
-            needs_flush: self.needs_flush,
-        })
+        Ok(Self { io: ManuallyDrop::new(self.io.try_clone()?), needs_flush: self.needs_flush })
     }
 }
 impl AsHandle for Sender {
     #[inline]
-    fn as_handle(&self) -> BorrowedHandle<'_> {
-        self.io.as_ref().map(AsHandle::as_handle).expect(LIMBO_ERR)
-    }
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.io.as_handle() }
 }
 impl From<OwnedHandle> for Sender {
     #[inline]
-    fn from(handle: OwnedHandle) -> Self { Self { io: Some(handle.into()), needs_flush: true } }
+    fn from(handle: OwnedHandle) -> Self {
+        Self { io: ManuallyDrop::new(handle.into()), needs_flush: true }
+    }
 }
 impl From<Sender> for OwnedHandle {
     #[inline]
-    fn from(tx: Sender) -> Self { ManuallyDrop::new(tx).io.take().expect(LIMBO_ERR).into() }
+    fn from(tx: Sender) -> Self {
+        unsafe { ManuallyDrop::take(&mut ManuallyDrop::new(tx).io) }.into()
+    }
 }

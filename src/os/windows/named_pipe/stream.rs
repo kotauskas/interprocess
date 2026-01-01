@@ -8,9 +8,9 @@ use {
     super::MaybeArc,
     crate::{
         local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-        os::windows::{FileHandle, NeedsFlush},
+        os::windows::{winprelude::*, FileHandle, NeedsFlush},
     },
-    std::{marker::PhantomData, os::windows::prelude::*},
+    std::{marker::PhantomData, mem::ManuallyDrop},
 };
 
 /// Named pipe stream, created by a server-side listener or by connecting to a server.
@@ -83,10 +83,18 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-    handle: Option<FileHandle>,
+    handle: ManuallyDrop<FileHandle>,
     is_server: bool,
     needs_flush: NeedsFlush,
     concurrency_detector: ConcurrencyDetector<NamedPipeSite>,
+}
+impl Drop for RawPipeStream {
+    fn drop(&mut self) {
+        let h = unsafe { ManuallyDrop::take(&mut self.handle) };
+        if self.needs_flush.get_mut() {
+            linger_pool::linger(h);
+        }
+    }
 }
 
 #[derive(Default)]

@@ -10,8 +10,8 @@ use {
 impl RawPipeStream {
     fn poll_write(&self, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         loop {
-            ready!(same_clsrv!(x in self.inner() => x.poll_write_ready(cx)))?;
-            match same_clsrv!(x in self.inner() => x.try_write(buf)) {
+            ready!(same_clsrv!(x in self.inner => x.poll_write_ready(cx)))?;
+            match same_clsrv!(x in self.inner => x.try_write(buf)) {
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
                 els => {
                     self.needs_flush.mark_dirty();

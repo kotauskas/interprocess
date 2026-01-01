@@ -1,4 +1,6 @@
-pub(super) mod winprelude {
+#[allow(unused_imports)]
+pub(crate) mod winprelude {
+    pub(in super::super) use super::super::linger_pool;
     pub(crate) use {
         super::{
             AsRawHandleExt as _, FromRawHandleExt as _, HANDLEExt as _, IntoRawHandleExt as _,

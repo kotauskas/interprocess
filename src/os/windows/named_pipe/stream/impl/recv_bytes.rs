@@ -11,7 +11,7 @@ impl RawPipeStream {
     #[track_caller]
     fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         let _guard = self.concurrency_detector.lock();
-        self.file_handle().read(buf)
+        self.handle.read(buf)
     }
 }
 

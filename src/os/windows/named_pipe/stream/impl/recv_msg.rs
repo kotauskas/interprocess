@@ -25,9 +25,8 @@ impl RawPipeStream {
         let _guard = self.concurrency_detector.lock();
 
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
-        let fh = self.file_handle();
         loop {
-            match downgrade_eof(fh.read(&mut buf)) {
+            match downgrade_eof(self.handle.read(&mut buf)) {
                 Ok(..) => break Ok(()),
                 Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {}
                 Err(e) => break Err(e),
@@ -44,7 +43,6 @@ impl RawPipeStream {
         let mut more_data = true;
         let mut partial = false;
         let mut spilled = false;
-        let fh = self.file_handle();
 
         while more_data {
             let slice = buf.unfilled_part();
@@ -69,7 +67,7 @@ impl RawPipeStream {
                 }
             }
 
-            let rslt = fh.read(slice);
+            let rslt = self.handle.read(slice);
             more_data = false;
 
             let incr = match decode_eof(rslt) {

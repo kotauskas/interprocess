@@ -8,14 +8,14 @@ mod r#impl;
 
 use {
     crate::os::windows::{
-        limbo::tokio::Corpse,
         named_pipe::{
             stream::{pipe_mode, PipeModeTag},
             MaybeArc,
         },
+        winprelude::*,
         NeedsFlush,
     },
-    std::{io, marker::PhantomData},
+    std::{io, marker::PhantomData, mem::ManuallyDrop},
     tokio::net::windows::named_pipe::{
         NamedPipeClient as TokioNPClient, NamedPipeServer as TokioNPServer,
     },
@@ -59,7 +59,7 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-    inner: Option<InnerTokio>,
+    inner: ManuallyDrop<InnerTokio>,
     // Cleared by the generic pipes rather than by the raw pipe stream, unlike in sync land.
     needs_flush: NeedsFlush,
     // MESSAGE READING DISABLED
@@ -69,11 +69,14 @@ enum InnerTokio {
     Server(TokioNPServer),
     Client(TokioNPClient),
 }
-impl From<InnerTokio> for Corpse {
-    fn from(it: InnerTokio) -> Self {
-        match it {
-            InnerTokio::Server(o) => Corpse::NpServer(o),
-            InnerTokio::Client(o) => Corpse::NpClient(o),
+impl Drop for RawPipeStream {
+    fn drop(&mut self) {
+        let i = unsafe { ManuallyDrop::take(&mut self.inner) };
+        if self.needs_flush.get_mut() {
+            match i {
+                InnerTokio::Server(p) => linger_pool::linger_boxed(p),
+                InnerTokio::Client(p) => linger_pool::linger_boxed(p),
+            }
         }
     }
 }

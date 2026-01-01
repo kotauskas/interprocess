@@ -1,16 +1,13 @@
 use {
     super::*,
-    crate::{
-        os::windows::{c_wrappers::duplicate_handle, limbo::LIMBO_ERR},
-        TryClone,
-    },
+    crate::{os::windows::c_wrappers::duplicate_handle, TryClone},
     std::mem::ManuallyDrop,
     windows_sys::Win32::System::Pipes::{PIPE_SERVER_END, PIPE_TYPE_MESSAGE},
 };
 
 impl AsHandle for RawPipeStream {
     #[inline]
-    fn as_handle(&self) -> BorrowedHandle<'_> { self.file_handle().as_handle() }
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.handle.as_handle() }
 }
 derive_asraw!(RawPipeStream);
 
@@ -44,7 +41,7 @@ impl From<RawPipeStream> for OwnedHandle {
     fn from(x: RawPipeStream) -> Self {
         let x = ManuallyDrop::new(x);
         let handle = unsafe { std::ptr::read(&x.handle) };
-        handle.expect(LIMBO_ERR).into()
+        ManuallyDrop::into_inner(handle).into()
     }
 }
 

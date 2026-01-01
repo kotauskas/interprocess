@@ -3,13 +3,7 @@
 use {
     crate::{
         os::windows::{
-            limbo::{
-                tokio::{send_off, Corpse},
-                LIMBO_ERR, REBURY_ERR,
-            },
-            tokio_flusher::TokioFlusher,
-            unnamed_pipe::CreationOptions,
-            winprelude::*,
+            tokio_flusher::TokioFlusher, unnamed_pipe::CreationOptions, winprelude::*,
         },
         unnamed_pipe::{
             tokio::{Recver as PubRecver, Sender as PubSender},
@@ -58,9 +52,7 @@ impl TryFrom<SyncRecver> for Recver {
 impl TryFrom<Recver> for OwnedHandle {
     type Error = io::Error;
     fn try_from(rx: Recver) -> io::Result<Self> {
-        rx.0.try_into_std()
-            .map(OwnedHandle::from)
-            .map_err(|_| io::Error::other(INFLIGHT_ERR))
+        rx.0.try_into_std().map(OwnedHandle::from).map_err(|_| io::Error::other(INFLIGHT_ERR))
     }
 }
 impl TryFrom<OwnedHandle> for Recver {
@@ -78,7 +70,7 @@ multimacro! {
 
 #[derive(Debug)]
 pub(crate) struct Sender {
-    io: Option<File>,
+    io: ManuallyDrop<File>,
     flusher: TokioFlusher,
     needs_flush: bool,
 }
@@ -91,7 +83,7 @@ impl AsyncWrite for Sender {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         self.needs_flush = true;
-        let rslt = ready!(self.io.as_mut().expect(LIMBO_ERR).pin().poll_write(cx, buf));
+        let rslt = ready!((*self.io).pin().poll_write(cx, buf));
         if rslt.is_err() {
             self.needs_flush = false;
         }
@@ -106,19 +98,15 @@ impl AsyncWrite for Sender {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         // For limbo elision given cooperative downstream
         let slf = self.get_mut();
-        slf.flusher.poll_flush_mut(
-            slf.io.as_ref().expect(LIMBO_ERR).as_handle(),
-            &mut slf.needs_flush,
-            cx,
-        )
+        slf.flusher.poll_flush_mut(slf.io.as_handle(), &mut slf.needs_flush, cx)
     }
 }
 
 impl Drop for Sender {
     fn drop(&mut self) {
-        let corpse = Corpse::Unnamed(self.io.take().expect(REBURY_ERR));
+        let h = unsafe { ManuallyDrop::take(&mut self.io) };
         if self.needs_flush {
-            send_off(corpse);
+            linger_pool::linger_boxed(h);
         }
     }
 }
@@ -130,11 +118,8 @@ impl TryFrom<SyncSender> for Sender {
 }
 impl TryFrom<Sender> for OwnedHandle {
     type Error = io::Error;
-    fn try_from(tx: Sender) -> io::Result<Self> {
-        ManuallyDrop::new(tx)
-            .io
-            .take()
-            .expect(LIMBO_ERR)
+    fn try_from(mut tx: Sender) -> io::Result<Self> {
+        unsafe { ManuallyDrop::take(&mut tx.io) }
             .try_into_std()
             .map(OwnedHandle::from)
             .map_err(|_| io::Error::other(INFLIGHT_ERR))
@@ -144,7 +129,7 @@ impl TryFrom<OwnedHandle> for Sender {
     type Error = io::Error;
     fn try_from(handle: OwnedHandle) -> io::Result<Self> {
         Ok(Self {
-            io: Some(File::from_std(handle.into())),
+            io: ManuallyDrop::new(File::from_std(handle.into())),
             flusher: TokioFlusher::new(),
             needs_flush: true,
         })
@@ -152,5 +137,6 @@ impl TryFrom<OwnedHandle> for Sender {
 }
 
 impl AsHandle for Sender {
-    fn as_handle(&self) -> BorrowedHandle<'_> { self.io.as_ref().expect(LIMBO_ERR).as_handle() }
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.io.as_handle() }
 }

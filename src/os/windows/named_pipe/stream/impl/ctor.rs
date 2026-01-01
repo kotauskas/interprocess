@@ -8,7 +8,7 @@ use {
 impl RawPipeStream {
     pub(super) fn new(handle: FileHandle, is_server: bool, nfv: NeedsFlushVal) -> Self {
         Self {
-            handle: Some(handle),
+            handle: ManuallyDrop::new(handle),
             is_server,
             needs_flush: NeedsFlush::from(nfv),
             concurrency_detector: ConcurrencyDetector::new(),

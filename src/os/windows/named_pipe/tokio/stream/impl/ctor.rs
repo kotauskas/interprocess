@@ -8,7 +8,7 @@ use {
 impl RawPipeStream {
     pub(super) fn new(inner: InnerTokio, nfv: NeedsFlushVal) -> Self {
         Self {
-            inner: Some(inner),
+            inner: ManuallyDrop::new(inner),
             needs_flush: NeedsFlush::from(nfv),
             //recv_msg_state: Mutex::new(RecvMsgState::NotRecving),
         }

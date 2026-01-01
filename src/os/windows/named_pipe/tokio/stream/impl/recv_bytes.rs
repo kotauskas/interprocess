@@ -11,12 +11,12 @@ impl RawPipeStream {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         loop {
-            match downgrade_eof(same_clsrv!(x in self.inner() => x.try_read_buf(buf))) {
+            match downgrade_eof(same_clsrv!(x in self.inner => x.try_read_buf(buf))) {
                 Ok(..) => return Poll::Ready(Ok(())),
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
                 Err(e) => return Poll::Ready(Err(e)),
             }
-            ready!(same_clsrv!(x in self.inner() => x.poll_read_ready(cx)))?;
+            ready!(same_clsrv!(x in self.inner => x.poll_read_ready(cx)))?;
         }
     }
 }

@@ -11,7 +11,7 @@ impl RawPipeStream {
         recv_mode: Option<PipeMode>,
         send_mode: Option<PipeMode>,
     ) -> &'a mut DebugStruct<'b, 'c> {
-        let (tokio_object, is_server) = match self.inner() {
+        let (tokio_object, is_server) = match &*self.inner {
             InnerTokio::Server(s) => (s as _, true),
             InnerTokio::Client(c) => (c as _, false),
         };
