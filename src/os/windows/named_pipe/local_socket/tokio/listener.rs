@@ -14,7 +14,8 @@ use {
 
 type PipeListener = GenericPipeListener<pipe_mode::Bytes, pipe_mode::Bytes>;
 
-/// Wrapper around [`PipeListener`] that implements [`Listener`](traits::Listener).
+/// Wrapper around [`PipeListener`](GenericPipeListener) that implements the
+/// [`Listener`](traits::Listener) trait.
 #[derive(Debug)]
 pub struct Listener(PipeListener);
 impl Sealed for Listener {}
@@ -37,12 +38,12 @@ impl traits::Listener for Listener {
 
 /// Access to the underlying implementation.
 impl Listener {
-    /// Borrows the [`PipeListener`] contained within, granting access to operations defined on
-    /// it.
+    /// Borrows the [`PipeListener`](GenericPipeListener) contained within, granting access to
+    /// operations defined on it.
     #[inline(always)]
     pub fn inner(&self) -> &PipeListener { &self.0 }
-    /// Mutably borrows the [`PipeListener`] contained within, granting access to operations
-    /// defined on it.
+    /// Mutably borrows the [`PipeListener`](GenericPipeListener) contained within, granting
+    /// access to operations defined on it.
     #[inline(always)]
     pub fn inner_mut(&mut self) -> &mut PipeListener { &mut self.0 }
 }

@@ -26,7 +26,7 @@ type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
 
-/// Wrapper around [`DuplexPipeStream`] that implements [`Stream`](traits::Stream).
+/// Wrapper around [`DuplexPipeStream`] that implements the [`Stream`](traits::Stream) trait.
 #[derive(Debug)]
 pub struct Stream(pub(super) StreamImpl);
 impl Sealed for Stream {}
