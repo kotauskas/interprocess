@@ -62,6 +62,8 @@ mkenum!(
 /// Tokio-based local socket byte stream, obtained either from [`Listener`](super::super::Listener)
 /// or by connecting to an existing local socket.
 ///
+/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
+///
 /// # Examples
 ///
 /// ## Basic client
@@ -113,6 +115,8 @@ multimacro! {
 
 mkenum!(
 /// Receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+///
+/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
 "local_socket::tokio::" RecvHalf);
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
@@ -124,6 +128,8 @@ multimacro! {
 
 mkenum!(
 /// Send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+///
+/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
 "local_socket::tokio::" SendHalf);
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;

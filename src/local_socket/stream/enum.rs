@@ -61,6 +61,8 @@ mkenum!(
 /// Local socket byte stream, obtained either from [`Listener`](super::super::Listener) or by
 /// connecting to an existing local socket.
 ///
+/// See the [module-level documentation](crate::local_socket) for more details.
+///
 /// # Examples
 ///
 /// ## Basic client
@@ -120,6 +122,8 @@ multimacro! {
 
 mkenum!(
 /// Receive half of a local socket stream, obtained by splitting a [`Stream`].
+///
+/// See the [module-level documentation](crate::local_socket) for more details.
 "local_socket::" RecvHalf);
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
@@ -128,6 +132,8 @@ dispatch_read!(RecvHalf);
 
 mkenum!(
 /// Send half of a local socket stream, obtained by splitting a [`Stream`].
+///
+/// See the [module-level documentation](crate::local_socket) for more details.
 "local_socket::" SendHalf);
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;
