@@ -19,7 +19,6 @@ exclude = [
     "/.github/",
     "/.gitignore",
     "/.editorconfig",
-    "interprocess.code-workspace",
     "/Cargo.lock",
 ]
 
