@@ -41,7 +41,8 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
         let _guard = mask.map(umask);
 
         let pathdisp = path.display();
-        let err = format_args!("Failed to bind to {pathdisp}");
+        // FIXME(3.0.0) use format_args!
+        let err = format!("Failed to bind to {pathdisp}");
 
         let bind = || {
             let mut report_err = true;
@@ -54,7 +55,7 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
             } else {
                 UnixListener::bind(path)
             }
-            .report_error_args_if(report_err, err)
+            .report_error_if(report_err, &err)
         };
         let print_success = || {
             print!("Successfully bound listener");
@@ -79,7 +80,7 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
             return Ok(listener);
         }
         std::fs::remove_file(path).report_error("Failed to remove stale socket")?;
-        let rslt = bind().report_error_args(err);
+        let rslt = bind().report_error(&err);
         if rslt.is_ok() {
             print_success();
             println!(" after unlinking previous socket");
