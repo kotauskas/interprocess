@@ -22,6 +22,11 @@ exclude = [
     "/Cargo.lock",
 ]
 
+[[bin]]
+name = "inspect-platform"
+path = "inspect-platform/main.rs"
+test = false
+
 [[example]]
 name = "unnamed_pipe_sync"
 path = "examples/unnamed_pipe/sync/main.rs"
@@ -129,9 +134,9 @@ rust_2018_idioms = { level = "deny", priority = -1 }
 dead_code = "allow"
 
 [lints.clippy]
-exit       = "forbid"
 ptr_as_ptr = "forbid"
 
+exit           = "deny"
 get_unwrap     = "deny"
 as_conversions = "deny"
 
