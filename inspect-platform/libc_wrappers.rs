@@ -1,10 +1,10 @@
 use {
     super::*,
-    libc::mode_t,
+    libc::{mode_t, uid_t},
     std::{
         ffi::CStr,
         io,
-        mem::{self, MaybeUninit},
+        mem::{self, size_of, MaybeUninit},
         os::unix::{ffi::OsStrExt as _, net::UnixListener, prelude::*},
         path::Path,
         ptr::{self, addr_of_mut},
@@ -26,6 +26,24 @@ impl RetExt for c_int {
     fn is_ok(&self) -> bool { *self >= 0 }
 }
 
+pub fn geteuid() -> uid_t { unsafe { libc::geteuid() } }
+pub fn seteuid(new: uid_t) -> io::Result<()> { unsafe { libc::seteuid(new) }.ok_or_errno() }
+
+pub fn access(path: &CStr, read: bool, write: bool, execute: bool) -> io::Result<()> {
+    let mut mask = 0;
+    let mut addbit = |cond, bit| {
+        if cond {
+            mask |= bit;
+        }
+    };
+    addbit(read, libc::R_OK);
+    addbit(write, libc::W_OK);
+    addbit(execute, libc::X_OK);
+    if mask == 0 {
+        mask = libc::F_OK;
+    }
+    unsafe { libc::access(path.as_ptr(), mask) }.ok_or_errno()
+}
 pub fn stat(path: &CStr) -> io::Result<libc::stat> {
     let mut out = MaybeUninit::uninit();
     unsafe { libc::stat(path.as_ptr(), out.as_mut_ptr()) }
@@ -64,7 +82,7 @@ fn sockaddr_un_init(
             pathbase.add(pathlen).write(0);
         }
     }
-    let addrlen = mem::offset_of!(libc::sockaddr_un, sun_path) + pathlen;
+    let addrlen = (size_of::<libc::sockaddr_un>() - SUN_PATH_LEN) + pathlen;
     Ok(addrlen as _)
 }
 
