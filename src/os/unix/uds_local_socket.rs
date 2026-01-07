@@ -67,21 +67,19 @@ static TOOLONG: &str = "local socket name length exceeds capacity of sun_path of
 
 /// Checks if `/run/user/<ruid>` exists, returning that path if it does.
 fn get_run_user() -> io::Result<Option<OsString>> {
+    use io::ErrorKind::*;
     let path = format!("/run/user/{}", unsafe { libc::getuid() }).into();
     match fs::metadata(&path) {
         Ok(..) => Ok(Some(path)),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) if matches!(e.kind(), NotFound | NotADirectory | Unsupported) => Ok(None),
         Err(e) => Err(e),
     }
 }
 
-static TMPDIR: &str = {
-    #[cfg(target_os = "android")]
-    {
+const TMPDIR: &str = {
+    if cfg!(target_os = "android") {
         "/data/local/tmp"
-    }
-    #[cfg(not(target_os = "android"))]
-    {
+    } else {
         "/tmp"
     }
 };
