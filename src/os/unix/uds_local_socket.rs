@@ -71,7 +71,8 @@ fn get_run_user() -> io::Result<Option<OsString>> {
     let path = format!("/run/user/{}", unsafe { libc::getuid() }).into();
     match fs::metadata(&path) {
         Ok(..) => Ok(Some(path)),
-        Err(e) if matches!(e.kind(), NotFound | NotADirectory | Unsupported) => Ok(None),
+        // FIXME(3.0.0) add NotADirectory
+        Err(e) if matches!(e.kind(), NotFound | Unsupported) => Ok(None),
         Err(e) => Err(e),
     }
 }
