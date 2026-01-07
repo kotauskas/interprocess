@@ -128,23 +128,23 @@ fn inspect_listener(
             *fchmod_succeeded = true;
             expected_listener_mode = 0o000;
             println!("Changing listener mode to 000 returned success");
-        }
-        chk_stat(true);
+            chk_stat(true);
 
-        if UnixStream::connect(listen_path)
-            .report_error("Failed to connect to listener after fchmod")
-            .is_ok()
-        {
-            #[rustfmt::skip] println!("\
-[Caution] Successfully connected to listener after fchmod to 000 - it is \
-likely that the mode set by fchmod only applies when creating the socket \
-file during bind()"
-            );
-        }
+            if UnixStream::connect(listen_path)
+                .report_error("Failed to connect to listener after fchmod")
+                .is_ok()
+            {
+                #[rustfmt::skip] println!("\
+    [Caution] Successfully connected to listener after fchmod to 000 - it is \
+    likely that the mode set by fchmod only applies when creating the socket \
+    file during bind()"
+                );
+            }
 
-        if fchmod(listener.as_fd(), 0o666).report_error("Failed to fchmod listener").is_ok() {
-            expected_listener_mode = 0o666;
-            println!("Changing listener mode to 666 returned success");
+            if fchmod(listener.as_fd(), 0o666).report_error("Failed to fchmod listener").is_ok() {
+                expected_listener_mode = 0o666;
+                println!("Changing listener mode to 666 returned success");
+            }
         }
     }
 
@@ -219,7 +219,7 @@ impl Display for StatDisplay {
         let (majdev, mindev) = (libc::major(st_dev), libc::minor(st_dev));
         write!(
             f,
-            "[dev {majdev:>3}:{mindev:0>3}] [ino {st_ino:>8}] [mode {st_mode:0>6o}] [uid {st_uid:>8}] [gid {st_gid:>8}]"
+            "[dev {majdev:>4}:{mindev:0>9}] [ino {st_ino:>8}] [mode {st_mode:0>6o}] [uid {st_uid:>8}] [gid {st_gid:>8}]"
         )
     }
 }
