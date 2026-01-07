@@ -4,9 +4,10 @@ use {
     std::{
         ffi::CStr,
         io,
-        mem::MaybeUninit,
+        mem::{self, MaybeUninit},
         os::unix::{ffi::OsStrExt as _, net::UnixListener, prelude::*},
         path::Path,
+        ptr::{self, addr_of_mut},
     },
 };
 
@@ -45,8 +46,8 @@ fn sockaddr_un_init(
     path: &Path,
 ) -> io::Result<libc::socklen_t> {
     const SUN_PATH_LEN: usize = {
-        let sau = unsafe { std::mem::zeroed::<libc::sockaddr_un>() };
-        std::mem::size_of_val(&sau.sun_path)
+        let sau = unsafe { mem::zeroed::<libc::sockaddr_un>() };
+        sau.sun_path.len()
     };
 
     std::os::unix::net::SocketAddr::from_pathname(path)?;
@@ -56,14 +57,14 @@ fn sockaddr_un_init(
     let pathlen = path_bytes.len();
     assert!(pathlen <= SUN_PATH_LEN);
     unsafe {
-        (&raw mut (*sauptr).sun_family).write(libc::AF_UNIX as _);
-        let pathbase = (&raw mut (*sauptr).sun_path).cast::<c_char>();
-        std::ptr::copy_nonoverlapping(path_bytes.as_ptr().cast(), pathbase, path_bytes.len());
+        addr_of_mut!((*sauptr).sun_family).write(libc::AF_UNIX as _);
+        let pathbase = addr_of_mut!((*sauptr).sun_path).cast::<c_char>();
+        ptr::copy_nonoverlapping(path_bytes.as_ptr().cast(), pathbase, path_bytes.len());
         if path_bytes.len() != SUN_PATH_LEN {
             pathbase.add(pathlen).write(0);
         }
     }
-    let addrlen = std::mem::offset_of!(libc::sockaddr_un, sun_path) + pathlen;
+    let addrlen = mem::offset_of!(libc::sockaddr_un, sun_path) + pathlen;
     Ok(addrlen as _)
 }
 
@@ -86,5 +87,5 @@ pub fn umask(mask: mode_t) -> UmaskGuard { UmaskGuard(unsafe { libc::umask(mask)
 #[repr(transparent)]
 pub struct UmaskGuard(mode_t);
 impl Drop for UmaskGuard {
-    fn drop(&mut self) { std::mem::forget(umask(self.0)) }
+    fn drop(&mut self) { mem::forget(umask(self.0)) }
 }
