@@ -7,7 +7,7 @@ use {
     std::{
         borrow::Cow,
         ffi::CString,
-        fmt::{self, Display, Formatter},
+        fmt::{self, Display, Formatter, Write as _},
         io,
         mem::ManuallyDrop,
         os::unix::{
@@ -41,8 +41,17 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
         let _guard = mask.map(umask);
 
         let pathdisp = path.display();
+
         // FIXME(3.0.0) use format_args!
-        let err = format!("Failed to bind to {pathdisp}");
+        let mut bindinfo = String::with_capacity(128);
+        if let Some(mask) = mask {
+            let _ = write!(bindinfo, " with umask {mask:0>3o}");
+        }
+        if let Some(mode) = fchmod_mode {
+            let _ = write!(bindinfo, "with pre-bind fchmod to {mode:0>4o}");
+        }
+        let _ = write!(bindinfo, " to {pathdisp}");
+        let err = format!("Failed to bind{bindinfo}");
 
         let bind = || {
             let mut report_err = true;
@@ -57,16 +66,7 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
             }
             .report_error_if(report_err, &err)
         };
-        let print_success = || {
-            print!("Successfully bound listener");
-            if let Some(mask) = mask {
-                print!(" with umask {mask:0>3o}");
-            }
-            if let Some(mode) = fchmod_mode {
-                print!("with pre-bind fchmod to {mode:0>4o}");
-            }
-            print!(" to {pathdisp}");
-        };
+        let print_success = || print!("Successfully bound listener{bindinfo}");
 
         if let Ok(listener) = bind() {
             if !first {
@@ -80,7 +80,7 @@ fn requires_tmpdir(tmpdir: Cow<'static, Path>) {
             return Ok(listener);
         }
         std::fs::remove_file(path).report_error("Failed to remove stale socket")?;
-        let rslt = bind().report_error(&err);
+        let rslt = bind();
         if rslt.is_ok() {
             print_success();
             println!(" after unlinking previous socket");
@@ -219,7 +219,7 @@ impl Display for StatDisplay {
         let (majdev, mindev) = (libc::major(st_dev), libc::minor(st_dev));
         write!(
             f,
-            "[dev {majdev:>4}:{mindev:0>9}] [ino {st_ino:>8}] [mode {st_mode:0>6o}] [uid {st_uid:>8}] [gid {st_gid:>8}]"
+            "[dev {majdev:>4},{mindev:0>8}] [ino {st_ino:>8}] [mode {st_mode:0>6o}] [uid {st_uid:>8}] [gid {st_gid:>8}]"
         )
     }
 }
