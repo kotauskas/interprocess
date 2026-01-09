@@ -51,7 +51,8 @@ fn test_inner(path: bool) -> TestResult {
     }
     .opname("get mode")?;
     if actual_mode != 0 {
-        // FreeBSD refuses to fstat sockets for reasons I cannot even begin to fathom
+        // FreeBSD 14.2 and below refuses to fstat sockets
+        // for reasons I cannot even begin to fathom
         ensure_eq!(actual_mode, MODE);
     }
 

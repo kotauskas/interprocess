@@ -18,7 +18,7 @@ use {
 macro_rules! cfg_atomic_cloexec {
     ($($block:tt)+) => {
         #[cfg(any(
-            // List taken from the standard library, file std/sys/pal/unix/net.rs.
+            // List taken from the standard library (std/src/sys/net/connection/socket/unix.rs)
             target_os = "android",
             target_os = "dragonfly",
             target_os = "freebsd",
@@ -27,7 +27,9 @@ macro_rules! cfg_atomic_cloexec {
             target_os = "linux",
             target_os = "netbsd",
             target_os = "openbsd",
+            target_os = "cygwin",
             target_os = "nto",
+            target_os = "solaris",
         ))]
         $($block)+
     };
@@ -43,7 +45,9 @@ macro_rules! cfg_no_atomic_cloexec {
             target_os = "linux",
             target_os = "netbsd",
             target_os = "openbsd",
+            target_os = "cygwin",
             target_os = "nto",
+            target_os = "solaris",
         )))]
         $($block)+
     };
@@ -93,46 +97,31 @@ cfg_no_atomic_cloexec! {
 }
 
 pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
-    unsafe { libc::fchmod(fd.as_raw_fd(), mode) != -1 }.true_val_or_errno(())
+    let rslt = unsafe { libc::fchmod(fd.as_raw_fd(), mode) != -1 }.true_val_or_errno(());
+    if let Err(e) = &rslt {
+        if e.kind() == io::ErrorKind::InvalidInput {
+            return Err(io::Error::from(io::ErrorKind::Unsupported));
+        }
+    }
+    rslt
 }
 
-pub(super) const CAN_CREATE_NONBLOCKING: bool =
-    cfg!(any(target_os = "linux", target_os = "android"));
-
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-static CAN_FCHMOD_SOCKETS: AtomicBool = AtomicBool::new(true);
-fn can_fchmod_sockets() -> bool {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        true
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    {
-        CAN_FCHMOD_SOCKETS.load(Relaxed)
-    }
-}
-fn can_not_fchmod_sockets() {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        unreachable!()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    {
-        CAN_FCHMOD_SOCKETS.store(false, Relaxed)
-    }
-}
-
-/// Creates a Unix domain socket of the given type. If on Linux or Android and `nonblocking` is
-/// `true`, also makes it nonblocking.
-#[allow(unused_mut)]
+/// Creates a Unix domain socket of the given type. If `nonblocking` is `true`, also makes it
+/// nonblocking.
+#[allow(unused_mut, unused_assignments)]
 fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
     // Suppress warning on platforms that don't support the flag.
     let _ = nonblocking;
     let mut flags = 0;
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let mut can_create_nonblocking = false;
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "freebsd",
+        target_os = "openbsd",
+    ))]
     {
+        can_create_nonblocking = true;
         if nonblocking {
             flags |= libc::SOCK_NONBLOCK;
         }
@@ -140,14 +129,17 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
     cfg_atomic_cloexec! {{
         flags |= libc::SOCK_CLOEXEC;
     }}
-
     let fd = unsafe { libc::socket(AF_UNIX, ty | flags, 0) }
         .fd_or_errno()
         .map(|fd| unsafe { OwnedFd::from_raw_fd(fd) })?;
-
     cfg_no_atomic_cloexec! {{
         set_cloexec(fd.as_fd())?;
     }}
+
+    if !can_create_nonblocking && nonblocking {
+        set_nonblocking(fd.as_fd(), true)?;
+    }
+
     Ok(fd)
 }
 
@@ -225,59 +217,19 @@ fn listen(fd: BorrowedFd<'_>) -> io::Result<()> {
     unsafe { libc::listen(fd.as_raw_fd(), BACKLOG) != -1 }.true_val_or_errno(())
 }
 
-struct WithUmask {
-    new: mode_t,
-    old: mode_t,
-}
-impl WithUmask {
-    pub fn set(new: mode_t) -> Self { Self { new, old: Self::umask(new) } }
-    fn umask(mode: mode_t) -> mode_t { unsafe { libc::umask(mode) } }
-}
-impl Drop for WithUmask {
-    fn drop(&mut self) {
-        let expected_new = Self::umask(self.old);
-        assert_eq!(self.new, expected_new, "parallel umask use detected");
-    }
-}
-
 pub(super) fn create_server(
     ty: c_int,
     addr: &SocketAddr,
     nonblocking: bool,
     mode: Option<mode_t>,
 ) -> io::Result<OwnedFd> {
-    let dg = if let Some(mode) = mode {
+    let sock = create_socket(ty, nonblocking)?;
+    if let Some(mode) = mode {
         // This used to forbid modes with the executable bit set, but no longer does. That is the
         // OS's business, not ours.
-
-        if can_fchmod_sockets() {
-            let sock = create_socket(ty, nonblocking)?;
-            match set_socket_mode(sock.as_fd(), mode) {
-                Ok(()) => return bind_and_listen(sock, addr, ()),
-                Err(e) if e.kind() == io::ErrorKind::InvalidInput => can_not_fchmod_sockets(),
-                Err(e) => return Err(e),
-            }
-        }
-        // If we haven't returned by this point, we can't fchmod sockets. Invert the mode to
-        // obtain an anti-mask, call umask() and return a drop guard that lasts until the end of
-        // the whole function's scope.
-        Some(WithUmask::set(!mode & 0o777))
-    } else {
-        // If no file mode had to be set, we don't get a umask drop guard.
-        None
-    };
-    // The below code runs under umask if necessary (we race in this muthafucka, better get yo
-    // secure code ass back to Linux). To be clear, if a mode for the socket isn't specified, the
-    // below code runs on both fchmod and non-fchmod platforms; the unifying property here is that
-    // the socket gets its mode solely from the umask.
-
-    let sock = create_socket(ty, nonblocking)?;
-    bind_and_listen(sock, addr, dg)
-}
-
-fn bind_and_listen<T>(sock: OwnedFd, addr: &SocketAddr, drop_guard: T) -> io::Result<OwnedFd> {
+        set_socket_mode(sock.as_fd(), mode)?;
+    }
     bind(sock.as_fd(), addr)?;
-    drop(drop_guard); // Revert umask as soon as possible
     listen(sock.as_fd())?;
     Ok(sock)
 }

@@ -52,10 +52,6 @@ impl traits::Listener for Listener {
         .map(UnixListener::from)
         .map_err(Self::decode_listen_error)?;
 
-        if !c_wrappers::CAN_CREATE_NONBLOCKING && nonblocking {
-            listener.set_nonblocking(true)?;
-        }
-
         Ok(Self {
             listener,
             reclaim: options

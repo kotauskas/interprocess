@@ -11,27 +11,24 @@ pub use name_type::*;
 /// Unix-specific [listener options](ListenerOptions).
 #[allow(private_bounds)]
 pub trait ListenerOptionsExt: Sized + Sealed {
-    /// Sets the file mode (Unix permissions) to be applied to the socket file.
+    /// Sets the file mode (Unix permissions) to be applied to the socket file. This will
+    /// authenticate clients using their process credentials according to the **write bits** of
+    /// the mode; the read and execute bits are ignored by the OS and serve a cosmetic purpose.
     ///
-    /// **Not all Unix systems respect this mode when checking permissions in `connect()`!** Linux
-    /// is known to perform full permission checks for all directories along the path to the
-    /// socket file in addition to checking permissions on the socket file itself, while FreeBSD
-    /// only checks directories but not the socket file itself. If you expect your program to be
-    /// used on a wide range of Unix systems, do not rely on this as a security mechanism.
+    /// # Platform support
+    /// The following platforms are known to support this feature:
+    /// - Linux
+    /// - FreeBSD 14.3 (2025-06-10) and newer
+    /// - OpenBSD
+    ///
+    /// Other Unix systems may support this as well.
+    /// [`Unsupported`](std::io::ErrorKind::Unsupported) will be returned on platforms that are
+    /// (dynamically) determined to not support choice of file mode of socket listeners.
     ///
     /// # Implementation notes
-    /// An opportunistic `fchmod()` is performed on the socket. If the system responds with a
-    /// `EINVAL`, Interprocess concludes that `fchmod()` on sockets is not supported on the
-    /// platform, remembers this fact in an atomic global variable and falls back to a temporary
-    /// `umask` change.
-    ///
-    /// Linux is known to support `fchmod()` on Unix domain sockets, while FreeBSD is known not to.
-    ///
-    /// Note that the fallback behavior **inherently racy:** if you specify this mode as, say,
-    /// 666₈ and have another thread create a file during the critical section between the first
-    /// `umask()` call and the one performed just before returning from `.create_*()`, that file
-    /// will have mode 666₈. There is nothing Interprocess can do about this, as POSIX prescribes
-    /// the `umask` to be shared across threads.
+    /// An `fchmod()` is performed on the socket prior to `bind()` and `listen()`. This eliminates
+    /// what would otherwise be a umask race condition. Previous versions of Interprocess made use
+    /// of a racy fallback, but it did not receive adoption, and was removed in 2.3.0.
     #[must_use = builder_must_use!()]
     fn mode(self, mode: libc::mode_t) -> Self;
 }
