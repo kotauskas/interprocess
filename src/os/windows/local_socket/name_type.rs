@@ -30,8 +30,8 @@ impl PathNameType<OsStr> for NamedPipe {
 }
 
 pub(crate) fn map_generic_path_osstr(path: Cow<'_, OsStr>) -> io::Result<Name<'_>> {
-    // TODO(2.3.0) do something meaningful for non-NPFS paths instead of rejecting them
-    // TODO(2.3.0) normskip (`\\?\`) paths
+    // TODO(2.4.0) do something meaningful for non-NPFS paths instead of rejecting them
+    // TODO(2.4.0) normskip (`\\?\`) paths
     NamedPipe::map(path)
 }
 
