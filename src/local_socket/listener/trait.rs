@@ -1,9 +1,11 @@
+#![allow(private_bounds)]
+
 use {
     crate::{
         local_socket::{stream::r#trait::Stream, ListenerOptions},
         Sealed,
     },
-    std::{io, iter::FusedIterator},
+    std::{fmt::Debug, io, iter::FusedIterator},
 };
 
 /// Local socket server implementations.
@@ -12,9 +14,8 @@ use {
 /// [`Listener` enum](super::enum::Listener). In addition, it is implemented on `Listener` itself,
 /// which makes it a trait object of sorts. See its documentation for more on the semantics of the
 /// methods seen here.
-#[allow(private_bounds)]
 pub trait Listener:
-    Iterator<Item = io::Result<Self::Stream>> + FusedIterator + Send + Sync + Sized + Sealed
+    Iterator<Item = io::Result<Self::Stream>> + FusedIterator + Debug + Send + Sync + Sized + Sealed
 {
     /// The stream type associated with this listener.
     type Stream: Stream;
@@ -60,6 +61,18 @@ pub enum ListenerNonblockingMode {
     Both,
 }
 impl ListenerNonblockingMode {
+    /// Constructs from two booleans which go on to become the return values of
+    /// [`accept_nonblocking`](Self::accept_nonblocking) and
+    /// [`stream_nonblocking`](Self::stream_nonblocking).
+    #[inline]
+    pub const fn from_bool(accept: bool, stream: bool) -> Self {
+        match (accept, stream) {
+            (false, false) => Self::Neither,
+            (true, false) => Self::Accept,
+            (false, true) => Self::Stream,
+            (true, true) => Self::Both,
+        }
+    }
     /// Returns `true` if `self` prescribes nonblocking `.accept()`, `false` otherwise.
     #[inline]
     pub const fn accept_nonblocking(self) -> bool { matches!(self, Self::Accept | Self::Both) }
