@@ -8,6 +8,7 @@ use {
     libc::mode_t,
     std::{
         ffi::{CString, OsStr},
+        io,
         mem::zeroed,
         os::unix::prelude::*,
         sync::Arc,
@@ -37,9 +38,28 @@ fn test_inner(path: bool) -> TestResult {
     const MODE: libc::mode_t = 0o600;
     let (name, listener) =
         listen_and_pick_name(&mut namegen_local_socket(make_id!(), path), |nm| {
-            ListenerOptions::new().name(nm.borrow()).mode(MODE).create_sync()
+            let rslt =
+                ListenerOptions::new().name(nm.borrow()).mode(MODE).create_sync().map(Some);
+            if cfg!(any(
+                target_os = "openbsd",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "tvos",
+                target_os = "watchos",
+            )) {
+                return if rslt.is_ok() {
+                    Err(io::Error::other("unexpected success, please update this test"))
+                } else {
+                    Ok(None)
+                };
+            }
+            rslt
         })?;
+
+    // If listener is None, we're on a platform on which we expect this to not be supported
+    let Some(listener) = listener else { return Ok(()) };
     let name = Arc::try_unwrap(name).unwrap();
+
     let _ = Stream::connect(name.borrow()).opname("client connect")?;
     let actual_mode = if let Name(NameInner::UdSocketPath(path)) = name {
         get_file_mode(&path)
