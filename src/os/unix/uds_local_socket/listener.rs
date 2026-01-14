@@ -1,11 +1,11 @@
 use {
-    super::{name_to_addr, ReclaimGuard, Stream},
+    super::{ReclaimGuard, Stream},
     crate::{
         local_socket::{
             traits::{self, Stream as _},
             ListenerNonblockingMode, ListenerOptions,
         },
-        os::unix::c_wrappers,
+        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
     },
     std::{
         io,
@@ -28,43 +28,32 @@ pub struct Listener {
     pub(super) reclaim: ReclaimGuard,
     pub(super) nonblocking_streams: AtomicBool,
 }
-impl Listener {
-    fn decode_listen_error(error: io::Error) -> io::Error {
-        io::Error::from(match error.kind() {
-            io::ErrorKind::AlreadyExists => io::ErrorKind::AddrInUse,
-            _ => return error,
-        })
-    }
-}
 impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
     type Stream = Stream;
 
     fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
-        let nonblocking = options.nonblocking.accept_nonblocking();
-
-        let listener = c_wrappers::create_server(
-            libc::SOCK_STREAM,
-            &name_to_addr(options.name.borrow(), true)?,
-            nonblocking,
-            options.mode,
-        )
-        .map(UnixListener::from)
-        .map_err(Self::decode_listen_error)?;
-
+        let nonblocking_streams = AtomicBool::new(options.get_nonblocking_stream());
         Ok(Self {
-            listener,
+            listener: dispatch_name(options.name.borrow(), true, |addr| {
+                c_wrappers::create_listener(
+                    libc::SOCK_STREAM,
+                    addr,
+                    options.get_nonblocking_accept(),
+                    options.get_mode(),
+                )
+            })
+            .map(UnixListener::from)?,
             reclaim: options
-                .reclaim_name
+                .get_reclaim_name()
                 .then(|| options.name.into_owned())
                 .map(ReclaimGuard::new)
                 .unwrap_or_default(),
-            nonblocking_streams: AtomicBool::new(options.nonblocking.stream_nonblocking()),
+            nonblocking_streams,
         })
     }
     #[inline]
     fn accept(&self) -> io::Result<Stream> {
-        // TODO(2.3.0) make use of the second return value in some shape or form
         let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
         if self.nonblocking_streams.load(Acquire) {
             stream.set_nonblocking(true)?;

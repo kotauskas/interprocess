@@ -36,7 +36,7 @@ pub trait ListenerOptionsExt: Sized + Sealed {
 impl ListenerOptionsExt for ListenerOptions<'_> {
     #[inline(always)]
     fn mode(mut self, mode: libc::mode_t) -> Self {
-        self.mode = Some(mode);
+        self.set_mode(mode);
         self
     }
 }

@@ -7,28 +7,34 @@ use {
         local_socket::{traits, Listener, ListenerNonblockingMode, Name},
         Sealed, TryClone,
     },
-    std::io,
+    std::{fmt::Debug, io},
 };
 
 /// A builder for [local socket listeners](traits::Listener), including [`Listener`].
-#[derive(Debug)]
 pub struct ListenerOptions<'n> {
     pub(crate) name: Name<'n>,
-    pub(crate) nonblocking: ListenerNonblockingMode,
-    pub(crate) reclaim_name: bool,
+    flags: u8,
     #[cfg(unix)]
-    pub(crate) mode: Option<libc::mode_t>,
+    mode: libc::mode_t,
     #[cfg(windows)]
     pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
 impl Sealed for ListenerOptions<'_> {}
 
+const SHFT_NONBLOCKING_ACCEPT: u8 = 0;
+const SHFT_NONBLOCKING_STREAM: u8 = 1;
+const SHFT_RECLAIM_NAME: u8 = 2;
+const SHFT_TRY_OVERWRITE: u8 = 3; // TODO
+const SHFT_HAS_MODE: u8 = 4;
+
+const ALL_BITS: u8 = (1 << 5) - 1;
+const NONBLOCKING_BITS: u8 = (1 << SHFT_NONBLOCKING_ACCEPT) | (1 << SHFT_NONBLOCKING_STREAM);
+
 impl TryClone for ListenerOptions<'_> {
     fn try_clone(&self) -> io::Result<Self> {
         Ok(Self {
             name: self.name.clone(),
-            nonblocking: self.nonblocking,
-            reclaim_name: self.reclaim_name,
+            flags: self.flags,
             #[cfg(unix)]
             mode: self.mode,
             #[cfg(windows)]
@@ -48,10 +54,9 @@ impl ListenerOptions<'_> {
     pub fn new() -> Self {
         Self {
             name: Name::invalid(),
-            nonblocking: ListenerNonblockingMode::Neither,
-            reclaim_name: true,
+            flags: 1 << SHFT_RECLAIM_NAME,
             #[cfg(unix)]
-            mode: None,
+            mode: 0,
             #[cfg(windows)]
             security_descriptor: None,
         }
@@ -63,14 +68,82 @@ impl<'n> ListenerOptions<'n> {
     builder_setters! {
         /// Sets the name the server will listen on.
         name: Name<'n>,
-        /// Selects the nonblocking mode to be used by the listener.
-        ///
-        /// The default value is `Neither`.
-        nonblocking: ListenerNonblockingMode,
-        /// Sets whether [name reclamation](Listener#name-reclamation) is to happen or not.
-        ///
-        /// This is enabled by default.
-        reclaim_name: bool,
+    }
+    /// Selects the nonblocking mode to be used by the listener.
+    ///
+    /// The default value is `Neither`.
+    #[must_use = builder_must_use!()]
+    #[inline(always)]
+    #[allow(clippy::as_conversions)]
+    pub fn nonblocking(mut self, nonblocking: ListenerNonblockingMode) -> Self {
+        self.flags = (self.flags & (ALL_BITS ^ NONBLOCKING_BITS)) | nonblocking as u8;
+        self
+    }
+    /// Sets whether [name reclamation](Listener#name-reclamation) is to happen or not.
+    ///
+    /// This is enabled by default.
+    #[must_use = builder_must_use!()]
+    #[inline(always)]
+    #[allow(clippy::as_conversions)]
+    pub fn reclaim_name(mut self, reclaim_name: bool) -> Self {
+        self.flags = (self.flags & (ALL_BITS ^ (1 << SHFT_RECLAIM_NAME)))
+            | ((reclaim_name as u8) << SHFT_RECLAIM_NAME);
+        self
+    }
+    /// Sets whether an attempt to handle [`AddrInUse`](std::io::ErrorKind::AddrInUse) errors by
+    /// overwriting an existing listener (in the same manner as in
+    /// [name reclamation](Listener#name-reclamation)) is to be made or not.
+    ///
+    /// If this is enabled, name reclamation will be performed on behalf of a previous listener,
+    /// even if it is still running and accepting connections, thereby displacing it from the
+    /// socket name so that the newly created listener could take its place.
+    ///
+    /// This is disabled by default.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Unix
+    /// On Unix, this deletes the socket file if an `AddrInUse` error is encountered. The previous
+    /// listener, if it is still listening on its socket, is not (and in fact cannot be) notified
+    /// of this in any way.
+    ///
+    /// The deletion suffers from an unavoidable TOCTOU race between the `AddrInUse` error being
+    /// observed and the socket file being deleted, since another process may replace the socket
+    /// file with a different file, causing Interprocess to delete that file instead. Note that
+    /// this generally has no inadvertent privilege escalation implications, as the privileges
+    /// required for renaming a file are the same as the ones required for deleting it, but the
+    /// behavior may still be surprising in this (admittedly rather artificial) edge case.
+    ///
+    /// ### Windows
+    /// Does nothing (meaning the error goes unhandled), as named pipes cannot be overwritten.
+    #[must_use = builder_must_use!()]
+    #[inline(always)]
+    #[allow(clippy::as_conversions)]
+    pub fn try_overwrite(mut self, try_overwrite: bool) -> Self {
+        self.flags = (self.flags & (ALL_BITS ^ (1 << SHFT_TRY_OVERWRITE)))
+            | ((try_overwrite as u8) << SHFT_TRY_OVERWRITE);
+        self
+    }
+    #[cfg(unix)]
+    #[inline(always)]
+    pub(crate) fn set_mode(&mut self, mode: libc::mode_t) {
+        self.flags |= 1 << SHFT_HAS_MODE;
+        self.mode = mode;
+    }
+}
+
+/// Option getters.
+impl ListenerOptions<'_> {
+    pub(crate) fn get_nonblocking_accept(&self) -> bool {
+        self.flags & (1 << SHFT_NONBLOCKING_ACCEPT) != 0
+    }
+    pub(crate) fn get_nonblocking_stream(&self) -> bool {
+        self.flags & (1 << SHFT_NONBLOCKING_STREAM) != 0
+    }
+    pub(crate) fn get_reclaim_name(&self) -> bool { self.flags & (1 << SHFT_RECLAIM_NAME) != 0 }
+    pub(crate) fn get_try_overwrite(&self) -> bool { self.flags & (1 << SHFT_TRY_OVERWRITE) != 0 }
+    #[cfg(unix)]
+    pub(crate) fn get_mode(&self) -> Option<libc::mode_t> {
+        (self.flags & (1 << SHFT_HAS_MODE) != 0).then_some(self.mode)
     }
 }
 
@@ -107,4 +180,28 @@ impl ListenerOptions<'_> {
 impl Default for ListenerOptions<'_> {
     #[inline]
     fn default() -> Self { Self::new() }
+}
+
+impl Debug for ListenerOptions<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut dbs = f.debug_struct("ListenerOptions");
+        let nonblocking = ListenerNonblockingMode::from_bool(
+            self.get_nonblocking_accept(),
+            self.get_nonblocking_stream(),
+        );
+        dbs.field("name", &self.name)
+            .field("nonblocking", &nonblocking)
+            .field("reclaim_name", &self.get_reclaim_name())
+            .field("try_overwrite", &self.get_try_overwrite());
+        #[cfg(unix)]
+        {
+            // FIXME not octal
+            dbs.field("mode", &self.get_mode());
+        }
+        #[cfg(windows)]
+        {
+            dbs.field("security_descriptor", &self.security_descriptor);
+        }
+        dbs.finish()
+    }
 }

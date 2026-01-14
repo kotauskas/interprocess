@@ -1,18 +1,15 @@
 use {
-    super::super::name_to_addr,
     crate::{
         error::ReuniteError,
         local_socket::{traits::tokio as traits, Name},
+        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
         Sealed,
     },
     std::{
         io::{self, ErrorKind::WouldBlock},
         os::{
             fd::{AsFd, OwnedFd},
-            unix::{
-                net::{SocketAddr, UnixStream as SyncUnixStream},
-                prelude::BorrowedFd,
-            },
+            unix::{net::UnixStream as SyncUnixStream, prelude::BorrowedFd},
         },
         pin::Pin,
         task::{ready, Context, Poll},
@@ -31,35 +28,20 @@ use {
 pub struct Stream(pub(super) UnixStream);
 impl Sealed for Stream {}
 
-impl Stream {
-    #[allow(clippy::unwrap_used)]
-    async fn _connect(addr: SocketAddr) -> io::Result<UnixStream> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        {
-            #[cfg(target_os = "android")]
-            use std::os::android::net::SocketAddrExt;
-            #[cfg(target_os = "linux")]
-            use std::os::linux::net::SocketAddrExt;
-            if addr.as_abstract_name().is_some() {
-                return tokio::task::spawn_blocking(move || {
-                    let stream = SyncUnixStream::connect_addr(&addr)?;
-                    stream.set_nonblocking(true)?;
-                    Ok::<_, io::Error>(stream)
-                })
-                .await??
-                .try_into();
-            }
-        }
-        UnixStream::connect(addr.as_pathname().unwrap()).await
-    }
-}
-
 impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
     async fn connect(name: Name<'_>) -> io::Result<Self> {
-        Self::_connect(name_to_addr(name, false)?).await.map(Self::from)
+        let (sock, inprog) = dispatch_name(name, false, |addr| {
+            c_wrappers::create_client_nonblockingly(addr, true)
+        })?;
+        let sock = UnixStream::from_std(SyncUnixStream::from(sock))?;
+        if inprog {
+            // disapprovingly points finger at Mio
+            sock.writable().await?;
+        }
+        Ok(Self(sock))
     }
     fn split(self) -> (RecvHalf, SendHalf) {
         let (r, w) = self.0.into_split();

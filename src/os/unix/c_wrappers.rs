@@ -1,22 +1,14 @@
 #[allow(unused_imports)]
 use crate::{FdOrErrno, OrErrno};
-#[cfg(target_os = "android")]
-use std::os::android::net::SocketAddrExt;
-#[cfg(target_os = "linux")]
-use std::os::linux::net::SocketAddrExt;
 use {
     super::unixprelude::*,
-    crate::AsPtr,
+    crate::os::unix::ud_addr::TerminatedUdAddr,
     libc::{sockaddr_un, AF_UNIX},
-    std::{
-        io,
-        mem::{transmute, zeroed},
-        os::unix::net::SocketAddr,
-    },
+    std::{io, mem::zeroed},
 };
 
 macro_rules! cfg_atomic_cloexec {
-    ($($block:tt)+) => {
+    ($($code:tt)+) => {
         #[cfg(any(
             // List taken from the standard library (std/src/sys/net/connection/socket/unix.rs)
             target_os = "android",
@@ -31,11 +23,11 @@ macro_rules! cfg_atomic_cloexec {
             target_os = "nto",
             target_os = "solaris",
         ))]
-        $($block)+
+        $($code)+
     };
 }
 macro_rules! cfg_no_atomic_cloexec {
-    ($($block:tt)+) => {
+    ($($code:tt)+) => {
         #[cfg(not(any(
             target_os = "android",
             target_os = "dragonfly",
@@ -49,7 +41,7 @@ macro_rules! cfg_no_atomic_cloexec {
             target_os = "nto",
             target_os = "solaris",
         )))]
-        $($block)+
+        $($code)+
     };
 }
 
@@ -106,14 +98,12 @@ pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()
     rslt
 }
 
-/// Creates a Unix domain socket of the given type. If `nonblocking` is `true`, also makes it
-/// nonblocking.
-#[allow(unused_mut, unused_assignments)]
-fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
-    // Suppress warning on platforms that don't support the flag.
-    let _ = nonblocking;
-    let mut flags = 0;
-    let mut can_create_nonblocking = false;
+pub(super) unsafe fn stat_ptr(path: *const c_char) -> io::Result<libc::stat> {
+    let mut rslt = unsafe { zeroed::<libc::stat>() };
+    unsafe { libc::stat(path, &mut rslt) != -1 }.true_val_or_errno(rslt)
+}
+
+const NONBLOCKING_PARAMS: (bool, c_int) = {
     #[cfg(any(
         target_os = "linux",
         target_os = "android",
@@ -121,11 +111,26 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
         target_os = "openbsd",
     ))]
     {
-        can_create_nonblocking = true;
-        if nonblocking {
-            flags |= libc::SOCK_NONBLOCK;
-        }
+        (true, libc::SOCK_NONBLOCK)
     }
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "freebsd",
+        target_os = "openbsd",
+    )))]
+    {
+        (false, 0)
+    }
+};
+const CAN_CREATE_NONBLOCKING: bool = NONBLOCKING_PARAMS.0;
+const NONBLOCKING_FLAG: c_int = NONBLOCKING_PARAMS.1;
+
+/// Creates a Unix domain socket of the given type. If `nonblocking` and
+/// [`CAN_CREATE_NONBLOCKING`] are both `true`, also makes it nonblocking.
+#[allow(unused_mut)]
+fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
+    let mut flags = if nonblocking { NONBLOCKING_FLAG } else { 0 };
     cfg_atomic_cloexec! {{
         flags |= libc::SOCK_CLOEXEC;
     }}
@@ -136,55 +141,32 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
         set_cloexec(fd.as_fd())?;
     }}
 
-    if !can_create_nonblocking && nonblocking {
+    if !CAN_CREATE_NONBLOCKING && nonblocking {
         set_nonblocking(fd.as_fd(), true)?;
     }
 
     Ok(fd)
 }
 
-fn addr_to_slice(addr: &SocketAddr) -> (&[u8], usize) {
-    if let Some(slice) = addr.as_pathname() {
-        (slice.as_os_str().as_bytes(), 0)
-    } else {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        if let Some(slice) = addr.as_abstract_name() {
-            return (slice, 1);
-        }
-        (&[], 0)
-    }
-}
-
 #[allow(clippy::as_conversions)]
 const SUN_PATH_OFFSET: usize = unsafe {
     // This code may or may not have been copied from the standard library
     let addr = zeroed::<sockaddr_un>();
-    let base = (&addr as *const sockaddr_un).cast::<libc::c_char>();
+    let base = (&addr as *const sockaddr_un).cast::<c_char>();
     let path = &addr.sun_path as *const c_char;
     path.byte_offset_from(base) as usize
 };
 
-#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects, clippy::as_conversions)]
-fn bind(fd: BorrowedFd<'_>, addr: &SocketAddr) -> io::Result<()> {
-    let (path, extra) = addr_to_slice(addr);
-    let path = unsafe { transmute::<&[u8], &[libc::c_char]>(path) };
-
-    let mut addr = unsafe { zeroed::<sockaddr_un>() };
-    addr.sun_family = AF_UNIX as _;
-    addr.sun_path[extra..(extra + path.len())].copy_from_slice(path);
-
-    let len = path.len() + extra + SUN_PATH_OFFSET;
-
-    unsafe {
-        libc::bind(
-            fd.as_raw_fd(),
-            addr.as_ptr().cast(),
-            // It's impossible for this to exceed socklen_t::MAX, since it came from a valid
-            // SocketAddr
-            len as _,
-        ) != -1
-    }
-    .true_val_or_errno(())
+fn bind(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Result<()> {
+    unsafe { libc::bind(fd.as_raw_fd(), addr.addr_ptr().cast(), addr.addrlen()) != -1 }
+        .true_val_or_errno(())
+        .map_err(|e| {
+            if e.raw_os_error() == Some(libc::EEXIST) {
+                io::Error::from_raw_os_error(libc::EADDRINUSE)
+            } else {
+                e
+            }
+        })
 }
 
 fn listen(fd: BorrowedFd<'_>) -> io::Result<()> {
@@ -195,14 +177,14 @@ fn listen(fd: BorrowedFd<'_>) -> io::Result<()> {
         target_os = "espidf",
         target_os = "horizon"
     ))]
-    const BACKLOG: libc::c_int = 128;
+    const BACKLOG: c_int = 128;
     #[cfg(any(
         target_os = "linux",
         target_os = "freebsd",
         target_os = "openbsd",
         target_os = "macos"
     ))]
-    const BACKLOG: libc::c_int = -1;
+    const BACKLOG: c_int = -1;
     #[cfg(not(any(
         target_os = "windows",
         target_os = "redox",
@@ -213,13 +195,13 @@ fn listen(fd: BorrowedFd<'_>) -> io::Result<()> {
         target_os = "espidf",
         target_os = "horizon"
     )))]
-    const BACKLOG: libc::c_int = libc::SOMAXCONN;
+    const BACKLOG: c_int = libc::SOMAXCONN;
     unsafe { libc::listen(fd.as_raw_fd(), BACKLOG) != -1 }.true_val_or_errno(())
 }
 
-pub(super) fn create_server(
+pub(super) fn create_listener(
     ty: c_int,
-    addr: &SocketAddr,
+    addr: TerminatedUdAddr<'_>,
     nonblocking: bool,
     mode: Option<mode_t>,
 ) -> io::Result<OwnedFd> {
@@ -231,7 +213,46 @@ pub(super) fn create_server(
     }
     bind(sock.as_fd(), addr)?;
     listen(sock.as_fd())?;
+    if !CAN_CREATE_NONBLOCKING && nonblocking {
+        set_nonblocking(sock.as_fd(), true)?;
+    }
     Ok(sock)
+}
+
+pub(super) fn connect(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Result<()> {
+    unsafe { libc::connect(fd.as_raw_fd(), addr.addr_ptr().cast(), addr.addrlen()) != -1 }
+        .true_val_or_errno(())
+}
+
+pub(super) fn create_client(
+    dst: TerminatedUdAddr<'_>,
+    ret_nonblocking: bool,
+) -> io::Result<OwnedFd> {
+    let sock = create_socket(libc::SOCK_STREAM, false)?;
+    connect(sock.as_fd(), dst)?;
+    if !CAN_CREATE_NONBLOCKING && ret_nonblocking {
+        set_nonblocking(sock.as_fd(), true)?;
+    }
+    Ok(sock)
+}
+#[allow(dead_code)]
+pub(super) fn create_client_nonblockingly(
+    dst: TerminatedUdAddr<'_>,
+    ret_nonblocking: bool,
+) -> io::Result<(OwnedFd, bool)> {
+    let sock = create_socket(libc::SOCK_STREAM, true)?;
+    if !CAN_CREATE_NONBLOCKING {
+        set_nonblocking(sock.as_fd(), true)?;
+    }
+    let inprog = match connect(sock.as_fd(), dst) {
+        Ok(()) => false,
+        Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) => true,
+        Err(e) => return Err(e),
+    };
+    if !ret_nonblocking {
+        set_nonblocking(sock.as_fd(), false)?;
+    }
+    Ok((sock, inprog))
 }
 
 #[allow(dead_code)]

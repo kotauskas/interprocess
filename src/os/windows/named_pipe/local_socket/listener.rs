@@ -28,16 +28,17 @@ impl traits::Listener for Listener {
     type Stream = Stream;
 
     fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
+        let nb_accept = options.get_nonblocking_accept();
+        let nb_stream = options.get_nonblocking_stream();
+        let nonblocking = ListenerNonblockingMode::from_bool(nb_accept, nb_stream);
+
         let mut impl_options = PipeListenerOptions::new();
         let NameInner::NamedPipe(path) = options.name.0;
         impl_options.path = path;
-        impl_options.nonblocking = options.nonblocking.accept_nonblocking();
+        impl_options.nonblocking = nb_accept;
         impl_options.security_descriptor = options.security_descriptor;
 
-        Ok(Self {
-            listener: impl_options.create()?,
-            nonblocking: AtomicEnum::new(options.nonblocking),
-        })
+        Ok(Self { listener: impl_options.create()?, nonblocking: AtomicEnum::new(nonblocking) })
     }
     fn accept(&self) -> io::Result<Stream> {
         use ListenerNonblockingMode as LNM;

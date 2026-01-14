@@ -232,7 +232,14 @@ pub(crate) unsafe fn assume_slice_init_mut<T>(s: &mut [MaybeUninit<T>]) -> &mut 
 
 #[inline(always)]
 pub(crate) fn contains_nuls(s: &[u8]) -> bool {
-    unsafe { libc::strnlen(s.as_ptr().cast(), s.len()) != s.len() }
+    #[cfg(unix)]
+    {
+        unsafe { libc::strnlen(s.as_ptr().cast(), s.len()) != s.len() }
+    }
+    #[cfg(not(unix))]
+    {
+        s.contains(&0)
+    }
 }
 #[inline(always)]
 pub(crate) const unsafe fn assume_nonzero_slice(s: &[u8]) -> &[NonZeroU8] {

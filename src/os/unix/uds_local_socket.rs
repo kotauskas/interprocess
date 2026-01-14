@@ -13,22 +13,16 @@ pub mod tokio {
     pub use {listener::*, stream::*};
 }
 
-#[cfg(target_os = "android")]
-use std::os::android::net::SocketAddrExt;
-#[cfg(target_os = "linux")]
-use std::os::linux::net::SocketAddrExt;
 use {
     crate::{
+        assume_nonzero_slice, check_nonzero_slice,
         local_socket::{Name, NameInner},
-        os::unix::unixprelude::*,
+        os::unix::{
+            ud_addr::{name_too_long, TerminatedUdAddr, UdAddr, SUN_LEN},
+            unixprelude::*,
+        },
     },
-    std::{
-        borrow::Cow,
-        ffi::{OsStr, OsString},
-        fs, io, mem,
-        os::unix::net::SocketAddr,
-        path::Path,
-    },
+    std::{ffi::OsStr, io, mem::MaybeUninit, num::NonZeroU8, path::Path},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -47,78 +41,132 @@ impl Drop for ReclaimGuard {
     }
 }
 
-#[allow(clippy::indexing_slicing)]
-fn name_to_addr(name: Name<'_>, create_dirs: bool) -> io::Result<SocketAddr> {
+fn check_no_nul(s: &[u8]) -> io::Result<&[NonZeroU8]> {
+    let msg = "interior nul bytes are not allowed inside Unix domain socket names";
+    check_nonzero_slice(s).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, msg))
+}
+
+fn dispatch_name<T>(
+    name: Name<'_>,
+    is_listener: bool,
+    mut create: impl FnMut(TerminatedUdAddr<'_>) -> io::Result<T>,
+) -> io::Result<T> {
+    let mut addr = UdAddr::new();
     match name.0 {
-        NameInner::UdSocketPath(path) => SocketAddr::from_pathname(path),
-        NameInner::UdSocketPseudoNs(name) => construct_and_prepare_pseudo_ns(name, create_dirs),
+        NameInner::UdSocketPath(path) => {
+            addr.init(check_no_nul(path.as_bytes())?)?;
+            create(addr.write_terminator())
+        }
+
+        NameInner::UdSocketPseudoNs(name) => {
+            let name = name.as_bytes();
+            write_run_user(&mut addr, name)?;
+            let addrt = addr.write_terminator();
+            match create(addrt) {
+                Err(e) if listen_fail_is_benign(&e) => {
+                    if is_listener {
+                        let path = Path::new(OsStr::from_bytes(addrt.inner().path()));
+                        if let Some(p) = path.parent() {
+                            if !p.as_os_str().is_empty() {
+                                if let Ok(ok) =
+                                    std::fs::create_dir_all(p).and_then(|()| create(addrt))
+                                {
+                                    return Ok(ok);
+                                }
+                            }
+                        }
+                    }
+                    write_prefixed(&mut addr, TMPDIR, name)?;
+                    create(addr.write_terminator())
+                }
+                otherwise => otherwise,
+            }
+        }
+
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        NameInner::UdSocketNs(name) => SocketAddr::from_abstract_name(name),
+        NameInner::UdSocketNs(name) => {
+            addr.init_namespaced(check_no_nul(&name)?)?;
+            create(addr.write_terminator())
+        }
     }
 }
 
-const SUN_LEN: usize = {
-    let dummy = unsafe { mem::zeroed::<libc::sockaddr_un>() };
-    dummy.sun_path.len()
-};
-const NMCAP: usize = SUN_LEN - "/run/user/18446744073709551614/".len();
+#[allow(clippy::as_conversions)]
+const MAX_RUN_USER: usize = "/run/user//".len() + uid_t::MAX.ilog10() as usize + 1;
+const RUN_USER_BUF: usize = MAX_RUN_USER + 1;
+const NMCAP: usize = SUN_LEN - MAX_RUN_USER;
 
-static TOOLONG: &str = "local socket name length exceeds capacity of sun_path of sockaddr_un";
+#[allow(clippy::as_conversions, clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+fn write_run_user(addr: &mut UdAddr, name: &[u8]) -> io::Result<()> {
+    // Comparing without regard for the length of the /run/user path
+    // improves robustness of programs by preventing reliance on the
+    // UID being small
+    if name.len() > NMCAP {
+        return Err(name_too_long());
+    }
+    addr.reset_len();
+    // SAFETY: proof by look at it
+    let start = unsafe { assume_nonzero_slice(b"/run/user/") };
+    // SAFETY: bounds check just up above
+    unsafe { addr.push_slice(start) };
+    let uid_len = {
+        // SAFETY: we do not write MaybeUninit::uninit
+        let buf = unsafe { addr.path_buf_mut() };
+        let mut idx = start.len();
+        // SAFETY: always safe
+        let mut uid = unsafe { libc::getuid() };
+        loop {
+            buf[idx] = MaybeUninit::new((uid % 10) as u8 + b'0');
+            uid /= 10;
+            idx += 1;
+            if uid == 0 {
+                break;
+            }
+        }
+        buf[idx] = MaybeUninit::new(b'/');
+        buf[start.len()..idx].reverse();
+        idx + 1 - start.len()
+    };
+    // SAFETY: we just wrote this many bytes to the buffer
+    unsafe { addr.incr_len(uid_len) };
+    let esc_start = addr.len();
+    // SAFETY: bounds check at the beginning
+    unsafe { addr.push_slice_with_nuls(name) };
+    escape_nuls(&mut addr.path_mut()[esc_start..]);
+    Ok(())
+}
 
-/// Checks if `/run/user/<ruid>` exists, returning that path if it does.
-fn get_run_user() -> io::Result<Option<OsString>> {
+#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+fn write_prefixed(addr: &mut UdAddr, pfx: &[NonZeroU8], name: &[u8]) -> io::Result<()> {
+    if pfx.len() + name.len() > SUN_LEN {
+        return Err(name_too_long());
+    }
+    let name = check_no_nul(name)?;
+    addr.reset_len();
+    // SAFETY: bounds check up above
+    unsafe { addr.push_slice(pfx) };
+    unsafe { addr.push_slice(name) };
+    escape_nuls(&mut addr.path_mut()[pfx.len()..]);
+    Ok(())
+}
+
+fn escape_nuls(b: &mut [u8]) {
+    // Previous versions of Interprocess escape nuls with underscores,
+    // so do what we've already been doing instead of erroring out
+    b.iter_mut().filter(|c| **c == 0).for_each(|c| *c = b'_');
+}
+
+fn listen_fail_is_benign(e: &io::Error) -> bool {
     use io::ErrorKind::*;
-    let path = format!("/run/user/{}", unsafe { libc::getuid() }).into();
-    match fs::metadata(&path) {
-        Ok(..) => Ok(Some(path)),
-        // FIXME(3.0.0) add NotADirectory
-        Err(e) if matches!(e.kind(), NotFound | Unsupported) => Ok(None),
-        Err(e) => Err(e),
-    }
+    matches!(e.kind(), NotFound | Unsupported) || e.raw_os_error() == Some(libc::ENOTDIR)
 }
 
-const TMPDIR: &str = {
-    if cfg!(target_os = "android") {
-        "/data/local/tmp"
-    } else {
-        "/tmp"
+const TMPDIR: &[NonZeroU8] = {
+    unsafe {
+        assume_nonzero_slice(if cfg!(target_os = "android") {
+            b"/data/local/tmp/"
+        } else {
+            b"/tmp/"
+        })
     }
 };
-
-#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
-fn construct_and_prepare_pseudo_ns(
-    name: Cow<'_, OsStr>,
-    create_dirs: bool,
-) -> io::Result<SocketAddr> {
-    let nlen = name.len();
-    if nlen > NMCAP {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, TOOLONG));
-    }
-    let run_user = get_run_user()?;
-    let pfx = run_user.map(Cow::Owned).unwrap_or(Cow::Borrowed(OsStr::new(TMPDIR)));
-    let pl = pfx.len();
-    let mut path = [0; SUN_LEN];
-    path[..pl].copy_from_slice(pfx.as_bytes());
-    path[pl] = b'/';
-
-    let namestart = pl + 1;
-    let fulllen = pl + 1 + nlen;
-    path[namestart..fulllen].copy_from_slice(name.as_bytes());
-
-    const ESCCHAR: u8 = b'_';
-    for byte in path[namestart..fulllen].iter_mut() {
-        if *byte == 0 {
-            *byte = ESCCHAR;
-        }
-    }
-
-    let opath = Path::new(OsStr::from_bytes(&path[..fulllen]));
-
-    if create_dirs {
-        let parent = opath.parent();
-        if let Some(p) = parent {
-            fs::create_dir_all(p)?;
-        }
-    }
-    SocketAddr::from_pathname(opath)
-}

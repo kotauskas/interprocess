@@ -1,11 +1,11 @@
 use {
-    super::name_to_addr,
     crate::{
         error::ReuniteError,
         local_socket::{
             traits::{self, ReuniteResult},
             ConcurrencyDetector, LocalSocketSite, Name,
         },
+        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
         Sealed, TryClone,
     },
     std::{
@@ -24,7 +24,8 @@ impl traits::Stream for Stream {
     type SendHalf = SendHalf;
 
     fn connect(name: Name<'_>) -> io::Result<Self> {
-        UnixStream::connect_addr(&name_to_addr(name, false)?).map(Self::from)
+        // TODO use nonblocking
+        dispatch_name(name, false, |addr| c_wrappers::create_client(addr, false)).map(Self::from)
     }
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
