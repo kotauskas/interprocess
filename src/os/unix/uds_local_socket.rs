@@ -61,23 +61,10 @@ fn dispatch_name<T>(
         NameInner::UdSocketPseudoNs(name) => {
             let name = name.as_bytes();
             write_run_user(&mut addr, name)?;
-            let addrt = addr.write_terminator();
-            match create(addrt) {
-                Err(e) if listen_fail_is_benign(&e) => {
-                    if is_listener {
-                        let path = Path::new(OsStr::from_bytes(addrt.inner().path()));
-                        if let Some(p) = path.parent() {
-                            if !p.as_os_str().is_empty() {
-                                if let Ok(ok) =
-                                    std::fs::create_dir_all(p).and_then(|()| create(addrt))
-                                {
-                                    return Ok(ok);
-                                }
-                            }
-                        }
-                    }
+            match with_missing_dir_creation(is_listener, addr.write_terminator(), &mut create) {
+                Err(e) if fail_is_benign(&e) => {
                     write_prefixed(&mut addr, TMPDIR, name)?;
-                    create(addr.write_terminator())
+                    with_missing_dir_creation(is_listener, addr.write_terminator(), &mut create)
                 }
                 otherwise => otherwise,
             }
@@ -89,6 +76,29 @@ fn dispatch_name<T>(
             create(addr.write_terminator())
         }
     }
+}
+
+fn with_missing_dir_creation<T>(
+    create: bool,
+    addr: TerminatedUdAddr<'_>,
+    mut f: impl FnMut(TerminatedUdAddr<'_>) -> io::Result<T>,
+) -> io::Result<T> {
+    match f(addr) {
+        Err(e) if create && fail_is_benign(&e) && create_missing_dirs(addr) => f(addr),
+        otherwise => otherwise,
+    }
+}
+
+fn create_missing_dirs(addr: TerminatedUdAddr<'_>) -> bool {
+    let path = Path::new(OsStr::from_bytes(addr.inner().path()));
+    if let Some(p) = path.parent() {
+        if !p.as_os_str().is_empty() {
+            if let Ok(()) = std::fs::create_dir_all(p) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[allow(clippy::as_conversions)]
@@ -156,7 +166,7 @@ fn escape_nuls(b: &mut [u8]) {
     b.iter_mut().filter(|c| **c == 0).for_each(|c| *c = b'_');
 }
 
-fn listen_fail_is_benign(e: &io::Error) -> bool {
+fn fail_is_benign(e: &io::Error) -> bool {
     use io::ErrorKind::*;
     matches!(e.kind(), NotFound | Unsupported) || e.raw_os_error() == Some(libc::ENOTDIR)
 }
