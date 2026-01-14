@@ -13,6 +13,7 @@ pub(crate) mod imports;
 
 mod c_wrappers;
 mod fdops;
+mod ud_addr;
 // Exported into child modules specifically, not this file.
 use fdops::*;
 
@@ -23,6 +24,8 @@ pub mod unnamed_pipe;
 
 mod unixprelude {
     #[allow(unused_imports)]
-    pub use libc::{c_char, c_int, c_short, gid_t, mode_t, pid_t, size_t, uid_t};
-    pub use std::os::unix::prelude::*;
+    pub(super) use libc::{
+        c_char, c_int, c_short, gid_t, mode_t, pid_t, size_t, socklen_t, uid_t,
+    };
+    pub(super) use std::os::unix::prelude::*;
 }
