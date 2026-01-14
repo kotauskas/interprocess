@@ -4,9 +4,10 @@
 use std::os::unix::io::RawFd;
 use std::{
     io,
-    mem::{transmute, MaybeUninit},
-    num::Saturating,
+    mem::{size_of, MaybeUninit},
+    num::{NonZeroU8, Saturating},
     pin::Pin,
+    slice,
     sync::PoisonError,
 };
 #[cfg(windows)]
@@ -190,28 +191,72 @@ impl RawOsErrorExt for Option<i32> {
     }
 }
 
-#[inline(always)]
-pub(crate) fn weaken_buf_init<T>(r: &[T]) -> &[MaybeUninit<T>] {
-    unsafe {
-        // SAFETY: same slice, weaker refinement
-        transmute(r)
+/// Crudely casts a slice without any checks, blindly presuming that the size of `T` is equal to
+/// that of `U`.
+pub(crate) const unsafe fn cast_slice<T, U>(s: &[T]) -> &[U] {
+    // TODO(3.0.0) use const assertion
+    if size_of::<T>() != size_of::<U>() {
+        panic!("element sizes must be equal");
     }
+    unsafe { slice::from_raw_parts(s.as_ptr().cast(), s.len()) }
 }
-#[inline(always)]
-pub(crate) fn weaken_buf_init_mut<T>(r: &mut [T]) -> &mut [MaybeUninit<T>] {
-    unsafe {
-        // SAFETY: same here
-        transmute(r)
+/// Mutable version of [`cast_slice`].
+pub(crate) unsafe fn cast_slice_mut<T, U>(s: &mut [T]) -> &mut [U] {
+    // TODO(3.0.0) use const assertion
+    if size_of::<T>() != size_of::<U>() {
+        panic!("element sizes must be equal");
     }
+    unsafe { slice::from_raw_parts_mut(s.as_mut_ptr().cast(), s.len()) }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn assume_slice_init<T>(r: &[MaybeUninit<T>]) -> &[T] {
-    unsafe {
-        // SAFETY: same slice, stronger refinement
-        transmute(r)
-    }
+// SAFETY: weaker refinement
+pub(crate) fn weaken_buf_init<T>(s: &[T]) -> &[MaybeUninit<T>] { unsafe { cast_slice(s) } }
+#[inline(always)]
+// TODO get rid of this, has a de-initialization footgun and would be unsound
+// as written if it were public
+pub(crate) fn weaken_buf_init_mut<T>(s: &mut [T]) -> &mut [MaybeUninit<T>] {
+    unsafe { cast_slice_mut(s) }
 }
+
+#[inline(always)]
+pub(crate) unsafe fn assume_slice_init<T>(s: &[MaybeUninit<T>]) -> &[T] {
+    // SAFETY: same slice, stronger refinement
+    unsafe { cast_slice(s) }
+}
+#[inline(always)]
+pub(crate) unsafe fn assume_slice_init_mut<T>(s: &mut [MaybeUninit<T>]) -> &mut [T] {
+    // SAFETY: as above
+    unsafe { cast_slice_mut(s) }
+}
+
+#[inline(always)]
+pub(crate) fn contains_nuls(s: &[u8]) -> bool {
+    unsafe { libc::strnlen(s.as_ptr().cast(), s.len()) != s.len() }
+}
+#[inline(always)]
+pub(crate) const unsafe fn assume_nonzero_slice(s: &[u8]) -> &[NonZeroU8] {
+    unsafe { cast_slice(s) }
+}
+#[inline(always)]
+pub(crate) unsafe fn assume_nonzero_slice_mut(s: &mut [u8]) -> &mut [NonZeroU8] {
+    unsafe { cast_slice_mut(s) }
+}
+#[inline(always)]
+pub(crate) fn check_nonzero_slice(s: &[u8]) -> Option<&[NonZeroU8]> {
+    let false = contains_nuls(s) else { return None };
+    // SAFETY: we've just checked for nul bytes
+    Some(unsafe { assume_nonzero_slice(s) })
+}
+#[inline(always)]
+pub(crate) fn check_nonzero_slice_mut(s: &mut [u8]) -> Option<&mut [NonZeroU8]> {
+    let false = contains_nuls(s) else { return None };
+    // SAFETY: as above
+    Some(unsafe { cast_slice_mut(s) })
+}
+// SAFETY: weaker refinement
+#[inline(always)]
+pub(crate) fn weaken_nonzero_slice(s: &[NonZeroU8]) -> &[u8] { unsafe { cast_slice(s) } }
 
 pub(crate) trait UnpinExt: Unpin {
     #[inline]
