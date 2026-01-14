@@ -40,17 +40,12 @@ fn test_inner(path: bool) -> TestResult {
         listen_and_pick_name(&mut namegen_local_socket(make_id!(), path), |nm| {
             let rslt =
                 ListenerOptions::new().name(nm.borrow()).mode(MODE).create_sync().map(Some);
-            if cfg!(any(
-                target_os = "openbsd",
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
-            )) {
-                return if rslt.is_ok() {
-                    Err(io::Error::other("unexpected success, please update this test"))
-                } else {
+            if cfg!(not(any(target_os = "linux", target_os = "android", target_os = "freebsd"))) {
+                return if rslt.err().filter(|e| e.kind() == io::ErrorKind::Unsupported).is_some()
+                {
                     Ok(None)
+                } else {
+                    Err(io::Error::other("unexpected success, please update this test"))
                 };
             }
             rslt
