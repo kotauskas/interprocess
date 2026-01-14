@@ -63,7 +63,7 @@ fn dispatch_name<T>(
             write_run_user(&mut addr, name)?;
             match with_missing_dir_creation(is_listener, addr.write_terminator(), &mut create) {
                 Err(e) if fail_is_benign(&e) => {
-                    write_prefixed(&mut addr, TMPDIR, name)?;
+                    write_prefixed(&mut addr, tmpdir(), name)?;
                     with_missing_dir_creation(is_listener, addr.write_terminator(), &mut create)
                 }
                 otherwise => otherwise,
@@ -171,12 +171,27 @@ fn fail_is_benign(e: &io::Error) -> bool {
     matches!(e.kind(), NotFound | Unsupported) || e.raw_os_error() == Some(libc::ENOTDIR)
 }
 
-const TMPDIR: &[NonZeroU8] = {
-    unsafe {
-        assume_nonzero_slice(if cfg!(target_os = "android") {
-            b"/data/local/tmp/"
-        } else {
-            b"/tmp/"
-        })
+// Don't check this in right away.
+fn tmpdir<'p>() -> &'p [NonZeroU8] {
+    if cfg!(target_os = "android") {
+        // SAFETY: there is a nul terminator
+        let mut ptr = unsafe { libc::getenv(b"TMPDIR\0".as_ptr().cast()) };
+        if ptr.is_null() {
+            // SAFETY: there is a nul terminator
+            ptr = unsafe { libc::getenv(b"TEMPDIR\0".as_ptr().cast()) };
+        }
+        if ptr.is_null() {
+            // SAFETY: proof by look at it
+            return unsafe { assume_nonzero_slice(b"/data/local/tmp/") };
+        }
+        // SAFETY: we got it from getenv and it's not null
+        let len = unsafe { libc::strlen(ptr) };
+        // SAFETY: there are no interior nuls as per strlen, and the pointer
+        // is from getenv (meaning it would only be invalidated by setenv,
+        // which would be a race)
+        unsafe { std::slice::from_raw_parts(ptr.cast(), len) }
+    } else {
+        // SAFETY: proof by look at it
+        unsafe { assume_nonzero_slice(b"/tmp/") }
     }
-};
+}
