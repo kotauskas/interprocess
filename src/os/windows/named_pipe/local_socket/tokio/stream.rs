@@ -3,7 +3,7 @@ use {
         error::{FromHandleError, ReuniteError},
         local_socket::{
             traits::tokio::{self as traits, ReuniteResult},
-            Name, NameInner,
+            ConnectOptions, NameInner,
         },
         os::windows::{
             named_pipe::{
@@ -35,9 +35,10 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    async fn connect(name: Name<'_>) -> io::Result<Self> {
-        let NameInner::NamedPipe(path) = name.0;
-        StreamImpl::connect_by_path(path).await.map(Self)
+    #[inline]
+    async fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        let NameInner::NamedPipe(path) = &options.name.0;
+        StreamImpl::connect_by_path(path.as_ref()).await.map(Self)
     }
     #[inline]
     fn split(self) -> (RecvHalf, SendHalf) {

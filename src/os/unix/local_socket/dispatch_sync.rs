@@ -1,15 +1,14 @@
 use {
     super::super::uds_local_socket as uds_impl,
-    crate::local_socket::{prelude::*, Listener, ListenerOptions, Name, Stream},
+    crate::local_socket::{ConnectOptions, Listener, ListenerOptions, Stream},
     std::io,
 };
 
 #[inline]
-pub fn from_options(options: ListenerOptions<'_>) -> io::Result<Listener> {
+pub fn listen(options: ListenerOptions<'_>) -> io::Result<Listener> {
     options.create_sync_as::<uds_impl::Listener>().map(Listener::from)
 }
-
 #[inline]
-pub fn connect(name: Name<'_>) -> io::Result<Stream> {
-    uds_impl::Stream::connect(name).map(Stream::from)
+pub fn connect(options: &ConnectOptions<'_>) -> io::Result<Stream> {
+    options.connect_sync_as::<uds_impl::Stream>().map(Stream::from)
 }

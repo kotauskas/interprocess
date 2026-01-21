@@ -19,6 +19,7 @@ pub(crate) enum NameInner<'s> {
 
 impl Default for NameInner<'_> {
     fn default() -> Self {
+        // TODO(3.0.0) make const
         #[cfg(windows)]
         {
             Self::NamedPipe(Cow::default())

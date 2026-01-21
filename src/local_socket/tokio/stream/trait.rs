@@ -3,7 +3,7 @@
 use {
     crate::{
         bound_util::{RefTokioAsyncRead, RefTokioAsyncWrite},
-        local_socket::Name,
+        local_socket::{ConnectOptions, Name},
         Sealed,
     },
     std::{future::Future, io},
@@ -17,15 +17,27 @@ use {
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
 pub trait Stream:
-    AsyncRead + RefTokioAsyncRead + AsyncWrite + RefTokioAsyncWrite + Send + Sync + Sized + Sealed
+    AsyncRead
+    + RefTokioAsyncRead
+    + AsyncWrite
+    + RefTokioAsyncWrite
+    + Send
+    + Sync
+    + Sized
+    + Sealed
+    + 'static
 {
     /// Receive half type returned by [`.split()`](Stream::split).
     type RecvHalf: RecvHalf<Stream = Self>;
     /// Send half type returned by [`.split()`](Stream::split).
     type SendHalf: SendHalf<Stream = Self>;
 
-    /// Asynchronously connects to a remote local socket server.
-    fn connect(name: Name<'_>) -> impl Future<Output = io::Result<Self>> + Send + Sync;
+    /// Asynchronously connects to a local socket server.
+    ///
+    /// This is equivalent to `ConnectOptions::new().name(name).connect_tokio_as::<Self>()`.
+    fn connect(name: Name<'_>) -> impl Future<Output = io::Result<Self>> + Send + Sync {
+        async { ConnectOptions::new().name(name).connect_tokio_as::<Self>().await }
+    }
 
     /// Splits a stream into a receive half and a send half, which can be used to receive from and
     /// send to the stream concurrently from different Tokio tasks, entailing a memory allocation.
@@ -35,6 +47,15 @@ pub trait Stream:
     /// returning both halves as an error if they belong to different streams (or when using this
     /// method on streams that haven't been split to begin with).
     fn reunite(rh: Self::RecvHalf, sh: Self::SendHalf) -> ReuniteResult<Self>;
+
+    /// Connects to a local socket server using the specified options.
+    ///
+    /// This method typically shouldn't be called directly – use the creation methods on
+    /// `ConnectOptions` (`connect_tokio`, `connect_tokio_as`) instead.
+    // TODO(3.0.0) add use<Self>
+    fn from_options(
+        options: &ConnectOptions<'_>,
+    ) -> impl Future<Output = io::Result<Self>> + Send + Sync;
 }
 
 /// Receive halves of Tokio [`Stream`]s, obtained through [`.split()`](Stream::split).

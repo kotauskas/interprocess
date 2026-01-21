@@ -3,7 +3,7 @@
 use {
     crate::{
         bound_util::{RefRead, RefWrite},
-        local_socket::Name,
+        local_socket::{ConnectOptions, Name},
         Sealed,
     },
     std::{
@@ -26,8 +26,13 @@ pub trait Stream:
     /// Send half type returned by [`.split()`](Stream::split).
     type SendHalf: SendHalf<Stream = Self>;
 
-    /// Connects to a remote local socket server.
-    fn connect(name: Name<'_>) -> io::Result<Self>;
+    /// Connects to a local socket server.
+    ///
+    /// This is equivalent to `ConnectOptions::new().name(name).connect_sync_as::<Self>()`.
+    #[inline]
+    fn connect(name: Name<'_>) -> io::Result<Self> {
+        ConnectOptions::new().name(name).connect_sync_as::<Self>()
+    }
 
     /// Enables or disables the nonblocking mode for the stream. By default, it is disabled.
     ///
@@ -47,6 +52,12 @@ pub trait Stream:
     /// returning both halves as an error if they belong to different streams (or when using this
     /// method on streams that haven't been split to begin with).
     fn reunite(rh: Self::RecvHalf, sh: Self::SendHalf) -> ReuniteResult<Self>;
+
+    /// Connects to a local socket server using the specified options.
+    ///
+    /// This method typically shouldn't be called directly – use the creation methods on
+    /// `ConnectOptions` (`connect_sync`, `connect_sync_as`) instead.
+    fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self>;
 
     // Do not add methods to this trait that aren't directly tied to non-async streams. A new trait,
     // which should be called StreamExtra or StreamCommon or something along those lines, is to be

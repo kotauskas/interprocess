@@ -1,7 +1,7 @@
 use {
     crate::{
         error::ReuniteError,
-        local_socket::{traits::tokio as traits, Name},
+        local_socket::{traits::tokio as traits, ConnectOptions},
         os::unix::{c_wrappers, uds_local_socket::dispatch_name},
         Sealed,
     },
@@ -32,8 +32,8 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    async fn connect(name: Name<'_>) -> io::Result<Self> {
-        let (sock, inprog) = dispatch_name(name, false, |addr| {
+    async fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        let (sock, inprog) = dispatch_name(options.name.borrow(), false, |addr| {
             c_wrappers::create_client_nonblockingly(addr, true)
         })?;
         let sock = UnixStream::from_std(SyncUnixStream::from(sock))?;

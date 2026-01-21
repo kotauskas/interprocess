@@ -33,7 +33,7 @@ impl r#trait::Listener for Listener {
 
     #[inline]
     fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
-        dispatch::from_options(options)
+        dispatch::listen(options)
     }
     #[inline]
     async fn accept(&self) -> io::Result<Stream> {

@@ -7,16 +7,20 @@ use {
         local_socket::{traits, Listener, ListenerNonblockingMode, Name},
         Sealed, TryClone,
     },
-    std::{fmt::Debug, io},
+    std::{
+        fmt::{self, Debug, Formatter},
+        io,
+    },
 };
 
-/// A builder for [local socket listeners](traits::Listener), including [`Listener`].
+/// Server-side builder for [local socket listeners](traits::Listener), including [`Listener`].
 pub struct ListenerOptions<'n> {
     pub(crate) name: Name<'n>,
     flags: u8,
     #[cfg(unix)]
     mode: libc::mode_t,
     #[cfg(windows)]
+    // TODO(3.0.0) use BorrowedSecurityDescriptor
     pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
 impl Sealed for ListenerOptions<'_> {}
@@ -29,6 +33,11 @@ const SHFT_HAS_MODE: u8 = 4;
 
 const ALL_BITS: u8 = (1 << 5) - 1;
 const NONBLOCKING_BITS: u8 = (1 << SHFT_NONBLOCKING_ACCEPT) | (1 << SHFT_NONBLOCKING_STREAM);
+#[allow(clippy::as_conversions)]
+const fn set_bit(flags: u8, pos: u8, val: bool) -> u8 {
+    flags & (ALL_BITS ^ (1 << pos)) | ((val as u8) << pos)
+}
+const fn has_bit(flags: u8, pos: u8) -> bool { flags & (1 << pos) != 0 }
 
 impl TryClone for ListenerOptions<'_> {
     fn try_clone(&self) -> io::Result<Self> {
@@ -47,9 +56,9 @@ impl TryClone for ListenerOptions<'_> {
     }
 }
 
-/// Creation.
+/// Creation and ownership.
 impl ListenerOptions<'_> {
-    /// Creates an options table with default values.
+    /// Returns a default set of listener options.
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -84,10 +93,8 @@ impl<'n> ListenerOptions<'n> {
     /// This is enabled by default.
     #[must_use = builder_must_use!()]
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     pub fn reclaim_name(mut self, reclaim_name: bool) -> Self {
-        self.flags = (self.flags & (ALL_BITS ^ (1 << SHFT_RECLAIM_NAME)))
-            | ((reclaim_name as u8) << SHFT_RECLAIM_NAME);
+        self.flags = set_bit(self.flags, SHFT_RECLAIM_NAME, reclaim_name);
         self
     }
     /// Sets whether an attempt to handle [`AddrInUse`](std::io::ErrorKind::AddrInUse) errors by
@@ -117,10 +124,8 @@ impl<'n> ListenerOptions<'n> {
     /// Does nothing (meaning the error goes unhandled), as named pipes cannot be overwritten.
     #[must_use = builder_must_use!()]
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     pub fn try_overwrite(mut self, try_overwrite: bool) -> Self {
-        self.flags = (self.flags & (ALL_BITS ^ (1 << SHFT_TRY_OVERWRITE)))
-            | ((try_overwrite as u8) << SHFT_TRY_OVERWRITE);
+        self.flags = set_bit(self.flags, SHFT_TRY_OVERWRITE, try_overwrite);
         self
     }
     #[cfg(unix)]
@@ -134,16 +139,16 @@ impl<'n> ListenerOptions<'n> {
 /// Option getters.
 impl ListenerOptions<'_> {
     pub(crate) fn get_nonblocking_accept(&self) -> bool {
-        self.flags & (1 << SHFT_NONBLOCKING_ACCEPT) != 0
+        has_bit(self.flags, SHFT_NONBLOCKING_ACCEPT)
     }
     pub(crate) fn get_nonblocking_stream(&self) -> bool {
-        self.flags & (1 << SHFT_NONBLOCKING_STREAM) != 0
+        has_bit(self.flags, SHFT_NONBLOCKING_STREAM)
     }
-    pub(crate) fn get_reclaim_name(&self) -> bool { self.flags & (1 << SHFT_RECLAIM_NAME) != 0 }
-    pub(crate) fn get_try_overwrite(&self) -> bool { self.flags & (1 << SHFT_TRY_OVERWRITE) != 0 }
+    pub(crate) fn get_reclaim_name(&self) -> bool { has_bit(self.flags, SHFT_RECLAIM_NAME) }
+    pub(crate) fn get_try_overwrite(&self) -> bool { has_bit(self.flags, SHFT_TRY_OVERWRITE) }
     #[cfg(unix)]
     pub(crate) fn get_mode(&self) -> Option<libc::mode_t> {
-        (self.flags & (1 << SHFT_HAS_MODE) != 0).then_some(self.mode)
+        has_bit(self.flags, SHFT_HAS_MODE).then_some(self.mode)
     }
 }
 
@@ -159,7 +164,8 @@ impl ListenerOptions<'_> {
     /// socket name.
     #[inline]
     pub fn create_sync_as<L: traits::Listener>(self) -> io::Result<L> { L::from_options(self) }
-    /// Creates a [`Listener`](TokioListener), binding it to the specified local socket name.
+    /// Creates a Tokio [`Listener`](TokioListener), binding it to the specified local socket
+    /// name.
     ///
     /// On platforms where there are multiple available implementations, this dispatches to the
     /// appropriate implementation based on where the name points to.
@@ -183,7 +189,7 @@ impl Default for ListenerOptions<'_> {
 }
 
 impl Debug for ListenerOptions<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbs = f.debug_struct("ListenerOptions");
         let nonblocking = ListenerNonblockingMode::from_bool(
             self.get_nonblocking_accept(),

@@ -4,7 +4,7 @@ use crate::os::unix::uds_local_socket::tokio as uds_impl;
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use {
     super::r#trait,
-    crate::local_socket::Name,
+    crate::local_socket::ConnectOptions,
     std::{
         io,
         pin::Pin,
@@ -77,7 +77,9 @@ impl r#trait::Stream for Stream {
     type SendHalf = SendHalf;
 
     #[inline]
-    async fn connect(name: Name<'_>) -> io::Result<Self> { dispatch::connect(name).await }
+    async fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        dispatch::connect(options).await
+    }
     fn split(self) -> (RecvHalf, SendHalf) {
         match self {
             #[cfg(windows)]

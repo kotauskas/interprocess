@@ -76,6 +76,7 @@ mod enumdef;
 mod name;
 mod stream {
     pub(super) mod r#enum;
+    pub(super) mod options;
     pub(super) mod r#trait;
 }
 mod listener {
@@ -101,7 +102,7 @@ pub mod traits {
 pub use {
     listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
     name::*,
-    stream::r#enum::*,
+    stream::{options::ConnectOptions, r#enum::*},
     traits::ListenerNonblockingMode,
 };
 

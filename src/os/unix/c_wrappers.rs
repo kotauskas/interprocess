@@ -226,14 +226,22 @@ pub(super) fn connect(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Res
 
 pub(super) fn create_client(
     dst: TerminatedUdAddr<'_>,
-    ret_nonblocking: bool,
-) -> io::Result<OwnedFd> {
-    let sock = create_socket(libc::SOCK_STREAM, false)?;
-    connect(sock.as_fd(), dst)?;
-    if !CAN_CREATE_NONBLOCKING && ret_nonblocking {
+    nb_connect: bool,
+    nb_stream: bool,
+) -> io::Result<(OwnedFd, bool)> {
+    let sock = create_socket(libc::SOCK_STREAM, nb_connect)?;
+    if !CAN_CREATE_NONBLOCKING && nb_connect {
         set_nonblocking(sock.as_fd(), true)?;
     }
-    Ok(sock)
+    let inprog = match connect(sock.as_fd(), dst) {
+        Ok(()) => false,
+        Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) => true,
+        Err(e) => return Err(e),
+    };
+    if nb_connect != nb_stream {
+        set_nonblocking(sock.as_fd(), nb_stream)?;
+    }
+    Ok((sock, inprog))
 }
 #[allow(dead_code)]
 pub(super) fn create_client_nonblockingly(

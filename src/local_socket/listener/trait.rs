@@ -20,9 +20,6 @@ pub trait Listener:
     /// The stream type associated with this listener.
     type Stream: Stream;
 
-    /// Creates a socket server using the specified options.
-    fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
-
     /// Listens for incoming connections to the socket, blocking until a client is connected.
     ///
     /// See [`.incoming()`](ListenerExt::incoming) for a convenient way to create a main loop for a
@@ -45,6 +42,13 @@ pub trait Listener:
 
     /// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.
     fn do_not_reclaim_name_on_drop(&mut self);
+
+    /// Creates a socket server using the specified options.
+    ///
+    /// This method typically shouldn't be called directly – use the creation methods on
+    /// `ListenerOptions` (`create_sync`, `create_sync_as`, `create_tokio`, `create_tokio_as`)
+    /// instead.
+    fn from_options(options: ListenerOptions<'_>) -> io::Result<Self>;
 }
 
 /// The manner in which a [listener](Listener) is to be nonblocking.

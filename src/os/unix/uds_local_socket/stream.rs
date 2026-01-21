@@ -3,7 +3,7 @@ use {
         error::ReuniteError,
         local_socket::{
             traits::{self, ReuniteResult},
-            ConcurrencyDetector, LocalSocketSite, Name,
+            ConcurrencyDetector, ConnectOptions, LocalSocketSite,
         },
         os::unix::{c_wrappers, uds_local_socket::dispatch_name},
         Sealed, TryClone,
@@ -23,9 +23,16 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    fn connect(name: Name<'_>) -> io::Result<Self> {
-        // TODO use nonblocking
-        dispatch_name(name, false, |addr| c_wrappers::create_client(addr, false)).map(Self::from)
+    fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        dispatch_name(options.name.borrow(), false, |addr| {
+            c_wrappers::create_client(
+                addr,
+                options.get_nonblocking_connect(),
+                options.get_nonblocking_stream(),
+            )
+        })
+        // Don't care if it's EINPROGRESS or not
+        .map(|(sock, _)| Self::from(sock))
     }
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {

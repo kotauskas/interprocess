@@ -4,7 +4,7 @@ use crate::os::unix::uds_local_socket as uds_impl;
 use crate::os::windows::named_pipe::local_socket as np_impl;
 use {
     super::r#trait,
-    crate::{local_socket::Name, TryClone},
+    crate::{local_socket::ConnectOptions, TryClone},
     std::io::{self, prelude::*, IoSlice, IoSliceMut},
 };
 
@@ -75,7 +75,9 @@ impl r#trait::Stream for Stream {
     type SendHalf = SendHalf;
 
     #[inline]
-    fn connect(name: Name<'_>) -> io::Result<Self> { dispatch_sync::connect(name) }
+    fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        dispatch_sync::connect(options)
+    }
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         dispatch!(Self: x in self => x.set_nonblocking(nonblocking))

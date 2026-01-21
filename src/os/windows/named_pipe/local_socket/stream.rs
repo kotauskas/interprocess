@@ -3,7 +3,7 @@ use {
         error::{FromHandleError, ReuniteError},
         local_socket::{
             traits::{self, ReuniteResult},
-            Name, NameInner,
+            ConnectOptions, NameInner,
         },
         os::windows::named_pipe::{
             pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream,
@@ -29,9 +29,13 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    fn connect(name: Name<'_>) -> io::Result<Self> {
-        let NameInner::NamedPipe(path) = name.0;
-        StreamImpl::connect_by_path(path).map(Self)
+    fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
+        let NameInner::NamedPipe(path) = &options.name.0;
+        let stream = StreamImpl::connect_by_path(path.as_ref()).map(Self)?;
+        if options.get_nonblocking_stream() {
+            stream.set_nonblocking(true)?;
+        }
+        Ok(stream)
     }
 
     #[inline]
