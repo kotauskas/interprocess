@@ -68,7 +68,10 @@ fn exclude_deadconn(r: TestResult) -> TestResult {
     }
 }
 
-pub fn drive_server_and_multiple_clients<T, B, Srv, Clt>(server: Srv, client: Clt) -> TestResult
+pub fn drive_server_and_multiple_clients<T, B, Srv, Clt>(
+    server: Srv,
+    client: Clt,
+) -> TestResult<T>
 where
     T: Send + Borrow<B>,
     B: Send + Sync + ?Sized,
@@ -78,8 +81,9 @@ where
     let choke = Choke::new(num_concurrent_clients());
 
     let num_clients = num_clients();
+    let mut t_return = None::<T>;
     let client_wrapper = |msg: T| {
-        thread::scope(|scope| {
+        let ret = thread::scope(|scope| {
             let mut client_threads = Vec::with_capacity(usize::try_from(num_clients).unwrap());
             for n in 1..=num_clients {
                 let tname = format!("client {n}");
@@ -104,9 +108,12 @@ where
                 rslt?; // Early-return the first error; context not necessary as drive_pair does it
             }
             Ok(())
-        })
+        });
+        t_return = Some(msg);
+        ret
     };
     let server_wrapper = move |sender: Sender<T>| server(sender, num_clients);
 
-    drive_pair(server_wrapper, "server", client_wrapper, "client")
+    drive_pair(server_wrapper, "server", client_wrapper, "client")?;
+    Ok(t_return.unwrap())
 }

@@ -5,8 +5,11 @@ mod util;
 mod os {
     #[cfg(unix)]
     mod unix {
-        mod local_socket_fake_ns;
-        mod local_socket_mode;
+        mod local_socket {
+            mod fake_ns;
+            mod mode;
+            mod try_overwrite;
+        }
     }
     #[cfg(windows)]
     mod windows {

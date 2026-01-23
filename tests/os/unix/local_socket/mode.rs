@@ -75,8 +75,8 @@ fn test_inner(path: bool) -> TestResult {
 }
 
 #[test]
-fn local_socket_file_mode() -> TestResult { test_wrapper(|| test_inner(true)) }
+fn file_main() -> TestResult { test_wrapper(|| test_inner(true)) }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
-fn local_socket_namespaced_mode() -> TestResult { test_wrapper(|| test_inner(false)) }
+fn namespaced_main() -> TestResult { test_wrapper(|| test_inner(false)) }

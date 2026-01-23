@@ -4,13 +4,23 @@ mod no_client;
 mod no_server;
 mod stream;
 
-use crate::tests::util::*;
+use {
+    crate::{local_socket::prelude::*, tests::util::*},
+    color_eyre::eyre::bail,
+    std::io,
+};
 
 fn test_stream(id: &'static str, path: bool) -> TestResult {
-    use stream::*;
+    use {io::ErrorKind::*, stream::*};
     let scl = |s, n| server(id, handle_client, s, n, path);
-    drive_server_and_multiple_clients(scl, client)?;
-    Ok(())
+    let name = drive_server_and_multiple_clients(scl, client)?;
+    match LocalSocketStream::connect(name.borrow()) {
+        Err(e) if matches!(e.kind(), NotFound | ConnectionRefused) => Ok(()),
+        Err(e) => bail!(
+            "expected NotFound or ConnectionRefused when connecting to dropped listener, got {e}"
+        ),
+        Ok(s) => bail!("unexpectedly succeeded in connecting to dropped listener: {s:?}"),
+    }
 }
 
 use {

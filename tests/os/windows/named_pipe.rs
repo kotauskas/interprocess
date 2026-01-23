@@ -25,7 +25,8 @@ macro_rules! matrix {
                 drive_server_and_multiple_clients(
                     |ns, nc| server(make_id!(), ns, nc),
                     matrix!(@dir_c $ty),
-                )
+                )?;
+                Ok(())
             })
         }
     )+};
