@@ -37,7 +37,7 @@ fn next_fs(rn: u32) -> io::Result<Name<'static>> {
     .to_fs_name::<GenericFilePath>()
 }
 fn next_ns(rn: u32) -> io::Result<Name<'static>> {
-    format!("@interprocess-test-{:08x}", rn).to_ns_name::<GenericNamespaced>()
+    format!("interprocess-test-{:08x}", rn).to_ns_name::<GenericNamespaced>()
 }
 
 pub fn namegen_named_pipe(id: &str) -> NameGen<str, impl FnMut(u32) -> NameResult<str>> {
