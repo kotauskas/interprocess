@@ -2,6 +2,7 @@ use {
     crate::{os::unix::unixprelude::*, weaken_nonzero_slice},
     libc::sockaddr_un,
     std::{
+        ffi::CStr,
         io,
         mem::{size_of, zeroed, MaybeUninit},
         num::NonZeroU8,
@@ -197,6 +198,11 @@ pub(super) struct TerminatedUdAddr<'a>(&'a UdAddr);
 impl<'a> TerminatedUdAddr<'a> {
     /// Grants read-only access to the [`UdAddr`].
     pub const fn inner(self) -> &'a UdAddr { self.0 }
+    /// Immutably borrows the path as a nul-terminated C string.
+    pub fn path(&self) -> &CStr {
+        // SAFETY: the nul terminator is either in sun_path or immediately follows it
+        unsafe { CStr::from_ptr(self.0.path_ptr().cast()) }
+    }
 }
 impl Deref for TerminatedUdAddr<'_> {
     type Target = UdAddr;

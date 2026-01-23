@@ -23,14 +23,20 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
-        dispatch_name(options.name.borrow(), false, |addr| {
-            c_wrappers::create_client(
-                addr,
-                options.get_nonblocking_connect(),
-                options.get_nonblocking_stream(),
-            )
-        })
+    fn from_options(mut opts: &ConnectOptions<'_>) -> io::Result<Self> {
+        dispatch_name(
+            &mut opts,
+            false,
+            |&mut opts| opts.name.borrow(),
+            |_| None,
+            |addr, opts| {
+                c_wrappers::create_client(
+                    addr,
+                    opts.get_nonblocking_connect(),
+                    opts.get_nonblocking_stream(),
+                )
+            },
+        )
         // Don't care if it's EINPROGRESS or not
         .map(|(sock, _)| Self::from(sock))
     }

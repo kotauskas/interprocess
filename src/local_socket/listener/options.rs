@@ -18,6 +18,8 @@ pub struct ListenerOptions<'n> {
     pub(crate) name: Name<'n>,
     flags: u8,
     #[cfg(unix)]
+    max_spin_time: std::time::Duration,
+    #[cfg(unix)]
     mode: libc::mode_t,
     #[cfg(windows)]
     // TODO(3.0.0) use BorrowedSecurityDescriptor
@@ -28,10 +30,11 @@ impl Sealed for ListenerOptions<'_> {}
 const SHFT_NONBLOCKING_ACCEPT: u8 = 0;
 const SHFT_NONBLOCKING_STREAM: u8 = 1;
 const SHFT_RECLAIM_NAME: u8 = 2;
-const SHFT_TRY_OVERWRITE: u8 = 3; // TODO
+const SHFT_TRY_OVERWRITE: u8 = 3;
 const SHFT_HAS_MODE: u8 = 4;
+const SHFT_HAS_MAX_SPIN_TIME: u8 = 5;
 
-const ALL_BITS: u8 = (1 << 5) - 1;
+const ALL_BITS: u8 = (1 << 6) - 1;
 const NONBLOCKING_BITS: u8 = (1 << SHFT_NONBLOCKING_ACCEPT) | (1 << SHFT_NONBLOCKING_STREAM);
 #[allow(clippy::as_conversions)]
 const fn set_bit(flags: u8, pos: u8, val: bool) -> u8 {
@@ -44,6 +47,8 @@ impl TryClone for ListenerOptions<'_> {
         Ok(Self {
             name: self.name.clone(),
             flags: self.flags,
+            #[cfg(unix)]
+            max_spin_time: self.max_spin_time,
             #[cfg(unix)]
             mode: self.mode,
             #[cfg(windows)]
@@ -64,6 +69,8 @@ impl ListenerOptions<'_> {
         Self {
             name: Name::invalid(),
             flags: 1 << SHFT_RECLAIM_NAME,
+            #[cfg(unix)]
+            max_spin_time: std::time::Duration::ZERO,
             #[cfg(unix)]
             mode: 0,
             #[cfg(windows)]
@@ -111,7 +118,9 @@ impl<'n> ListenerOptions<'n> {
     /// ### Unix
     /// On Unix, this deletes the socket file if an `AddrInUse` error is encountered. The previous
     /// listener, if it is still listening on its socket, is not (and in fact cannot be) notified
-    /// of this in any way.
+    /// of this in any way. Note that, by default, this will spin for an unbounded amount of time
+    /// if there is contention – set [`max_spin_time`](Self::max_spin_time) if this is
+    /// undesirable.
     ///
     /// The deletion suffers from an unavoidable TOCTOU race between the `AddrInUse` error being
     /// observed and the socket file being deleted, since another process may replace the socket
@@ -126,6 +135,33 @@ impl<'n> ListenerOptions<'n> {
     #[inline(always)]
     pub fn try_overwrite(mut self, try_overwrite: bool) -> Self {
         self.flags = set_bit(self.flags, SHFT_TRY_OVERWRITE, try_overwrite);
+        self
+    }
+    /// Sets the maximum cumulative amount of time for which listener creation may spin in retry
+    /// loops.
+    ///
+    /// Spinning under contention is, of course, avoided whenever possible, but certain features
+    /// simply can't be implemented without retry loops that have to loop for up to however long
+    /// contention persists. If you'd like to limit the duration for which listener creation can
+    /// be delayed by other processes, including potentially untrusted ones, set this option to
+    /// a value that you consider reasonably low.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Unix
+    /// Made use of in the implementation of [`try_overwrite`](Self::try_overwrite).
+    ///
+    /// ### Windows
+    /// Currently not used for anything.
+    #[must_use = builder_must_use!()]
+    #[inline(always)]
+    #[cfg_attr(not(unix), allow(unused_mut))]
+    pub fn max_spin_time(mut self, max_spin_time: std::time::Duration) -> Self {
+        #[cfg(unix)]
+        {
+            self.flags |= 1 << SHFT_HAS_MAX_SPIN_TIME;
+            self.max_spin_time = max_spin_time;
+        }
+        let _ = max_spin_time;
         self
     }
     #[cfg(unix)]
@@ -149,6 +185,14 @@ impl ListenerOptions<'_> {
     #[cfg(unix)]
     pub(crate) fn get_mode(&self) -> Option<libc::mode_t> {
         has_bit(self.flags, SHFT_HAS_MODE).then_some(self.mode)
+    }
+    #[cfg(unix)]
+    pub(crate) fn get_max_spin_time(&self) -> Option<std::time::Duration> {
+        has_bit(self.flags, SHFT_HAS_MAX_SPIN_TIME).then_some(self.max_spin_time)
+    }
+    #[cfg(unix)]
+    pub(crate) fn get_max_spin_time_mut(&mut self) -> Option<&mut std::time::Duration> {
+        has_bit(self.flags, SHFT_HAS_MAX_SPIN_TIME).then_some(&mut self.max_spin_time)
     }
 }
 
@@ -199,6 +243,10 @@ impl Debug for ListenerOptions<'_> {
             .field("nonblocking", &nonblocking)
             .field("reclaim_name", &self.get_reclaim_name())
             .field("try_overwrite", &self.get_try_overwrite());
+        #[cfg(unix)]
+        {
+            dbs.field("max_spin_time", &self.get_max_spin_time());
+        }
         #[cfg(unix)]
         {
             // FIXME not octal

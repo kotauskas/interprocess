@@ -1,11 +1,11 @@
 use {
-    super::{ReclaimGuard, Stream},
+    super::{listen_and_maybe_overwrite, ReclaimGuard, Stream},
     crate::{
         local_socket::{
             traits::{self, Stream as _},
             ListenerNonblockingMode, ListenerOptions,
         },
-        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
+        os::unix::c_wrappers,
     },
     std::{
         io,
@@ -32,28 +32,28 @@ impl crate::Sealed for Listener {}
 impl traits::Listener for Listener {
     type Stream = Stream;
 
-    fn from_options(options: ListenerOptions<'_>) -> io::Result<Self> {
-        let nonblocking_streams = AtomicBool::new(options.get_nonblocking_stream());
+    fn from_options(opts: ListenerOptions<'_>) -> io::Result<Self> {
+        let mut reclaim = ReclaimGuard::default();
+        let nonblocking_streams = AtomicBool::new(opts.get_nonblocking_stream());
         Ok(Self {
-            listener: dispatch_name(options.name.borrow(), true, |addr| {
-                c_wrappers::create_listener(
+            listener: listen_and_maybe_overwrite(opts, |addr, opts| {
+                let rslt = c_wrappers::create_listener(
                     libc::SOCK_STREAM,
                     addr,
-                    options.get_nonblocking_accept(),
-                    options.get_mode(),
-                )
+                    opts.get_nonblocking_accept(),
+                    opts.get_mode(),
+                )?;
+                reclaim = ReclaimGuard::new(opts.get_reclaim_name(), addr);
+                Ok(rslt)
             })
             .map(UnixListener::from)?,
-            reclaim: options
-                .get_reclaim_name()
-                .then(|| options.name.into_owned())
-                .map(ReclaimGuard::new)
-                .unwrap_or_default(),
+            reclaim,
             nonblocking_streams,
         })
     }
     #[inline]
     fn accept(&self) -> io::Result<Stream> {
+        // TODO do our own accept and pass SOCK_NONBLOCK on supported platforms
         let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
         if self.nonblocking_streams.load(Acquire) {
             stream.set_nonblocking(true)?;

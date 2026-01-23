@@ -32,10 +32,14 @@ impl traits::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
 
-    async fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
-        let (sock, inprog) = dispatch_name(options.name.borrow(), false, |addr| {
-            c_wrappers::create_client_nonblockingly(addr, true)
-        })?;
+    async fn from_options(mut opts: &ConnectOptions<'_>) -> io::Result<Self> {
+        let (sock, inprog) = dispatch_name(
+            &mut opts,
+            false,
+            |&mut opts| opts.name.borrow(),
+            |_| None,
+            |addr, _| c_wrappers::create_client_nonblockingly(addr, true),
+        )?;
         let sock = UnixStream::from_std(SyncUnixStream::from(sock))?;
         if inprog {
             // disapprovingly points finger at Mio

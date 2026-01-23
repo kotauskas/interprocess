@@ -134,14 +134,12 @@ rust_2018_idioms = { level = "deny", priority = -1 }
 dead_code = "allow"
 
 [lints.clippy]
-ptr_as_ptr = "forbid"
-
-exit           = "deny"
-get_unwrap     = "deny"
-as_conversions = "deny"
-
-dbg_macro = "warn"
-
+ptr_as_ptr           = "forbid"
+as_conversions       = "deny"
+exit                 = "deny"
+get_unwrap           = "deny"
+dbg_macro            = "warn"
+option_map_unit_fn   = "allow"
 tabs_in_doc_comments = "allow"
 
 [package.metadata.docs.rs]
