@@ -103,6 +103,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
 }
 
 /// Extends [`PipeListenerOptions`] with a constructor method for the Tokio [`PipeListener`].
+// TODO deprecate in favor of conditionally compiled inherent methods
 #[allow(private_bounds)]
 pub trait PipeListenerOptionsExt: Sealed {
     /// Creates a Tokio pipe listener from the builder. See the

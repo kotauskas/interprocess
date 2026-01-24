@@ -35,7 +35,13 @@ pub use {incoming::*, options::*};
 ///
 /// The only way to create a `PipeListener` is to use [`PipeListenerOptions`]. See its documentation
 /// for more.
-// TODO(2.3.0) examples
+///
+/// # Examples
+///
+/// ## Basic server
+/// ```no_run
+#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/named_pipe/sync/listener.rs"))]
+/// ```
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     nonblocking: AtomicBool,

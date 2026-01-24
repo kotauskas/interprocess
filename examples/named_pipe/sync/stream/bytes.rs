@@ -1,6 +1,8 @@
 //{
 #[cfg(not(windows))]
-fn main() {}
+fn main() {
+    eprintln!("This example is not available on platforms other than Windows.");
+}
 #[cfg(windows)]
 fn main() -> std::io::Result<()> {
     //}

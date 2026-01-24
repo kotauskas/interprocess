@@ -34,10 +34,8 @@ fn main() -> std::io::Result<()> {
             // this on affected platforms by deleting the socket file when the listener is
             // dropped. (This is vulnerable to all sorts of races and thus can be disabled.)
             //
-            // There are multiple ways this error can be handled, if it occurs, but when the
-            // listener only comes from Interprocess, it can be assumed that its previous instance
-            // either has crashed or simply hasn't exited yet. In this example, we leave cleanup
-            // up to the user, but in a real application, you usually don't want to do that.
+            // In a real program, instead of leaving it up to the user to perform cleanup, one
+            // would use the .try_overwrite(true) listener option to try to replace the socket.
             eprintln!(
                 "Error: could not start server because the socket file is occupied. Please check
                 if {printname} is in use by another process and try again."
@@ -67,9 +65,9 @@ fn main() -> std::io::Result<()> {
         // both sides wait for the send buffer to be emptied by the other.
         conn.read_line(&mut buffer)?;
 
-        // Now that the receive has come through and the client is waiting on the server's send, do
-        // it. (`.get_mut()` is to get the sender, `BufReader` doesn't implement a pass-through
-        // `Write`.)
+        // Now that the receive has come through and the client is waiting on the server's send,
+        // do it. (`.get_mut()` is to get the sender, `BufReader` doesn't implement a
+        // pass-through `Write`.)
         conn.get_mut().write_all(b"Hello from server!\n")?;
 
         // Print out the result, getting the newline for free!
