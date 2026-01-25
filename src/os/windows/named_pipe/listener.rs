@@ -28,8 +28,6 @@ use {
 };
 pub use {incoming::*, options::*};
 
-// TODO(2.4.0) finish collect_options and add conversion from handles after all
-
 /// The server for a named pipe, listening for connections to clients and producing pipe streams.
 ///
 /// Note that this type does not correspond to any Win32 object, and is an invention of Interprocess
@@ -47,6 +45,7 @@ pub use {incoming::*, options::*};
 pub struct PipeListener<Rm: PipeModeTag, Sm: PipeModeTag> {
     config: PipeListenerOptions<'static>, // We need the options to create new instances
     nonblocking: AtomicBool,
+    // TODO implement a handover mechanism for the case of having an instance limit of 1
     stored_instance: Mutex<FileHandle>,
     _phantom: PhantomData<(Rm, Sm)>,
 }
@@ -112,7 +111,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     ///
     /// The options are necessary to provide because the listener needs to create new instances of
     /// the named pipe server in `.accept()`.
-    // TODO(2.4.0) mention TryFrom<OwnedHandle> here
     pub fn from_handle_and_options(
         handle: OwnedHandle,
         options: PipeListenerOptions<'static>,

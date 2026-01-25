@@ -63,7 +63,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     ///
     /// The options are necessary to provide because the listener needs to create new instances of
     /// the named pipe server in `.accept()`.
-    // TODO(2.4.0) mention TryFrom<OwnedHandle> here
     pub fn from_tokio_and_options(
         tokio_object: TokioNPServer,
         options: PipeListenerOptions<'static>,
