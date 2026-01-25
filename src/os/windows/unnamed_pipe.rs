@@ -41,7 +41,7 @@ impl Sealed for CreationOptions<'_> {}
 impl<'sd> CreationOptions<'sd> {
     /// Starts with the default parameters for the pipe. Identical to `Default::default()`.
     pub const fn new() -> Self {
-        Self { inheritable: false, security_descriptor: None, buffer_size_hint: None }
+        Self { inheritable: true, security_descriptor: None, buffer_size_hint: None }
     }
 
     builder_setters! {
