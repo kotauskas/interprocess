@@ -22,6 +22,12 @@ pub trait Listener: Send + Sync + Sized + Sealed {
 
     /// Asynchronously listens for incoming connections to the socket, returning a future that
     /// finishes only when a client is connected.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Windows
+    /// **Neglecting to call this periodically may result in new clients being unable to
+    /// connect.** See the warning on [the sync equivalent](crate::local_socket::traits::Listener)
+    /// for more information.
     fn accept(&self) -> impl Future<Output = io::Result<Self::Stream>> + Send + Sync;
 
     /// Disables [name reclamation](super::enum::Listener#name-reclamation) on the listener.

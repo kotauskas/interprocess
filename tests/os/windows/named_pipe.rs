@@ -1,5 +1,7 @@
 #![cfg(windows)]
 
+// TODO test dead-on-arrival connection
+
 mod bytes;
 mod msg;
 

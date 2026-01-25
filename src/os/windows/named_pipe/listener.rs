@@ -6,7 +6,7 @@ use {
     super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream},
     crate::{
         os::windows::{winprelude::*, FileHandle},
-        poison_error, DebugExpectExt, OrErrno, RawOsErrorExt, LOCK_POISON,
+        poison_error, OrErrno, RawOsErrorExt, LOCK_POISON,
     },
     std::{
         fmt::{self, Debug, Formatter},
@@ -20,7 +20,9 @@ use {
         },
     },
     windows_sys::Win32::{
-        Foundation::{ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING},
+        Foundation::{
+            ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, ERROR_PIPE_NOT_CONNECTED,
+        },
         System::Pipes::{ConnectNamedPipe, DisconnectNamedPipe},
     },
 };
@@ -55,6 +57,13 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     /// the pipe.
     ///
     /// See `incoming` for an iterator version of this.
+    ///
+    /// **Neglecting to call this periodically may result in new clients being unable to
+    /// connect.** This is because a named pipe client connecting to a server immediately puts the
+    /// pipe into a connected state, contrary to the concept of *accepting* clients. If a client
+    /// connects to and disconnects from a named pipe without `accept` being called between those
+    /// two events, the named pipe instance will contain a dead-on-arrival connection that will
+    /// prevent new connections until it is removed by a call to `accept`.
     pub fn accept(&self) -> io::Result<PipeStream<Rm, Sm>> {
         let instance_to_hand_out = {
             let mut stored_instance = self.stored_instance.lock().map_err(poison_error)?;
@@ -62,21 +71,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
             // convenient to do this instead. The mutex takes care of ordering.
             let nonblocking = self.nonblocking.load(Relaxed);
 
-            if let Err(e) = block_on_connect(stored_instance.as_handle()) {
-                if e.raw_os_error().eeq(ERROR_NO_DATA) {
-                    // Client disconnected, but we haven't. We have to discard this instance.
-                    // https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-connectnamedpipe#remarks
-
-                    let new_instance = self.create_instance(nonblocking)?;
-                    let broken_instance = replace(&mut *stored_instance, new_instance);
-
-                    unsafe { DisconnectNamedPipe(broken_instance.as_int_handle()) }
-                        .true_val_or_errno(())
-                        .debug_expect("Failed to disconnect broken pipe");
-                }
-
-                return Err(e);
-            }
+            block_on_connect_clearing_empty_conns(stored_instance.as_handle())?;
 
             let new_instance = self.create_instance(nonblocking)?;
             replace(&mut *stored_instance, new_instance)
@@ -163,6 +158,15 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
     }
 }
 
+fn block_on_connect_clearing_empty_conns(handle: BorrowedHandle<'_>) -> io::Result<()> {
+    loop {
+        match block_on_connect(handle) {
+            Err(e) if e.raw_os_error().eeq(ERROR_NO_DATA) => disconnect_if_connected(handle)?,
+            r => break r,
+        }
+    }
+}
+
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
     unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 }
         .true_val_or_errno(())
@@ -177,4 +181,10 @@ fn thunk_accept_error(e: io::Error) -> io::Result<()> {
     } else {
         Err(e)
     }
+}
+
+fn disconnect_if_connected(handle: BorrowedHandle<'_>) -> io::Result<()> {
+    unsafe { DisconnectNamedPipe(handle.as_int_handle()) != 0 }
+        .true_val_or_errno(())
+        .or_else(|e| if e.raw_os_error().eeq(ERROR_PIPE_NOT_CONNECTED) { Ok(()) } else { Err(e) })
 }

@@ -24,6 +24,16 @@ pub trait Listener:
     ///
     /// See [`.incoming()`](ListenerExt::incoming) for a convenient way to create a main loop for a
     /// server.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Windows
+    /// As is the case with named pipe listeners (via which local sockets are implemented),
+    /// **neglecting to call this periodically may result in new clients being unable to
+    /// connect.** This is because a named pipe client connecting to a server immediately puts the
+    /// pipe into a connected state, contrary to the concept of *accepting* clients. If a client
+    /// connects to and disconnects from a named pipe without `accept` being called between those
+    /// two events, the named pipe instance will contain a dead-on-arrival connection that will
+    /// prevent new connections until it is removed by a call to `accept`.
     fn accept(&self) -> io::Result<Self::Stream>;
 
     /// Enables or disables the nonblocking mode for the listener. By default, it is disabled.
