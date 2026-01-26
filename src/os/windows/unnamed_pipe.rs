@@ -8,7 +8,7 @@ use {
     crate::{
         os::windows::{security_descriptor::*, winprelude::*, FileHandle},
         unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
-        weaken_buf_init_mut, AsPtr, Sealed, TryClone,
+        AsPtr, Sealed, TryClone,
     },
     std::{
         fmt::{self, Debug, Formatter},
@@ -106,9 +106,7 @@ pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
 pub(crate) struct Recver(FileHandle);
 impl Read for Recver {
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(weaken_buf_init_mut(buf))
-    }
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { self.0.read(buf) }
 }
 impl Debug for Recver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

@@ -212,12 +212,6 @@ pub(crate) unsafe fn cast_slice_mut<T, U>(s: &mut [T]) -> &mut [U] {
 #[inline(always)]
 // SAFETY: weaker refinement
 pub(crate) fn weaken_buf_init<T>(s: &[T]) -> &[MaybeUninit<T>] { unsafe { cast_slice(s) } }
-#[inline(always)]
-// TODO get rid of this, has a de-initialization footgun and would be unsound
-// as written if it were public
-pub(crate) fn weaken_buf_init_mut<T>(s: &mut [T]) -> &mut [MaybeUninit<T>] {
-    unsafe { cast_slice_mut(s) }
-}
 
 #[inline(always)]
 pub(crate) unsafe fn assume_slice_init<T>(s: &[MaybeUninit<T>]) -> &[T] {
@@ -270,3 +264,26 @@ pub(crate) trait UnpinExt: Unpin {
     fn pin(&mut self) -> Pin<&mut Self> { Pin::new(self) }
 }
 impl<T: Unpin + ?Sized> UnpinExt for T {}
+
+/// Generalizes over `&mut [u8]` and `&mut [MaybeUninit<u8>]`.
+///
+/// # Safety
+/// The pointer returned by `as_ptr` must be valid for writes of length returned by a preceding
+/// call to `len` for at least as long as no methods other than those that are in this trait are
+/// called.
+pub(crate) unsafe trait AsBuf {
+    fn as_ptr(&mut self) -> *mut u8;
+    fn len(&mut self) -> usize;
+}
+unsafe impl AsBuf for [u8] {
+    #[inline(always)]
+    fn as_ptr(&mut self) -> *mut u8 { self.as_mut_ptr() }
+    #[inline(always)]
+    fn len(&mut self) -> usize { <[u8]>::len(self) }
+}
+unsafe impl AsBuf for [MaybeUninit<u8>] {
+    #[inline(always)]
+    fn as_ptr(&mut self) -> *mut u8 { self.as_mut_ptr().cast() }
+    #[inline(always)]
+    fn len(&mut self) -> usize { <[MaybeUninit<u8>]>::len(self) }
+}

@@ -26,7 +26,7 @@ impl RawPipeStream {
 
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         loop {
-            match downgrade_eof(self.handle.read(&mut buf)) {
+            match downgrade_eof(self.handle.read(&mut buf[..])) {
                 Ok(..) => break Ok(()),
                 Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {}
                 Err(e) => break Err(e),
