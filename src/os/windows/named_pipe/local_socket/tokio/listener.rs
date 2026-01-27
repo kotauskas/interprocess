@@ -3,9 +3,7 @@ use {
     crate::{
         local_socket::{traits::tokio as traits, ListenerOptions, NameInner},
         os::windows::named_pipe::{
-            pipe_mode,
-            tokio::{PipeListener as GenericPipeListener, PipeListenerOptionsExt as _},
-            PipeListenerOptions,
+            pipe_mode, tokio::PipeListener as GenericPipeListener, PipeListenerOptions,
         },
         Sealed,
     },

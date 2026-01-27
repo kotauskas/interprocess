@@ -74,6 +74,7 @@ pub struct PipeListenerOptions<'path> {
     pub inheritable: bool,
 }
 
+/// Creation and setters.
 impl<'path> PipeListenerOptions<'path> {
     /// Creates a new builder with default options.
     #[allow(clippy::indexing_slicing)] // are you fucking with me
@@ -138,7 +139,10 @@ impl<'path> PipeListenerOptions<'path> {
         security_descriptor: Option<SecurityDescriptor>,
         inheritable: bool,
     }
+}
 
+/// Creation of synchronous listeners.
+impl PipeListenerOptions<'_> {
     /// Creates the pipe listener from the builder. The `Rm` and `Sm` generic arguments specify the
     /// type of pipe stream that the listener will create, thus determining the direction of the
     /// pipe and its mode.

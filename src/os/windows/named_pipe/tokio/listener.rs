@@ -2,7 +2,7 @@ use {
     crate::{
         os::windows::{
             named_pipe::{
-                enums::{PipeMode, PipeStreamRole},
+                enums::PipeStreamRole,
                 pipe_mode,
                 tokio::{PipeStream, RawPipeStream},
                 PipeListenerOptions, PipeModeTag,
@@ -78,7 +78,6 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     ///
     /// # Errors
     /// Returns an error if called outside a Tokio runtime.
-    // TODO(2.4.0) mention TryFrom<OwnedHandle> here
     pub fn from_handle_and_options(
         handle: OwnedHandle,
         options: PipeListenerOptions<'static>,
@@ -101,8 +100,52 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {
     }
 }
 
+/// Creation of Tokio listeners.
+impl PipeListenerOptions<'_> {
+    /// Creates a Tokio pipe listener from the builder. See the
+    /// [non-async `create` method](PipeListenerOptions::create) for more.
+    ///
+    /// The `nonblocking` parameter is ignored and forced to be enabled.
+    pub fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<Rm, Sm>> {
+        let mut config = self.to_owned()?;
+        // Tokio should ideally already set that, but let's do it just in case.
+        config.nonblocking = false;
+
+        let instance = config
+            .create_instance(true, false, true, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)
+            .and_then(npserver_from_handle)?;
+        Ok(PipeListener::from_tokio_and_options(instance, config))
+    }
+    /// Alias for [`create_tokio`](PipeListenerOptions::create_tokio) with the same `Rm` and
+    /// `Sm`.
+    #[inline]
+    pub fn create_tokio_duplex<M: PipeModeTag>(&self) -> io::Result<PipeListener<M, M>> {
+        self.create_tokio::<M, M>()
+    }
+    /// Alias for [`create_tokio`](PipeListenerOptions::create_tokio) with an `Sm` of
+    /// [`pipe_mode::None`].
+    #[inline]
+    pub fn create_tokio_recv_only<Rm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<Rm, pipe_mode::None>> {
+        self.create_tokio::<Rm, pipe_mode::None>()
+    }
+    /// Alias for [`create_tokio`](PipeListenerOptions::create_tokio) with an `Rm` of
+    /// [`pipe_mode::None`].
+    #[inline]
+    pub fn create_tokio_send_only<Sm: PipeModeTag>(
+        &self,
+    ) -> io::Result<PipeListener<pipe_mode::None, Sm>> {
+        self.create_tokio::<pipe_mode::None, Sm>()
+    }
+}
+
 /// Extends [`PipeListenerOptions`] with a constructor method for the Tokio [`PipeListener`].
-// TODO deprecate in favor of conditionally compiled inherent methods
+#[deprecated = "\
+use the eponymous inherent methods instead; all you need to do to fix this \
+warning is remove the PipeListenerOptionsExt import"]
 #[allow(private_bounds)]
 pub trait PipeListenerOptionsExt: Sealed {
     /// Creates a Tokio pipe listener from the builder. See the
@@ -133,31 +176,14 @@ pub trait PipeListenerOptionsExt: Sealed {
         self.create_tokio::<pipe_mode::None, Sm>()
     }
 }
+#[allow(deprecated)]
 impl PipeListenerOptionsExt for PipeListenerOptions<'_> {
+    #[inline(always)]
     fn create_tokio<Rm: PipeModeTag, Sm: PipeModeTag>(&self) -> io::Result<PipeListener<Rm, Sm>> {
-        let (owned_config, instance) =
-            _create_tokio(self, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)?;
-        Ok(PipeListener::from_tokio_and_options(instance, owned_config))
+        PipeListenerOptions::create_tokio::<Rm, Sm>(self)
     }
 }
 impl Sealed for PipeListenerOptions<'_> {}
-fn _create_tokio(
-    config: &PipeListenerOptions<'_>,
-    role: PipeStreamRole,
-    recv_mode: Option<PipeMode>,
-) -> io::Result<(PipeListenerOptions<'static>, TokioNPServer)> {
-    // Shadow to avoid mixing them up.
-    let mut config = config.to_owned()?;
-
-    // Tokio should ideally already set that, but let's do it just in case.
-    config.nonblocking = false;
-
-    let instance = config
-        .create_instance(true, false, true, role, recv_mode)
-        .and_then(npserver_from_handle)?;
-
-    Ok((config, instance))
-}
 
 fn npserver_from_handle(handle: OwnedHandle) -> io::Result<TokioNPServer> {
     unsafe { TokioNPServer::from_raw_handle(handle.into_raw_handle()) }

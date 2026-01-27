@@ -3,10 +3,7 @@ use {
     crate::{
         os::windows::named_pipe::{
             pipe_mode,
-            tokio::{
-                DuplexPipeStream, PipeListener, PipeListenerOptionsExt, RecvPipeStream,
-                SendPipeStream,
-            },
+            tokio::{DuplexPipeStream, PipeListener, RecvPipeStream, SendPipeStream},
         },
         tests::util::{message, TestResult, WrapErrExt},
     },
