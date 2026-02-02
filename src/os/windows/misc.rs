@@ -35,7 +35,7 @@ pub(crate) trait FromRawHandleExt: FromRawHandle + Sized {
     #[inline(always)]
     #[allow(clippy::as_conversions)]
     unsafe fn from_int_handle(h: HANDLE) -> Self {
-        // TODO(3.0.0) use null provenance instead of int2ptr
+        // FUTURE use null provenance instead of int2ptr
         unsafe { Self::from_raw_handle(h as *mut c_void) }
     }
 }

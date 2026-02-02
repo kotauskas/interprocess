@@ -1,5 +1,5 @@
 //{
-// TODO(2.3.0)..?
+// TODO(2.x.0)..?
 #[cfg(not(all(windows, feature = "tokio")))]
 fn main() {
     #[rustfmt::skip] eprintln!("\

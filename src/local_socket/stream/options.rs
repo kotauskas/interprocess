@@ -123,7 +123,7 @@ impl ConnectOptions<'_> {
     /// appropriate implementation based on where the name points to.
     #[inline]
     #[cfg(feature = "tokio")]
-    // TODO(3.0.0) remove + '_
+    // FUTURE remove + '_
     pub fn connect_tokio(
         &self,
     ) -> impl Future<Output = io::Result<TokioStream>> + Send + Sync + '_ {
@@ -133,7 +133,7 @@ impl ConnectOptions<'_> {
     /// specified local socket name.
     #[inline]
     #[cfg(feature = "tokio")]
-    // TODO(3.0.0) remove + '_
+    // FUTURE remove + '_
     pub fn connect_tokio_as<S: traits::tokio::Stream>(
         &self,
     ) -> impl Future<Output = io::Result<S>> + Send + Sync + '_ {

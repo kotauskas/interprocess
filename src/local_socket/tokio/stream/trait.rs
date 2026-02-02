@@ -52,7 +52,7 @@ pub trait Stream:
     ///
     /// This method typically shouldn't be called directly – use the creation methods on
     /// `ConnectOptions` (`connect_tokio`, `connect_tokio_as`) instead.
-    // TODO(3.0.0) add use<Self>
+    // FUTURE add use<Self>
     fn from_options(
         options: &ConnectOptions<'_>,
     ) -> impl Future<Output = io::Result<Self>> + Send + Sync;

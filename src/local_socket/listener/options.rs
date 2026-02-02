@@ -22,7 +22,6 @@ pub struct ListenerOptions<'n> {
     #[cfg(unix)]
     mode: libc::mode_t,
     #[cfg(windows)]
-    // TODO(3.0.0) use BorrowedSecurityDescriptor
     pub(crate) security_descriptor: Option<SecurityDescriptor>,
 }
 impl Sealed for ListenerOptions<'_> {}
