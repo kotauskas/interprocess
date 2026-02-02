@@ -4,11 +4,14 @@
 use std::os::unix::io::RawFd;
 use std::{
     io,
-    mem::{size_of, MaybeUninit},
+    mem::{size_of, ManuallyDrop, MaybeUninit},
     num::{NonZeroU8, Saturating},
+    ops::ControlFlow,
     pin::Pin,
     slice,
     sync::PoisonError,
+    task::{RawWaker, RawWakerVTable, Waker},
+    time::{Duration, Instant},
 };
 #[cfg(windows)]
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
@@ -68,6 +71,68 @@ impl HandleOrErrno for HANDLE {
     #[inline]
     fn handle_or_errno(self) -> io::Result<Self> {
         (self != INVALID_HANDLE_VALUE).true_val_or_errno(self)
+    }
+}
+
+// FUTURE remove
+pub(crate) trait ControlFlowExt {
+    type B;
+    type C;
+    // "pf" means "polyfill"
+    fn break_value_pf(self) -> Option<Self::B>;
+    fn continue_value_pf(self) -> Option<Self::C>;
+    fn is_break_pf(&self) -> bool;
+    fn is_continue_pf(&self) -> bool;
+}
+impl<B, C> ControlFlowExt for ControlFlow<B, C> {
+    type B = B;
+    type C = C;
+    #[inline(always)]
+    fn break_value_pf(self) -> Option<B> {
+        match self {
+            Self::Break(v) => Some(v),
+            Self::Continue(_) => None,
+        }
+    }
+    #[inline(always)]
+    fn continue_value_pf(self) -> Option<C> {
+        match self {
+            Self::Break(_) => None,
+            Self::Continue(v) => Some(v),
+        }
+    }
+    #[inline(always)]
+    fn is_break_pf(&self) -> bool { matches!(self, Self::Break(..)) }
+    #[inline(always)]
+    fn is_continue_pf(&self) -> bool { matches!(self, Self::Continue(..)) }
+}
+
+pub(crate) trait OptionExt {
+    type Value;
+    fn break_some(self) -> ControlFlow<Self::Value>;
+}
+impl<T> OptionExt for Option<T> {
+    type Value = T;
+    fn break_some(self) -> ControlFlow<T> {
+        match self {
+            Some(v) => ControlFlow::Break(v),
+            None => ControlFlow::Continue(()),
+        }
+    }
+}
+
+pub(crate) trait OptionTimeoutExt {
+    type Output;
+    fn some_or_timeout(self) -> io::Result<Self::Output>;
+}
+impl<O> OptionTimeoutExt for Option<io::Result<O>> {
+    type Output = O;
+    #[inline(always)]
+    fn some_or_timeout(self) -> io::Result<O> {
+        match self {
+            Some(r) => r,
+            None => Err(io::Error::from(io::ErrorKind::TimedOut)),
+        }
     }
 }
 
@@ -194,7 +259,7 @@ impl RawOsErrorExt for Option<i32> {
 /// Crudely casts a slice without any checks, blindly presuming that the size of `T` is equal to
 /// that of `U`.
 pub(crate) const unsafe fn cast_slice<T, U>(s: &[T]) -> &[U] {
-    // TODO(3.0.0) use const assertion
+    // FUTURE use const assertion
     if size_of::<T>() != size_of::<U>() {
         panic!("element sizes must be equal");
     }
@@ -202,7 +267,7 @@ pub(crate) const unsafe fn cast_slice<T, U>(s: &[T]) -> &[U] {
 }
 /// Mutable version of [`cast_slice`].
 pub(crate) unsafe fn cast_slice_mut<T, U>(s: &mut [T]) -> &mut [U] {
-    // TODO(3.0.0) use const assertion
+    // FUTURE use const assertion
     if size_of::<T>() != size_of::<U>() {
         panic!("element sizes must be equal");
     }
@@ -286,4 +351,53 @@ unsafe impl AsBuf for [MaybeUninit<u8>] {
     fn as_ptr(&mut self) -> *mut u8 { self.as_mut_ptr().cast() }
     #[inline(always)]
     fn len(&mut self) -> usize { <[MaybeUninit<u8>]>::len(self) }
+}
+
+pub(crate) fn spin_with_timeout<S, R>(
+    state: &mut S,
+    timeout: Option<Duration>,
+    start: impl FnOnce(&mut S) -> ControlFlow<R>,
+    spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<R>,
+    update_timeout: impl FnMut(&mut S, Duration),
+) -> Option<R> {
+    if let ControlFlow::Break(val) = start(state) {
+        Some(val)
+    } else {
+        spin_with_timeout_loop(state, timeout, spin, update_timeout)
+    }
+}
+#[cold]
+fn spin_with_timeout_loop<S, R>(
+    state: &mut S,
+    mut timeout: Option<Duration>,
+    mut spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<R>,
+    mut update_timeout: impl FnMut(&mut S, Duration),
+) -> Option<R> {
+    let end = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+    loop {
+        if let ControlFlow::Break(val) = spin(state, timeout) {
+            break Some(val);
+        }
+        if let Some(end) = end {
+            let cur = Instant::now();
+            if cur >= end {
+                update_timeout(state, Duration::ZERO);
+                break None;
+            }
+            let remain = end.saturating_duration_since(cur);
+            timeout = Some(remain);
+            update_timeout(state, remain);
+        }
+    }
+}
+
+// FUTURE remove in favor of Waker::noop
+#[inline(always)]
+pub(crate) fn noop_waker() -> ManuallyDrop<Waker> {
+    ManuallyDrop::new(unsafe { Waker::from_raw(noop_raw_waker()) })
+}
+#[inline(always)]
+fn noop_raw_waker() -> RawWaker {
+    static VTAB: RawWakerVTable = RawWakerVTable::new(|_| noop_raw_waker(), drop, drop, drop);
+    RawWaker::new(std::ptr::null(), &VTAB)
 }

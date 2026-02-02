@@ -39,6 +39,32 @@ pub mod os {
     pub mod windows;
 }
 
+/// Describes how a client connection operation should wait for the server to accept it.
+#[derive(Copy, Clone, Debug, Default)]
+pub enum ConnectWaitMode {
+    /// The connection operation returns immediately. Subsequent I/O operations will block until
+    /// the connection actually becomes established. If a connection error occurs in the
+    /// background, that error will be returned by the next I/O operation on the returned object.
+    Deferred,
+    /// A wait state is entered until the connection becomes established which lasts for up to the
+    /// given amount of time. An error of kind [`TimedOut`](std::io::ErrorKind::WouldBlock) is
+    /// returned if it does not become established within that timeframe.
+    Timeout(std::time::Duration),
+    /// A wait state is entered until the connection becomes established. This wait state may
+    /// last for an indefinite amount of time.
+    #[default]
+    Unbounded,
+}
+impl ConnectWaitMode {
+    fn timeout_or_unsupported(self, emsg: &str) -> std::io::Result<Option<std::time::Duration>> {
+        match self {
+            Self::Deferred => Err(std::io::Error::new(std::io::ErrorKind::Unsupported, emsg)),
+            Self::Timeout(t) => Ok(Some(t)),
+            Self::Unbounded => Ok(None),
+        }
+    }
+}
+
 mod try_clone;
 pub use try_clone::*;
 

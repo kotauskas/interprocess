@@ -153,7 +153,7 @@ pub(crate) fn connect_without_waiting(
     recv: Option<PipeMode>,
     send: Option<PipeMode>,
     overlapped: bool,
-) -> io::Result<FileHandle> {
+) -> Option<io::Result<FileHandle>> {
     let access_flags = modes_to_access_flags(recv, send);
     let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
     match unsafe {
@@ -171,8 +171,8 @@ pub(crate) fn connect_without_waiting(
             // SAFETY: we just created this handle
             FileHandle::from(OwnedHandle::from_raw_handle(h.to_std())))
     } {
-        Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => Err(io::ErrorKind::WouldBlock.into()),
-        els => els,
+        Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => None,
+        els => Some(els),
     }
 }
 

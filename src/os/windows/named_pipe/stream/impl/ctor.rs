@@ -1,6 +1,11 @@
 use {
     super::*,
-    crate::os::windows::{named_pipe::WaitTimeout, path_conversion::*},
+    crate::{
+        os::windows::{named_pipe::WaitTimeout, path_conversion::*},
+        spin_with_timeout, ConnectWaitMode, ControlFlowExt as _, OptionExt as _,
+        OptionTimeoutExt as _,
+    },
+    std::{ops::ControlFlow, time::Duration},
     widestring::U16CStr,
     windows_sys::Win32::System::Pipes::PIPE_READMODE_MESSAGE,
 };
@@ -18,20 +23,24 @@ impl RawPipeStream {
         Self::new(handle, true, NeedsFlushVal::No)
     }
     fn new_client(handle: FileHandle) -> Self { Self::new(handle, false, NeedsFlushVal::No) }
-    fn connect(
+    pub(crate) fn connect(
         path: &U16CStr,
         recv: Option<PipeMode>,
         send: Option<PipeMode>,
+        wait_mode: ConnectWaitMode,
     ) -> io::Result<Self> {
-        let handle = loop {
-            match c_wrappers::connect_without_waiting(path, recv, send, false) {
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    c_wrappers::block_for_server(path, WaitTimeout::DEFAULT)?;
-                    continue;
-                }
-                els => break els,
-            }
-        }?;
+        let connect =
+            |path: &_| c_wrappers::connect_without_waiting(path, recv, send, false).break_some();
+        let timeout = wait_mode.timeout_or_unsupported(
+            "synchronous named pipes do not support the deferred connection wait mode",
+        )?;
+
+        let handle = if timeout == Some(Duration::ZERO) {
+            connect(path).break_value_pf()
+        } else {
+            Self::connect_spin_loop(path, connect, timeout)
+        }
+        .some_or_timeout()?;
 
         if recv == Some(PipeMode::Messages) {
             c_wrappers::set_np_handle_state(
@@ -43,6 +52,30 @@ impl RawPipeStream {
         }
         Ok(Self::new_client(handle))
     }
+
+    pub(crate) fn connect_spin_loop(
+        path: &U16CStr,
+        mut connect: impl FnMut(&U16CStr) -> ControlFlow<io::Result<FileHandle>>,
+        timeout: Option<Duration>,
+    ) -> Option<io::Result<FileHandle>> {
+        spin_with_timeout(
+            &mut connect,
+            timeout,
+            |connect| connect(path),
+            |connect, remain| {
+                if let Err(e) = c_wrappers::block_for_server(
+                    path,
+                    remain
+                        .map(WaitTimeout::from_duration_clamped)
+                        .unwrap_or(WaitTimeout::FOREVER),
+                ) {
+                    return ControlFlow::Break(Err(e));
+                }
+                connect(path)
+            },
+            |_, _| (),
+        )
+    }
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
@@ -50,8 +83,26 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// is not added automatically), blocking until a server instance is dispatched.
     #[inline]
     pub fn connect_by_path<'p>(path: impl ToWtf16<'p>) -> io::Result<Self> {
-        RawPipeStream::connect(&path.to_wtf_16().map_err(to_io_error)?, Rm::MODE, Sm::MODE)
-            .map(Self::new)
+        Self::connect_by_path_with_wait_mode(path, ConnectWaitMode::Unbounded)
+    }
+
+    /// Like `connect_by_path`, but also takes a [wait mode](ConnectWaitMode).
+    ///
+    /// # Errors
+    /// The [unbounded wait mode](ConnectWaitMode::Unbounded) is currently
+    /// [not supported](io::ErrorKind::Unsupported).
+    #[inline]
+    pub fn connect_by_path_with_wait_mode<'p>(
+        path: impl ToWtf16<'p>,
+        wait_mode: ConnectWaitMode,
+    ) -> io::Result<Self> {
+        RawPipeStream::connect(
+            &path.to_wtf_16().map_err(to_io_error)?,
+            Rm::MODE,
+            Sm::MODE,
+            wait_mode,
+        )
+        .map(Self::new)
     }
 
     /// Internal constructor used by the listener. It's a logic error, but not UB, to create the
