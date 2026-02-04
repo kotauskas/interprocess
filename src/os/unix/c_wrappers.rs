@@ -284,7 +284,9 @@ pub(super) fn create_client(
     }
     let inprog = match connect(sock.as_fd(), dst) {
         Ok(()) => false,
-        Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) => true,
+        Err(e) if matches!(e.raw_os_error(), Some(libc::EINPROGRESS) | Some(libc::EAGAIN)) => {
+            true
+        }
         Err(e) => return Err(e),
     };
     Ok((sock, inprog))
