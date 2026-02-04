@@ -335,6 +335,7 @@ pub(super) fn poll_loop(
             }
             timeout = Some(remain);
         }
+        std::hint::spin_loop();
     }
 }
 
@@ -363,20 +364,49 @@ pub(super) fn poll(
             sigmask: *const libc::sigset_t,
         ) -> c_int;
     }
-    #[cfg(not(any(target_os = "netbsd", target_os = "openbsd")))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    ))]
     use libc::ppoll;
 
-    let timeout = timeout.map(duration_to_timespec).transpose()?;
     let mut fd = libc::pollfd { fd: fd.as_raw_fd(), events, revents: 0 };
-    let ret = unsafe {
+
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    ))]
+    let scret = unsafe {
+        let timeout = timeout.map(duration_to_timespec).transpose()?;
         ppoll(
             &mut fd,
             1,
             timeout.as_ref().map(crate::AsPtr::as_ptr).unwrap_or(ptr::null()),
             ptr::null(),
-        ) >= 0
-    }
-    .true_val_or_errno(fd.revents);
+        )
+    };
+
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+    )))]
+    let scret = unsafe {
+        let timeout =
+            timeout.map(|t| c_int::try_from(t.as_millis()).unwrap_or(c_int::MAX)).unwrap_or(-1);
+        libc::poll(&mut fd, 1, timeout)
+    };
+
+    let ret = (scret >= 0).true_val_or_errno(fd.revents);
     if ret.as_ref().err().and_then(io::Error::raw_os_error) == Some(libc::EINTR) {
         return Ok(0);
     }
@@ -394,6 +424,7 @@ pub(super) fn shutdown(fd: BorrowedFd<'_>, how: std::net::Shutdown) -> io::Resul
     unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 }.true_val_or_errno(())
 }
 
+#[allow(dead_code)]
 fn duration_to_timespec(d: Duration) -> io::Result<libc::timespec> {
     let tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "timeout duration overflowed time_t")
