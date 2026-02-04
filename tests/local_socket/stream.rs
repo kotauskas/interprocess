@@ -43,6 +43,8 @@ pub fn handle_client(conn: Stream) -> TestResult {
 
 pub fn client(name: &Name<'_>) -> TestResult {
     let mut conn = Stream::connect(name.borrow()).opname("connect").map(BufReader::new)?;
+    conn.get_ref().set_nonblocking(true).opname("set_nonblocking(true)")?;
+    conn.get_ref().set_nonblocking(false).opname("set_nonblocking(false)")?;
     send(conn.get_mut(), &msg(false, false), 0)?;
     recv(&mut conn, &msg(true, false), 0)?;
     send(conn.get_mut(), &msg(false, true), 1)?;
