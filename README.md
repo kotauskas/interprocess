@@ -78,7 +78,7 @@ releases.
 - Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Explicit support without CI
-*OSes at this level: **OpenBSD***
+*OSes at this level: **OpenBSD**, **NetBSD***
 
 - Interprocess is expected to compile and succeed in running all tests – it would be a bug for it
   not to
@@ -87,8 +87,7 @@ releases.
 - Certain `#[cfg]`-gated platform-specific features are supported with stable public APIs
 
 ##### Support by association
-*OSes at this level: **Dragonfly BSD**, **NetBSD**, **Redox**, **Fuchsia**, **iOS**, **tvOS**,
-**watchOS***
+*OSes at this level: **Dragonfly BSD**, **Redox**, **Fuchsia**, **iOS**, **tvOS**, **watchOS***
 
 - Interprocess is expected to compile and succeed in running all tests – it would be a bug for it not to
 - No manual testing is performed, and CI is unavailable because GitHub Actions does not provide it
