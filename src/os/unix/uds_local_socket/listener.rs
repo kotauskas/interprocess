@@ -1,10 +1,7 @@
 use {
     super::{listen_and_maybe_overwrite, ReclaimGuard, Stream},
     crate::{
-        local_socket::{
-            traits::{self, Stream as _},
-            ListenerNonblockingMode, ListenerOptions,
-        },
+        local_socket::{traits, ListenerNonblockingMode, ListenerOptions},
         os::unix::c_wrappers,
     },
     std::{
@@ -53,10 +50,10 @@ impl traits::Listener for Listener {
     }
     #[inline]
     fn accept(&self) -> io::Result<Stream> {
-        // TODO do our own accept and pass SOCK_NONBLOCK on supported platforms
+        // TODO do our own accept4 and pass SOCK_NONBLOCK on supported platforms
         let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
         if self.nonblocking_streams.load(Acquire) {
-            stream.set_nonblocking(true)?;
+            c_wrappers::fast_set_nonblocking(stream.as_fd(), true)?;
         }
         Ok(stream)
     }
