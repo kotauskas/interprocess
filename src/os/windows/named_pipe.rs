@@ -14,7 +14,7 @@
 //! counterparts, list important behavior implemented by Interprocess in their item-level
 //! documentation.
 
-// TODO(2.3.0) improve docs and add examples
+// TODO(2.3.1) improve docs and add examples
 // TODO(2.4.0) raw instance functionality
 // TODO(2.4.0) transactions
 

@@ -53,7 +53,7 @@ impl Listener {
 
 /// Does not assume that the sync `Listener` is in nonblocking mode, setting it to
 /// `ListenerNonblockingMode::Both` automatically.
-// TODO(3.0.0) remove handholding and assume nonblocking
+// FUTURE remove handholding and assume nonblocking
 impl TryFrom<SyncListener> for Listener {
     type Error = io::Error;
     fn try_from(mut sync: SyncListener) -> io::Result<Self> {

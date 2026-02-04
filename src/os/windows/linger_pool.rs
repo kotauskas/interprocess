@@ -49,7 +49,7 @@ unsafe impl Send for BoxedHandleOwner {}
 unsafe impl Sync for BoxedHandleOwner {}
 impl BoxedHandleOwner {
     fn new<T: AsRawHandle + Send + Sync>(value: T) -> Self {
-        // TODO(3.0.0) use const {}
+        // FUTURE use const {}
         assert!(align_of::<Self>() >= 2, "cannot perform low-bit tagging in QueueEnt");
         let boxptr = Box::into_raw(Box::new(HandleOwnerPointee {
             dtor: |slf| {
@@ -83,7 +83,7 @@ enum QueueEnt {
 }
 impl QueueEnt {
     /// Converts into a low-bit-tagged pointer.
-    #[allow(clippy::as_conversions)] // TODO(3.0.0) use Strict Provenance API
+    #[allow(clippy::as_conversions)] // FUTURE use Strict Provenance API
     fn into_raw(self) -> *mut () {
         match self {
             // Windows handles don't conflict with low-bit-tagging because
@@ -96,7 +96,7 @@ impl QueueEnt {
         }
     }
     /// Converts from a low-bit-tagged pointer created by `into_raw`.
-    #[allow(clippy::as_conversions)] // TODO(3.0.0) use Strict Provenance API
+    #[allow(clippy::as_conversions)] // FUTURE use Strict Provenance API
     unsafe fn from_raw(raw: *mut ()) -> Self {
         if raw as usize & 1 == 1 {
             let raw = (raw as usize & !1) as *mut ();

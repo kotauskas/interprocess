@@ -11,7 +11,7 @@ pub enum MaybeArc<T> {
 }
 impl<T> MaybeArc<T> {
     /// `Arc::clone` in place.
-    // TODO(2.3.0) this whole function is dodgy, Miri correction needed
+    // TODO(2.3.1) this whole function is dodgy, Miri correction needed
     pub fn refclone(&mut self) -> Self {
         let arc = match self {
             Self::Inline(mx) => {

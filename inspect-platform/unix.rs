@@ -76,7 +76,7 @@ fn listen(
 
     let pathdisp = path.display();
 
-    // FIXME(3.0.0) use format_args!
+    // FUTURE use format_args!
     let mut bindinfo = String::with_capacity(128);
     if let Some(mask) = mask {
         let _ = write!(bindinfo, " with umask {mask:0>3o}");
