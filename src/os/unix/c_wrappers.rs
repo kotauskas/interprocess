@@ -65,7 +65,7 @@ fn set_flflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
 pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
     {
-        let old_flags = get_flflags(fd)? & libc::O_NONBLOCK;
+        let old_flags = get_flflags(fd)? & !libc::O_NONBLOCK;
         set_flflags(fd, old_flags | if nonblocking { libc::O_NONBLOCK } else { 0 })
     }
     #[cfg(any(target_os = "linux", target_os = "android"))]
