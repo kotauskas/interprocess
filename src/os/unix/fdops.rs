@@ -1,10 +1,7 @@
 use {
     super::{c_wrappers, unixprelude::*},
-    crate::{weaken_buf_init_mut, OrErrno, TryClone},
-    std::{
-        io::{self, prelude::*, IoSlice, IoSliceMut},
-        mem::MaybeUninit,
-    },
+    crate::{AsBuf, OrErrno, TryClone},
+    std::io::{self, prelude::*, IoSlice, IoSliceMut},
 };
 
 #[allow(clippy::as_conversions)]
@@ -13,14 +10,16 @@ fn i2u(i: isize) -> usize { i as usize }
 #[repr(transparent)]
 pub(super) struct FdOps(pub(super) OwnedFd);
 impl FdOps {
-    pub(super) fn read_uninit(
+    pub(super) unsafe fn read_ptr(
         fd: BorrowedFd<'_>,
-        buf: &mut [MaybeUninit<u8>],
+        ptr: *mut u8,
+        len: usize,
     ) -> io::Result<usize> {
-        let length_to_read = buf.len();
-        let bytes_read =
-            unsafe { libc::read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), length_to_read) };
+        let bytes_read = unsafe { libc::read(fd.as_raw_fd(), ptr.cast(), len) };
         (bytes_read >= 0).true_val_or_errno(i2u(bytes_read))
+    }
+    pub(super) fn read(fd: BorrowedFd<'_>, buf: &mut (impl AsBuf + ?Sized)) -> io::Result<usize> {
+        unsafe { Self::read_ptr(fd, buf.as_ptr(), buf.len()) }
     }
     pub(super) fn write(fd: BorrowedFd<'_>, buf: &[u8]) -> io::Result<usize> {
         let length_to_write = buf.len();
@@ -30,9 +29,7 @@ impl FdOps {
     }
 }
 impl Read for &FdOps {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        FdOps::read_uninit(self.as_fd(), weaken_buf_init_mut(buf))
-    }
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { FdOps::read(self.as_fd(), buf) }
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
         let num_bufs = c_int::try_from(bufs.len()).unwrap_or(c_int::MAX);
         let bytes_read =

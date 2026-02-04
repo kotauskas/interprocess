@@ -42,9 +42,9 @@ impl AsyncRead for Recver {
             let fd = slf.0.get_ref().as_raw_fd();
             let mut readiness = ready!(slf.0.poll_read_ready_mut(cx))?;
             unsafe {
-                // SAFETY(unfilled_mut): what the fuck does "de-initialize" mean
+                // SAFETY(unfilled_mut): we are not de-initializing anything
                 // SAFETY(borrow_raw): we're getting it from an OwnedFd that we don't drop
-                match FdOps::read_uninit(BorrowedFd::borrow_raw(fd), buf.unfilled_mut()) {
+                match FdOps::read(BorrowedFd::borrow_raw(fd), buf.unfilled_mut()) {
                     Ok(bytes_read) => {
                         buf.assume_init(bytes_read);
                         buf.advance(bytes_read);
