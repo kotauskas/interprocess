@@ -11,7 +11,10 @@ use {
     recvmsg::{MsgBuf, RecvMsg, RecvResult},
     std::{
         str,
-        sync::{mpsc::Sender, Arc},
+        sync::{
+            mpsc::{Receiver, Sender},
+            Arc,
+        },
     },
 };
 
@@ -58,37 +61,60 @@ fn handle_conn_stc(
     send(&mut sender, msg2, 1)
 }
 
-pub fn server_duplex(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_duplex(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.mode(PipeMode::Messages).create_duplex::<pipe_mode::Messages>(),
         handle_conn_duplex,
+        doa_sync,
     )
 }
-pub fn server_cts(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_cts(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.mode(PipeMode::Messages).create_recv_only::<pipe_mode::Messages>(),
         handle_conn_cts,
+        doa_sync,
     )
 }
-pub fn server_stc(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_stc(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.mode(PipeMode::Messages).create_send_only::<pipe_mode::Messages>(),
         handle_conn_stc,
+        doa_sync,
     )
 }
 
-pub fn client_duplex(name: &str) -> TestResult {
-    let (mut recver, mut sender) =
-        DuplexPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?.split();
+pub fn client_duplex(name: &str, doa: bool) -> TestResult {
+    let conn =
+        DuplexPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
+
+    let (mut recver, mut sender) = conn.split();
 
     let [msg1, msg2] = msgs(false);
     send(&mut sender, msg1, 0)?;
@@ -101,16 +127,22 @@ pub fn client_duplex(name: &str) -> TestResult {
     DuplexPipeStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
-pub fn client_cts(name: &str) -> TestResult {
+pub fn client_cts(name: &str, doa: bool) -> TestResult {
     let mut sender =
         SendPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
     let [msg1, msg2] = msgs(false);
     send(&mut sender, msg1, 0)?;
     send(&mut sender, msg2, 1)
 }
-pub fn client_stc(name: &str) -> TestResult {
+pub fn client_stc(name: &str, doa: bool) -> TestResult {
     let mut recver =
         RecvPipeStream::<pipe_mode::Messages>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
     let [msg1, msg2] = msgs(true);
     recv(&mut recver, msg1, 0)?;
     recv(&mut recver, msg2, 1)

@@ -1,7 +1,5 @@
 #![cfg(windows)]
 
-// TODO test dead-on-arrival connection
-
 mod bytes;
 mod msg;
 
@@ -11,7 +9,11 @@ use {
         fmt::Debug,
         io,
         path::Path,
-        sync::{mpsc::Sender, Arc},
+        sync::{
+            atomic::{AtomicBool, Ordering::*},
+            mpsc::{self, Sender},
+            Arc,
+        },
     },
 };
 
@@ -23,10 +25,19 @@ macro_rules! matrix {
         fn $nm() -> TestResult {
             use $mod::*;
             test_wrapper(|| {
-                let server = matrix!(@dir_s $ty);
+                let (dtx, drx) = mpsc::channel();
+                let (server, client) = (matrix!(@dir_s $ty), matrix!(@dir_c $ty));
+                let doa = AtomicBool::new(true);
                 drive_server_and_multiple_clients(
-                    |ns, nc| server(make_id!(), ns, nc),
-                    matrix!(@dir_c $ty),
+                    |ns, nc| server(make_id!(), ns, nc, drx),
+                    |nm| {
+                        let doaval = doa.compare_exchange(true, false, AcqRel, Relaxed).is_ok();
+                        client(nm, doaval)?;
+                        if doaval {
+                            dtx.send(()).opname("doa_sync send")?;
+                        }
+                        Ok(())
+                    },
                 )?;
                 Ok(())
             })
@@ -49,16 +60,16 @@ fn drive_server<L: Debug>(
     num_clients: u32,
     mut createfn: impl FnMut(PipeListenerOptions<'_>) -> io::Result<L>,
     mut acceptfn: impl FnMut(&mut L) -> TestResult,
+    doa_sync: mpsc::Receiver<()>,
 ) -> TestResult {
     let (name, mut listener) = listen_and_pick_name(&mut namegen_named_pipe(id), |nm| {
         createfn(PipeListenerOptions::new().path(Path::new(nm)))
     })?;
-
     let _ = name_sender.send(Arc::from(name));
-
-    for _ in 0..num_clients {
+    doa_sync.recv().opname("doa_sync receive")?;
+    // The one client subtracted is the dead-on-arrival client
+    for _ in 0..num_clients - 1 {
         acceptfn(&mut listener)?;
     }
-
     Ok(())
 }

@@ -8,7 +8,10 @@ use {
     },
     std::{
         io::{prelude::*, BufReader},
-        sync::{mpsc::Sender, Arc},
+        sync::{
+            mpsc::{Receiver, Sender},
+            Arc,
+        },
     },
 };
 
@@ -32,50 +35,77 @@ fn handle_conn_stc(listener: &mut PipeListener<pipe_mode::None, pipe_mode::Bytes
     send(&mut sender, msg(true))
 }
 
-pub fn server_duplex(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_duplex(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.create_duplex::<pipe_mode::Bytes>(),
         handle_conn_duplex,
+        doa_sync,
     )
 }
-pub fn server_cts(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_cts(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.create_recv_only::<pipe_mode::Bytes>(),
         handle_conn_cts,
+        doa_sync,
     )
 }
-pub fn server_stc(id: &str, name_sender: Sender<Arc<str>>, num_clients: u32) -> TestResult {
+pub fn server_stc(
+    id: &str,
+    name_sender: Sender<Arc<str>>,
+    num_clients: u32,
+    doa_sync: Receiver<()>,
+) -> TestResult {
     drive_server(
         id,
         name_sender,
         num_clients,
         |plo| plo.create_send_only::<pipe_mode::Bytes>(),
         handle_conn_stc,
+        doa_sync,
     )
 }
 
-pub fn client_duplex(name: &str) -> TestResult {
-    let (mut recver, mut sender) =
-        DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?.split();
+pub fn client_duplex(name: &str, doa: bool) -> TestResult {
+    let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
+    let (mut recver, mut sender) = conn.split();
     send(&mut sender, msg(false))?;
     recv(&mut recver, msg(true))?;
     DuplexPipeStream::reunite(recver, sender).opname("reunite")?;
     Ok(())
 }
-pub fn client_cts(name: &str) -> TestResult {
+pub fn client_cts(name: &str, doa: bool) -> TestResult {
     let mut sender =
         SendPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
     send(&mut sender, msg(false))
 }
-pub fn client_stc(name: &str) -> TestResult {
+pub fn client_stc(name: &str, doa: bool) -> TestResult {
     let mut recver =
         RecvPipeStream::<pipe_mode::Bytes>::connect_by_path(name).opname("connect")?;
+    if doa {
+        return Ok(());
+    }
     recv(&mut recver, msg(true))
 }
 
