@@ -31,7 +31,7 @@ pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
         ListenerOptions::new().name(nm.borrow()).create_tokio()
     })?;
 
-    let _ = name_sender.send(name);
+    let _ = name_sender.send(Arc::new(name));
 
     let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
     for _ in 0..num_clients {

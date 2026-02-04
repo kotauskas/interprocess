@@ -51,7 +51,7 @@ async fn drive_server<L: Debug, T: Future<Output = TestResult> + Send + 'static>
         createfn(PipeListenerOptions::new().path(Path::new(nm))).map(Arc::new)
     })?;
 
-    let _ = name_sender.send(name);
+    let _ = name_sender.send(Arc::from(name));
 
     let mut tasks = Vec::with_capacity(num_clients.try_into().unwrap());
 

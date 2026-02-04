@@ -26,7 +26,7 @@ pub fn server(
     let (name, listener) = listen_and_pick_name(&mut namegen_local_socket(id, path), |nm| {
         ListenerOptions::new().name(nm.borrow()).create_sync()
     })?;
-    let _ = name_sender.send(name);
+    let _ = name_sender.send(Arc::new(name));
     listener
         .incoming()
         .take(num_clients.try_into().unwrap())

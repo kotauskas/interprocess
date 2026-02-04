@@ -54,7 +54,7 @@ fn drive_server<L: Debug>(
         createfn(PipeListenerOptions::new().path(Path::new(nm)))
     })?;
 
-    let _ = name_sender.send(name);
+    let _ = name_sender.send(Arc::from(name));
 
     for _ in 0..num_clients {
         acceptfn(&mut listener)?;

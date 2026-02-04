@@ -22,7 +22,6 @@ use {
     std::{
         fmt::{Arguments, Debug},
         io,
-        sync::Arc,
     },
 };
 
@@ -52,12 +51,12 @@ pub fn message(msg: Option<Arguments<'_>>, server: bool, terminator: Option<char
     msg.into()
 }
 
-pub fn listen_and_pick_name<L: Debug, N: Debug + ?Sized, F: FnMut(u32) -> NameResult<N>>(
+pub fn listen_and_pick_name<L: Debug, N: Debug, F: FnMut(u32) -> io::Result<N>>(
     namegen: &mut NameGen<N, F>,
     mut bindfn: impl FnMut(&N) -> io::Result<L>,
-) -> TestResult<(Arc<N>, L)> {
+) -> TestResult<(N, L)> {
     use std::io::ErrorKind::*;
-    let listener = namegen
+    let name_and_listener = namegen
         .find_map(|nm| {
             eprintln!("Trying name {nm:?}...");
             let nm = match nm {
@@ -76,6 +75,6 @@ pub fn listen_and_pick_name<L: Debug, N: Debug + ?Sized, F: FnMut(u32) -> NameRe
         })
         .unwrap() // Infinite iterator
         .context("listener bind failed")?;
-    eprintln!("Listener successfully created: {listener:#?}");
-    Ok(listener)
+    eprintln!("Listener successfully created: {name_and_listener:#?}");
+    Ok(name_and_listener)
 }

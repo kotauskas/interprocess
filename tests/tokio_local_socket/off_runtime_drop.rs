@@ -6,11 +6,11 @@ use {
         },
         tests::util::{listen_and_pick_name, namegen_local_socket, TestResult},
     },
-    std::{convert::Infallible, sync::Arc},
+    std::convert::Infallible,
     tokio::{io::AsyncWriteExt as _, runtime::Builder, task},
 };
 
-async fn create_server(name_sender: std::sync::mpsc::Sender<Arc<Name<'static>>>) -> TestResult {
+async fn create_server(name_sender: std::sync::mpsc::Sender<Name<'static>>) -> TestResult {
     // Not trying path = true because this was a Windows-only bug.
     let (name, listener) =
         listen_and_pick_name(&mut namegen_local_socket(make_id!(), false), |nm| {

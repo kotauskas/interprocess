@@ -13,7 +13,7 @@ use {
         tests::util::*,
         OrErrno, SubUsizeExt, TryClone,
     },
-    std::{ffi::OsString, fs::File, io, mem::MaybeUninit, ptr, sync::Arc},
+    std::{ffi::OsString, fs::File, io, mem::MaybeUninit, ptr},
     widestring::{U16CStr, U16Str},
     windows_sys::Win32::{
         Foundation::{MAX_PATH, STATUS_SUCCESS},
@@ -121,7 +121,7 @@ pub(super) fn test_main() -> TestResult {
                 .security_descriptor(sd.try_clone()?)
                 .create_sync()
         })?;
-    let _ = Stream::connect(Arc::try_unwrap(name).unwrap()).opname("client connect")?;
+    let _ = Stream::connect(name).opname("client connect")?;
 
     let listener_handle = match listener {
         Listener::NamedPipe(l) => OwnedHandle::from(l),

@@ -11,7 +11,6 @@ use {
         io,
         mem::zeroed,
         os::unix::prelude::*,
-        sync::Arc,
     },
 };
 
@@ -53,7 +52,6 @@ fn test_inner(path: bool) -> TestResult {
 
     // If listener is None, we're on a platform on which we expect this to not be supported
     let Some(listener) = listener else { return Ok(()) };
-    let name = Arc::try_unwrap(name).unwrap();
 
     let _ = Stream::connect(name.borrow()).opname("client connect")?;
     let actual_mode = if let Name(NameInner::UdSocketPath(path)) = name {

@@ -8,7 +8,7 @@ use {
         tests::util::*,
         TryClone,
     },
-    std::{ptr, sync::Arc},
+    std::ptr,
 };
 
 pub(super) fn test_main() -> TestResult {
@@ -23,6 +23,6 @@ pub(super) fn test_main() -> TestResult {
                 .security_descriptor(sd.try_clone()?)
                 .create_sync()
         })?;
-    let _ = Stream::connect(Arc::try_unwrap(name).unwrap()).opname("client connect")?;
+    let _ = Stream::connect(name).opname("client connect")?;
     Ok(())
 }
