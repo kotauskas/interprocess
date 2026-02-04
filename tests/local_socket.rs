@@ -14,7 +14,7 @@ use {
 fn test_stream(id: &'static str, path: bool) -> TestResult {
     use {io::ErrorKind::*, stream::*};
     let scl = |s, n| server(id, handle_client, s, n, path);
-    let name = drive_server_and_multiple_clients(scl, client)?;
+    let name = drive_server_and_multiple_clients(scl, |_| Ok(()), client)?;
     match LocalSocketStream::connect(name.borrow()) {
         Err(e) if matches!(e.kind(), NotFound | ConnectionRefused) => Ok(()),
         Err(e) => bail!(
