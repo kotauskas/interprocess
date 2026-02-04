@@ -22,6 +22,7 @@ use {
             ud_addr::{name_too_long, TerminatedUdAddr, UdAddr, SUN_LEN},
             unixprelude::*,
         },
+        timeout_expiry,
     },
     std::{
         ffi::{CStr, OsStr},
@@ -89,7 +90,7 @@ fn listen_and_maybe_overwrite<T>(
     mut opts: ListenerOptions<'_>,
     mut listen: impl FnMut(TerminatedUdAddr<'_>, &mut ListenerOptions<'_>) -> io::Result<T>,
 ) -> io::Result<T> {
-    let end = opts.get_max_spin_time().and_then(|time| Instant::now().checked_add(time));
+    let end = opts.get_max_spin_time().map(timeout_expiry).transpose()?;
     dispatch_name(
         &mut opts,
         true,
@@ -189,7 +190,7 @@ fn with_missing_dir_creat<O, T>(
     mut max_spin_time: impl FnMut(&mut O) -> Option<&mut Duration>,
     mut f: impl FnMut(TerminatedUdAddr<'_>, &mut O) -> io::Result<T>,
 ) -> io::Result<T> {
-    let end = max_spin_time(options).and_then(|&mut time| Instant::now().checked_add(time));
+    let end = max_spin_time(options).copied().map(timeout_expiry).transpose()?;
     let mut first = true;
     loop {
         let err = match f(addr, options) {

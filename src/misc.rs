@@ -401,3 +401,10 @@ fn noop_raw_waker() -> RawWaker {
     static VTAB: RawWakerVTable = RawWakerVTable::new(|_| noop_raw_waker(), drop, drop, drop);
     RawWaker::new(std::ptr::null(), &VTAB)
 }
+
+pub(crate) fn timeout_expiry(timeout: Duration) -> io::Result<Instant> {
+    let msg = "timeout expiry time overflowed std::time::Instant";
+    Instant::now()
+        .checked_add(timeout)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, msg))
+}
