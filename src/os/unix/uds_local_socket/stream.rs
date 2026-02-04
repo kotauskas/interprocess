@@ -1,16 +1,17 @@
 use {
+    super::{dispatch_name, CONN_TIMEOUT_MSG},
     crate::{
         error::ReuniteError,
         local_socket::{
             traits::{self, ReuniteResult},
             ConcurrencyDetector, ConnectOptions, LocalSocketSite,
         },
-        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
-        Sealed, TryClone,
+        os::unix::{c_wrappers, unixprelude::*},
+        ConnectWaitMode, Sealed, TryClone,
     },
     std::{
         io::{self, prelude::*, IoSlice, IoSliceMut},
-        os::{fd::OwnedFd, unix::net::UnixStream},
+        os::unix::net::UnixStream,
         sync::Arc,
     },
 };
@@ -24,25 +25,30 @@ impl traits::Stream for Stream {
     type SendHalf = SendHalf;
 
     fn from_options(mut opts: &ConnectOptions<'_>) -> io::Result<Self> {
-        dispatch_name(
+        let nonblocking_connect = matches!(
+            opts.get_wait_mode(),
+            ConnectWaitMode::Timeout(..) | ConnectWaitMode::Deferred
+        );
+        let (stream, inprog) = dispatch_name(
             &mut opts,
             false,
             |&mut opts| opts.name.borrow(),
             |_| None,
-            |addr, opts| {
-                c_wrappers::create_client(
-                    addr,
-                    opts.get_nonblocking_connect(),
-                    opts.get_nonblocking_stream(),
-                )
-            },
-        )
-        // Don't care if it's EINPROGRESS or not
-        .map(|(sock, _)| Self::from(sock))
+            |addr, _| c_wrappers::create_client(addr, nonblocking_connect),
+        )?;
+        if let ConnectWaitMode::Timeout(timeout) = opts.get_wait_mode() {
+            if inprog {
+                c_wrappers::wait_for_connect(stream.as_fd(), Some(timeout), CONN_TIMEOUT_MSG)?;
+            }
+        }
+        if opts.get_nonblocking_stream() != nonblocking_connect {
+            c_wrappers::set_nonblocking(stream.as_fd(), opts.get_nonblocking_stream())?;
+        }
+        Ok(stream.into())
     }
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        self.0.set_nonblocking(nonblocking)
+        c_wrappers::set_nonblocking(self.as_fd(), nonblocking)
     }
     #[inline]
     fn split(self) -> (RecvHalf, SendHalf) {
@@ -59,6 +65,10 @@ impl traits::Stream for Stream {
         let inner = Arc::into_inner(sh.0).expect("stream half inexplicably copied");
         Ok(inner)
     }
+}
+impl traits::StreamCommon for Stream {
+    #[inline]
+    fn take_error(&self) -> io::Result<Option<io::Error>> { c_wrappers::take_error(self.as_fd()) }
 }
 
 impl Read for &Stream {

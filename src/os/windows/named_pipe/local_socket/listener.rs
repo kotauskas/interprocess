@@ -2,8 +2,8 @@ use {
     super::stream::Stream,
     crate::{
         local_socket::{
-            traits::{self, ListenerNonblockingMode, Stream as _},
-            ListenerOptions, NameInner,
+            traits::{self, Stream as _, StreamCommon},
+            ListenerNonblockingMode, ListenerOptions, NameInner,
         },
         os::windows::{
             named_pipe::{pipe_mode::Bytes, PipeListener, PipeListenerOptions},
@@ -11,7 +11,7 @@ use {
         },
         AtomicEnum, Sealed,
     },
-    std::{io, iter::FusedIterator, sync::atomic::Ordering::SeqCst},
+    std::{io, iter::FusedIterator, sync::atomic::Ordering::*},
 };
 
 type ListenerImpl = PipeListener<Bytes, Bytes>;
@@ -43,8 +43,7 @@ impl traits::Listener for Listener {
     fn accept(&self) -> io::Result<Stream> {
         use ListenerNonblockingMode as LNM;
         let stream = self.listener.accept().map(Stream)?;
-        // TODO(2.3.0) verify necessity of orderings
-        let nonblocking = self.nonblocking.load(SeqCst);
+        let nonblocking = self.nonblocking.load(Acquire);
         if matches!(nonblocking, LNM::Accept) {
             stream.set_nonblocking(false)?;
         } else if matches!(nonblocking, LNM::Stream) {
@@ -54,10 +53,14 @@ impl traits::Listener for Listener {
     }
     fn set_nonblocking(&self, nonblocking: ListenerNonblockingMode) -> io::Result<()> {
         self.listener.set_nonblocking(nonblocking.accept_nonblocking())?;
-        self.nonblocking.store(nonblocking, SeqCst);
+        self.nonblocking.store(nonblocking, Release);
         Ok(())
     }
     fn do_not_reclaim_name_on_drop(&mut self) {}
+}
+impl StreamCommon for Stream {
+    #[inline(always)]
+    fn take_error(&self) -> io::Result<Option<io::Error>> { Ok(None) }
 }
 
 /// Access to the underlying implementation.

@@ -3,7 +3,7 @@
 use {
     crate::{
         bound_util::{RefTokioAsyncRead, RefTokioAsyncWrite},
-        local_socket::{ConnectOptions, Name},
+        local_socket::{traits::StreamCommon, ConnectOptions, Name},
         Sealed,
     },
     std::{future::Future, io},
@@ -17,15 +17,7 @@ use {
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
 pub trait Stream:
-    AsyncRead
-    + RefTokioAsyncRead
-    + AsyncWrite
-    + RefTokioAsyncWrite
-    + Send
-    + Sync
-    + Sized
-    + Sealed
-    + 'static
+    AsyncRead + RefTokioAsyncRead + AsyncWrite + RefTokioAsyncWrite + StreamCommon
 {
     /// Receive half type returned by [`.split()`](Stream::split).
     type RecvHalf: RecvHalf<Stream = Self>;
@@ -63,7 +55,9 @@ pub trait Stream:
 /// Types on which this trait is implemented are variants of the
 /// [`RecvHalf` enum](super::enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
 /// which makes it a trait object of sorts.
-pub trait RecvHalf: Sized + AsyncRead + RefTokioAsyncRead + Sealed {
+pub trait RecvHalf:
+    AsyncRead + RefTokioAsyncRead + Send + Sync + Sized + Sealed + 'static
+{
     /// The stream type the half is split from.
     type Stream: Stream;
 }
@@ -73,7 +67,9 @@ pub trait RecvHalf: Sized + AsyncRead + RefTokioAsyncRead + Sealed {
 /// Types on which this trait is implemented are variants of the
 /// [`SendHalf` enum](super::enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
 /// which makes it a trait object of sorts.
-pub trait SendHalf: Sized + AsyncWrite + RefTokioAsyncWrite + Sealed {
+pub trait SendHalf:
+    AsyncWrite + RefTokioAsyncWrite + Send + Sync + Sized + Sealed + 'static
+{
     /// The stream type the half is split from.
     type Stream: Stream;
 }

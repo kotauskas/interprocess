@@ -1,9 +1,13 @@
 use {
+    super::super::{dispatch_name, CONN_TIMEOUT_MSG},
     crate::{
         error::ReuniteError,
-        local_socket::{traits::tokio as traits, ConnectOptions},
-        os::unix::{c_wrappers, uds_local_socket::dispatch_name},
-        Sealed,
+        local_socket::{
+            traits::{tokio as traits, StreamCommon},
+            ConnectOptions,
+        },
+        os::unix::c_wrappers,
+        ConnectWaitMode, Sealed,
     },
     std::{
         io::{self, ErrorKind::WouldBlock},
@@ -38,12 +42,22 @@ impl traits::Stream for Stream {
             false,
             |&mut opts| opts.name.borrow(),
             |_| None,
-            |addr, _| c_wrappers::create_client_nonblockingly(addr, true),
+            |addr, _| c_wrappers::create_client(addr, true),
         )?;
         let sock = UnixStream::from_std(SyncUnixStream::from(sock))?;
         if inprog {
             // disapprovingly points finger at Mio
-            sock.writable().await?;
+            match opts.get_wait_mode() {
+                ConnectWaitMode::Deferred => {}
+                ConnectWaitMode::Timeout(timeout) => tokio::select! {
+                    biased;
+                    rslt = sock.writable() => rslt,
+                    _ = tokio::time::sleep(timeout) => {
+                        Err(io::Error::new(io::ErrorKind::TimedOut, CONN_TIMEOUT_MSG))
+                    }
+                }?,
+                ConnectWaitMode::Unbounded => sock.writable().await?,
+            }
         }
         Ok(Self(sock))
     }
@@ -57,6 +71,10 @@ impl traits::Stream for Stream {
             ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) }
         })
     }
+}
+impl StreamCommon for Stream {
+    #[inline]
+    fn take_error(&self) -> io::Result<Option<io::Error>> { c_wrappers::take_error(self.as_fd()) }
 }
 
 /// Access to the underlying implementation.

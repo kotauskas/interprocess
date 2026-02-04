@@ -18,9 +18,8 @@ use {
 /// [`Stream` enum](super::enum::Stream). In addition, it is implemented on `Stream` itself, which
 /// makes it a trait object of sorts. See its documentation for more on the semantics of the methods
 /// seen here.
-pub trait Stream:
-    Read + RefRead + Write + RefWrite + Debug + Send + Sync + Sized + Sealed
-{
+pub trait Stream: Read + RefRead + Write + RefWrite + StreamCommon {
+    // FUTURE move this to StreamCommon
     /// Receive half type returned by [`.split()`](Stream::split).
     type RecvHalf: RecvHalf<Stream = Self>;
     /// Send half type returned by [`.split()`](Stream::split).
@@ -64,12 +63,20 @@ pub trait Stream:
     // created for features like impersonation (ones that are instantaneous in nature).
 }
 
+/// Functionality common between [the `Stream` trait](Stream) and its async counterparts.
+pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
+    /// Reads the stored error code from the socket, returning `None` if no error has happened
+    /// since the last call to a method that propagates stored errors. Subsequent calls will
+    /// return `None` until another error occurs.
+    fn take_error(&self) -> io::Result<Option<io::Error>>;
+}
+
 /// Receive halves of [`Stream`]s, obtained through [`.split()`](Stream::split).
 ///
 /// Types on which this trait is implemented are variants of the
 /// [`RecvHalf` enum](super::enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
 /// which makes it a trait object of sorts.
-pub trait RecvHalf: Sized + Read + RefRead + Sealed {
+pub trait RecvHalf: Read + RefRead + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
 }
@@ -79,7 +86,7 @@ pub trait RecvHalf: Sized + Read + RefRead + Sealed {
 /// Types on which this trait is implemented are variants of the
 /// [`SendHalf` enum](super::enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
 /// which makes it a trait object of sorts.
-pub trait SendHalf: Sized + Write + RefWrite + Sealed {
+pub trait SendHalf: Write + RefWrite + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
 }

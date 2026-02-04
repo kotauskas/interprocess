@@ -70,6 +70,7 @@ mkenum!(
 #[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/sync/stream.rs"))]
 /// ```
 Stream);
+
 impl r#trait::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
@@ -109,6 +110,12 @@ impl r#trait::Stream for Stream {
             #[allow(unreachable_patterns)]
             (rh, sh) => Err(ReuniteError { rh, sh }),
         }
+    }
+}
+impl r#trait::StreamCommon for Stream {
+    #[inline]
+    fn take_error(&self) -> io::Result<Option<io::Error>> {
+        dispatch!(Self: x in self => x.take_error())
     }
 }
 impl TryClone for Stream {

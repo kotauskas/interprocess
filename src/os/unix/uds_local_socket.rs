@@ -35,6 +35,8 @@ use {
     },
 };
 
+const CONN_TIMEOUT_MSG: &str = "timed out while connecting to local socket server";
+
 /// Performs name reclamation when dropped.
 #[derive(Clone, Default)]
 struct ReclaimGuard(Box<[u8]>);

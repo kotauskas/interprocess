@@ -2,9 +2,15 @@
 use crate::{FdOrErrno, OrErrno};
 use {
     super::unixprelude::*,
-    crate::os::unix::ud_addr::TerminatedUdAddr,
+    crate::{os::unix::ud_addr::TerminatedUdAddr, timeout_expiry},
     libc::{sockaddr_un, AF_UNIX},
-    std::{ffi::CStr, io, mem::zeroed},
+    std::{
+        ffi::CStr,
+        io,
+        mem::{size_of, zeroed},
+        ptr,
+        time::{Duration, Instant},
+    },
 };
 
 macro_rules! cfg_atomic_cloexec {
@@ -55,9 +61,40 @@ fn get_flflags(fd: BorrowedFd<'_>) -> io::Result<c_int> {
 fn set_flflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
     unsafe { fcntl_int(fd, libc::F_SETFL, flags) }.map(drop)
 }
+
 pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
-    let old_flags = get_flflags(fd)? & libc::O_NONBLOCK;
-    set_flflags(fd, old_flags | if nonblocking { libc::O_NONBLOCK } else { 0 })
+    // TODO don't use get_flflags at all
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        let old_flags = get_flflags(fd)? & libc::O_NONBLOCK;
+        set_flflags(fd, old_flags | if nonblocking { libc::O_NONBLOCK } else { 0 })
+    }
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        let nonblocking = c_int::from(nonblocking);
+        unsafe { libc::ioctl(fd.as_raw_fd(), libc::FIONBIO, ptr::addr_of!(nonblocking)) >= 0 }
+            .true_val_or_errno(())
+    }
+}
+
+#[allow(clippy::as_conversions)]
+pub(super) unsafe fn getsockopt_int(
+    fd: BorrowedFd<'_>,
+    level: c_int,
+    optname: c_int,
+) -> io::Result<c_int> {
+    let mut rslt: c_int = 0;
+    let mut len = size_of::<c_int>() as socklen_t;
+    unsafe {
+        libc::getsockopt(
+            fd.as_raw_fd(),
+            level,
+            optname,
+            ptr::addr_of_mut!(rslt).cast(),
+            ptr::addr_of_mut!(len),
+        ) >= 0
+    }
+    .true_val_or_errno(rslt)
 }
 
 pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
@@ -222,13 +259,15 @@ pub(super) fn connect(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Res
         .true_val_or_errno(())
 }
 
+/// Creates a client stream by connecting to the given address. `nonblocking` specifies whether
+/// the connection is to happen in a nonblocking manner or not. The resulting stream will not
+/// have its nonblocking status changed after that.
 pub(super) fn create_client(
     dst: TerminatedUdAddr<'_>,
-    nb_connect: bool,
-    nb_stream: bool,
+    nonblocking: bool,
 ) -> io::Result<(OwnedFd, bool)> {
-    let sock = create_socket(libc::SOCK_STREAM, nb_connect)?;
-    if !CAN_CREATE_NONBLOCKING && nb_connect {
+    let sock = create_socket(libc::SOCK_STREAM, nonblocking)?;
+    if !CAN_CREATE_NONBLOCKING && nonblocking {
         set_nonblocking(sock.as_fd(), true)?;
     }
     let inprog = match connect(sock.as_fd(), dst) {
@@ -236,29 +275,98 @@ pub(super) fn create_client(
         Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) => true,
         Err(e) => return Err(e),
     };
-    if nb_connect != nb_stream {
-        set_nonblocking(sock.as_fd(), nb_stream)?;
-    }
     Ok((sock, inprog))
 }
-#[allow(dead_code)]
-pub(super) fn create_client_nonblockingly(
-    dst: TerminatedUdAddr<'_>,
-    ret_nonblocking: bool,
-) -> io::Result<(OwnedFd, bool)> {
-    let sock = create_socket(libc::SOCK_STREAM, true)?;
-    if !CAN_CREATE_NONBLOCKING {
-        set_nonblocking(sock.as_fd(), true)?;
+
+pub(super) fn take_error(fd: BorrowedFd<'_>) -> io::Result<Option<io::Error>> {
+    let errno = unsafe { getsockopt_int(fd, libc::SOL_SOCKET, libc::SO_ERROR)? };
+    Ok((errno != 0).then(|| io::Error::from_raw_os_error(errno)))
+}
+
+pub(super) fn wait_for_connect(
+    fd: BorrowedFd<'_>,
+    timeout: Option<Duration>,
+    timeout_msg: &str,
+) -> io::Result<()> {
+    let revents = poll_loop(fd, libc::POLLOUT, timeout)?;
+    // We have to assume there might be an error on VxWorks because it does not
+    // set POLLHUP and POLLERR
+    if cfg!(target_os = "vxworks") || (revents & (libc::POLLHUP | libc::POLLERR)) != 0 {
+        if let Some(e) = take_error(fd)? {
+            return Err(e);
+        }
     }
-    let inprog = match connect(sock.as_fd(), dst) {
-        Ok(()) => false,
-        Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) => true,
-        Err(e) => return Err(e),
-    };
-    if !ret_nonblocking {
-        set_nonblocking(sock.as_fd(), false)?;
+    if revents & libc::POLLOUT == 0 {
+        return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_msg));
     }
-    Ok((sock, inprog))
+    Ok(())
+}
+
+/// Like [`poll`], but loops until one of the events of interest, or an error/hangup, is signaled.
+pub(super) fn poll_loop(
+    fd: BorrowedFd<'_>,
+    events: c_short,
+    mut timeout: Option<Duration>,
+) -> io::Result<c_short> {
+    let end = timeout.map(timeout_expiry).transpose()?;
+    loop {
+        let rslt = poll(fd, events, timeout)?;
+        if rslt & (events | libc::POLLHUP | libc::POLLERR) != 0 {
+            break Ok(rslt);
+        }
+        if let Some(end) = end {
+            let remain = end.saturating_duration_since(Instant::now());
+            if remain == Duration::ZERO {
+                break Ok(0);
+            }
+            timeout = Some(remain);
+        }
+    }
+}
+
+pub(super) fn poll(
+    fd: BorrowedFd<'_>,
+    events: c_short,
+    timeout: Option<Duration>,
+) -> io::Result<c_short> {
+    // NetBSD pollts is identical to ppoll, but named differently for historical
+    // reasons. Recent NetBSD versions provide an alias named ppoll to ease
+    // porting of Linux programs, but since I bothered to look at the source
+    // code, we have no need to depend on that. Hilariously, NetBSD's manpage
+    // makes no effort to make it clear that ppoll does not do anything other
+    // than call pollts with the exact same arguments it receives. The moral
+    // of the story is that you can't do anything on the Berzerklies without
+    // reading the source code of the operating system.
+    #[cfg(target_os = "netbsd")]
+    use libc::pollts as ppoll;
+    // https://github.com/rust-lang/libc/pull/4957
+    #[cfg(target_os = "openbsd")]
+    extern "C" {
+        fn ppoll(
+            fds: *mut libc::pollfd,
+            nfds: libc::nfds_t,
+            timeout: *const libc::timespec,
+            sigmask: *const libc::sigset_t,
+        ) -> c_int;
+    }
+    #[cfg(not(any(target_os = "netbsd", target_os = "openbsd")))]
+    use libc::ppoll;
+
+    let timeout = timeout.map(duration_to_timespec).transpose()?;
+    let mut fd = libc::pollfd { fd: fd.as_raw_fd(), events, revents: 0 };
+    let ret = unsafe {
+        ppoll(
+            &mut fd,
+            1,
+            timeout.as_ref().map(crate::AsPtr::as_ptr).unwrap_or(ptr::null()),
+            ptr::null(),
+        ) >= 0
+    }
+    .true_val_or_errno(fd.revents);
+    if ret.as_ref().err().and_then(io::Error::raw_os_error) == Some(libc::EINTR) {
+        return Ok(0);
+    }
+    ret
 }
 
 #[allow(dead_code)]
@@ -270,4 +378,11 @@ pub(super) fn shutdown(fd: BorrowedFd<'_>, how: std::net::Shutdown) -> io::Resul
         Both => libc::SHUT_RDWR,
     };
     unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 }.true_val_or_errno(())
+}
+
+fn duration_to_timespec(d: Duration) -> io::Result<libc::timespec> {
+    let tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidInput, "timeout duration overflowed time_t")
+    })?;
+    Ok(libc::timespec { tv_sec, tv_nsec: d.subsec_nanos().into() })
 }

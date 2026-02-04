@@ -88,7 +88,7 @@ mod listener {
 /// Traits representing the interface of local sockets.
 pub mod traits {
     pub use super::{
-        listener::r#trait::{Listener, ListenerExt, ListenerNonblockingMode},
+        listener::r#trait::{Listener, ListenerExt},
         stream::r#trait::*,
     };
     /// Traits for the Tokio variants of local socket objects.
@@ -100,10 +100,13 @@ pub mod traits {
 }
 
 pub use {
-    listener::{options::ListenerOptions, r#enum::*, r#trait::Incoming},
+    listener::{
+        options::ListenerOptions,
+        r#enum::*,
+        r#trait::{Incoming, ListenerNonblockingMode},
+    },
     name::*,
     stream::{options::ConnectOptions, r#enum::*},
-    traits::ListenerNonblockingMode,
 };
 
 /// Re-exports of [traits] done in a way that doesn't pollute the scope, as well as of the
@@ -111,7 +114,7 @@ pub use {
 pub mod prelude {
     pub use super::{
         name::{NameType as _, ToFsName as _, ToNsName as _},
-        traits::{Listener as _, ListenerExt as _, Stream as _},
+        traits::{Listener as _, ListenerExt as _, Stream as _, StreamCommon as _},
         Listener as LocalSocketListener, Stream as LocalSocketStream,
     };
 }
@@ -147,7 +150,10 @@ pub mod tokio {
         pub use super::{
             super::{
                 name::{NameType as _, ToFsName as _, ToNsName as _},
-                traits::tokio::{Listener as _, Stream as _},
+                traits::{
+                    tokio::{Listener as _, Stream as _},
+                    StreamCommon as _,
+                },
             },
             Listener as LocalSocketListener, Stream as LocalSocketStream,
         };

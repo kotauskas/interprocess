@@ -2,7 +2,10 @@ use {
     crate::{
         error::{FromHandleError, ReuniteError},
         local_socket::{
-            traits::tokio::{self as traits, ReuniteResult},
+            traits::{
+                tokio::{self as traits, ReuniteResult},
+                StreamCommon,
+            },
             ConnectOptions, NameInner,
         },
         os::windows::{
@@ -51,6 +54,10 @@ impl traits::Stream for Stream {
             ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) }
         })
     }
+}
+impl StreamCommon for Stream {
+    #[inline(always)]
+    fn take_error(&self) -> io::Result<Option<io::Error>> { Ok(None) }
 }
 
 /// Access to the underlying implementation.

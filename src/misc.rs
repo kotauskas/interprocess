@@ -356,10 +356,10 @@ unsafe impl AsBuf for [MaybeUninit<u8>] {
 pub(crate) fn spin_with_timeout<S, R>(
     state: &mut S,
     timeout: Option<Duration>,
-    start: impl FnOnce(&mut S) -> ControlFlow<R>,
-    spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<R>,
+    start: impl FnOnce(&mut S) -> ControlFlow<io::Result<R>>,
+    spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<io::Result<R>>,
     update_timeout: impl FnMut(&mut S, Duration),
-) -> Option<R> {
+) -> Option<io::Result<R>> {
     if let ControlFlow::Break(val) = start(state) {
         Some(val)
     } else {
@@ -370,10 +370,14 @@ pub(crate) fn spin_with_timeout<S, R>(
 fn spin_with_timeout_loop<S, R>(
     state: &mut S,
     mut timeout: Option<Duration>,
-    mut spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<R>,
+    mut spin: impl FnMut(&mut S, Option<Duration>) -> ControlFlow<io::Result<R>>,
     mut update_timeout: impl FnMut(&mut S, Duration),
-) -> Option<R> {
-    let end = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
+) -> Option<io::Result<R>> {
+    let end = match timeout.map(timeout_expiry).transpose() {
+        Ok(end_or_none) => end_or_none,
+        Err(e) => return Some(Err(e)),
+    };
+
     loop {
         if let ControlFlow::Break(val) = spin(state, timeout) {
             break Some(val);

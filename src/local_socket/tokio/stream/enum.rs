@@ -4,7 +4,7 @@ use crate::os::unix::uds_local_socket::tokio as uds_impl;
 use crate::os::windows::named_pipe::local_socket::tokio as np_impl;
 use {
     super::r#trait,
-    crate::local_socket::ConnectOptions,
+    crate::local_socket::{traits::StreamCommon, ConnectOptions},
     std::{
         io,
         pin::Pin,
@@ -107,6 +107,12 @@ impl r#trait::Stream for Stream {
             #[allow(unreachable_patterns)]
             (rh, sh) => Err(ReuniteError { rh, sh }),
         }
+    }
+}
+impl StreamCommon for Stream {
+    #[inline]
+    fn take_error(&self) -> io::Result<Option<io::Error>> {
+        dispatch!(Self: x in self => x.take_error())
     }
 }
 multimacro! {

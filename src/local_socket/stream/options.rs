@@ -5,11 +5,12 @@ use std::future::Future;
 use {
     crate::{
         local_socket::{traits, Name, Stream},
-        Sealed, TryClone,
+        ConnectWaitMode, Sealed, TryClone,
     },
     std::{
         fmt::{self, Debug, Formatter},
         io,
+        time::Duration,
     },
 };
 
@@ -17,12 +18,17 @@ use {
 pub struct ConnectOptions<'n> {
     pub(crate) name: Name<'n>,
     flags: u8,
+    timeout: Duration,
 }
 impl Sealed for ConnectOptions<'_> {}
 
-const SHFT_NONBLOCKING_CONNECT: u8 = 0;
-const SHFT_NONBLOCKING_STREAM: u8 = 1;
-const ALL_BITS: u8 = (1 << 2) - 1;
+const SHFT_NONBLOCKING_STREAM: u8 = 0;
+const SHFT_TIMEOUT: u8 = 1;
+const SHFT_DEFERRED: u8 = 2;
+const ALL_BITS: u8 = (1 << 3) - 1;
+
+const WAITMODE_UNMASK: u8 = ALL_BITS ^ ((1 << SHFT_TIMEOUT) | (1 << SHFT_DEFERRED));
+
 #[allow(clippy::as_conversions)]
 const fn set_bit(flags: u8, pos: u8, val: bool) -> u8 {
     flags & (ALL_BITS ^ (1 << pos)) | ((val as u8) << pos)
@@ -32,7 +38,7 @@ const fn has_bit(flags: u8, pos: u8) -> bool { flags & (1 << pos) != 0 }
 impl TryClone for ConnectOptions<'_> {
     #[inline]
     fn try_clone(&self) -> io::Result<Self> {
-        Ok(Self { name: self.name.clone(), flags: self.flags })
+        Ok(Self { name: self.name.clone(), flags: self.flags, timeout: self.timeout })
     }
 }
 
@@ -40,7 +46,7 @@ impl TryClone for ConnectOptions<'_> {
 impl ConnectOptions<'_> {
     /// Returns a default set of client options.
     #[inline]
-    pub fn new() -> Self { Self { name: Name::invalid(), flags: 0 } }
+    pub fn new() -> Self { Self { name: Name::invalid(), flags: 0, timeout: Duration::ZERO } }
 }
 
 /// Option setters.
@@ -49,31 +55,41 @@ impl<'n> ConnectOptions<'n> {
         /// Sets the name the client will connect to.
         name: Name<'n>,
     }
-    /// Sets whether the connection operation should be nonblocking or not.
+    /// Sets the [wait mode](ConnectWaitMode) of the connection operation.
     ///
-    /// This is disabled by default.
+    /// This defaults to [unbounded waiting](ConnectWaitMode::Unbounded).
     ///
     /// ## Platform-specific behavior
     /// ### Unix
     /// Number of additional `fcntl`s if `SOCK_NONBLOCK` is available:
-    /// | conn \ stream | false | true |
-    /// |---------------|-------|------|
-    /// | false         |     0 |    1 |
-    /// | true          |     1 |    0 |
+    /// | wait_mode \ nonblocking_stream | false | true |
+    /// |--------------------------------|-------|------|
+    /// | Unbounded                      |     0 |    1 |
+    /// | Timeout                        |     1 |    0 |
+    /// | Deferred                       |     1 |    0 |
     ///
     /// Number of additional `fcntl`s if `SOCK_NONBLOCK` is not available:
-    /// | conn \ stream | false | true |
-    /// |---------------|-------|------|
-    /// | false         |     0 |    1 |
-    /// | true          |     2 |    1 |
+    /// | wait_mode \ nonblocking_stream | false | true |
+    /// |--------------------------------|-------|------|
+    /// | Unbounded                      |     0 |    1 |
+    /// | Timeout                        |     2 |    1 |
+    /// | Deferred                       |     2 |    1 |
     ///
     /// ### Windows
     /// Has no effect, as attempting to connect to an overloaded named pipe will immediately
     /// return an error.
     #[must_use = builder_must_use!()]
     #[inline(always)]
-    pub fn nonblocking_connect(mut self, nonblocking: bool) -> Self {
-        self.flags = set_bit(self.flags, SHFT_NONBLOCKING_CONNECT, nonblocking);
+    pub fn wait_mode(mut self, wait_mode: ConnectWaitMode) -> Self {
+        let flags = self.flags & WAITMODE_UNMASK;
+        match wait_mode {
+            ConnectWaitMode::Deferred => self.flags = set_bit(flags, SHFT_DEFERRED, true),
+            ConnectWaitMode::Timeout(timeout) => {
+                self.flags = set_bit(flags, SHFT_TIMEOUT, true);
+                self.timeout = timeout;
+            }
+            ConnectWaitMode::Unbounded => self.flags = flags,
+        };
         self
     }
     /// Sets whether the resulting connection is to have its reads and writes be nonblocking or
@@ -83,7 +99,7 @@ impl<'n> ConnectOptions<'n> {
     ///
     /// ## Platform-specific behavior
     /// ### Unix
-    /// See [`nonblocking_connect`](Self::nonblocking_connect).
+    /// See [`wait_mode`](Self::wait_mode).
     ///
     /// ### Windows
     /// The same as `.set_nonblocking(true)` immediately after creation.
@@ -97,8 +113,14 @@ impl<'n> ConnectOptions<'n> {
 
 /// Option getters.
 impl ConnectOptions<'_> {
-    pub(crate) fn get_nonblocking_connect(&self) -> bool {
-        has_bit(self.flags, SHFT_NONBLOCKING_CONNECT)
+    pub(crate) fn get_wait_mode(&self) -> ConnectWaitMode {
+        if has_bit(self.flags, SHFT_DEFERRED) {
+            ConnectWaitMode::Deferred
+        } else if has_bit(self.flags, SHFT_TIMEOUT) {
+            ConnectWaitMode::Timeout(self.timeout)
+        } else {
+            ConnectWaitMode::Unbounded
+        }
     }
     pub(crate) fn get_nonblocking_stream(&self) -> bool {
         has_bit(self.flags, SHFT_NONBLOCKING_STREAM)
@@ -150,7 +172,7 @@ impl Debug for ConnectOptions<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConnectOptions")
             .field("name", &self.name)
-            .field("nonblocking_connect", &self.get_nonblocking_connect())
+            .field("wait_mode", &self.get_wait_mode())
             .field("nonblocking_stream", &self.get_nonblocking_stream())
             .finish()
     }
