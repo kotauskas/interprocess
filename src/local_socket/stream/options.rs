@@ -76,8 +76,13 @@ impl<'n> ConnectOptions<'n> {
     /// | Deferred                       |     2 |    1 |
     ///
     /// ### Windows
-    /// Has no effect, as attempting to connect to an overloaded named pipe will immediately
-    /// return an error.
+    /// `WaitMode::Timeout` has no effect in that attempting to connect to an overloaded named
+    /// pipe will always return an error as soon as possible. If the named pipe is across the
+    /// network, this may entail blocking on network activity for a duration that exceeds the
+    /// specified timeout.
+    ///
+    /// `WaitMode::Deferred` is not supported, and an error will be returned by `connect_*` if it
+    /// is used.
     #[must_use = builder_must_use!()]
     #[inline(always)]
     pub fn wait_mode(mut self, wait_mode: ConnectWaitMode) -> Self {
