@@ -13,12 +13,17 @@ use {
     std::{
         io::{self, Write},
         os::windows::io::OwnedHandle,
+        time::Duration,
     },
 };
 
 type StreamImpl = DuplexPipeStream<Bytes>;
 type RecvHalfImpl = RecvPipeStream<Bytes>;
 type SendHalfImpl = SendPipeStream<Bytes>;
+
+fn no_timeouts() -> io::Result<()> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "named pipes do not support I/O timeouts"))
+}
 
 /// Wrapper around [`DuplexPipeStream`] that implements [`Stream`](traits::Stream).
 #[derive(Debug)]
@@ -42,6 +47,12 @@ impl traits::Stream for Stream {
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         self.0.set_nonblocking(nonblocking)
     }
+
+    #[inline]
+    fn set_recv_timeout(&self, _: Option<Duration>) -> io::Result<()> { no_timeouts() }
+    #[inline]
+    fn set_send_timeout(&self, _: Option<Duration>) -> io::Result<()> { no_timeouts() }
+
     #[inline]
     fn split(self) -> (RecvHalf, SendHalf) {
         let (rh, sh) = self.0.split();
@@ -157,8 +168,14 @@ impl Write for &SendHalf {
 impl Sealed for RecvHalf {}
 impl traits::RecvHalf for RecvHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, _: Option<Duration>) -> io::Result<()> { no_timeouts() }
 }
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, _: Option<Duration>) -> io::Result<()> { no_timeouts() }
 }

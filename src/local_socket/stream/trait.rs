@@ -9,6 +9,7 @@ use {
     std::{
         fmt::Debug,
         io::{self, prelude::*},
+        time::Duration,
     },
 };
 
@@ -42,6 +43,13 @@ pub trait Stream: Read + RefRead + Write + RefWrite + StreamCommon {
     /// - Sending is attempted and the buffer is full due to the other side not yet having
     ///   received previously sent data.
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()>;
+
+    /// Sets the receive timeout to the specified value. If set to `None` (the default), reads
+    /// will block indefinitely if there is no data.
+    fn set_recv_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
+    /// Sets the send timeout to the specified value. If set to `None` (the default), writes
+    /// will block indefinitely if there is no space in the send buffer.
+    fn set_send_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
 
     /// Splits a stream into a receive half and a send half, which can be used to receive from and
     /// send to the stream concurrently from different threads, entailing a memory allocation.
@@ -79,6 +87,10 @@ pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
 pub trait RecvHalf: Read + RefRead + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
+
+    /// Sets the receive timeout to the specified value. If set to `None` (the default), reads
+    /// will block indefinitely if there is no data.
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
 }
 
 /// Send halves of [`Stream`]s, obtained through [`.split()`](Stream::split).
@@ -89,6 +101,10 @@ pub trait RecvHalf: Read + RefRead + Send + Sync + Sized + Sealed + 'static {
 pub trait SendHalf: Write + RefWrite + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
+
+    /// Sets the send timeout to the specified value. If set to `None` (the default), writes
+    /// will block indefinitely if there is no space in the send buffer.
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
 }
 
 /// [`ReuniteResult`](crate::error::ReuniteResult) for the [`Stream` trait](Stream).

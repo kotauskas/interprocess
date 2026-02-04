@@ -3,6 +3,7 @@
 mod no_client;
 mod no_server;
 mod stream;
+mod timeout;
 
 use {
     crate::{local_socket::prelude::*, tests::util::*},
@@ -23,9 +24,10 @@ fn test_stream(id: &'static str, path: bool) -> TestResult {
     }
 }
 
+#[allow(unused_imports)]
 use {
     no_client::run_and_verify_error as test_no_client,
-    no_server::run_and_verify_error as test_no_server,
+    no_server::run_and_verify_error as test_no_server, timeout::main as test_timeout,
 };
 
 macro_rules! tests {
@@ -51,4 +53,10 @@ tests! {test_no_server
 tests! {test_no_client
     no_client_file       true
     no_client_namespaced false
+}
+
+#[cfg(not(windows))]
+tests! {test_timeout
+    timeout_file       true
+    timeout_namespaced false
 }

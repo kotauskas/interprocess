@@ -3,6 +3,7 @@ use {
     crate::{
         error::ReuniteError,
         local_socket::{
+            prelude::*,
             traits::{self, ReuniteResult},
             ConcurrencyDetector, ConnectOptions, LocalSocketSite,
         },
@@ -13,6 +14,7 @@ use {
         io::{self, prelude::*, IoSlice, IoSliceMut},
         os::unix::net::UnixStream,
         sync::Arc,
+        time::Duration,
     },
 };
 
@@ -46,10 +48,21 @@ impl traits::Stream for Stream {
         }
         Ok(stream.into())
     }
+
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         c_wrappers::set_nonblocking(self.as_fd(), nonblocking)
     }
+
+    #[inline]
+    fn set_recv_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_read_timeout(timeout)
+    }
+    #[inline]
+    fn set_send_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_write_timeout(timeout)
+    }
+
     #[inline]
     fn split(self) -> (RecvHalf, SendHalf) {
         let arc = Arc::new(self);
@@ -154,6 +167,11 @@ pub struct RecvHalf(pub(super) Arc<Stream>);
 impl Sealed for RecvHalf {}
 impl traits::RecvHalf for RecvHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_recv_timeout(timeout)
+    }
 }
 multimacro! {
     RecvHalf,
@@ -170,6 +188,11 @@ pub struct SendHalf(pub(super) Arc<Stream>);
 impl Sealed for SendHalf {}
 impl traits::SendHalf for SendHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_send_timeout(timeout)
+    }
 }
 multimacro! {
     SendHalf,

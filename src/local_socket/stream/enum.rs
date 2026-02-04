@@ -5,7 +5,10 @@ use crate::os::windows::named_pipe::local_socket as np_impl;
 use {
     super::r#trait,
     crate::{local_socket::ConnectOptions, TryClone},
-    std::io::{self, prelude::*, IoSlice, IoSliceMut},
+    std::{
+        io::{self, prelude::*, IoSlice, IoSliceMut},
+        time::Duration,
+    },
 };
 
 impmod! {local_socket::dispatch_sync}
@@ -79,10 +82,21 @@ impl r#trait::Stream for Stream {
     fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
         dispatch_sync::connect(options)
     }
+
     #[inline]
     fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         dispatch!(Self: x in self => x.set_nonblocking(nonblocking))
     }
+
+    #[inline]
+    fn set_recv_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        dispatch!(Self: x in self => x.set_recv_timeout(timeout))
+    }
+    #[inline]
+    fn set_send_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        dispatch!(Self: x in self => x.set_send_timeout(timeout))
+    }
+
     fn split(self) -> (RecvHalf, SendHalf) {
         match self {
             #[cfg(windows)]
@@ -136,6 +150,11 @@ mkenum!(
 "local_socket::" RecvHalf);
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        dispatch!(Self: x in self => x.set_timeout(timeout))
+    }
 }
 dispatch_read!(RecvHalf);
 
@@ -146,6 +165,11 @@ mkenum!(
 "local_socket::" SendHalf);
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        dispatch!(Self: x in self => x.set_timeout(timeout))
+    }
 }
 dispatch_write!(SendHalf);
 
