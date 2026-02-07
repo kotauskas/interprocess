@@ -106,7 +106,6 @@ impl<S, E: Display> Display for ConversionError<S, E> {
 }
 impl<S: Debug, E: Error + 'static> Error for ConversionError<S, E> {
     #[inline]
-    #[allow(clippy::as_conversions)]
     fn source(&self) -> Option<&(dyn Error + 'static)> { self.cause.as_ref().map(|r| r as &_) }
 }
 

@@ -30,6 +30,7 @@ const SECINFO: u32 =
 
 fn get_sd(handle: BorrowedHandle<'_>, ot: SE_OBJECT_TYPE) -> TestResult<SecurityDescriptor> {
     let mut sdptr = ptr::null_mut();
+    #[allow(clippy::cast_possible_wrap)] // sign not relevant
     let errno = unsafe {
         GetSecurityInfo(
             handle.as_int_handle(),
@@ -40,13 +41,7 @@ fn get_sd(handle: BorrowedHandle<'_>, ot: SE_OBJECT_TYPE) -> TestResult<Security
             ptr::null_mut(),
             ptr::null_mut(),
             &mut sdptr,
-        )
-    };
-    let errno = {
-        #[allow(clippy::as_conversions)]
-        {
-            errno as i32
-        }
+        ) as i32
     };
     (errno == STATUS_SUCCESS)
         .then_some(())
@@ -99,7 +94,6 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
     })
 }
 
-#[allow(clippy::as_conversions)]
 pub(super) fn test_main() -> TestResult {
     let sd = {
         let mut pathbuf = [MaybeUninit::uninit(); MAX_PATH as _];

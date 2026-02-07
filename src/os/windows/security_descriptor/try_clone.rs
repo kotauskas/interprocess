@@ -124,8 +124,8 @@ unsafe fn get_acl_info<T>(
     }
 }
 
-#[allow(clippy::unwrap_used, clippy::as_conversions)]
 fn create_acl(sz: u32, rev: u32) -> io::Result<LocalBox<ACL>> {
+    #[allow(clippy::cast_possible_truncation)] // I'm sure the size of u32 in bytes fits in u32
     const ALIGN: u32 = size_of::<u32>() as u32; // 100₂
     const ALIGN_MASK: u32 = ALIGN - 1; // 011₂
     let sz = if sz & ALIGN_MASK != 0 {

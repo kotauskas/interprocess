@@ -210,7 +210,6 @@ macro_rules! impl_subsize {
     ($src:ident to usize) => {
         impl SubUsizeExt for $src {
             #[inline(always)]
-            #[allow(clippy::as_conversions)]
             fn to_usize(self) -> usize {
                 self as usize
             }
@@ -219,7 +218,8 @@ macro_rules! impl_subsize {
     ($src:ident to isize) => {
         impl SubIsizeExt for $src {
             #[inline(always)]
-            #[allow(clippy::as_conversions)]
+            // we don't run on 16-bit platforms
+            #[allow(clippy::cast_possible_wrap)]
             fn to_isize(self) -> isize {
                 self as isize
             }
@@ -247,7 +247,7 @@ pub(crate) trait RawOsErrorExt {
 }
 impl RawOsErrorExt for Option<i32> {
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
+    #[allow(clippy::cast_sign_loss)] // bitwise comparison
     fn eeq(self, other: u32) -> bool {
         match self {
             Some(n) => n as u32 == other,

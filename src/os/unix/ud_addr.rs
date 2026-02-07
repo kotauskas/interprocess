@@ -25,10 +25,12 @@ pub(super) const SUN_LEN: usize = {
     let sun = unsafe { zeroed::<sockaddr_un>() };
     sun.sun_path.len()
 };
-#[allow(clippy::as_conversions)]
 const PATH_OFFSET: usize = {
     let sun = unsafe { zeroed::<sockaddr_un>() };
     let sunptr = (&sun as *const sockaddr_un).cast::<u8>();
+
+    // FUTURE use offset_from_unsigned
+    #[allow(clippy::cast_sign_loss)]
     let off = unsafe { addr_of!(sun.sun_path).cast::<u8>().offset_from(sunptr) } as usize;
     if off + sun.sun_path.len() != size_of::<sockaddr_un>() {
         panic!("unsupported sockaddr_un layout");
@@ -50,10 +52,12 @@ pub(super) struct UdAddr {
 impl UdAddr {
     /// Creates an empty `UdAddr`.
     #[inline]
-    #[allow(clippy::as_conversions)]
     pub fn new() -> Self {
         let mut sun = MaybeUninit::<sockaddr_un>::uninit();
-        unsafe { addr_of_mut!((*sun.as_mut_ptr()).sun_family).write(libc::AF_UNIX as _) };
+        #[allow(clippy::cast_possible_truncation)]
+        unsafe {
+            addr_of_mut!((*sun.as_mut_ptr()).sun_family).write(libc::AF_UNIX as _)
+        };
         Self { len: 0, sun, terminator: MaybeUninit::uninit() }
     }
 
@@ -99,14 +103,13 @@ impl UdAddr {
 
     /// Returns the address length that is to be passed to `bind`. This is different from the
     /// [initialized length](Self::len).
-    #[allow(clippy::as_conversions, clippy::arithmetic_side_effects)]
+    #[allow(clippy::cast_possible_truncation, clippy::arithmetic_side_effects)]
     #[inline]
     pub fn addrlen(&self) -> socklen_t { self.len + PATH_OFFSET as socklen_t }
 
     /// Returns the initialized length, which is the number of bytes at the beginning of the
     /// path buffer that are initialized.
     #[inline]
-    #[allow(clippy::as_conversions)]
     pub fn len(&self) -> usize { self.len as usize }
     /// Resets the [initialized length](Self::len) to zero.
     #[inline]
@@ -117,14 +120,14 @@ impl UdAddr {
     /// At least this many bytes must be initialized at the beginning of the buffer, and
     /// it must not exceed the bounds of the buffer.
     #[inline]
-    #[allow(clippy::as_conversions)]
+    #[allow(clippy::cast_possible_truncation)]
     pub unsafe fn set_len(&mut self, len: usize) { self.len = len as socklen_t }
     /// Increments the [initialized length](Self::len) by the given value.
     ///
     /// # Safety
     /// See [`set_len`](Self::set_len).
     #[inline]
-    #[allow(clippy::as_conversions, clippy::arithmetic_side_effects)]
+    #[allow(clippy::cast_possible_truncation, clippy::arithmetic_side_effects)]
     pub unsafe fn incr_len(&mut self, incr: usize) { self.len += incr as socklen_t }
 }
 
@@ -145,7 +148,6 @@ impl UdAddr {
     ///
     /// # Safety
     /// Same as `push_slice`.
-    #[allow(clippy::as_conversions)]
     pub unsafe fn push_slice_with_nuls(&mut self, s: &[u8]) {
         unsafe { self.write_slice(self.len as usize, s) };
         unsafe { self.incr_len(s.len()) };
@@ -154,7 +156,6 @@ impl UdAddr {
     /// Writes a nul terminator, making `path_ptr` point to a nul-terminated string. A witness
     /// object is returned that codifies in the type system that nul termination has been
     /// established.
-    #[allow(clippy::as_conversions)]
     pub fn write_terminator(&mut self) -> TerminatedUdAddr<'_> {
         let len = self.len as usize;
         if len < SUN_LEN {
@@ -174,14 +175,13 @@ impl UdAddr {
     }
 
     /// Initializes from a regular path.
-    #[allow(clippy::as_conversions)]
     pub fn init(&mut self, path: &[NonZeroU8]) -> io::Result<()> {
         Self::check_path_length(path.len())?;
         unsafe { self.push_slice(path) };
         Ok(())
     }
     /// Initializes from an abstract namespace name.
-    #[allow(dead_code, clippy::as_conversions, clippy::arithmetic_side_effects)]
+    #[allow(dead_code, clippy::arithmetic_side_effects)]
     pub fn init_namespaced(&mut self, nsname: &[NonZeroU8]) -> io::Result<()> {
         // Cannot overflow, as the length of slices always fits into an isize
         Self::check_path_length(nsname.len() + 1)?;

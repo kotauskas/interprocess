@@ -235,14 +235,13 @@ fn continue_spin_loop(end: Option<Instant>, spin_time: Option<&mut Duration>) ->
     true
 }
 
-#[allow(clippy::as_conversions)]
 const MAX_RUN_USER: usize = "/run/user//".len() + uid_t::MAX.ilog10() as usize + 1;
 const RUN_USER_BUF: usize = MAX_RUN_USER + 1;
 const NMCAP: usize = SUN_LEN - MAX_RUN_USER;
 
 /// Writes a `/run/user/<uid>/` path with the given socket name into the address buffer,
 /// [escaping](escape_nuls) interior nuls.
-#[allow(clippy::as_conversions, clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 fn write_run_user(addr: &mut UdAddr, name: &[u8]) -> io::Result<()> {
     // Comparing without regard for the length of the /run/user path
     // improves robustness of programs by preventing reliance on the

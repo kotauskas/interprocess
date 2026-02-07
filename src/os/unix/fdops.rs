@@ -4,7 +4,7 @@ use {
     std::io::{self, prelude::*, IoSlice, IoSliceMut},
 };
 
-#[allow(clippy::as_conversions)]
+#[allow(clippy::cast_sign_loss)]
 fn i2u(i: isize) -> usize { i as usize }
 
 #[repr(transparent)]

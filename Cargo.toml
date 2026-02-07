@@ -1,6 +1,6 @@
 [package]
 name         = "interprocess"
-version      = "2.3.0"
+version      = "2.3.1"
 rust-version = "1.75"
 edition      = "2021"
 authors      = ["Goat"]
@@ -137,13 +137,18 @@ rust_2018_idioms = { level = "deny", priority = -1 }
 dead_code = "allow"
 
 [lints.clippy]
-ptr_as_ptr           = "forbid"
-as_conversions       = "deny"
-exit                 = "deny"
-get_unwrap           = "deny"
-dbg_macro            = "warn"
-option_map_unit_fn   = "allow"
-tabs_in_doc_comments = "allow"
+ptr_as_ptr               = "forbid" # use .cast()
+cast_precision_loss      = "deny" # we don't use floats
+exit                     = "deny" # we're a library
+fn_to_numeric_cast_any   = "deny" # we have no use for this
+get_unwrap               = "deny"
+cast_possible_truncation = "warn"
+cast_possible_wrap       = "warn"
+cast_sign_loss           = "warn"
+dbg_macro                = "warn"
+cast_lossless            = "allow" # very important for portability
+option_map_unit_fn       = "allow" # more concise
+unnecessary_cast         = "allow" # also important for portability
 
 [package.metadata.docs.rs]
 features = ["doc_cfg", "tokio"]

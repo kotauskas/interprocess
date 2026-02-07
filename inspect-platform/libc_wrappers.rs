@@ -58,7 +58,7 @@ pub fn fchmod(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
     unsafe { libc::fchmod(fd.as_raw_fd(), mode) }.ok_or_errno()
 }
 
-#[allow(clippy::as_conversions)]
+#[allow(clippy::cast_possible_truncation)]
 fn sockaddr_un_init(
     sau: &mut MaybeUninit<libc::sockaddr_un>,
     path: &Path,

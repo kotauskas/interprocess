@@ -21,19 +21,16 @@ use {
 
 pub(crate) trait AsRawHandleExt: AsRawHandle {
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     fn as_int_handle(&self) -> HANDLE { self.as_raw_handle() as HANDLE }
 }
 impl<T: AsRawHandle + ?Sized> AsRawHandleExt for T {}
 pub(crate) trait IntoRawHandleExt: IntoRawHandle + Sized {
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     fn into_int_handle(self) -> HANDLE { self.into_raw_handle() as HANDLE }
 }
 impl<T: IntoRawHandle> IntoRawHandleExt for T {}
 pub(crate) trait FromRawHandleExt: FromRawHandle + Sized {
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     unsafe fn from_int_handle(h: HANDLE) -> Self {
         // FUTURE use null provenance instead of int2ptr
         unsafe { Self::from_raw_handle(h as *mut c_void) }
@@ -46,7 +43,6 @@ pub(crate) trait HANDLEExt {
 }
 impl HANDLEExt for HANDLE {
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     fn to_std(self) -> RawHandle { self as RawHandle }
 }
 

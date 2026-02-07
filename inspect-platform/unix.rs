@@ -227,7 +227,6 @@ fn select_tmpdir() -> Option<&'static Path> {
 
 pub struct StatDisplay(libc::stat);
 impl Display for StatDisplay {
-    #[allow(clippy::as_conversions)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let &StatDisplay(libc::stat { st_dev, st_ino, st_mode, st_uid, st_gid, .. }) = self;
         let (majdev, mindev) = (libc::major(st_dev), libc::minor(st_dev));

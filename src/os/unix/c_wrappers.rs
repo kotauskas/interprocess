@@ -89,13 +89,13 @@ pub(super) fn fast_set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io:
     }
 }
 
-#[allow(clippy::as_conversions)]
 pub(super) unsafe fn getsockopt_int(
     fd: BorrowedFd<'_>,
     level: c_int,
     optname: c_int,
 ) -> io::Result<c_int> {
     let mut rslt: c_int = 0;
+    #[allow(clippy::cast_possible_truncation)]
     let mut len = size_of::<c_int>() as socklen_t;
     unsafe {
         libc::getsockopt(
@@ -195,13 +195,16 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
     Ok(fd)
 }
 
-#[allow(clippy::as_conversions)]
 const SUN_PATH_OFFSET: usize = unsafe {
     // This code may or may not have been copied from the standard library
     let addr = zeroed::<sockaddr_un>();
     let base = (&addr as *const sockaddr_un).cast::<c_char>();
     let path = &addr.sun_path as *const c_char;
-    path.byte_offset_from(base) as usize
+    #[allow(clippy::cast_sign_loss)]
+    {
+        // FUTURE use byte_offset_from_unsigned
+        path.byte_offset_from(base) as usize
+    }
 };
 
 fn bind(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Result<()> {

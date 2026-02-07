@@ -35,7 +35,6 @@ const SHFT_HAS_MAX_SPIN_TIME: u8 = 5;
 
 const ALL_BITS: u8 = (1 << 6) - 1;
 const NONBLOCKING_BITS: u8 = (1 << SHFT_NONBLOCKING_ACCEPT) | (1 << SHFT_NONBLOCKING_STREAM);
-#[allow(clippy::as_conversions)]
 const fn set_bit(flags: u8, pos: u8, val: bool) -> u8 {
     flags & (ALL_BITS ^ (1 << pos)) | ((val as u8) << pos)
 }
@@ -89,7 +88,6 @@ impl<'n> ListenerOptions<'n> {
     /// The default value is `Neither`.
     #[must_use = builder_must_use!()]
     #[inline(always)]
-    #[allow(clippy::as_conversions)]
     pub fn nonblocking(mut self, nonblocking: ListenerNonblockingMode) -> Self {
         self.flags = (self.flags & (ALL_BITS ^ NONBLOCKING_BITS)) | nonblocking as u8;
         self

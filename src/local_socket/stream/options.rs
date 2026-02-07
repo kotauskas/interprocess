@@ -29,7 +29,6 @@ const ALL_BITS: u8 = (1 << 3) - 1;
 
 const WAITMODE_UNMASK: u8 = ALL_BITS ^ ((1 << SHFT_TIMEOUT) | (1 << SHFT_DEFERRED));
 
-#[allow(clippy::as_conversions)]
 const fn set_bit(flags: u8, pos: u8, val: bool) -> u8 {
     flags & (ALL_BITS ^ (1 << pos)) | ((val as u8) << pos)
 }

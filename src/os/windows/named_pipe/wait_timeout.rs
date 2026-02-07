@@ -36,7 +36,6 @@ impl WaitTimeout {
     }
     /// Like [`from_millis_clamped`](Self::from_millis_clamped), but constructs from a
     /// [`Duration`].
-    #[allow(clippy::as_conversions)]
     pub const fn from_duration_clamped(duration: Duration) -> Self {
         let millis = duration.as_millis();
         if millis == Self::DEFAULT.0 as u128 {
@@ -44,6 +43,8 @@ impl WaitTimeout {
         } else if millis >= u32::MAX as u128 {
             Self::MAX
         } else {
+            // FUTURE use TryFrom
+            #[allow(clippy::cast_possible_truncation)]
             Self(millis as u32)
         }
     }

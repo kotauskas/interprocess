@@ -4,7 +4,6 @@ use {
 };
 
 impl RawPipeStream {
-    #[allow(clippy::as_conversions)]
     fn fill_fields<'a, 'b, 'c>(
         &self,
         dbst: &'a mut DebugStruct<'b, 'c>,
