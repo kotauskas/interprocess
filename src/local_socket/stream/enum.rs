@@ -148,6 +148,7 @@ mkenum!(
 ///
 /// See the [module-level documentation](crate::local_socket) for more details.
 "local_socket::" RecvHalf);
+
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
 
@@ -163,6 +164,7 @@ mkenum!(
 ///
 /// See the [module-level documentation](crate::local_socket) for more details.
 "local_socket::" SendHalf);
+
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;
 

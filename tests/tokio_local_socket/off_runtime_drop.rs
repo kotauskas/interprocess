@@ -1,9 +1,6 @@
 use {
     crate::{
-        local_socket::{
-            tokio::{prelude::*, SendHalf},
-            ListenerOptions, Name,
-        },
+        local_socket::{tokio::prelude::*, ListenerOptions, Name},
         tests::util::{listen_and_pick_name, namegen_local_socket, TestResult},
     },
     std::convert::Infallible,
@@ -17,12 +14,12 @@ async fn create_server(name_sender: std::sync::mpsc::Sender<Name<'static>>) -> T
             ListenerOptions::new().name(nm.borrow()).create_tokio()
         })?;
     let _ = name_sender.send(name);
-    task::spawn(send_loop(listener.accept().await?.split().1));
+    task::spawn(send_loop(listener.accept().await?));
     Ok(())
 }
 
-async fn send_loop(mut sh: SendHalf) -> TestResult<Infallible> {
-    sh.write_all(b"Hello, world!").await?;
+async fn send_loop(mut st: LocalSocketStream) -> TestResult<Infallible> {
+    st.write_all(b"Hello, world!").await?;
     tokio::sync::Notify::new().notified().await;
     unreachable!()
 }

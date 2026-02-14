@@ -46,7 +46,7 @@ pub async fn server<HCF: Future<Output = TestResult> + Send + 'static>(
     Ok(())
 }
 
-pub async fn handle_client_nosplit(conn: Stream) -> TestResult {
+pub async fn handle_client(conn: Stream) -> TestResult {
     let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
     let recv = async {
         recv(&mut recver, &msg(false, false), 0).await?;
@@ -59,28 +59,7 @@ pub async fn handle_client_nosplit(conn: Stream) -> TestResult {
     try_join!(recv, send).map(|((), ())| ())
 }
 
-pub async fn handle_client_split(conn: Stream) -> TestResult {
-    let (recver, sender) = conn.split();
-
-    let recv = task::spawn(async move {
-        let mut recver = BufReader::new(recver);
-        recv(&mut recver, &msg(true, false), 0).await?;
-        recv(&mut recver, &msg(true, true), 1).await?;
-        TestResult::<_>::Ok(recver.into_inner())
-    });
-    let send = task::spawn(async move {
-        let mut sender = sender;
-        send(&mut sender, &msg(false, false), 0).await?;
-        send(&mut sender, &msg(false, true), 1).await?;
-        TestResult::<_>::Ok(sender)
-    });
-
-    let (recver, sender) = try_join!(recv, send)?;
-    Stream::reunite(recver?, sender?).opname("reunite")?;
-    Ok(())
-}
-
-pub async fn client_nosplit(nm: Arc<Name<'static>>) -> TestResult {
+pub async fn client(nm: Arc<Name<'static>>) -> TestResult {
     let conn = Stream::connect(nm.borrow()).await.opname("connect")?;
     let (mut recver, mut sender) = (BufReader::new(&conn), &conn);
     let recv = async {
@@ -92,27 +71,6 @@ pub async fn client_nosplit(nm: Arc<Name<'static>>) -> TestResult {
         send(&mut sender, &msg(false, true), 1).await
     };
     try_join!(recv, send).map(|((), ())| ())
-}
-
-pub async fn client_split(name: Arc<Name<'_>>) -> TestResult {
-    let (recver, sender) = Stream::connect(name.borrow()).await.opname("connect")?.split();
-
-    let recv = task::spawn(async move {
-        let mut recver = BufReader::new(recver);
-        recv(&mut recver, &msg(false, false), 0).await?;
-        recv(&mut recver, &msg(false, true), 1).await?;
-        TestResult::<_>::Ok(recver.into_inner())
-    });
-    let send = task::spawn(async move {
-        let mut sender = sender;
-        send(&mut sender, &msg(true, false), 0).await?;
-        send(&mut sender, &msg(true, true), 1).await?;
-        TestResult::<_>::Ok(sender)
-    });
-
-    let (recver, sender) = try_join!(recv, send)?;
-    Stream::reunite(recver?, sender?).opname("reunite")?;
-    Ok(())
 }
 
 async fn recv(conn: &mut (dyn AsyncBufRead + Unpin + Send), exp: &str, nr: u8) -> TestResult {

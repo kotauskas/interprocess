@@ -165,14 +165,6 @@ macro_rules! arc_accessors {
 #[derive(Clone, Debug)]
 pub struct RecvHalf(pub(super) Arc<Stream>);
 impl Sealed for RecvHalf {}
-impl traits::RecvHalf for RecvHalf {
-    type Stream = Stream;
-
-    #[inline]
-    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.0.set_recv_timeout(timeout)
-    }
-}
 multimacro! {
     RecvHalf,
     forward_rbv(Stream, *),
@@ -181,19 +173,19 @@ multimacro! {
     forward_as_handle,
     derive_sync_mut_read,
 }
+impl traits::RecvHalf for RecvHalf {
+    type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_recv_timeout(timeout)
+    }
+}
 
 /// [`Stream`]'s send half, implemented using [`Arc`].
 #[derive(Clone, Debug)]
 pub struct SendHalf(pub(super) Arc<Stream>);
 impl Sealed for SendHalf {}
-impl traits::SendHalf for SendHalf {
-    type Stream = Stream;
-
-    #[inline]
-    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.0.set_send_timeout(timeout)
-    }
-}
 multimacro! {
     SendHalf,
     forward_rbv(Stream, *),
@@ -201,4 +193,12 @@ multimacro! {
     forward_sync_ref_write,
     forward_as_handle,
     derive_sync_mut_write,
+}
+impl traits::SendHalf for SendHalf {
+    type Stream = Stream;
+
+    #[inline]
+    fn set_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
+        self.0.set_send_timeout(timeout)
+    }
 }

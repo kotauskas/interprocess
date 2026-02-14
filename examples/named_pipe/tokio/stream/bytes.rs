@@ -25,8 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // AsyncReadExt.
     let (mut recver, mut sender) = conn.split();
 
-    // Preemptively allocate a sizeable buffer for receiving. This size should be enough and
-    // should be easy to find for the allocator.
+    // Allocate a small buffer for receiving.
     let mut buffer = String::with_capacity(128);
 
     // Describe the send operation as sending our whole string, waiting for that to complete, and

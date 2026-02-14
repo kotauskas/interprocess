@@ -24,19 +24,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut recver = BufReader::new(&conn);
         let mut sender = &conn;
 
-        // Allocate a sizeable buffer for receiving. This size should be big enough and easy to
-        // find for the allocator.
+        // Allocate a small buffer for receiving.
         let mut buffer = String::with_capacity(128);
 
         // Describe the send operation as sending our whole message.
         let send = sender.write_all(b"Hello from server!\n");
-        // Describe the receive operation as receiving a line into our big buffer.
+        // Describe the receive operation as receiving a line into our buffer.
         let recv = recver.read_line(&mut buffer);
 
         // Run both operations concurrently.
         try_join!(recv, send)?;
 
-        // Produce our output!
+        // Print the result!
         println!("Client answered: {}", buffer.trim());
         Ok(())
     }
@@ -68,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         x => x?,
     };
 
-    // The syncronization between the server and client, if any is used, goes here.
+    // This is a good place to inform clients that the server is ready.
     eprintln!("Server running at {printname}");
 
     // Set up our loop boilerplate that processes our incoming connections.

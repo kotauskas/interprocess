@@ -4,57 +4,28 @@ mod no_server;
 mod stream;
 mod off_runtime_drop;
 
-use {
-    crate::{
-        local_socket::{tokio::Stream, Name},
-        tests::util::{self, tokio::test_wrapper, TestResult},
-    },
-    std::{future::Future, pin::Pin, sync::Arc},
-};
+use crate::tests::util::{self, tokio::test_wrapper, TestResult};
 
 #[allow(clippy::type_complexity)]
-async fn test_stream(id: &'static str, split: bool, path: bool) -> TestResult {
+async fn test_stream(id: &'static str, path: bool) -> TestResult {
     use stream::*;
-    type Fut = Pin<Box<dyn Future<Output = TestResult> + Send + 'static>>;
-    type F<T> = Box<dyn Fn(T) -> Fut + Send + Sync>;
-    let hcl: F<Stream> = if split {
-        Box::new(|conn| Box::pin(handle_client_split(conn)))
-    } else {
-        Box::new(|conn| Box::pin(handle_client_nosplit(conn)))
-    };
-    let client: F<Arc<Name<'static>>> = if split {
-        Box::new(|conn| Box::pin(client_split(conn)))
-    } else {
-        Box::new(|conn| Box::pin(client_nosplit(conn)))
-    };
     util::tokio::drive_server_and_multiple_clients(
-        move |s, n| server(id, hcl, s, n, path),
+        move |s, n| server(id, handle_client, s, n, path),
         client,
     )
     .await
 }
 
 macro_rules! matrix {
-    (@body $split:ident $path:ident) => {
-        test_wrapper(test_stream(make_id!(), $split, $path))
-    };
-    ($nm:ident false $path:ident) => {
+    ($($nm:ident $path:ident)+) => {$(
         #[test]
-        fn $nm() -> TestResult { matrix!(@body false $path) }
-    };
-    ($nm:ident true $path:ident) => {
-        #[test]
-        #[cfg(not(windows))]
-        fn $nm() -> TestResult { matrix!(@body true $path) }
-    };
-    ($($nm:ident $split:ident $path:ident)+) => { $(matrix!($nm $split $path);)+ };
+        fn $nm() -> TestResult { test_wrapper(test_stream(make_id!(), $path)) }
+    )+};
 }
 
 matrix! {
-    stream_file_nosplit       false true
-    stream_file_split         true  true
-    stream_namespaced_nosplit false false
-    stream_namespaced_split   true  false
+    stream_file       true
+    stream_namespaced false
 }
 
 #[test]

@@ -37,19 +37,18 @@ fn main() -> std::io::Result<()> {
         .path(Path::new(PIPE_NAME))
         .create_duplex::<pipe_mode::Bytes>()?;
 
-    // The syncronization between the server and client, if any is used, goes here.
+    // This is a good place to inform clients that the server is ready.
     eprintln!(r"Server running at \\.\pipe\{PIPE_NAME}");
 
-    // Preemptively allocate a sizeable buffer for receiving at a later moment. This size should
-    // be enough and should be easy to find for the allocator. Since we only have one concurrent
-    // client, there's no need to reallocate the buffer repeatedly.
+    // Preemptively allocate a small buffer for receiving at a later moment.
+    // Since we only have one concurrent client, there's no need to reallocate
+    // the buffer repeatedly.
     let mut buffer = String::with_capacity(128);
 
     for conn in listener.incoming().filter_map(handle_error) {
-        // Wrap the connection into a buffered receiver right away
-        // so that we could receive a single line from it.
+        // Create a buffered reader that wraps the connection by reference
+        // so we can receive a single line.
         let mut conn = BufReader::new(conn);
-        println!("Incoming connection!");
 
         // Since our client example sends first, the server should receive a line and only then
         // send a response. Otherwise, because receiving from and sending to a connection cannot

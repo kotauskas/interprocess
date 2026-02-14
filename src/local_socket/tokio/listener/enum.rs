@@ -27,7 +27,6 @@ mkenum!(
 #[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
 /// ```
 Listener);
-
 impl r#trait::Listener for Listener {
     type Stream = Stream;
 

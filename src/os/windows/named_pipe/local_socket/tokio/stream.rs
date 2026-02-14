@@ -122,9 +122,6 @@ multimacro! {
 /// Wrapper around [`RecvPipeStream`] that implements [`RecvHalf`](traits::RecvHalf).
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 impl Sealed for RecvHalf {}
-impl traits::RecvHalf for RecvHalf {
-    type Stream = Stream;
-}
 multimacro! {
     RecvHalf,
     pinproj_for_unpin(RecvHalfImpl),
@@ -137,14 +134,26 @@ multimacro! {
     forward_debug("local_socket::RecvHalf"),
     derive_trivial_conv(RecvHalfImpl),
 }
+impl traits::RecvHalf for RecvHalf {
+    type Stream = Stream;
+}
 
 /// Wrapper around [`SendPipeStream`] that implements [`SendHalf`](traits::SendHalf).
 pub struct SendHalf(pub(super) SendHalfImpl);
 impl Sealed for SendHalf {}
+multimacro! {
+    SendHalf,
+    forward_rbv(SendHalfImpl, &),
+    forward_as_ref(SendHalfImpl),
+    forward_as_mut(SendHalfImpl),
+    forward_as_handle,
+    forward_debug("local_socket::SendHalf"),
+    derive_tokio_mut_write,
+    derive_trivial_conv(SendHalfImpl),
+}
 impl traits::SendHalf for SendHalf {
     type Stream = Stream;
 }
-
 impl AsyncWrite for &SendHalf {
     #[inline]
     fn poll_write(
@@ -162,15 +171,4 @@ impl AsyncWrite for &SendHalf {
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
-}
-
-multimacro! {
-    SendHalf,
-    forward_rbv(SendHalfImpl, &),
-    forward_as_ref(SendHalfImpl),
-    forward_as_mut(SendHalfImpl),
-    forward_as_handle,
-    forward_debug("local_socket::SendHalf"),
-    derive_tokio_mut_write,
-    derive_trivial_conv(SendHalfImpl),
 }

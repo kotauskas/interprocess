@@ -13,8 +13,7 @@ fn main() -> std::io::Result<()> {
         "/tmp/example.sock".to_fs_name::<GenericFilePath>()?
     };
 
-    // Preemptively allocate a sizeable buffer for receiving. This size should be enough and
-    // should be easy to find for the allocator.
+    // Allocate a small buffer for receiving.
     let mut buffer = String::with_capacity(128);
 
     // Create our connection. This will block until the server accepts our connection, but will
@@ -23,7 +22,7 @@ fn main() -> std::io::Result<()> {
     // refused" response, but that will take twice the ping, the roundtrip time, to reach the
     // client.
     let conn = Stream::connect(name)?;
-    // Wrap it into a buffered reader right away so that we could receive a single line out of it.
+    // Wrap it into a buffered reader right away so that we can receive a single line out of it.
     let mut conn = BufReader::new(conn);
 
     // Send our message into the stream. This will finish either when the whole message has been
@@ -36,7 +35,7 @@ fn main() -> std::io::Result<()> {
     // verifying validity of UTF-8 on the fly.
     conn.read_line(&mut buffer)?;
 
-    // Print out the result, getting the newline for free!
+    // Print the result!
     print!("Server answered: {buffer}");
     //{
     Ok(())

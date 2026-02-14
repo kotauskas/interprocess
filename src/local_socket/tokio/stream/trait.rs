@@ -31,13 +31,17 @@ pub trait Stream:
         async { ConnectOptions::new().name(name).connect_tokio_as::<Self>().await }
     }
 
-    /// Splits a stream into a receive half and a send half, which can be used to receive from and
-    /// send to the stream concurrently from different Tokio tasks, entailing a memory allocation.
+    /// Splits a stream into a receive half and a send half.
+    ///
+    /// You probably want to avoid this mechanism for the following reasons:
+    /// - Placing a stream in an `Rc` or `Arc` produces identical behavior,
+    ///   since `&Stream` implements `Read` and `Write`
+    /// - Dropping a half does not shut it down like it does with sockets,
+    ///   which may be counterintuitive
     fn split(self) -> (Self::RecvHalf, Self::SendHalf);
 
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
-    /// returning both halves as an error if they belong to different streams (or when using this
-    /// method on streams that haven't been split to begin with).
+    /// returning both halves as an error if they belong to different streams.
     fn reunite(rh: Self::RecvHalf, sh: Self::SendHalf) -> ReuniteResult<Self>;
 
     /// Connects to a local socket server using the specified options.

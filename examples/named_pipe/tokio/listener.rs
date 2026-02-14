@@ -20,32 +20,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Describe the things we do when we've got a connection ready.
     async fn handle_conn(conn: DuplexPipeStream<pipe_mode::Bytes>) -> io::Result<()> {
-        // Split the connection into two halves to process received and sent data concurrently.
-        let (mut recver, mut sender) = conn.split();
-
-        // Allocate a sizeable buffer for receiving. This size should be enough and should be easy
-        // to find for the allocator.
+        let [mut recver, mut sender] = [&conn; 2];
+        // Allocate a small buffer for receiving.
         let mut buffer = String::with_capacity(128);
 
-        // Describe the send operation as first sending our whole message, and then shutting down
-        // the send half to send an EOF to help the other side determine the end of the
-        // transmission.
+        // Describe the send operation as first sending our whole message,
+        // and then shutting down the send half to make sure Tokio flushes
+        // its internal buffer.
         let send = async {
             sender.write_all(b"Hello from server!").await?;
             sender.shutdown().await?;
             Ok(())
         };
 
-        // Describe the receive operation as receiving into our big buffer.
+        // Describe the receive operation as receiving into our buffer.
         let recv = recver.read_to_string(&mut buffer);
 
-        // Run both the send-and-invoke-EOF operation and the receive operation concurrently.
+        // Run both the send-and-invoke-EOF operation
+        // and the receive operation concurrently.
         try_join!(recv, send)?;
 
-        // Dispose of our connection right now and not a moment later because I want to!
-        drop((recver, sender));
+        // Close the connection right away to avoid holding up resources.
+        drop(conn);
 
-        // Produce our output!
+        // Print the result!
         println!("Client answered: {}", buffer.trim());
         Ok(())
     }
@@ -57,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .path(Path::new(PIPE_NAME))
         .create_tokio_duplex::<pipe_mode::Bytes>()?;
 
-    // The syncronization between the server and client, if any is used, goes here.
+    // This is a good place to inform clients that the server is ready.
     eprintln!(r"Server running at \\.\pipe\{PIPE_NAME}");
 
     // Set up our loop boilerplate that processes our incoming connections.
