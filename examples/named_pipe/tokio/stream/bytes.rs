@@ -17,37 +17,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    // Await this here since we can't do a whole lot without a connection.
-    let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(r"\\.\pipe\Example").await?;
-
-    // This consumes our connection and splits it into two owned halves, so that we could
-    // concurrently act on both. Take care not to use the .split() method from the futures crate's
-    // AsyncReadExt.
-    let (mut recver, mut sender) = conn.split();
-
-    // Allocate a small buffer for receiving.
+    let name = r"\\.\pipe\Example";
     let mut buffer = String::with_capacity(128);
 
-    // Describe the send operation as sending our whole string, waiting for that to complete, and
-    // then shutting down the send half, which sends an EOF to the other end to help it determine
-    // where the message ends.
+    let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(name).await?;
+    let [mut recver, mut sender] = [&conn; 2];
+
     let send = async {
         sender.write_all(b"Hello from client!").await?;
+        // Make sure Tokio flushes its internal buffer.
         sender.shutdown().await?;
         Ok(())
     };
-
-    // Describe the receive operation as receiving until EOF into our big buffer.
     let recv = recver.read_to_string(&mut buffer);
 
-    // Concurrently perform both operations: send-and-invoke-EOF and receive.
     try_join!(send, recv)?;
 
-    // Get rid of those here to close the receive half too.
-    drop((recver, sender));
+    // Avoid holding up resources.
+    drop(conn);
 
-    // Display the results when we're done!
-    println!("Server answered: {}", buffer.trim());
+    println!("Server answered: {buffer}");
     //{
     Ok(())
 } //}

@@ -11,24 +11,13 @@ fn main() -> std::io::Result<()> {
         std::io::{prelude::*, BufReader},
     };
 
-    // Allocate a small buffer for receiving.
+    let name = r"\\.\pipe\Example";
     let mut buffer = String::with_capacity(128);
 
-    // Create our connection. This will block until the server accepts our
-    // connection, but will fail immediately if the server hasn't even started
-    // yet; somewhat similar to how happens with TCP, where connecting to a
-    // port that's not bound to any server will send a "connection refused"
-    // response, but that will take twice the ping, the roundtrip time, to
-    // reach the client.
-    let conn = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(r"\\.\pipe\Example")?;
-    // Create a buffered reader that wraps the connection by reference
-    // so we can receive a single line.
-    let mut conn = BufReader::new(conn);
+    // Will fail immediately if the server hasn't started yet.
+    let mut conn = BufReader::new(DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(name)?);
 
-    // Send our message into the stream. This will finish either when the
-    // whole message has been sent or if a send operation returns an error.
-    // (`.get_mut()` is to get the sender, `BufReader` doesn't implement a
-    // pass-through `Write`.)
+    // BufReader doesn't pass Write through, so we use get_mut.
     conn.get_mut().write_all(b"Hello from client!\n")?;
 
     // We now employ the buffer we allocated prior and receive a single line,
@@ -37,7 +26,10 @@ fn main() -> std::io::Result<()> {
     // the fly.
     conn.read_line(&mut buffer)?;
 
-    // Print out the result, getting the newline for free!
+    // Avoid holding up resources.
+    drop(conn);
+
+    // read_line keeps the line feed at the end.
     print!("Server answered: {buffer}");
     //{
     Ok(())

@@ -2,43 +2,30 @@
 fn main() -> std::io::Result<()> {
     //}
     use {
-        interprocess::local_socket::{prelude::*, GenericNamespaced, ListenerOptions, Stream},
+        interprocess::local_socket::{prelude::*, GenericNamespaced, ListenerOptions},
         std::io::{self, prelude::*, BufReader},
     };
 
-    // Define a function that checks for errors in incoming connections. We'll use this to filter
-    // through connections that fail on initialization for one reason or another.
-    fn handle_error(conn: io::Result<Stream>) -> Option<Stream> {
-        match conn {
-            Ok(c) => Some(c),
-            Err(e) => {
-                eprintln!("Incoming connection failed: {e}");
-                None
-            }
-        }
-    }
-
-    // Pick a name.
     let printname = "example.sock";
     let name = printname.to_ns_name::<GenericNamespaced>()?;
 
-    // Configure our listener...
-    let opts = ListenerOptions::new().name(name);
-
-    // ...then create it.
-    let listener = match opts.create_sync() {
+    let listener = match ListenerOptions::new().name(name).create_sync() {
         Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
-            // When a program that uses a file-type socket name terminates its socket server
-            // without deleting the file, a "corpse socket" remains, which can neither be
-            // connected to nor reused by a new listener. Normally, Interprocess takes care of
-            // this on affected platforms by deleting the socket file when the listener is
-            // dropped. (This is vulnerable to all sorts of races and thus can be disabled.)
+            // When a program that uses a file-type socket name terminates
+            // its socket server without deleting the file, a "corpse socket"
+            // remains, which can neither be connected to nor reused by a new
+            // listener. Normally, Interprocess takes care of this on affected
+            // platforms by deleting the socket file when the listener is
+            // dropped. (This is vulnerable to all sorts of races and thus can
+            // be disabled.)
             //
-            // In a real program, instead of leaving it up to the user to perform cleanup, one
-            // would use the .try_overwrite(true) listener option to try to replace the socket.
+            // In a real program, instead of leaving it up to the user
+            // to perform cleanup, one would use the .try_overwrite(true)
+            // listener option to try to replace the socket.
             eprintln!(
-                "Error: could not start server because the socket file is occupied. Please check
-                if {printname} is in use by another process and try again."
+                "Error: could not start server because the socket file is \
+                occupied. Please check if {printname} is in use by another \
+                process and try again."
             );
             return Err(e);
         }
@@ -48,17 +35,14 @@ fn main() -> std::io::Result<()> {
     // This is a good place to inform clients that the server is ready.
     eprintln!("Server running at {printname}");
 
-    // Preemptively allocate a small buffer for receiving at a later moment.
-    // Since we only have one concurrent client, there's no need to reallocate
-    // the buffer repeatedly.
+    // This buffer will be reused between clients.
     let mut buffer = String::with_capacity(128);
 
-    for conn in listener.incoming().filter_map(handle_error) {
-        // Wrap the connection into a buffered receiver
-        // so that we can receive a single line.
-        let mut conn = BufReader::new(conn);
-        println!("Incoming connection!");
-
+    for mut conn in listener
+        .incoming()
+        .filter_map(|conn| conn.map_err(|e| eprintln!("Incoming connection failed: {e}")).ok())
+        .map(BufReader::new)
+    {
         // Since our client example sends first, the server should receive a
         // line and only then send a response. Otherwise, because receiving
         // from and sending to a connection cannot be simultaneous without
@@ -71,7 +55,10 @@ fn main() -> std::io::Result<()> {
         // `BufReader` doesn't implement a pass-through `Write`.)
         conn.get_mut().write_all(b"Hello from server!\n")?;
 
-        // Print out the result, getting the newline for free!
+        // Avoid holding up resources.
+        drop(conn);
+
+        // read_line keeps the line feed at the end.
         print!("Client answered: {buffer}");
 
         // Clear the buffer so that the next iteration will display new data
