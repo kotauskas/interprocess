@@ -10,7 +10,7 @@ use {
 
 /// Newtype wrapper which defines file I/O operations on a handle to a file.
 #[repr(transparent)]
-pub(crate) struct FileHandle(OwnedHandle);
+pub(crate) struct FileHandle(AdvOwnedHandle);
 impl FileHandle {
     #[inline]
     pub unsafe fn read_ptr(&self, ptr: *mut u8, len: usize) -> io::Result<usize> {
@@ -85,7 +85,7 @@ impl FileHandle {
 }
 impl TryClone for FileHandle {
     fn try_clone(&self) -> io::Result<Self> {
-        c_wrappers::duplicate_handle(self.as_handle()).map(Self)
+        c_wrappers::duplicate_handle(self.as_handle()).map(AdvOwnedHandle::from).map(Self)
     }
 }
 
