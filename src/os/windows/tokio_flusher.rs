@@ -1,13 +1,18 @@
 use {
     crate::{
-        os::windows::{winprelude::*, FileHandle, NeedsFlush},
+        os::windows::{c_wrappers, winprelude::*, NeedsFlush},
         UnpinExt, LOCK_POISON,
     },
     std::{
         future::{self, Future},
         io,
-        sync::{atomic::Ordering::*, Mutex},
+        mem::transmute,
+        sync::{
+            atomic::{AtomicBool, Ordering::*},
+            Mutex,
+        },
         task::{ready, Context, Poll},
+        thread::Thread,
     },
     tokio::task::JoinHandle,
 };
@@ -66,7 +71,7 @@ impl TokioFlusher {
         cx: &mut Context<'_>,
     ) -> Poll<io::Result<()>> {
         if !*needs_flush {
-            // Idempotency optimization — don't flush unless there have been unflushed writes
+            // Idempotency optimization – don't flush unless there have been unflushed writes
             return Poll::Ready(Ok(()));
         }
 
@@ -88,12 +93,57 @@ impl TokioFlusher {
         if let Some(jh) = join_handle {
             return jh;
         }
-        let handle = file_handle.as_int_handle();
-        let task = tokio::task::spawn_blocking(move || FileHandle::flush_hndl(handle));
-        join_handle.insert(task)
+        let fh = file_handle.as_int_handle();
+        // Notifier prevents file handle UaF if execution of the spawned task
+        // is delayed by a significant amount of time, as might happen if the
+        // Tokio thread limit is hit (note that this UaF is benign from a
+        // memory safety standpoint, since it's a handle UaF, but it may
+        // produce undesirable behavior)
+        // FIXME this is still somewhat fragile
+        let notifier = Notifier::new();
+        let notifier_ref = unsafe { transmute::<&Notifier, &'static Notifier>(&notifier) };
+        let task = tokio::task::spawn_blocking(move || {
+            notifier_ref.notify();
+            c_wrappers::flush(unsafe { BorrowedHandle::borrow_raw(fh as _) })
+        });
+        let ret = join_handle.insert(task);
+        notifier.wait();
+        ret
     }
 }
 impl Default for TokioFlusher {
     #[inline]
     fn default() -> Self { Self::new() }
+}
+
+struct Notifier {
+    thr: Thread,
+    compl: AtomicBool,
+    parked: AtomicBool,
+}
+impl Notifier {
+    pub fn new() -> Self {
+        Self {
+            thr: std::thread::current(),
+            compl: AtomicBool::new(false),
+            parked: AtomicBool::new(false),
+        }
+    }
+    pub fn wait(&self) {
+        if !self.compl.load(Acquire) {
+            self.parked.store(true, Release);
+            loop {
+                std::thread::park();
+                if self.compl.load(Acquire) {
+                    break;
+                }
+            }
+        }
+    }
+    pub fn notify(&self) {
+        self.compl.store(true, Release);
+        if self.parked.load(Acquire) {
+            self.thr.unpark();
+        }
+    }
 }

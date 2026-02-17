@@ -8,7 +8,7 @@ use {
     super::MaybeArc,
     crate::{
         local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-        os::windows::{winprelude::*, FileHandle, NeedsFlush},
+        os::windows::{winprelude::*, NeedsFlush},
     },
     std::{marker::PhantomData, mem::ManuallyDrop},
 };
@@ -83,7 +83,7 @@ pub type RecvPipeStream<M> = PipeStream<M, pipe_mode::None>;
 pub type SendPipeStream<M> = PipeStream<pipe_mode::None, M>;
 
 pub(crate) struct RawPipeStream {
-    handle: ManuallyDrop<FileHandle>,
+    handle: ManuallyDrop<AdvOwnedHandle>,
     is_server: bool,
     needs_flush: NeedsFlush,
     concurrency_detector: ConcurrencyDetector<NamedPipeSite>,

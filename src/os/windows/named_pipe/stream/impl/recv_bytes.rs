@@ -1,13 +1,16 @@
 use {
     super::*,
-    crate::{os::windows::downgrade_eof, AsBuf},
+    crate::{
+        os::windows::{c_wrappers, downgrade_eof},
+        AsBuf,
+    },
 };
 
 impl RawPipeStream {
     #[track_caller]
     fn read(&self, buf: &mut (impl AsBuf + ?Sized)) -> io::Result<usize> {
         let _guard = self.concurrency_detector.lock();
-        self.handle.read(buf)
+        c_wrappers::read(self.as_handle(), buf)
     }
 }
 

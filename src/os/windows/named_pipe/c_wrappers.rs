@@ -4,7 +4,6 @@ use {
             decode_eof,
             named_pipe::{PipeMode, WaitTimeout},
             winprelude::*,
-            FileHandle,
         },
         AsMutPtr, HandleOrErrno, OrErrno, RawOsErrorExt, SubUsizeExt,
     },
@@ -153,7 +152,7 @@ pub(crate) fn connect_without_waiting(
     recv: Option<PipeMode>,
     send: Option<PipeMode>,
     overlapped: bool,
-) -> Option<io::Result<FileHandle>> {
+) -> Option<io::Result<OwnedHandle>> {
     let access_flags = modes_to_access_flags(recv, send);
     let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
     match unsafe {
@@ -169,7 +168,7 @@ pub(crate) fn connect_without_waiting(
         .handle_or_errno()
         .map(|h|
             // SAFETY: we just created this handle
-            FileHandle::from(OwnedHandle::from_raw_handle(h.to_std())))
+            OwnedHandle::from_raw_handle(h.to_std()))
     } {
         Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => None,
         els => Some(els),

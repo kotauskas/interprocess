@@ -1,5 +1,5 @@
 use {
-    super::{winprelude::*, FileHandle},
+    super::{c_wrappers, winprelude::*},
     std::{
         collections::VecDeque,
         io,
@@ -17,14 +17,14 @@ static HAS_PERSISTENT_THREAD: AtomicBool = AtomicBool::new(false);
 static QUEUE: Queue = Queue::new();
 
 /// Sends the given handle owner off to the linger pool without a heap indirection.
-pub fn linger<T: IntoRawHandle>(h: T) {
-    let h = HandleFini(unsafe { OwnedHandle::from_raw_handle(h.into_raw_handle()) });
+pub fn linger<T: Into<OwnedHandle>>(h: T) {
+    let h = HandleFini(h.into());
     linger_ent(QueueEnt::Handle(h))
 }
 /// Sends the given handle owner off to the linger pool.
 ///
-/// If `T` implements `IntoRawHandle`, use `linger` instead.
-pub fn linger_boxed<T: AsRawHandle + Send + Sync>(ih: T) {
+/// If `T` implements `Into<OwnedHandle>`, use `linger` instead.
+pub fn linger_boxed<T: AsHandle + Send + Sync>(ih: T) {
     linger_ent(QueueEnt::IndirectHandle(BoxedHandleOwner::new(ih)))
 }
 fn linger_ent(h: QueueEnt) {
@@ -48,13 +48,13 @@ type DropFn = unsafe fn(*mut ());
 unsafe impl Send for BoxedHandleOwner {}
 unsafe impl Sync for BoxedHandleOwner {}
 impl BoxedHandleOwner {
-    fn new<T: AsRawHandle + Send + Sync>(value: T) -> Self {
+    fn new<T: AsHandle + Send + Sync>(value: T) -> Self {
         // FUTURE use const {}
         assert!(align_of::<Self>() >= 2, "cannot perform low-bit tagging in QueueEnt");
         let boxptr = Box::into_raw(Box::new(HandleOwnerPointee {
             dtor: |slf| {
                 let slf = slf.cast::<T>();
-                let _ = FileHandle::flush_hndl(unsafe { &*slf }.as_int_handle());
+                let _ = c_wrappers::flush(unsafe { &*slf }.as_handle());
                 unsafe { std::ptr::drop_in_place(slf) }
             },
             value,
@@ -74,7 +74,7 @@ impl Drop for BoxedHandleOwner {
 
 struct HandleFini(OwnedHandle);
 impl Drop for HandleFini {
-    fn drop(&mut self) { let _ = FileHandle::flush_hndl(self.0.as_int_handle()); }
+    fn drop(&mut self) { let _ = c_wrappers::flush(self.0.as_handle()); }
 }
 
 enum QueueEnt {

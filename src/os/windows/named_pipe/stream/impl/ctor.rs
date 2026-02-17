@@ -11,18 +11,18 @@ use {
 };
 
 impl RawPipeStream {
-    pub(super) fn new(handle: FileHandle, is_server: bool, nfv: NeedsFlushVal) -> Self {
+    pub(super) fn new(handle: OwnedHandle, is_server: bool, nfv: NeedsFlushVal) -> Self {
         Self {
-            handle: ManuallyDrop::new(handle),
+            handle: ManuallyDrop::new(handle.into()),
             is_server,
             needs_flush: NeedsFlush::from(nfv),
             concurrency_detector: ConcurrencyDetector::new(),
         }
     }
-    pub(crate) fn new_server(handle: FileHandle) -> Self {
+    pub(crate) fn new_server(handle: OwnedHandle) -> Self {
         Self::new(handle, true, NeedsFlushVal::No)
     }
-    fn new_client(handle: FileHandle) -> Self { Self::new(handle, false, NeedsFlushVal::No) }
+    fn new_client(handle: OwnedHandle) -> Self { Self::new(handle, false, NeedsFlushVal::No) }
     pub(crate) fn connect(
         path: &U16CStr,
         recv: Option<PipeMode>,
@@ -30,7 +30,7 @@ impl RawPipeStream {
         wait_mode: ConnectWaitMode,
     ) -> io::Result<Self> {
         let connect =
-            |path: &_| c_wrappers::connect_without_waiting(path, recv, send, false).break_some();
+            |path: &_| np_wrappers::connect_without_waiting(path, recv, send, false).break_some();
         let timeout = wait_mode.timeout_or_unsupported(
             "synchronous named pipes do not support the deferred connection wait mode",
         )?;
@@ -43,7 +43,7 @@ impl RawPipeStream {
         .some_or_timeout()?;
 
         if recv == Some(PipeMode::Messages) {
-            c_wrappers::set_np_handle_state(
+            np_wrappers::set_np_handle_state(
                 handle.as_handle(),
                 Some(PIPE_READMODE_MESSAGE),
                 None,
@@ -55,15 +55,15 @@ impl RawPipeStream {
 
     pub(crate) fn connect_spin_loop(
         path: &U16CStr,
-        mut connect: impl FnMut(&U16CStr) -> ControlFlow<io::Result<FileHandle>>,
+        mut connect: impl FnMut(&U16CStr) -> ControlFlow<io::Result<OwnedHandle>>,
         timeout: Option<Duration>,
-    ) -> Option<io::Result<FileHandle>> {
+    ) -> Option<io::Result<OwnedHandle>> {
         spin_with_timeout(
             &mut connect,
             timeout,
             |connect| connect(path),
             |connect, remain| {
-                if let Err(e) = c_wrappers::block_for_server(
+                if let Err(e) = np_wrappers::block_for_server(
                     path,
                     remain
                         .map(WaitTimeout::from_duration_clamped)

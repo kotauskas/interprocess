@@ -1,6 +1,9 @@
 use {
     super::*,
-    crate::{os::windows::downgrade_eof, RawOsErrorExt as _},
+    crate::{
+        os::windows::{c_wrappers, downgrade_eof},
+        RawOsErrorExt as _,
+    },
     recvmsg::{prelude::*, NoAddrBuf, RecvResult},
     windows_sys::Win32::Foundation::ERROR_MORE_DATA,
 };
@@ -17,7 +20,7 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 impl RawPipeStream {
     fn peek_msg_len(&self) -> io::Result<usize> {
         let _guard = self.concurrency_detector.lock();
-        c_wrappers::peek_msg_len(self.as_handle())
+        np_wrappers::peek_msg_len(self.as_handle())
     }
 
     #[track_caller]
@@ -26,7 +29,7 @@ impl RawPipeStream {
 
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         loop {
-            match downgrade_eof(self.handle.read(&mut buf[..])) {
+            match downgrade_eof(c_wrappers::read(self.as_handle(), &mut buf[..])) {
                 Ok(..) => break Ok(()),
                 Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {}
                 Err(e) => break Err(e),
@@ -67,7 +70,7 @@ impl RawPipeStream {
                 }
             }
 
-            let rslt = self.handle.read(slice);
+            let rslt = c_wrappers::read(self.as_handle(), slice);
             more_data = false;
 
             let incr = match decode_eof(rslt) {

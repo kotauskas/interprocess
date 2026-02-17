@@ -6,7 +6,7 @@ pub mod tokio;
 
 use {
     crate::{
-        os::windows::{security_descriptor::*, winprelude::*, FileHandle},
+        os::windows::{c_wrappers, security_descriptor::*, winprelude::*},
         unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
         AsPtr, Sealed, TryClone,
     },
@@ -80,11 +80,8 @@ impl<'sd> CreationOptions<'sd> {
                 let r = OwnedHandle::from_raw_handle(r.to_std());
                 (w, r)
             };
-            let w = PubSender(Sender {
-                io: ManuallyDrop::new(FileHandle::from(w)),
-                needs_flush: false,
-            });
-            let r = PubRecver(Recver(FileHandle::from(r)));
+            let w = PubSender(Sender { io: ManuallyDrop::new(w.into()), needs_flush: false });
+            let r = PubRecver(Recver(r.into()));
             Ok((w, r))
         } else {
             Err(io::Error::last_os_error())
@@ -103,31 +100,35 @@ pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
     CreationOptions::default().build()
 }
 
-pub(crate) struct Recver(FileHandle);
+pub(crate) struct Recver(AdvOwnedHandle);
+forward_handle!(Recver);
 impl Read for Recver {
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { self.0.read(buf) }
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        c_wrappers::read(self.as_handle(), buf)
+    }
 }
 impl Debug for Recver {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Recver").field(&self.0.as_raw_handle()).finish()
     }
 }
-multimacro! {
-    Recver,
-    forward_handle,
-    forward_try_clone,
+impl TryClone for Recver {
+    #[inline]
+    fn try_clone(&self) -> io::Result<Self> {
+        c_wrappers::duplicate_handle(self.as_handle()).map(AdvOwnedHandle::from).map(Self)
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct Sender {
-    io: ManuallyDrop<FileHandle>,
+    io: ManuallyDrop<AdvOwnedHandle>,
     needs_flush: bool,
 }
 impl Write for Sender {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let rslt = self.io.write(buf);
+        let rslt = c_wrappers::write(self.as_handle(), buf);
         if rslt.is_ok() {
             self.needs_flush = true;
         }
@@ -136,7 +137,7 @@ impl Write for Sender {
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         if self.needs_flush {
-            let rslt = self.io.flush();
+            let rslt = c_wrappers::flush(self.as_handle());
             if rslt.is_ok() {
                 self.needs_flush = false;
             }
@@ -172,6 +173,6 @@ impl From<OwnedHandle> for Sender {
 impl From<Sender> for OwnedHandle {
     #[inline]
     fn from(tx: Sender) -> Self {
-        unsafe { ManuallyDrop::take(&mut ManuallyDrop::new(tx).io) }.into()
+        unsafe { ManuallyDrop::take(&mut ManuallyDrop::new(tx).io).into() }
     }
 }

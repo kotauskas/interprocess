@@ -11,12 +11,12 @@ use {
     super::*,
     crate::{
         os::windows::{
-            decode_eof,
+            c_wrappers, decode_eof,
             named_pipe::{
-                c_wrappers::{self as c_wrappers, hget},
+                c_wrappers::{self as np_wrappers, hget},
                 PipeMode,
             },
-            AsRawHandleExt, FileHandle, ImpersonationGuard, NeedsFlushVal,
+            AsRawHandleExt, ImpersonationGuard, NeedsFlushVal,
         },
         OrErrno, ToBool,
     },
@@ -100,7 +100,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// [`.set_nonblocking()`]: super::super::PipeListener::set_nonblocking
     #[inline]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
-        c_wrappers::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
+        np_wrappers::set_nonblocking_given_readmode(self.as_handle(), nonblocking, Rm::MODE)
     }
 
     /// [Impersonates the client][imp] of the named pipe.

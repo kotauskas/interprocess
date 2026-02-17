@@ -20,12 +20,10 @@ impl PipeListenerOptions<'_> {
         &self,
         role: PipeStreamRole,
         recv_mode: Option<PipeMode>,
-    ) -> io::Result<(PipeListenerOptions<'static>, FileHandle)> {
+    ) -> io::Result<(PipeListenerOptions<'static>, OwnedHandle)> {
         let owned_config = self.to_owned()?;
 
-        let instance = self
-            .create_instance(true, self.nonblocking, false, role, recv_mode)
-            .map(FileHandle::from)?;
+        let instance = self.create_instance(true, self.nonblocking, false, role, recv_mode)?;
         Ok((owned_config, instance))
     }
 

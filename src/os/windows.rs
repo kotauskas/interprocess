@@ -14,7 +14,6 @@ mod share_handle;
 pub use {impersonation_guard::*, path_conversion::*, share_handle::*};
 
 pub(crate) mod misc;
-mod file_handle;
 mod adv_handle;
 mod needs_flush;
 mod linger_pool;
@@ -22,4 +21,4 @@ mod c_wrappers;
 #[cfg(feature = "tokio")]
 mod tokio_flusher;
 
-pub(crate) use {file_handle::*, misc::*, needs_flush::*};
+pub(crate) use {misc::*, needs_flush::*};
