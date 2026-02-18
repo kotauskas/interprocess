@@ -3,7 +3,7 @@ use {
     std::{
         collections::VecDeque,
         io,
-        mem::{align_of, size_of, ManuallyDrop},
+        mem::{align_of, ManuallyDrop},
         sync::{
             atomic::{AtomicBool, Ordering::*},
             Condvar, Mutex, PoisonError,
@@ -53,8 +53,10 @@ impl BoxedHandleOwner {
         assert!(align_of::<Self>() >= 2, "cannot perform low-bit tagging in QueueEnt");
         let boxptr = Box::into_raw(Box::new(HandleOwnerPointee {
             dtor: |slf| {
-                let slf = slf.cast::<T>();
-                let _ = c_wrappers::flush(unsafe { &*slf }.as_handle());
+                // slf points to dtor, we do this to delegate the offsetof
+                // to the dynamically dispatched destructor (this closure)
+                let slf = unsafe { &mut (*slf.cast::<HandleOwnerPointee<T>>()).value };
+                let _ = c_wrappers::flush(slf.as_handle());
                 unsafe { std::ptr::drop_in_place(slf) }
             },
             value,
@@ -68,7 +70,7 @@ impl Drop for BoxedHandleOwner {
     fn drop(&mut self) {
         // SAFETY: DropFn is the first field of HandleOwnerPointee
         let dtor = unsafe { *self.0.cast_const().cast::<DropFn>() };
-        unsafe { (dtor)(self.0.byte_add(size_of::<DropFn>()).cast()) }
+        unsafe { (dtor)(self.0) }
     }
 }
 
