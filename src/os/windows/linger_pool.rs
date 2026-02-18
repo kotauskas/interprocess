@@ -52,12 +52,15 @@ impl BoxedHandleOwner {
         // FUTURE use const {}
         assert!(align_of::<Self>() >= 2, "cannot perform low-bit tagging in QueueEnt");
         let boxptr = Box::into_raw(Box::new(HandleOwnerPointee {
-            dtor: |slf| {
-                // slf points to dtor, we do this to delegate the offsetof
-                // to the dynamically dispatched destructor (this closure)
-                let slf = unsafe { &mut (*slf.cast::<HandleOwnerPointee<T>>()).value };
-                let _ = c_wrappers::flush(slf.as_handle());
-                unsafe { std::ptr::drop_in_place(slf) }
+            dtor: |slf: *mut ()| {
+                let slf = slf.cast::<HandleOwnerPointee<T>>();
+                // SAFETY: the destructor can only be called with exclusive
+                // ownership of the pointee
+                let _ = c_wrappers::flush(unsafe { &mut (*slf).value }.as_handle());
+                // SAFETY: slf is the same pointer as the one returned by
+                // into_raw; this one line calls the destructor of T and
+                // deallocates the memory allocated by Box with the right layout
+                drop(unsafe { Box::from_raw(slf.cast::<HandleOwnerPointee<T>>()) });
             },
             value,
         }));
