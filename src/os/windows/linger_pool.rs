@@ -4,9 +4,10 @@ use {
         collections::VecDeque,
         io,
         mem::{align_of, ManuallyDrop},
+        ops::Deref,
         sync::{
             atomic::{AtomicBool, Ordering::*},
-            Condvar, Mutex, PoisonError,
+            Arc, Condvar, Mutex, PoisonError,
         },
         thread::Thread,
         time::{Duration, Instant},
@@ -25,7 +26,13 @@ pub fn linger<T: Into<OwnedHandle>>(h: T) {
 ///
 /// If `T` implements `Into<OwnedHandle>`, use `linger` instead.
 pub fn linger_boxed<T: AsHandle + Send + Sync>(ih: T) {
-    linger_ent(QueueEnt::IndirectHandle(BoxedHandleOwner::new(ih)))
+    linger_ent(QueueEnt::IndirectHandle(DynHandleOwner::boxed(ih)))
+}
+/// Sends the given `Arc`-ed handle owner off to the linger pool.
+///
+/// If `T` implements `Into<OwnedHandle>`, use `linger` instead.
+pub fn linger_arc<T: AsHandle + Send + Sync>(arc: LingerableArc<T>) {
+    linger_ent(QueueEnt::IndirectHandle(DynHandleOwner::from_arc(arc)))
 }
 fn linger_ent(h: QueueEnt) {
     if !HAS_PERSISTENT_THREAD.fetch_or(true, AcqRel) {
@@ -35,41 +42,67 @@ fn linger_ent(h: QueueEnt) {
     }
 }
 
-/// `Box<dyn AsRawHandle + Send + Sync>` that fits into a single pointer. In other words,
-/// `thin_trait_object` at home.
-struct BoxedHandleOwner(*mut ());
+#[derive(Debug)]
 #[repr(C)]
 struct HandleOwnerPointee<T> {
     dtor: DropFn,
     value: T,
 }
 type DropFn = unsafe fn(*mut ());
+
+/// An `Arc` with a heap layout prepared for [`linger_arc`] lingering.
+#[derive(Debug)]
+pub struct LingerableArc<T>(Arc<HandleOwnerPointee<T>>);
+impl<T: AsHandle + Send + Sync> LingerableArc<T> {
+    /// Wraps the given object in a [`LingerableArc`].
+    pub fn new(value: T) -> Self {
+        Self(Arc::new(HandleOwnerPointee {
+            dtor: |slf: *mut ()| {
+                // SAFETY: slf is the same pointer as the one returned by into_raw
+                let slf = unsafe { Arc::from_raw(slf.cast::<Self>()) };
+                let _ = c_wrappers::flush(slf.0.value.as_handle());
+            },
+            value,
+        }))
+    }
+}
+impl<T> Deref for LingerableArc<T> {
+    type Target = T;
+    #[inline(always)]
+    fn deref(&self) -> &T { &self.0.value }
+}
+impl<T> Clone for LingerableArc<T> {
+    #[inline]
+    fn clone(&self) -> Self { Self(self.0.clone()) }
+}
+
+/// `Box<dyn AsHandle + Send + Sync>` (or the corresponding `Arc`) that fits
+/// into a single pointer. In other words, `thin_trait_object` at home.
+struct DynHandleOwner(*mut ());
 // SAFETY: bound on HandleOwner ctor
-unsafe impl Send for BoxedHandleOwner {}
-unsafe impl Sync for BoxedHandleOwner {}
-impl BoxedHandleOwner {
-    fn new<T: AsHandle + Send + Sync>(value: T) -> Self {
+unsafe impl Send for DynHandleOwner {}
+unsafe impl Sync for DynHandleOwner {}
+impl DynHandleOwner {
+    fn boxed<T: AsHandle + Send + Sync>(value: T) -> Self {
         // FUTURE use const {}
         assert!(align_of::<Self>() >= 2, "cannot perform low-bit tagging in QueueEnt");
         let boxptr = Box::into_raw(Box::new(HandleOwnerPointee {
             dtor: |slf: *mut ()| {
-                let slf = slf.cast::<HandleOwnerPointee<T>>();
-                // SAFETY: the destructor can only be called with exclusive
-                // ownership of the pointee
-                let _ = c_wrappers::flush(unsafe { &mut (*slf).value }.as_handle());
-                // SAFETY: slf is the same pointer as the one returned by
-                // into_raw; this one line calls the destructor of T and
-                // deallocates the memory allocated by Box with the right layout
-                drop(unsafe { Box::from_raw(slf.cast::<HandleOwnerPointee<T>>()) });
+                // SAFETY: slf is the same pointer as the one returned by into_raw
+                let slf = unsafe { Box::from_raw(slf.cast::<HandleOwnerPointee<T>>()) };
+                let _ = c_wrappers::flush(slf.value.as_handle());
             },
             value,
         }));
         Self(boxptr.cast())
     }
+    fn from_arc<T: AsHandle + Send + Sync>(arc: LingerableArc<T>) -> Self {
+        Self(Arc::into_raw(arc.0).cast_mut().cast())
+    }
     fn into_raw(self) -> *mut () { ManuallyDrop::new(self).0 }
     unsafe fn from_raw(ptr: *mut ()) -> Self { Self(ptr) }
 }
-impl Drop for BoxedHandleOwner {
+impl Drop for DynHandleOwner {
     fn drop(&mut self) {
         // SAFETY: DropFn is the first field of HandleOwnerPointee
         let dtor = unsafe { *self.0.cast_const().cast::<DropFn>() };
@@ -84,7 +117,7 @@ impl Drop for HandleFini {
 
 enum QueueEnt {
     Handle(HandleFini),
-    IndirectHandle(BoxedHandleOwner),
+    IndirectHandle(DynHandleOwner),
 }
 impl QueueEnt {
     /// Converts into a low-bit-tagged pointer.
@@ -105,7 +138,7 @@ impl QueueEnt {
     unsafe fn from_raw(raw: *mut ()) -> Self {
         if raw as usize & 1 == 1 {
             let raw = (raw as usize & !1) as *mut ();
-            Self::IndirectHandle(unsafe { BoxedHandleOwner::from_raw(raw) })
+            Self::IndirectHandle(unsafe { DynHandleOwner::from_raw(raw) })
         } else {
             Self::Handle(HandleFini(unsafe { OwnedHandle::from_raw_handle(raw.cast()) }))
         }
