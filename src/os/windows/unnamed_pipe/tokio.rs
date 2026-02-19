@@ -91,7 +91,7 @@ impl AsyncWrite for Sender {
     }
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // Unnamed pipes on Unix can't be flushed
+        // We consider flushing of pipes to not be a thing on all platforms
         Poll::Ready(Ok(()))
     }
     #[inline]

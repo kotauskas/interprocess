@@ -147,6 +147,8 @@ fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 
     access_flags
 }
 
+pub(crate) const NP_SHARE_MODE: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
+
 pub(crate) fn connect_without_waiting(
     path: &U16CStr,
     recv: Option<PipeMode>,
@@ -173,6 +175,19 @@ pub(crate) fn connect_without_waiting(
         Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => None,
         els => Some(els),
     }
+}
+
+pub(crate) fn reopen_overlapped(
+    h: BorrowedHandle<'_>,
+    recv: Option<PipeMode>,
+    send: Option<PipeMode>,
+) -> io::Result<OwnedHandle> {
+    let access_flags = modes_to_access_flags(recv, send);
+    unsafe { ReOpenFile(h.as_int_handle(), access_flags, NP_SHARE_MODE, FILE_FLAG_OVERLAPPED) }
+        .handle_or_errno()
+        .map(|h|
+            // SAFETY: we just created this handle
+            unsafe {OwnedHandle::from_raw_handle(h.to_std())})
 }
 
 pub(crate) fn set_nonblocking_given_readmode(

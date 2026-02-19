@@ -412,3 +412,12 @@ pub(crate) fn timeout_expiry(timeout: Duration) -> io::Result<Instant> {
         .checked_add(timeout)
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, msg))
 }
+
+pub(crate) struct CannotUnwind(());
+impl CannotUnwind {
+    pub fn begin() -> Self { Self(()) }
+    pub fn end(self) { std::mem::forget(self) }
+}
+impl Drop for CannotUnwind {
+    fn drop(&mut self) { std::process::abort(); }
+}
