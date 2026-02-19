@@ -66,7 +66,7 @@ fn drive_server<L: Debug>(
     doa_sync.recv().opname("doa_sync receive")?;
 
     let start = std::time::Instant::now();
-    for i in 0..num_clients {
+    for i in 1..=num_clients {
         eprint!("[{:.3}] accepting client {i}/{num_clients}… ", start.elapsed().as_secs_f64());
         acceptfn(&mut listener)?;
         eprintln!("done");
