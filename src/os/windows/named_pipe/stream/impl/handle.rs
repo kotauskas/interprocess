@@ -67,7 +67,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<PipeStream<Rm, Sm>> for OwnedHand
 /// server-side pipe and whether it has message boundaries.
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, Sm> {
     type Error = FromHandleError;
-    fn try_from(handle: OwnedHandle) -> Result<Self, Self::Error> {
+    fn try_from(mut handle: OwnedHandle) -> Result<Self, Self::Error> {
         let flags = match np_wrappers::get_flags(handle.as_handle()) {
             Ok(f) => f,
             Err(e) => return Err(is_server_check_failed_error(e, handle)),
@@ -80,6 +80,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
                 cause: None,
                 source: Some(handle),
             });
+        }
+        // FUTURE pass this unlikely error up to the caller
+        if let Ok(h) = np_wrappers::reopen_overlapped(handle.as_handle(), Rm::MODE, Sm::MODE) {
+            handle = h;
         }
         Ok(Self::new(RawPipeStream::from_handle_given_flags(handle, flags)))
     }

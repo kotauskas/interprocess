@@ -121,7 +121,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
     }
 
     fn create_instance(&self, nonblocking: bool) -> io::Result<OwnedHandle> {
-        self.config.create_instance(false, nonblocking, false, Self::STREAM_ROLE, Rm::MODE)
+        self.config.create_instance(false, nonblocking, Self::STREAM_ROLE, Rm::MODE)
     }
 }
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeListener<Rm, Sm> {

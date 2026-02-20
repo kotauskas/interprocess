@@ -87,7 +87,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
 
     fn create_instance(&self) -> io::Result<TokioNPServer> {
         self.config
-            .create_instance(false, false, true, Self::STREAM_ROLE, Rm::MODE)
+            .create_instance(false, false, Self::STREAM_ROLE, Rm::MODE)
             .and_then(npserver_from_handle)
     }
 }
@@ -114,7 +114,7 @@ impl PipeListenerOptions<'_> {
         config.nonblocking = false;
 
         let instance = config
-            .create_instance(true, false, true, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)
+            .create_instance(true, false, PipeListener::<Rm, Sm>::STREAM_ROLE, Rm::MODE)
             .and_then(npserver_from_handle)?;
         Ok(PipeListener::from_tokio_and_options(instance, config))
     }

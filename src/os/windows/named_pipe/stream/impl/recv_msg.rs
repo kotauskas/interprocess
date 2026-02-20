@@ -29,7 +29,7 @@ impl RawPipeStream {
 
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         loop {
-            match downgrade_eof(c_wrappers::read(self.as_handle(), &mut buf[..])) {
+            match downgrade_eof(c_wrappers::read_exsync(self.as_handle(), &mut buf[..], None)) {
                 Ok(..) => break Ok(()),
                 Err(e) if e.raw_os_error().eeq(ERROR_MORE_DATA) => {}
                 Err(e) => break Err(e),

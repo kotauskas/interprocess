@@ -5,7 +5,7 @@ impl RawPipeStream {
     fn send(&self, buf: &[u8]) -> io::Result<usize> {
         let r = {
             let _guard = self.concurrency_detector.lock();
-            c_wrappers::write(self.as_handle(), buf)
+            c_wrappers::write_exsync(self.as_handle(), buf, None)
         };
         if r.is_ok() {
             self.needs_flush.mark_dirty();

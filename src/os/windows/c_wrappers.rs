@@ -187,6 +187,7 @@ pub fn flush(h: BorrowedHandle<'_>) -> io::Result<()> {
     downgrade_eof(unsafe { FlushFileBuffers(h.as_int_handle()) }.true_val_or_errno(()))
 }
 
+#[allow(clippy::arithmetic_side_effects)]
 fn duration_to_timeout(duration: Option<Duration>) -> u32 {
     let Some(duration) = duration else { return u32::MAX };
     let sec_millis = u128::from(duration.as_secs()) * 1000;

@@ -30,7 +30,7 @@ impl RawPipeStream {
         wait_mode: ConnectWaitMode,
     ) -> io::Result<Self> {
         let connect =
-            |path: &_| np_wrappers::connect_without_waiting(path, recv, send, false).break_some();
+            |path: &_| np_wrappers::connect_without_waiting(path, recv, send).break_some();
         let timeout = wait_mode.timeout_or_unsupported(
             "synchronous named pipes do not support the deferred connection wait mode",
         )?;

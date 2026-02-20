@@ -29,9 +29,8 @@ impl RawPipeStream {
         send: Option<PipeMode>,
         wait_mode: ConnectWaitMode,
     ) -> io::Result<Self> {
-        let connect = move |path: &_| {
-            c_wrappers::connect_without_waiting(path, recv, send, true).break_some()
-        };
+        let connect =
+            move |path: &_| c_wrappers::connect_without_waiting(path, recv, send).break_some();
         let timeout = wait_mode.timeout_or_unsupported(
             "Tokio named pipes do not support the deferred connection wait mode",
         )?;

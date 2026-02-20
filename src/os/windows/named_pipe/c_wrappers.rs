@@ -12,7 +12,7 @@ use {
     windows_sys::Win32::{
         Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},
         Storage::FileSystem::{
-            CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            CreateFileW, ReOpenFile, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
             FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
         },
         System::Pipes::{
@@ -119,18 +119,19 @@ pub(crate) fn get_np_handle_mode(handle: BorrowedHandle<'_>) -> io::Result<u32> 
 
 pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
     let mut msglen: u32 = 0;
-    let rslt = unsafe {
-        PeekNamedPipe(
-            handle.as_int_handle(),
-            ptr::null_mut(),
-            0,
-            ptr::null_mut(),
-            ptr::null_mut(),
-            msglen.as_mut_ptr(),
-        )
-    }
-    .true_val_or_errno(msglen.to_usize());
-    decode_eof(rslt)
+    decode_eof(
+        unsafe {
+            PeekNamedPipe(
+                handle.as_int_handle(),
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                msglen.as_mut_ptr(),
+            )
+        }
+        .true_val_or_errno(msglen.to_usize()),
+    )
 }
 
 fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 {
@@ -147,24 +148,22 @@ fn modes_to_access_flags(recv: Option<PipeMode>, send: Option<PipeMode>) -> u32 
     access_flags
 }
 
-pub(crate) const NP_SHARE_MODE: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
+const NP_SHARE_MODE: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
 pub(crate) fn connect_without_waiting(
     path: &U16CStr,
     recv: Option<PipeMode>,
     send: Option<PipeMode>,
-    overlapped: bool,
 ) -> Option<io::Result<OwnedHandle>> {
     let access_flags = modes_to_access_flags(recv, send);
-    let flags = if overlapped { FILE_FLAG_OVERLAPPED } else { 0 };
     match unsafe {
         CreateFileW(
             path.as_ptr(),
             access_flags,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NP_SHARE_MODE,
             ptr::null_mut(),
             OPEN_EXISTING,
-            flags,
+            FILE_FLAG_OVERLAPPED,
             0,
         )
         .handle_or_errno()

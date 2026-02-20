@@ -10,7 +10,7 @@ impl RawPipeStream {
     #[track_caller]
     fn read(&self, buf: &mut (impl AsBuf + ?Sized)) -> io::Result<usize> {
         let _guard = self.concurrency_detector.lock();
-        c_wrappers::read(self.as_handle(), buf)
+        c_wrappers::read_exsync(self.as_handle(), buf, None)
     }
 }
 
