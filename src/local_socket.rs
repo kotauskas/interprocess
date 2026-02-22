@@ -107,8 +107,8 @@ pub use {
         r#trait::{Incoming, ListenerNonblockingMode},
     },
     name::*,
-    stream::{options::ConnectOptions, r#enum::*},
     peer_creds::*,
+    stream::{options::ConnectOptions, r#enum::*},
 };
 
 /// Re-exports of [traits] done in a way that doesn't pollute the scope, as well as of the
@@ -161,6 +161,3 @@ pub mod tokio {
         };
     }
 }
-
-mod concurrency_detector;
-pub(crate) use concurrency_detector::*;

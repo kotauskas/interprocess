@@ -18,15 +18,10 @@ pub(crate) const DISCARD_BUF_SIZE: usize = {
 };
 
 impl RawPipeStream {
-    fn peek_msg_len(&self) -> io::Result<usize> {
-        let _guard = self.concurrency_detector.lock();
-        np_wrappers::peek_msg_len(self.as_handle())
-    }
+    fn peek_msg_len(&self) -> io::Result<usize> { np_wrappers::peek_msg_len(self.as_handle()) }
 
     #[track_caller]
     fn discard_msg(&self) -> io::Result<()> {
-        let _guard = self.concurrency_detector.lock();
-
         let mut buf = [MaybeUninit::uninit(); DISCARD_BUF_SIZE];
         loop {
             match downgrade_eof(c_wrappers::read_exsync(self.as_handle(), &mut buf[..], None)) {
@@ -39,8 +34,6 @@ impl RawPipeStream {
 
     #[track_caller]
     fn recv_msg(&self, buf: &mut MsgBuf<'_>) -> io::Result<RecvResult> {
-        let _guard = self.concurrency_detector.lock();
-
         buf.set_fill(0);
         buf.has_msg = false;
         let mut more_data = true;
@@ -111,13 +104,10 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     ///
     /// If the message stream has been closed, this returns a
     /// [`BrokenPipe`](io::ErrorKind::BrokenPipe) error.
-    ///
-    /// Interacts with [concurrency prevention](#concurrency-prevention).
     #[inline]
     pub fn peek_msg_len(&self) -> io::Result<usize> { self.raw.get().peek_msg_len() }
 }
 
-/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;
@@ -130,7 +120,6 @@ impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
         self.raw.get().recv_msg(buf)
     }
 }
-/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> RecvMsg for PipeStream<pipe_mode::Messages, Sm> {
     type Error = io::Error;
     type AddrBuf = NoAddrBuf;

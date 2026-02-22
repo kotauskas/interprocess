@@ -16,7 +16,6 @@ impl RawPipeStream {
             handle: ManuallyDrop::new(handle.into()),
             is_server,
             needs_flush: NeedsFlush::from(nfv),
-            concurrency_detector: ConcurrencyDetector::new(),
         }
     }
     pub(crate) fn new_server(handle: OwnedHandle) -> Self {

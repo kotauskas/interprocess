@@ -5,10 +5,7 @@ pub use {enums::*, error::*};
 mod r#impl;
 
 use {
-    crate::{
-        local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-        os::windows::{winprelude::*, MaybeArc, NeedsFlush},
-    },
+    crate::os::windows::{winprelude::*, MaybeArc, NeedsFlush},
     std::{marker::PhantomData, mem::ManuallyDrop},
 };
 
@@ -46,13 +43,6 @@ use {
 /// since the last flush – thus, the second of any two consecutive `.flush()` calls is a no-op that
 /// returns immediately and cannot fail. This can also be overridden in the same manner.
 ///
-/// ## Concurrency prevention
-/// Multiple I/O operations [cannot be performed on the same named pipe concurrently][ms], and
-/// attempts to do so will be caught by the concurrency detector in order to avoid deadlocks and
-/// other unexpected, chaotic behavior.
-///
-/// [ms]: https://learn.microsoft.com/en-nz/windows/win32/ipc/named-pipe-server-using-overlapped-i-o
-///
 /// # Examples
 ///
 /// ## Basic bytestream client
@@ -85,7 +75,6 @@ pub(crate) struct RawPipeStream {
     handle: ManuallyDrop<AdvOwnedHandle>,
     is_server: bool,
     needs_flush: NeedsFlush,
-    concurrency_detector: ConcurrencyDetector<NamedPipeSite>,
 }
 impl Drop for RawPipeStream {
     fn drop(&mut self) {
@@ -94,11 +83,4 @@ impl Drop for RawPipeStream {
             linger_pool::linger(h);
         }
     }
-}
-
-#[derive(Default)]
-struct NamedPipeSite;
-impl ConcurrencyDetectionSite for NamedPipeSite {
-    const NAME: &'static str = "named pipe";
-    const WOULD_ACTUALLY_DEADLOCK: bool = true;
 }

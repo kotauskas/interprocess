@@ -9,29 +9,24 @@ use {
 impl RawPipeStream {
     #[track_caller]
     fn read(&self, buf: &mut (impl AsBuf + ?Sized)) -> io::Result<usize> {
-        let _guard = self.concurrency_detector.lock();
         c_wrappers::read_exsync(self.as_handle(), buf, None)
     }
 }
 
 impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// Same as `.read()` from the [`Read`] trait, but accepts an uninitialized buffer.
-    ///
-    /// Interacts with [concurrency prevention](#concurrency-prevention).
     #[inline]
     pub fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         downgrade_eof(self.raw.get().read(buf))
     }
 }
 
-/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         downgrade_eof(self.raw.get().read(buf))
     }
 }
-/// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {
     #[inline(always)]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { (&*self).read(buf) }
