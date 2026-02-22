@@ -1,5 +1,6 @@
-// TODO(2.x.0) message reading disabled due to a lack of support in Mio; we should try to figure
-// something out, they need to add first-class message pipe support and handling of ERROR_MORE_DATA
+// TODO message reading disabled due to a lack of support in Mio; we should try to figure
+// something out, they need to add first-class message pipe support and handling of
+// ERROR_MORE_DATA
 
 mod error;
 pub use error::*;

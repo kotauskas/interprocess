@@ -11,7 +11,7 @@
 
 mod platform_check;
 
-// TODO(2.3.1) inspect panic points
+// TODO inspect panic points
 
 #[macro_use]
 mod macros;

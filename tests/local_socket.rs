@@ -1,4 +1,4 @@
-// TODO(2.3.1) test various error conditions
+// TODO test various error conditions
 
 mod no_client;
 mod no_server;

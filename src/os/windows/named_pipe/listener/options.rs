@@ -13,7 +13,7 @@ use {
 };
 
 /// Allows for thorough customization of [`PipeListener`]s during creation.
-// TODO(2.3.1) allow partial modification for later instances
+// TODO allow partial modification for later instances
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct PipeListenerOptions<'path> {

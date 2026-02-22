@@ -241,7 +241,7 @@ impl_subsize! {
     u16 to isize
 }
 
-// TODO(2.4.0) find a more elegant way
+// TODO find a more elegant way
 pub(crate) trait RawOsErrorExt {
     fn eeq(self, other: u32) -> bool;
 }
