@@ -151,10 +151,10 @@ def suite(vers, *, target=None, test=True):
     set_warn_vars(allow_unknown_lints = vers != 'nightly')
 
     with ErasingLine():
-        cargo(vers, 'Check for default config', 'check', checkargs)
+        cargo(vers, 'Check for default config', check, checkargs)
         if test: cargo(vers, "Tests for default config", 'test', testargs, capture=True)
         cargo(vers, 'Rustdoc for default config', 'doc', docargs)
-        cargo(vers, 'Check for Tokio config', 'check', ftokio + checkargs)
+        cargo(vers, 'Check for Tokio config', check, ftokio + checkargs)
         if test: cargo(vers, "Tests for Tokio config", 'test', ftokio + testargs, capture=True)
         cargo(vers, 'Rustdoc for Tokio config', 'doc', ftokio + docargs)
     print(f'Suite {green("succeeded")}', f' for {blue(vers)}' if vers is not None else '', sep='')
@@ -198,3 +198,4 @@ def main():
 if __name__ == '__main__':
     try: main()
     except RuntimeError as e: print(ERROR, str(e))
+    except KeyboardInterrupt: sys.exit(2)
