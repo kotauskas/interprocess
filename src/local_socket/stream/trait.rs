@@ -86,6 +86,12 @@ pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
     /// making security decisions may be subject to race conditions.
     ///
     /// See the documentation on [`PeerCreds`] for more information.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Unix
+    /// The returned credentials are those that were in effect at the time of `connect` (for the
+    /// credentials of the client), `listen` (for those of the server). On OpenBSD and NetBSD,
+    /// server credentials are instead those which were in effect at the time of `bind` instead.
     fn peer_creds(&self) -> io::Result<PeerCreds>;
 }
 
