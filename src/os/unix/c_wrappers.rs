@@ -1,5 +1,3 @@
-#[allow(unused_imports)]
-use crate::{FdOrErrno, OrErrno};
 use {
     super::unixprelude::*,
     crate::{os::unix::ud_addr::TerminatedUdAddr, timeout_expiry},
@@ -8,9 +6,13 @@ use {
         ffi::CStr,
         io,
         mem::{size_of, zeroed, MaybeUninit},
-        ptr,
         time::{Duration, Instant},
     },
+};
+#[allow(unused_imports)]
+use {
+    crate::{FdOrErrno, OrErrno},
+    std::ptr,
 };
 
 macro_rules! cfg_atomic_cloexec {
