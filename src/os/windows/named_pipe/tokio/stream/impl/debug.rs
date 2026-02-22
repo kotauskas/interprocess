@@ -27,7 +27,7 @@ impl RawPipeStream {
 impl<Rm: PipeModeTag, Sm: PipeModeTag> Debug for PipeStream<Rm, Sm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbst = f.debug_struct("PipeStream");
-        self.raw.fill_fields(&mut dbst, Rm::MODE, Sm::MODE);
+        self.raw.get().fill_fields(&mut dbst, Rm::MODE, Sm::MODE);
         if Sm::MODE.is_some() {
             dbst.field("flusher", &self.flusher);
         }

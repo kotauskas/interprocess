@@ -5,10 +5,9 @@ pub use {enums::*, error::*};
 mod r#impl;
 
 use {
-    super::MaybeArc,
     crate::{
         local_socket::{ConcurrencyDetectionSite, ConcurrencyDetector},
-        os::windows::{winprelude::*, NeedsFlush},
+        os::windows::{winprelude::*, MaybeArc, NeedsFlush},
     },
     std::{marker::PhantomData, mem::ManuallyDrop},
 };

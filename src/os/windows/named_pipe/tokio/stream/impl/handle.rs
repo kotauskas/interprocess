@@ -62,7 +62,7 @@ impl TryFrom<OwnedHandle> for RawPipeStream {
 }
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
-    fn as_handle(&self) -> BorrowedHandle<'_> { self.raw.as_handle() }
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.raw.get().as_handle() }
 }
 
 /// Attempts to wrap the given handle into the high-level pipe stream type. If the underlying pipe

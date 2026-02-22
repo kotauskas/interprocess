@@ -1,9 +1,6 @@
 use {
     super::*,
-    crate::{
-        os::windows::{named_pipe::PmtNotNone, winprelude::*},
-        UnpinExt,
-    },
+    crate::{os::windows::named_pipe::PmtNotNone, UnpinExt},
     tokio::io::AsyncWrite,
 };
 
@@ -29,26 +26,26 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     /// Only available on streams that have a send mode.
     #[inline]
     pub async fn flush(&self) -> io::Result<()> {
-        self.flusher.flush_atomic(self.as_handle(), &self.raw.needs_flush).await
+        self.flusher.flush_atomic(Sm::cast_oai(&self.raw), &self.raw.get().needs_flush).await
     }
 
     /// Polls the future of `.flush()`.
     #[inline]
     pub fn poll_flush(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.flusher.poll_flush_atomic(self.as_handle(), &self.raw.needs_flush, cx)
+        self.flusher.poll_flush_atomic(Sm::cast_oai(&self.raw), &self.raw.get().needs_flush, cx)
     }
 
     /// Marks the stream as unflushed, preventing elision of the next flush operation (which
     /// includes limbo).
     #[inline]
-    pub fn mark_dirty(&self) { self.raw.needs_flush.mark_dirty(); }
+    pub fn mark_dirty(&self) { self.raw.get().needs_flush.mark_dirty(); }
     /// Assumes that the other side has consumed everything that's been written so far. This will
     /// turn the next flush into a no-op, but will cause the send buffer to be cleared when the
     /// stream is closed, since it won't be sent to limbo.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     #[inline]
-    pub fn assume_flushed(&self) { self.raw.needs_flush.take(); }
+    pub fn assume_flushed(&self) { self.raw.get().needs_flush.take(); }
     /// Drops the stream without sending it to limbo. This is the same as calling `assume_flushed()`
     /// right before dropping it.
     ///
@@ -71,7 +68,7 @@ impl<Rm: PipeModeTag> PipeStream<Rm, pipe_mode::Messages> {
                 slf.0.poll_write(cx, slf.1)
             }
         }
-        Write(&self.raw, buf).await
+        Write(self.raw.get(), buf).await
     }
 }
 
@@ -82,7 +79,7 @@ impl<Rm: PipeModeTag> AsyncWrite for &PipeStream<Rm, pipe_mode::Bytes> {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        self.get_mut().raw.poll_write(cx, buf)
+        self.get_mut().raw.get().poll_write(cx, buf)
     }
     #[inline(always)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {

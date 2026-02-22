@@ -16,7 +16,7 @@ use {
                 c_wrappers::{self as np_wrappers, hget},
                 PipeMode,
             },
-            AsRawHandleExt, ImpersonationGuard, NeedsFlushVal,
+            AsRawHandleExt, ImpersonationGuard, NeedsFlushVal, OptArc as _,
         },
         OrErrno, ToBool,
     },
@@ -76,11 +76,11 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was
     /// created by connecting to a server (server-side).
     #[inline]
-    pub fn is_server(&self) -> bool { self.raw.is_server }
+    pub fn is_server(&self) -> bool { self.raw.get().is_server }
     /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if
     /// it was created by a listener (server-side).
     #[inline]
-    pub fn is_client(&self) -> bool { !self.raw.is_server }
+    pub fn is_client(&self) -> bool { !self.raw.get().is_server }
 
     /// Sets whether the nonblocking mode for the pipe stream is enabled. By default, it is
     /// disabled.

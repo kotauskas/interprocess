@@ -41,9 +41,6 @@ pub mod local_socket {
 }
 
 mod c_wrappers;
-mod maybe_arc;
-
-use maybe_arc::*;
 
 /// Asynchronous named pipes which work with the Tokio runtime and event loop.
 ///

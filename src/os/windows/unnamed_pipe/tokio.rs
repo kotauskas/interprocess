@@ -2,9 +2,7 @@
 
 use {
     crate::{
-        os::windows::{
-            tokio_flusher::TokioFlusher, unnamed_pipe::CreationOptions, winprelude::*,
-        },
+        os::windows::{unnamed_pipe::CreationOptions, winprelude::*},
         unnamed_pipe::{
             tokio::{Recver as PubRecver, Sender as PubSender},
             Recver as SyncRecver, Sender as SyncSender,
@@ -71,7 +69,6 @@ multimacro! {
 #[derive(Debug)]
 pub(crate) struct Sender {
     io: ManuallyDrop<File>,
-    flusher: TokioFlusher,
     needs_flush: bool,
 }
 
@@ -95,10 +92,8 @@ impl AsyncWrite for Sender {
         Poll::Ready(Ok(()))
     }
     #[inline]
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // For limbo elision given cooperative downstream
-        let slf = self.get_mut();
-        slf.flusher.poll_flush_mut(slf.io.as_handle(), &mut slf.needs_flush, cx)
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -128,11 +123,7 @@ impl TryFrom<Sender> for OwnedHandle {
 impl TryFrom<OwnedHandle> for Sender {
     type Error = io::Error;
     fn try_from(handle: OwnedHandle) -> io::Result<Self> {
-        Ok(Self {
-            io: ManuallyDrop::new(File::from_std(handle.into())),
-            flusher: TokioFlusher::new(),
-            needs_flush: true,
-        })
+        Ok(Self { io: ManuallyDrop::new(File::from_std(handle.into())), needs_flush: true })
     }
 }
 

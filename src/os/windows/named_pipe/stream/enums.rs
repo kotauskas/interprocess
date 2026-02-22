@@ -1,4 +1,10 @@
-use super::super::*;
+#[cfg(feature = "tokio")]
+use crate::os::windows::{tokio_flusher::TokioFlusher, OptArcIRC};
+use {
+    super::super::*,
+    crate::os::windows::{MaybeArc, OptArc},
+    std::sync::Arc,
+};
 
 /// Tags for [`PipeStream`]'s generic arguments that specify the directionality of the stream and
 /// how it receives and/or sends data (as bytes or as messages).
@@ -19,14 +25,36 @@ pub mod pipe_mode {
         use super::*;
         pub trait PipeModeTag: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin {
             const MODE: Option<PipeMode>;
+            /// Used on the send mode to determine if the raw instance should always be in an
+            /// `Arc` to enable `&self` refcloning or not.
+            type OptArc<T>: OptArc<Value = T>
+            where
+                T: Send + Sync;
             #[cfg(feature = "tokio")]
             type TokioFlusher: std::fmt::Debug + Default;
         }
+        // Hack for working around the lack of associated type bounds on 1.75.
         #[cfg(feature = "tokio")]
-        pub trait NotNone:
-            PipeModeTag<TokioFlusher = crate::os::windows::tokio_flusher::TokioFlusher>
-        {
+        pub(crate) trait PmtOptArcIRC: PipeModeTag {
+            fn cast_oai(
+                oa: &Self::OptArc<tokio::RawPipeStream>,
+            ) -> &(impl OptArcIRC<Value = tokio::RawPipeStream> + 'static);
         }
+        #[cfg(feature = "tokio")]
+        impl<T: PipeModeTag> PmtOptArcIRC for T
+        where
+            T::OptArc<tokio::RawPipeStream>: OptArcIRC + 'static,
+        {
+            #[cfg(feature = "tokio")]
+            fn cast_oai(
+                oa: &Self::OptArc<tokio::RawPipeStream>,
+            ) -> &(impl OptArcIRC<Value = tokio::RawPipeStream> + 'static) {
+                oa
+            }
+        }
+        #[cfg(feature = "tokio")]
+        #[allow(private_bounds)]
+        pub trait NotNone: PipeModeTag<TokioFlusher = TokioFlusher> + PmtOptArcIRC {}
         #[cfg(not(feature = "tokio"))]
         pub trait NotNone: PipeModeTag {}
     }
@@ -37,6 +65,7 @@ pub mod pipe_mode {
                 tag_enum!($( #[$attr] )* $tag);
                 impl PipeModeTag for $tag {
                     const MODE: Option<PipeMode> = $mode;
+                    type OptArc<T> = MaybeArc<T> where T: Send + Sync;
                     #[cfg(feature = "tokio")]
                     type TokioFlusher = ();
                 }
@@ -45,8 +74,9 @@ pub mod pipe_mode {
                 tag_enum!($( #[$attr] )* $tag);
                 impl PipeModeTag for $tag {
                     const MODE: Option<PipeMode> = $mode;
+                    type OptArc<T> = Arc<T> where T: Send + Sync;
                     #[cfg(feature = "tokio")]
-                    type TokioFlusher = crate::os::windows::tokio_flusher::TokioFlusher;
+                    type TokioFlusher = TokioFlusher;
                 }
         };
         ($($(#[$attr:meta])* $tag:ident is $mode:expr $(; $yayornay:ident)?),+ $(,)?) => {

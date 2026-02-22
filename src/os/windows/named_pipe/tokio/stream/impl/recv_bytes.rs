@@ -28,7 +28,7 @@ impl<Sm: PipeModeTag> AsyncRead for &PipeStream<pipe_mode::Bytes, Sm> {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.get_mut().raw.poll_read_readbuf(cx, buf)
+        self.get_mut().raw.get().poll_read_readbuf(cx, buf)
     }
 }
 impl<Sm: PipeModeTag> AsyncRead for PipeStream<pipe_mode::Bytes, Sm> {

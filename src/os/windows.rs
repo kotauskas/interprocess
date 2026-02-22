@@ -18,7 +18,8 @@ mod adv_handle;
 mod needs_flush;
 mod linger_pool;
 mod c_wrappers;
+mod maybe_arc;
 #[cfg(feature = "tokio")]
 mod tokio_flusher;
 
-pub(crate) use {misc::*, needs_flush::*};
+pub(crate) use {maybe_arc::*, misc::*, needs_flush::*};

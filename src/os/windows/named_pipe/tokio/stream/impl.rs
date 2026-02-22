@@ -23,6 +23,7 @@ use {
             PipeMode,
         },
         winprelude::*,
+        OptArc as _,
     },
     std::{
         future::Future,
@@ -41,11 +42,10 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// hood).
     pub fn split(mut self) -> (RecvPipeStream<Rm>, SendPipeStream<Sm>) {
         let (raw_ac, raw_a) = (self.raw.refclone(), self.raw);
-        (RecvPipeStream { raw: raw_a, flusher: (), _phantom: PhantomData }, SendPipeStream {
-            raw: raw_ac,
-            flusher: self.flusher,
-            _phantom: PhantomData,
-        })
+        (
+            RecvPipeStream { raw: raw_a.into(), flusher: (), _phantom: PhantomData },
+            SendPipeStream { raw: raw_ac, flusher: self.flusher, _phantom: PhantomData },
+        )
     }
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
     /// returning both halves as an error if they belong to different streams (or when using
@@ -82,7 +82,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     /// Returns `true` if the stream was created by a listener (server-side), `false` if it was
     /// created by connecting to a server (server-side).
     #[inline]
-    pub fn is_server(&self) -> bool { matches!(*self.raw.inner, InnerTokio::Server(..)) }
+    pub fn is_server(&self) -> bool { matches!(*self.raw.get().inner, InnerTokio::Server(..)) }
     /// Returns `true` if the stream was created by connecting to a server (client-side), `false` if
     /// it was created by a listener (server-side).
     #[inline]

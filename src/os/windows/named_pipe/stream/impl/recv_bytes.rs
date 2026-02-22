@@ -20,14 +20,16 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Bytes, Sm> {
     /// Interacts with [concurrency prevention](#concurrency-prevention).
     #[inline]
     pub fn read_to_uninit(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        downgrade_eof(self.raw.read(buf))
+        downgrade_eof(self.raw.get().read(buf))
     }
 }
 
 /// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> Read for &PipeStream<pipe_mode::Bytes, Sm> {
     #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> { downgrade_eof(self.raw.read(buf)) }
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        downgrade_eof(self.raw.get().read(buf))
+    }
 }
 /// Interacts with [concurrency prevention](#concurrency-prevention).
 impl<Sm: PipeModeTag> Read for PipeStream<pipe_mode::Bytes, Sm> {

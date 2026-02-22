@@ -114,7 +114,7 @@ impl<Sm: PipeModeTag> PipeStream<pipe_mode::Messages, Sm> {
     ///
     /// Interacts with [concurrency prevention](#concurrency-prevention).
     #[inline]
-    pub fn peek_msg_len(&self) -> io::Result<usize> { self.raw.peek_msg_len() }
+    pub fn peek_msg_len(&self) -> io::Result<usize> { self.raw.get().peek_msg_len() }
 }
 
 /// Interacts with [concurrency prevention](#concurrency-prevention).
@@ -127,7 +127,7 @@ impl<Sm: PipeModeTag> RecvMsg for &PipeStream<pipe_mode::Messages, Sm> {
         buf: &mut MsgBuf<'_>,
         _: Option<&mut NoAddrBuf>,
     ) -> io::Result<RecvResult> {
-        self.raw.recv_msg(buf)
+        self.raw.get().recv_msg(buf)
     }
 }
 /// Interacts with [concurrency prevention](#concurrency-prevention).

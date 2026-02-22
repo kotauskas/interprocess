@@ -92,7 +92,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryFrom<OwnedHandle> for PipeStream<Rm, S
 impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
     fn try_clone(&self) -> io::Result<Self> {
         let handle = duplicate_handle(self.as_handle())?;
-        self.raw.needs_flush.on_clone();
+        self.raw.get().needs_flush.on_clone();
         let new = RawPipeStream::new(handle, self.is_server(), NeedsFlushVal::Always);
         Ok(Self::new(new))
     }
@@ -100,7 +100,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> TryClone for PipeStream<Rm, Sm> {
 
 impl<Rm: PipeModeTag, Sm: PipeModeTag> AsHandle for PipeStream<Rm, Sm> {
     #[inline]
-    fn as_handle(&self) -> BorrowedHandle<'_> { self.raw.as_handle() }
+    fn as_handle(&self) -> BorrowedHandle<'_> { self.raw.get().as_handle() }
 }
 
 derive_asraw!({Rm: PipeModeTag, Sm: PipeModeTag} PipeStream<Rm, Sm>, windows);
