@@ -1,6 +1,6 @@
 use {
     super::*,
-    crate::{AsMutPtr, AsPtr, DebugExpectExt, OrErrno, TryClone},
+    crate::{mut2ptr, ref2ptr, DebugExpectExt, OrErrno, TryClone},
     std::{
         fmt::{self, Debug, Formatter},
         mem::MaybeUninit,
@@ -29,11 +29,11 @@ unsafe impl Send for SecurityDescriptor {}
 
 unsafe impl AsSecurityDescriptor for SecurityDescriptor {
     #[inline(always)]
-    fn as_sd(&self) -> *const c_void { self.as_ptr().cast() }
+    fn as_sd(&self) -> *const c_void { ref2ptr(self).cast() }
 }
 unsafe impl AsSecurityDescriptorMut for SecurityDescriptor {
     #[inline(always)]
-    fn as_sd_mut(&mut self) -> *mut c_void { self.as_sd().cast_mut() }
+    fn as_sd_mut(&mut self) -> *mut c_void { mut2ptr(self).cast() }
 }
 
 /// Constructors.
@@ -42,7 +42,7 @@ impl SecurityDescriptor {
     pub fn new() -> io::Result<Self> {
         let mut sd = MaybeUninit::<SECURITY_DESCRIPTOR>::uninit();
         unsafe {
-            InitializeSecurityDescriptor(sd.as_mut_ptr().cast(), SECURITY_DESCRIPTOR_REVISION)
+            InitializeSecurityDescriptor(mut2ptr(&mut sd).cast(), SECURITY_DESCRIPTOR_REVISION)
                 .true_or_errno(||
                     // SAFETY: InitializeSecurityDescriptor() creates a well-initialized absolute SD
                     Self::from_owned(sd.assume_init()))
@@ -69,7 +69,7 @@ impl SecurityDescriptor {
     pub unsafe fn from_owned(mut sd: SECURITY_DESCRIPTOR) -> Self {
         debug_assert!(
             unsafe {
-                c_wrappers::control_and_revision(sd.as_ptr().cast())
+                c_wrappers::control_and_revision(ref2ptr(&sd).cast())
                     .expect("failed to verify that security descriptor is not self-relative")
                     .0
                     & SE_SELF_RELATIVE
@@ -78,7 +78,7 @@ impl SecurityDescriptor {
             "self-relative security descriptor not allowed here"
         );
         unsafe {
-            validate(sd.as_mut_ptr().cast());
+            validate(mut2ptr(&mut sd).cast());
         }
         Self(sd)
     }
@@ -100,18 +100,18 @@ impl SecurityDescriptor {
     /// Borrows immutably. The returned type is also a safe wrapper around security descriptors.
     #[inline(always)]
     pub fn borrow(&self) -> BorrowedSecurityDescriptor<'_> {
-        unsafe { BorrowedSecurityDescriptor::from_ptr(self.as_ptr().cast()) }
+        unsafe { BorrowedSecurityDescriptor::from_ptr(ref2ptr(self).cast()) }
     }
     /// Borrows mutably. The returned type is also a safe wrapper around security descriptors.
     #[inline(always)]
     pub fn borrow_mut(&mut self) -> MutBorrowedSecurityDescriptor<'_> {
-        unsafe { MutBorrowedSecurityDescriptor::from_ptr(self.as_mut_ptr().cast()) }
+        unsafe { MutBorrowedSecurityDescriptor::from_ptr(mut2ptr(self).cast()) }
     }
 }
 
 impl Debug for SecurityDescriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("SecurityDescriptor").field(&(self.as_ptr())).finish()
+        f.debug_tuple("SecurityDescriptor").field(&ref2ptr(self)).finish()
     }
 }
 

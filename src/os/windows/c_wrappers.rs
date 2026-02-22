@@ -1,6 +1,6 @@
 use {
     super::{downgrade_eof, winprelude::*},
-    crate::{timeout_expiry, AsBuf, AsMutPtr as _, CannotUnwind, OrErrno as _, SubUsizeExt as _},
+    crate::{mut2ptr, timeout_expiry, AsBuf, CannotUnwind, OrErrno as _, SubUsizeExt as _},
     std::{
         io, ptr,
         time::{Duration, Instant},
@@ -86,7 +86,7 @@ fn duplicate_handle_inner(
 pub unsafe fn read_ptr(h: BorrowedHandle<'_>, ptr: *mut u8, len: usize) -> io::Result<usize> {
     let len = u32::try_from(len).unwrap_or(u32::MAX);
     let mut bytes_read: u32 = 0;
-    unsafe { ReadFile(h.as_int_handle(), ptr, len, bytes_read.as_mut_ptr(), ptr::null_mut()) }
+    unsafe { ReadFile(h.as_int_handle(), ptr, len, mut2ptr(&mut bytes_read), ptr::null_mut()) }
         .true_val_or_errno(bytes_read.to_usize())
 }
 #[inline]
@@ -164,7 +164,7 @@ pub fn write(h: BorrowedHandle<'_>, buf: &[u8]) -> io::Result<usize> {
             h.as_int_handle(),
             buf.as_ptr().cast(),
             len,
-            bytes_written.as_mut_ptr(),
+            mut2ptr(&mut bytes_written),
             ptr::null_mut(),
         )
     }

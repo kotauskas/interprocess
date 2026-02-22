@@ -74,6 +74,7 @@
 mod enumdef;
 
 mod name;
+mod peer_creds;
 mod stream {
     pub(super) mod r#enum;
     pub(super) mod options;
@@ -107,6 +108,7 @@ pub use {
     },
     name::*,
     stream::{options::ConnectOptions, r#enum::*},
+    peer_creds::*,
 };
 
 /// Re-exports of [traits] done in a way that doesn't pollute the scope, as well as of the

@@ -6,9 +6,10 @@ use {
                 tokio::{self as traits, ReuniteResult},
                 StreamCommon,
             },
-            ConnectOptions, NameInner,
+            ConnectOptions, NameInner, PeerCreds,
         },
         os::windows::{
+            local_socket::peer_creds::PeerCreds as PeerCredsInner,
             named_pipe::{
                 pipe_mode::Bytes,
                 tokio::{DuplexPipeStream, RecvPipeStream, SendPipeStream},
@@ -58,6 +59,10 @@ impl traits::Stream for Stream {
 impl StreamCommon for Stream {
     #[inline(always)]
     fn take_error(&self) -> io::Result<Option<io::Error>> { Ok(None) }
+    #[inline]
+    fn peer_creds(&self) -> io::Result<PeerCreds> {
+        Ok(PeerCredsInner { pid: self.0.peer_process_id()? }.into())
+    }
 }
 
 /// Access to the underlying implementation.

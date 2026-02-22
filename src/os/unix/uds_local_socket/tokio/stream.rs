@@ -4,9 +4,9 @@ use {
         error::ReuniteError,
         local_socket::{
             traits::{tokio as traits, StreamCommon},
-            ConnectOptions,
+            ConnectOptions, PeerCreds,
         },
-        os::unix::c_wrappers,
+        os::unix::{c_wrappers, local_socket::peer_creds::PeerCreds as PeerCredsInner},
         ConnectWaitMode, Sealed,
     },
     std::{
@@ -75,6 +75,10 @@ impl traits::Stream for Stream {
 impl StreamCommon for Stream {
     #[inline]
     fn take_error(&self) -> io::Result<Option<io::Error>> { c_wrappers::take_error(self.as_fd()) }
+    #[inline]
+    fn peer_creds(&self) -> io::Result<PeerCreds> {
+        PeerCredsInner::for_socket(self.as_fd()).map(From::from)
+    }
 }
 
 /// Access to the underlying implementation.

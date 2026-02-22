@@ -1,6 +1,6 @@
 use {
     super::*,
-    crate::{AsMutPtr, OrErrno},
+    crate::{mut2ptr, OrErrno},
     std::{
         marker::PhantomData,
         mem::{size_of, size_of_val, zeroed, ManuallyDrop},
@@ -116,7 +116,7 @@ unsafe fn get_acl_info<T>(
     unsafe {
         GetAclInformation(
             acl.cast_mut(),
-            info.as_mut_ptr().cast(),
+            mut2ptr(&mut info).cast(),
             size_of_val(&info).try_into().unwrap(),
             information_class,
         )

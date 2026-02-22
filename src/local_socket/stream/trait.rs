@@ -3,7 +3,7 @@
 use {
     crate::{
         bound_util::{RefRead, RefWrite},
-        local_socket::{ConnectOptions, Name},
+        local_socket::{ConnectOptions, Name, PeerCreds},
         Sealed,
     },
     std::{
@@ -81,6 +81,12 @@ pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
     /// since the last call to a method that propagates stored errors. Subsequent calls will
     /// return `None` until another error occurs.
     fn take_error(&self) -> io::Result<Option<io::Error>>;
+    /// Returns a structure containing a subset of the credentials of the other side of the
+    /// connection. The nature of the credentials is OS-specific and using some of them for
+    /// making security decisions may be subject to race conditions.
+    ///
+    /// See the documentation on [`PeerCreds`] for more information.
+    fn peer_creds(&self) -> io::Result<PeerCreds>;
 }
 
 /// Receive halves of [`Stream`]s, obtained through [`.split()`](Stream::split).

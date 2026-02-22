@@ -5,9 +5,11 @@ use {
         local_socket::{
             prelude::*,
             traits::{self, ReuniteResult},
-            ConcurrencyDetector, ConnectOptions, LocalSocketSite,
+            ConcurrencyDetector, ConnectOptions, LocalSocketSite, PeerCreds,
         },
-        os::unix::{c_wrappers, unixprelude::*},
+        os::unix::{
+            c_wrappers, local_socket::peer_creds::PeerCreds as PeerCredsInner, unixprelude::*,
+        },
         ConnectWaitMode, Sealed, TryClone,
     },
     std::{
@@ -82,6 +84,10 @@ impl traits::Stream for Stream {
 impl traits::StreamCommon for Stream {
     #[inline]
     fn take_error(&self) -> io::Result<Option<io::Error>> { c_wrappers::take_error(self.as_fd()) }
+    #[inline]
+    fn peer_creds(&self) -> io::Result<PeerCreds> {
+        PeerCredsInner::for_socket(self.as_fd()).map(From::from)
+    }
 }
 
 impl Read for &Stream {

@@ -3,10 +3,11 @@ use {
         error::{FromHandleError, ReuniteError},
         local_socket::{
             traits::{self, ReuniteResult},
-            ConnectOptions, NameInner,
+            ConnectOptions, NameInner, PeerCreds,
         },
-        os::windows::named_pipe::{
-            pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream,
+        os::windows::{
+            local_socket::peer_creds::PeerCreds as PeerCredsInner,
+            named_pipe::{pipe_mode::Bytes, DuplexPipeStream, RecvPipeStream, SendPipeStream},
         },
         Sealed,
     },
@@ -62,6 +63,15 @@ impl traits::Stream for Stream {
         StreamImpl::reunite(rh.0, sh.0).map(Self).map_err(|ReuniteError { rh, sh }| {
             ReuniteError { rh: RecvHalf(rh), sh: SendHalf(sh) }
         })
+    }
+}
+
+impl traits::StreamCommon for Stream {
+    #[inline(always)]
+    fn take_error(&self) -> io::Result<Option<io::Error>> { Ok(None) }
+    #[inline]
+    fn peer_creds(&self) -> io::Result<PeerCreds> {
+        Ok(PeerCredsInner { pid: self.0.peer_process_id()? }.into())
     }
 }
 

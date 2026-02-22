@@ -1,11 +1,12 @@
 use {
     crate::{
+        mut2ptr,
         os::windows::{
             decode_eof,
             named_pipe::{PipeMode, WaitTimeout},
             winprelude::*,
         },
-        AsMutPtr, HandleOrErrno, OrErrno, RawOsErrorExt, SubUsizeExt,
+        HandleOrErrno, OrErrno, RawOsErrorExt, SubUsizeExt,
     },
     std::{io, mem::MaybeUninit, ptr},
     widestring::U16CStr,
@@ -23,10 +24,7 @@ use {
 };
 
 fn optional_out_ptr<T>(outref: Option<&mut T>) -> *mut T {
-    match outref {
-        Some(outref) => outref.as_mut_ptr(),
-        None => ptr::null_mut(),
-    }
+    outref.map(mut2ptr).unwrap_or(ptr::null_mut())
 }
 
 /// Helper for several functions that take a handle and a u32 out-pointer.
@@ -35,7 +33,7 @@ pub(crate) unsafe fn hget(
     f: unsafe extern "system" fn(HANDLE, *mut u32) -> i32,
 ) -> io::Result<u32> {
     let mut x: u32 = 0;
-    unsafe { f(handle.as_int_handle(), x.as_mut_ptr()) }.true_val_or_errno(x)
+    unsafe { f(handle.as_int_handle(), mut2ptr(&mut x)) }.true_val_or_errno(x)
 }
 
 pub(crate) fn get_np_info(
@@ -95,9 +93,9 @@ pub(crate) fn set_np_handle_state(
     unsafe {
         SetNamedPipeHandleState(
             handle.as_int_handle(),
-            if has_mode { mode_.as_mut_ptr() } else { null },
-            if has_mcc { mcc.as_mut_ptr() } else { null },
-            if has_cdt { cdt.as_mut_ptr() } else { null },
+            if has_mode { mut2ptr(&mut mode_) } else { null },
+            if has_mcc { mut2ptr(&mut mcc) } else { null },
+            if has_cdt { mut2ptr(&mut cdt) } else { null },
         )
     }
     .true_val_or_errno(())
@@ -127,7 +125,7 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
                 0,
                 ptr::null_mut(),
                 ptr::null_mut(),
-                msglen.as_mut_ptr(),
+                mut2ptr(&mut msglen),
             )
         }
         .true_val_or_errno(msglen.to_usize()),

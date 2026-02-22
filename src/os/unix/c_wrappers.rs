@@ -7,7 +7,7 @@ use {
     std::{
         ffi::CStr,
         io,
-        mem::{size_of, zeroed},
+        mem::{size_of, zeroed, MaybeUninit},
         ptr,
         time::{Duration, Instant},
     },
@@ -89,24 +89,22 @@ pub(super) fn fast_set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io:
     }
 }
 
-pub(super) unsafe fn getsockopt_int(
+pub(super) unsafe fn getsockopt<T>(
     fd: BorrowedFd<'_>,
     level: c_int,
     optname: c_int,
-) -> io::Result<c_int> {
-    let mut rslt: c_int = 0;
-    #[allow(clippy::cast_possible_truncation)]
-    let mut len = size_of::<c_int>() as socklen_t;
-    unsafe {
-        libc::getsockopt(
-            fd.as_raw_fd(),
-            level,
-            optname,
-            ptr::addr_of_mut!(rslt).cast(),
-            ptr::addr_of_mut!(len),
-        ) >= 0
+) -> io::Result<T> {
+    let mut rslt = MaybeUninit::<T>::uninit();
+    #[allow(clippy::cast_possible_truncation)] // safety contract
+    let orig_len = size_of::<T>() as socklen_t;
+    let mut len = orig_len;
+    let success = unsafe {
+        libc::getsockopt(fd.as_raw_fd(), level, optname, rslt.as_mut_ptr().cast(), &mut len) >= 0
+    };
+    if len < orig_len {
+        return Err(io::Error::from(io::ErrorKind::InvalidData));
     }
-    .true_val_or_errno(rslt)
+    success.true_or_errno(|| unsafe { rslt.assume_init() })
 }
 
 pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
@@ -296,7 +294,7 @@ pub(super) fn create_client(
 }
 
 pub(super) fn take_error(fd: BorrowedFd<'_>) -> io::Result<Option<io::Error>> {
-    let errno = unsafe { getsockopt_int(fd, libc::SOL_SOCKET, libc::SO_ERROR)? };
+    let errno = unsafe { getsockopt(fd, libc::SOL_SOCKET, libc::SO_ERROR)? };
     Ok((errno != 0).then(|| io::Error::from_raw_os_error(errno)))
 }
 
@@ -390,7 +388,7 @@ pub(super) fn poll(
         ppoll(
             &mut fd,
             1,
-            timeout.as_ref().map(crate::AsPtr::as_ptr).unwrap_or(ptr::null()),
+            timeout.as_ref().map(crate::ref2ptr).unwrap_or(ptr::null()),
             ptr::null(),
         )
     };

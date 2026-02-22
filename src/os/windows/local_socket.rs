@@ -4,6 +4,7 @@ pub(crate) mod dispatch_sync;
 #[cfg(feature = "tokio")]
 pub(crate) mod dispatch_tokio;
 pub(crate) mod name_type;
+pub(crate) mod peer_creds;
 
 pub use name_type::*;
 use {

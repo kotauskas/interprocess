@@ -2,7 +2,7 @@ use {
     super::stream::Stream,
     crate::{
         local_socket::{
-            traits::{self, Stream as _, StreamCommon},
+            traits::{self, Stream as _},
             ListenerNonblockingMode, ListenerOptions, NameInner,
         },
         os::windows::{
@@ -57,10 +57,6 @@ impl traits::Listener for Listener {
         Ok(())
     }
     fn do_not_reclaim_name_on_drop(&mut self) {}
-}
-impl StreamCommon for Stream {
-    #[inline(always)]
-    fn take_error(&self) -> io::Result<Option<io::Error>> { Ok(None) }
 }
 
 /// Access to the underlying implementation.

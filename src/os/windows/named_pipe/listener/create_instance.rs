@@ -4,7 +4,7 @@ use {
         os::windows::{
             named_pipe::PipeMode, security_descriptor::create_security_attributes, winprelude::*,
         },
-        AsPtr, HandleOrErrno,
+        ref2ptr, HandleOrErrno,
     },
     std::num::NonZeroU8,
     windows_sys::Win32::{
@@ -71,7 +71,7 @@ the `mode` field in `PipeListenerOptions`?",
                 self.output_buffer_size_hint,
                 self.input_buffer_size_hint,
                 self.wait_timeout.to_raw(),
-                sa.as_ptr().cast_mut().cast(),
+                ref2ptr(&sa).cast_mut().cast(),
             )
             .handle_or_errno()
             .map(|h|

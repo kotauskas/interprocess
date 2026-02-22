@@ -1,4 +1,7 @@
-use std::{mem::ManuallyDrop, ptr, sync::Arc};
+use {
+    crate::ref2ptr,
+    std::{mem::ManuallyDrop, ptr, sync::Arc},
+};
 
 pub trait OptArc:
     From<Self::Value> + From<Arc<Self::Value>> + Into<MaybeArc<Self::Value>> + Send + Sync + Sized
@@ -9,10 +12,9 @@ pub trait OptArc:
     fn refclone(&mut self) -> Self;
     fn try_make_owned(&mut self) -> bool;
     fn ptr_eq(&self, other: &impl OptArc<Value = Self::Value>) -> bool {
-        fn as_ptr<T: ?Sized>(r: &T) -> *const T { r }
         match (self.get_arc(), other.get_arc()) {
             (Some(a), Some(b)) => Arc::ptr_eq(a, b),
-            (None, None) => std::ptr::eq(as_ptr(self).cast::<()>(), as_ptr(other).cast()),
+            (None, None) => std::ptr::eq(ref2ptr(self).cast::<()>(), ref2ptr(other).cast()),
             _ => false,
         }
     }

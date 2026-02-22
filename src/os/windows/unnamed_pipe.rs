@@ -7,8 +7,9 @@ pub mod tokio;
 use {
     crate::{
         os::windows::{c_wrappers, security_descriptor::*, winprelude::*},
+        ref2ptr,
         unnamed_pipe::{Recver as PubRecver, Sender as PubSender},
-        AsPtr, Sealed, TryClone,
+        Sealed, TryClone,
     },
     std::{
         fmt::{self, Debug, Formatter},
@@ -72,7 +73,7 @@ impl<'sd> CreationOptions<'sd> {
 
         let [mut w, mut r] = [INVALID_HANDLE_VALUE; 2];
         let success =
-            unsafe { CreatePipe(&mut r, &mut w, sd.as_ptr().cast_mut().cast(), hint_raw) } != 0;
+            unsafe { CreatePipe(&mut r, &mut w, ref2ptr(&sd).cast_mut().cast(), hint_raw) } != 0;
         if success {
             let (w, r) = unsafe {
                 // SAFETY: we just created those handles which means that we own them

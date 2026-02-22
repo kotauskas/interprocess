@@ -163,17 +163,11 @@ impl BoolExt for bool {
     }
 }
 
-pub(crate) trait AsPtr {
-    #[inline(always)]
-    fn as_ptr(&self) -> *const Self { self }
-}
-impl<T: ?Sized> AsPtr for T {}
-
-pub(crate) trait AsMutPtr {
-    #[inline(always)]
-    fn as_mut_ptr(&mut self) -> *mut Self { self }
-}
-impl<T: ?Sized> AsMutPtr for T {}
+// FUTURE replace with std::ptr::from_{ref,mut}
+#[inline(always)]
+pub(crate) const fn ref2ptr<T: ?Sized>(r: &T) -> *const T { r }
+#[inline(always)]
+pub(crate) fn mut2ptr<T: ?Sized>(r: &mut T) -> *mut T { r }
 
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
     #[inline]

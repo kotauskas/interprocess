@@ -1,6 +1,6 @@
 use {
     super::{validate, AsSecurityDescriptor, AsSecurityDescriptorMut},
-    crate::AsPtr,
+    crate::ref2ptr,
     std::{ffi::c_void, marker::PhantomData, ptr::NonNull},
     windows_sys::Win32::Security::SECURITY_DESCRIPTOR,
 };
@@ -36,7 +36,7 @@ impl<'a> BorrowedSecurityDescriptor<'a> {
     /// The [safety constraints](AsSecurityDescriptor#safety-constraints) must be upheld.
     #[inline]
     pub unsafe fn from_ref(r: &'a SECURITY_DESCRIPTOR) -> Self {
-        unsafe { Self::from_ptr(r.as_ptr().cast()) }
+        unsafe { Self::from_ptr(ref2ptr(r).cast()) }
     }
 
     /// Wraps the given raw pointer to a security descriptor.
@@ -73,7 +73,7 @@ unsafe impl Send for MutBorrowedSecurityDescriptor<'_> {}
 
 unsafe impl AsSecurityDescriptor for MutBorrowedSecurityDescriptor<'_> {
     #[inline(always)]
-    fn as_sd(&self) -> *const c_void { self.0.as_ptr().cast() }
+    fn as_sd(&self) -> *const c_void { ref2ptr(&self.0).cast() }
 }
 unsafe impl AsSecurityDescriptorMut for MutBorrowedSecurityDescriptor<'_> {
     #[inline(always)]

@@ -4,7 +4,10 @@ use crate::os::unix::uds_local_socket as uds_impl;
 use crate::os::windows::named_pipe::local_socket as np_impl;
 use {
     super::r#trait,
-    crate::{local_socket::ConnectOptions, TryClone},
+    crate::{
+        local_socket::{ConnectOptions, PeerCreds},
+        TryClone,
+    },
     std::{
         io::{self, prelude::*, IoSlice, IoSliceMut},
         time::Duration,
@@ -131,6 +134,8 @@ impl r#trait::StreamCommon for Stream {
     fn take_error(&self) -> io::Result<Option<io::Error>> {
         dispatch!(Self: x in self => x.take_error())
     }
+    #[inline]
+    fn peer_creds(&self) -> io::Result<PeerCreds> { dispatch!(Self: x in self => x.peer_creds()) }
 }
 impl TryClone for Stream {
     fn try_clone(&self) -> io::Result<Self> {
