@@ -86,7 +86,7 @@ impl PeerCreds {
     ///
     /// # Platform-specific behavior
     /// Available on:
-    /// - `ucred`-based platforms
+    /// - `xucred`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
