@@ -30,10 +30,10 @@ fn optional_out_ptr<T>(outref: Option<&mut T>) -> *mut T {
 /// Helper for several functions that take a handle and a u32 out-pointer.
 pub(crate) unsafe fn hget(
     handle: BorrowedHandle<'_>,
-    f: unsafe extern "system" fn(HANDLE, *mut u32) -> i32,
+    f: unsafe extern "system" fn(RawHandle, *mut u32) -> i32,
 ) -> io::Result<u32> {
     let mut x: u32 = 0;
-    unsafe { f(handle.as_int_handle(), mut2ptr(&mut x)) }.true_val_or_errno(x)
+    unsafe { f(handle.as_raw_handle(), mut2ptr(&mut x)) }.true_val_or_errno(x)
 }
 
 pub(crate) fn get_np_info(
@@ -45,7 +45,7 @@ pub(crate) fn get_np_info(
 ) -> io::Result<()> {
     unsafe {
         GetNamedPipeInfo(
-            handle.as_int_handle(),
+            handle.as_raw_handle(),
             optional_out_ptr(flags),
             optional_out_ptr(in_buf),
             optional_out_ptr(out_buf),
@@ -66,7 +66,7 @@ pub(crate) fn get_np_handle_state(
     // TODO expose the rest of the owl as public API
     unsafe {
         GetNamedPipeHandleStateW(
-            handle.as_int_handle(),
+            handle.as_raw_handle(),
             optional_out_ptr(mode),
             optional_out_ptr(cur_instances),
             optional_out_ptr(max_collection_count),
@@ -92,7 +92,7 @@ pub(crate) fn set_np_handle_state(
     let null = ptr::null_mut();
     unsafe {
         SetNamedPipeHandleState(
-            handle.as_int_handle(),
+            handle.as_raw_handle(),
             if has_mode { mut2ptr(&mut mode_) } else { null },
             if has_mcc { mut2ptr(&mut mcc) } else { null },
             if has_cdt { mut2ptr(&mut cdt) } else { null },
@@ -120,7 +120,7 @@ pub(crate) fn peek_msg_len(handle: BorrowedHandle<'_>) -> io::Result<usize> {
     decode_eof(
         unsafe {
             PeekNamedPipe(
-                handle.as_int_handle(),
+                handle.as_raw_handle(),
                 ptr::null_mut(),
                 0,
                 ptr::null_mut(),
@@ -162,12 +162,11 @@ pub(crate) fn connect_without_waiting(
             ptr::null_mut(),
             OPEN_EXISTING,
             FILE_FLAG_OVERLAPPED,
-            0,
+            ptr::null_mut(),
         )
         .handle_or_errno()
-        .map(|h|
-            // SAFETY: we just created this handle
-            OwnedHandle::from_raw_handle(h.to_std()))
+        // SAFETY: we just created this handle
+        .map(|h| OwnedHandle::from_raw_handle(h))
     } {
         Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => None,
         els => Some(els),
@@ -180,11 +179,10 @@ pub(crate) fn reopen_overlapped(
     send: Option<PipeMode>,
 ) -> io::Result<OwnedHandle> {
     let access_flags = modes_to_access_flags(recv, send);
-    unsafe { ReOpenFile(h.as_int_handle(), access_flags, NP_SHARE_MODE, FILE_FLAG_OVERLAPPED) }
+    unsafe { ReOpenFile(h.as_raw_handle(), access_flags, NP_SHARE_MODE, FILE_FLAG_OVERLAPPED) }
         .handle_or_errno()
-        .map(|h|
-            // SAFETY: we just created this handle
-            unsafe {OwnedHandle::from_raw_handle(h.to_std())})
+        // SAFETY: we just created this handle
+        .map(|h| unsafe { OwnedHandle::from_raw_handle(h) })
 }
 
 pub(crate) fn set_nonblocking_given_readmode(

@@ -1,10 +1,10 @@
 use {
     super::LocalBox,
-    crate::{BoolExt, OrErrno, SubUsizeExt},
+    crate::{BoolExt, OrErrno, SubUsizeExt, os::windows::winprelude::*},
     std::{ffi::c_void, io, ptr},
     widestring::U16CStr,
     windows_sys::Win32::{
-        Foundation::{LocalFree, BOOL, PSID},
+        Foundation::LocalFree,
         Security::{
             Authorization::{
                 ConvertSecurityDescriptorToStringSecurityDescriptorW,
@@ -12,6 +12,7 @@ use {
             },
             FreeSid, GetSecurityDescriptorControl, SetSecurityDescriptorControl, ACL,
             SECURITY_DESCRIPTOR_CONTROL,
+            PSID,
         },
     },
 };

@@ -77,8 +77,8 @@ impl<'sd> CreationOptions<'sd> {
         if success {
             let (w, r) = unsafe {
                 // SAFETY: we just created those handles which means that we own them
-                let w = OwnedHandle::from_raw_handle(w.to_std());
-                let r = OwnedHandle::from_raw_handle(r.to_std());
+                let w = OwnedHandle::from_raw_handle(w);
+                let r = OwnedHandle::from_raw_handle(r);
                 (w, r)
             };
             let w = PubSender(Sender { io: ManuallyDrop::new(w.into()), needs_flush: false });

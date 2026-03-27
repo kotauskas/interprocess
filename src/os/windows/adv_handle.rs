@@ -5,7 +5,7 @@ use {
         fmt::{self, Debug, Formatter},
         io,
         mem::ManuallyDrop,
-        num::NonZeroIsize,
+        num::NonZeroUsize,
     },
 };
 
@@ -13,7 +13,7 @@ use {
 ///
 /// The boolean generic parameters correspond to whether the tag bits are enabled or not.
 #[repr(transparent)]
-pub struct AdvOwnedHandle<const TAG0: bool = false, const TAG1: bool = false>(NonZeroIsize);
+pub struct AdvOwnedHandle<const TAG0: bool = false, const TAG1: bool = false>(NonZeroUsize);
 
 impl<const TAG0: bool, const TAG1: bool> Drop for AdvOwnedHandle<TAG0, TAG1> {
     #[inline]
@@ -23,22 +23,22 @@ impl<const TAG0: bool, const TAG1: bool> Drop for AdvOwnedHandle<TAG0, TAG1> {
 /// Private utilities.
 impl<const TAG0: bool, const TAG1: bool> AdvOwnedHandle<TAG0, TAG1> {
     #[inline(always)]
-    const fn mk_tag(tag0: bool, tag1: bool) -> isize {
-        (((TAG1 && tag1) as isize) << 1) | ((TAG0 && tag0) as isize)
+    const fn mk_tag(tag0: bool, tag1: bool) -> usize {
+        (((TAG1 && tag1) as usize) << 1) | ((TAG0 && tag0) as usize)
     }
     #[inline(always)]
-    const fn isize_with_tag(val: isize, tag0: bool, tag1: bool) -> isize {
+    const fn usize_with_tag(val: usize, tag0: bool, tag1: bool) -> usize {
         val | Self::mk_tag(tag0, tag1)
     }
-    const TAG_MASK: isize = Self::mk_tag(true, true);
-    const TAG_UNMASK: isize = !Self::TAG_MASK;
+    const TAG_MASK: usize = Self::mk_tag(true, true);
+    const TAG_UNMASK: usize = !Self::TAG_MASK;
 
     /// Ignores tags that are not stored.
     #[inline]
     fn new(h: OwnedHandle, tag0: bool, tag1: bool) -> Self {
         // SAFETY: valid handles (as guaranteed by OwnedHandle) are never zero
         Self(unsafe {
-            NonZeroIsize::new_unchecked(h.into_int_handle() | Self::mk_tag(tag0, tag1))
+            NonZeroUsize::new_unchecked(h.into_raw_handle() as usize | Self::mk_tag(tag0, tag1))
         })
     }
     #[inline(always)]
@@ -54,8 +54,8 @@ impl<const TAG1: bool> AdvOwnedHandle<true, TAG1> {
     /// Sets the value of tag bit 0 to the given value.
     #[inline(always)]
     pub fn set_tag0(&mut self, tag0: bool) {
-        let unmasked = self.0.get() & !1_isize;
-        self.0 = unsafe { NonZeroIsize::new_unchecked(unmasked | tag0 as isize) };
+        let unmasked = self.0.get() & !1_usize;
+        self.0 = unsafe { NonZeroUsize::new_unchecked(unmasked | tag0 as usize) };
     }
     /// Maps to the same handle but with tag bit 0 set to the given value.
     #[inline(always)]
@@ -71,8 +71,8 @@ impl<const TAG0: bool> AdvOwnedHandle<TAG0, true> {
     /// Sets the value of tag bit 1 to the given value.
     #[inline(always)]
     pub fn set_tag1(&mut self, tag1: bool) {
-        let unmasked = self.0.get() & !2_isize;
-        self.0 = unsafe { NonZeroIsize::new_unchecked(unmasked | ((tag1 as isize) << 1)) };
+        let unmasked = self.0.get() & !2_usize;
+        self.0 = unsafe { NonZeroUsize::new_unchecked(unmasked | ((tag1 as usize) << 1)) };
     }
     /// Maps to the same handle but with tag bit 1 set to the given value.
     #[inline(always)]
@@ -116,7 +116,7 @@ impl<const TAG0: bool, const TAG1: bool> AsHandle for AdvOwnedHandle<TAG0, TAG1>
 impl From<OwnedHandle> for AdvOwnedHandle<false, false> {
     #[inline(always)]
     fn from(h: OwnedHandle) -> Self {
-        Self(unsafe { NonZeroIsize::new_unchecked(h.into_int_handle()) })
+        Self(unsafe { NonZeroUsize::new_unchecked(h.into_raw_handle() as usize) })
     }
 }
 impl FromRawHandle for AdvOwnedHandle<false, false> {
@@ -171,7 +171,7 @@ impl From<AdvOwnedHandle<true, true>> for AdvOwnedHandle<false, true> {
 impl<const TAG0: bool, const TAG1: bool> From<AdvOwnedHandle<TAG0, TAG1>> for OwnedHandle {
     #[inline(always)]
     fn from(ah: AdvOwnedHandle<TAG0, TAG1>) -> Self {
-        unsafe { Self::from_int_handle(ManuallyDrop::new(ah).as_int_handle()) }
+        unsafe { Self::from_raw_handle(ManuallyDrop::new(ah).as_raw_handle()) }
     }
 }
 impl<const TAG0: bool, const TAG1: bool> IntoRawHandle for AdvOwnedHandle<TAG0, TAG1> {

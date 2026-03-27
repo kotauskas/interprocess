@@ -16,7 +16,7 @@ use {
                 c_wrappers::{self as np_wrappers, hget},
                 PipeMode,
             },
-            AsRawHandleExt, ImpersonationGuard, NeedsFlushVal, OptArc as _,
+            ImpersonationGuard, NeedsFlushVal, OptArc as _,
         },
         OrErrno, ToBool,
     },
@@ -130,7 +130,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeStream<Rm, Sm> {
     ///
     /// [imp]: https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-impersonatenamedpipeclient
     pub fn impersonate_client(&self) -> io::Result<ImpersonationGuard> {
-        unsafe { Pipes::ImpersonateNamedPipeClient(self.as_int_handle()) }
+        unsafe { Pipes::ImpersonateNamedPipeClient(self.as_raw_handle()) }
             .to_bool()
             .true_or_errno(|| ImpersonationGuard(()))
     }

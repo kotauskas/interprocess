@@ -74,9 +74,8 @@ the `mode` field in `PipeListenerOptions`?",
                 ref2ptr(&sa).cast_mut().cast(),
             )
             .handle_or_errno()
-            .map(|h|
-                // SAFETY: we just made it and received ownership
-                OwnedHandle::from_raw_handle(h.to_std()))
+            // SAFETY: we just made it and received ownership
+            .map(|h| OwnedHandle::from_raw_handle(h))
         }
     }
 

@@ -161,7 +161,7 @@ fn block_on_connect_clearing_empty_conns(handle: BorrowedHandle<'_>) -> io::Resu
 }
 
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    unsafe { ConnectNamedPipe(handle.as_int_handle(), ptr::null_mut()) != 0 }
+    unsafe { ConnectNamedPipe(handle.as_raw_handle(), ptr::null_mut()) != 0 }
         .true_val_or_errno(())
         .or_else(thunk_accept_error)
 }
@@ -177,7 +177,7 @@ fn thunk_accept_error(e: io::Error) -> io::Result<()> {
 }
 
 fn disconnect_if_connected(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    unsafe { DisconnectNamedPipe(handle.as_int_handle()) != 0 }
+    unsafe { DisconnectNamedPipe(handle.as_raw_handle()) != 0 }
         .true_val_or_errno(())
         .or_else(|e| if e.raw_os_error().eeq(ERROR_PIPE_NOT_CONNECTED) { Ok(()) } else { Err(e) })
 }

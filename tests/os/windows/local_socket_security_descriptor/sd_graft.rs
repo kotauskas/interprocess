@@ -33,7 +33,7 @@ fn get_sd(handle: BorrowedHandle<'_>, ot: SE_OBJECT_TYPE) -> TestResult<Security
     #[allow(clippy::cast_possible_wrap)] // sign not relevant
     let errno = unsafe {
         GetSecurityInfo(
-            handle.as_int_handle(),
+            handle.as_raw_handle(),
             ot,
             SECINFO,
             ptr::null_mut(),
@@ -89,9 +89,12 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
     }
     let base = obuf.as_mut_ptr().cast();
     let cap = obuf.len().try_into().unwrap_or(u32::MAX);
-    unsafe { GetModuleFileNameW(0, base, cap) != 0 }.true_val_or_errno(()).and_then(|()| unsafe {
-        U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize()).map_err(io::Error::other)
-    })
+    unsafe { GetModuleFileNameW(ptr::null_mut(), base, cap) != 0 }.true_val_or_errno(()).and_then(
+        |()| unsafe {
+            U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize())
+                .map_err(io::Error::other)
+        },
+    )
 }
 
 pub(super) fn test_main() -> TestResult {

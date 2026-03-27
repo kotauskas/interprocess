@@ -7,7 +7,7 @@ use {
     },
     windows_sys::Win32::{
         Foundation::{
-            DuplicateHandle, GetLastError, BOOL, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING,
+            DuplicateHandle, GetLastError, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING,
             ERROR_NOT_FOUND, MAX_PATH, WAIT_IO_COMPLETION,
         },
         Storage::FileSystem::{
@@ -30,12 +30,11 @@ struct CompletionResult {
 }
 impl CompletionResult {
     pub fn write_to_overlapped(&mut self, overlapped: &mut OVERLAPPED) {
-        overlapped.hEvent = self as *mut _ as isize
+        overlapped.hEvent = (self as *mut Self).cast();
     }
     #[allow(clippy::cast_sign_loss)] // not a number
     pub unsafe fn from_overlapped<'s>(overlapped: *mut OVERLAPPED) -> &'s mut Self {
-        // FUTURE use Exposed Provenance API
-        unsafe { &mut *((*overlapped).hEvent as usize as *mut _) }
+        unsafe { &mut *((*overlapped).hEvent.cast()) }
     }
     pub fn has_finished(&self) -> bool {
         (self.error_code == 0 && self.n_bytes > 0)
@@ -53,26 +52,26 @@ impl Default for CompletionResult {
 
 pub fn duplicate_handle(handle: BorrowedHandle<'_>) -> io::Result<OwnedHandle> {
     let raw = duplicate_handle_inner(handle, None)?;
-    unsafe { Ok(OwnedHandle::from_raw_handle(raw.to_std())) }
+    unsafe { Ok(OwnedHandle::from_raw_handle(raw)) }
 }
 pub fn duplicate_handle_to_foreign(
     handle: BorrowedHandle<'_>,
     other_process: BorrowedHandle<'_>,
-) -> io::Result<HANDLE> {
+) -> io::Result<RawHandle> {
     duplicate_handle_inner(handle, Some(other_process))
 }
 
 fn duplicate_handle_inner(
     handle: BorrowedHandle<'_>,
     other_process: Option<BorrowedHandle<'_>>,
-) -> io::Result<HANDLE> {
+) -> io::Result<RawHandle> {
     let mut new_handle = INVALID_HANDLE_VALUE;
     unsafe {
         let proc = GetCurrentProcess();
         DuplicateHandle(
             proc,
-            handle.as_int_handle(),
-            other_process.map(|h| h.as_int_handle()).unwrap_or(proc),
+            handle.as_raw_handle(),
+            other_process.map(|h| h.as_raw_handle()).unwrap_or(proc),
             &mut new_handle,
             0,
             0,
@@ -86,7 +85,7 @@ fn duplicate_handle_inner(
 pub unsafe fn read_ptr(h: BorrowedHandle<'_>, ptr: *mut u8, len: usize) -> io::Result<usize> {
     let len = u32::try_from(len).unwrap_or(u32::MAX);
     let mut bytes_read: u32 = 0;
-    unsafe { ReadFile(h.as_int_handle(), ptr, len, mut2ptr(&mut bytes_read), ptr::null_mut()) }
+    unsafe { ReadFile(h.as_raw_handle(), ptr, len, mut2ptr(&mut bytes_read), ptr::null_mut()) }
         .true_val_or_errno(bytes_read.to_usize())
 }
 #[inline]
@@ -144,7 +143,7 @@ pub unsafe fn read_exsync_ptr(
 ) -> io::Result<usize> {
     let routine = Some(CompletionResult::routine as _);
     let len = u32::try_from(len).unwrap_or(u32::MAX);
-    exsync_op(h, timeout, |ov| unsafe { ReadFileEx(h.as_int_handle(), ptr, len, ov, routine) })
+    exsync_op(h, timeout, |ov| unsafe { ReadFileEx(h.as_raw_handle(), ptr, len, ov, routine) })
 }
 #[inline]
 pub fn read_exsync(
@@ -161,7 +160,7 @@ pub fn write(h: BorrowedHandle<'_>, buf: &[u8]) -> io::Result<usize> {
     let mut bytes_written: u32 = 0;
     unsafe {
         WriteFile(
-            h.as_int_handle(),
+            h.as_raw_handle(),
             buf.as_ptr().cast(),
             len,
             mut2ptr(&mut bytes_written),
@@ -179,12 +178,12 @@ pub fn write_exsync(
     let routine = Some(CompletionResult::routine as _);
     let ptr = buf.as_ptr();
     let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
-    exsync_op(h, timeout, |ov| unsafe { WriteFileEx(h.as_int_handle(), ptr, len, ov, routine) })
+    exsync_op(h, timeout, |ov| unsafe { WriteFileEx(h.as_raw_handle(), ptr, len, ov, routine) })
 }
 
 #[inline]
 pub fn flush(h: BorrowedHandle<'_>) -> io::Result<()> {
-    downgrade_eof(unsafe { FlushFileBuffers(h.as_int_handle()) }.true_val_or_errno(()))
+    downgrade_eof(unsafe { FlushFileBuffers(h.as_raw_handle()) }.true_val_or_errno(()))
 }
 
 #[allow(clippy::arithmetic_side_effects)]
@@ -200,7 +199,7 @@ pub fn wait_apc(timeout: Option<Duration>) -> bool {
 }
 
 pub fn cancel_io(h: BorrowedHandle<'_>, ov: &OVERLAPPED) -> io::Result<bool> {
-    if unsafe { CancelIoEx(h.as_int_handle(), ov) } != 0 {
+    if unsafe { CancelIoEx(h.as_raw_handle(), ov) } != 0 {
         return Ok(true);
     }
     let err = unsafe { GetLastError() };
@@ -213,7 +212,7 @@ pub fn cancel_io(h: BorrowedHandle<'_>, ov: &OVERLAPPED) -> io::Result<bool> {
 }
 
 pub fn path(h: BorrowedHandle<'_>) -> io::Result<Vec<u16>> {
-    let h = h.as_int_handle();
+    let h = h.as_raw_handle();
     let mut buf = Vec::with_capacity((MAX_PATH + 1).to_usize());
     loop {
         let bufcap = buf.capacity().try_into().unwrap_or(u32::MAX);
