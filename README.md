@@ -5,7 +5,7 @@
 [cratesio-shield]: https://img.shields.io/crates/v/interprocess
 [docsrs-shield]: https://img.shields.io/badge/documentation-docs.rs-informational
 [ci-shield]: https://github.com/kotauskas/interprocess/actions/workflows/checks_and_tests.yml/badge.svg
-[maint-shield]: https://img.shields.io/badge/maintenance-actively%20developed-brightgreen
+[maint-shield]: https://img.shields.io/badge/maintenance-passive-green
 [msrv-shield]: https://img.shields.io/badge/rust%20version-1.75+-orange
 
 [cratesio]: https://crates.io/crates/interprocess "Interprocess on Crates.io"
