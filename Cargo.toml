@@ -94,7 +94,7 @@ tokio = { version = "1.36.0", features = [
 futures-core = { version = "0.3.28", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52.0", features = [
+windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Security_Authorization",
