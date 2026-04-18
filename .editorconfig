@@ -1,13 +1,17 @@
 root = true
 
 [*]
+charset                  = utf-8
 end_of_line              = lf
+indent_size              = 4
+indent_style             = space
 insert_final_newline     = true
 trim_trailing_whitespace = true
-indent_style             = space
-indent_size              = 4
-charset                  = utf-8
+max_line_length          = 98
 
 [**.yml]
-indent_style = space
 indent_size  = 2
+indent_style = space
+
+[README.md]
+max_line_length = 78
