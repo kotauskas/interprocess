@@ -2,7 +2,7 @@ use {
     super::{downgrade_eof, winprelude::*},
     crate::{mut2ptr, timeout_expiry, AsBuf, CannotUnwind, OrErrno as _, SubUsizeExt as _},
     std::{
-        io, ptr,
+        ffi::c_void, io, ptr,
         time::{Duration, Instant},
     },
     windows_sys::{
@@ -33,7 +33,7 @@ struct CompletionResult {
 }
 impl CompletionResult {
     pub fn write_to_overlapped(&mut self, overlapped: &mut OVERLAPPED) {
-        overlapped.hEvent = self as *mut _ as isize
+        overlapped.hEvent = self as *mut _ as *mut c_void
     }
     #[allow(clippy::cast_sign_loss)] // not a number
     pub unsafe fn from_overlapped<'s>(overlapped: *mut OVERLAPPED) -> &'s mut Self {
