@@ -407,11 +407,35 @@ pub(crate) fn timeout_expiry(timeout: Duration) -> io::Result<Instant> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, msg))
 }
 
-pub(crate) struct CannotUnwind(());
-impl CannotUnwind {
-    pub fn begin() -> Self { Self(()) }
-    pub fn end(self) { std::mem::forget(self) }
+pub(crate) struct UnwindBomb(());
+impl UnwindBomb {
+    #[inline]
+    pub fn arm() -> Self { Self(()) }
+    #[inline]
+    pub fn defuse(self) { std::mem::forget(self) }
 }
-impl Drop for CannotUnwind {
-    fn drop(&mut self) { std::process::abort(); }
+#[cfg(panic = "unwind")]
+impl Drop for UnwindBomb {
+    fn drop(&mut self) {
+        aborting_panic("unsafe unwinding through critical section (this is a bug!)");
+    }
 }
+
+#[cfg(panic = "unwind")]
+#[inline(never)]
+#[cold]
+#[track_caller]
+pub(crate) fn aborting_panic<M: std::any::Any + Send + 'static>(m: M) -> ! {
+    struct SilentBomb;
+    impl Drop for SilentBomb {
+        #[inline(always)]
+        fn drop(&mut self) { std::process::abort() }
+    }
+    let _bomb = SilentBomb;
+    // It would be pretty nice to be able to trigger the Usual Panic Things without proceeding
+    // with an unwind, but this is the best that current Rust offers and it's not too terribly
+    // expensive anyway.
+    std::panic::panic_any(m)
+}
+#[cfg(not(panic = "unwind"))]
+pub(crate) use std::panic::panic_any as aborting_panic;

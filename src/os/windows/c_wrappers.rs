@@ -1,6 +1,6 @@
 use {
     super::{downgrade_eof, winprelude::*},
-    crate::{mut2ptr, timeout_expiry, AsBuf, CannotUnwind, OrErrno as _, SubUsizeExt as _},
+    crate::{mut2ptr, timeout_expiry, AsBuf, OrErrno as _, SubUsizeExt as _, UnwindBomb},
     std::{
         io, ptr,
         time::{Duration, Instant},
@@ -103,10 +103,10 @@ pub fn exsync_op(
     resultbuf.write_to_overlapped(&mut ov);
     let end = timeout.map(timeout_expiry).transpose()?;
     'outer: loop {
-        let uw_guard = CannotUnwind::begin();
         f(&mut ov).true_val_or_errno(())?;
         // The above early return is okay because we always enter a loop iteration without a
         // pending I/O op, and a zero return value means that it failed to start the operation.
+        let bomb = UnwindBomb::arm();
         'wait: loop {
             if wait_apc(timeout) {
                 break 'wait;
@@ -116,13 +116,13 @@ pub fn exsync_op(
                 if remain == Duration::ZERO {
                     cancel_io(h, &ov)
                         .expect("CancelIoEx unexpectedly failed during critical section");
-                    uw_guard.end();
+                    bomb.defuse();
                     break 'outer;
                 }
                 timeout = Some(remain);
             }
         }
-        uw_guard.end();
+        bomb.defuse();
         if resultbuf.has_finished() {
             break 'outer;
         }
