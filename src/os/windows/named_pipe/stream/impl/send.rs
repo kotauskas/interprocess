@@ -3,7 +3,7 @@ use super::*;
 impl RawPipeStream {
     #[track_caller]
     fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        let r = c_wrappers::write_exsync(self.as_handle(), buf, None);
+        let r = c_wrappers::write_exsync(self.as_handle(), buf);
         if r.is_ok() {
             self.needs_flush.mark_dirty();
         }

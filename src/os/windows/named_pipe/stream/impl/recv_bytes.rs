@@ -9,7 +9,7 @@ use {
 impl RawPipeStream {
     #[track_caller]
     fn read(&self, buf: &mut (impl AsBuf + ?Sized)) -> io::Result<usize> {
-        c_wrappers::read_exsync(self.as_handle(), buf, None)
+        c_wrappers::read_exsync(self.as_handle(), buf)
     }
 }
 
