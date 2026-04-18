@@ -162,7 +162,7 @@ pub(crate) fn connect_without_waiting(
             ptr::null_mut(),
             OPEN_EXISTING,
             FILE_FLAG_OVERLAPPED,
-            0,
+            ptr::null_mut(),
         )
         .handle_or_errno()
         .map(|h|
