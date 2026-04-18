@@ -38,7 +38,7 @@ impl<const TAG0: bool, const TAG1: bool> AdvOwnedHandle<TAG0, TAG1> {
     fn new(h: OwnedHandle, tag0: bool, tag1: bool) -> Self {
         // SAFETY: valid handles (as guaranteed by OwnedHandle) are never zero
         Self(unsafe {
-            NonZeroIsize::new_unchecked(h.into_int_handle() | Self::mk_tag(tag0, tag1))
+            NonZeroIsize::new_unchecked((h.into_int_handle() as isize) | Self::mk_tag(tag0, tag1))
         })
     }
     #[inline(always)]
@@ -116,7 +116,7 @@ impl<const TAG0: bool, const TAG1: bool> AsHandle for AdvOwnedHandle<TAG0, TAG1>
 impl From<OwnedHandle> for AdvOwnedHandle<false, false> {
     #[inline(always)]
     fn from(h: OwnedHandle) -> Self {
-        Self(unsafe { NonZeroIsize::new_unchecked(h.into_int_handle()) })
+        Self(unsafe { NonZeroIsize::new_unchecked(h.into_int_handle() as isize) })
     }
 }
 impl FromRawHandle for AdvOwnedHandle<false, false> {
