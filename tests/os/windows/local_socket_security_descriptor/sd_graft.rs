@@ -89,7 +89,7 @@ fn get_self_exe(obuf: &mut [MaybeUninit<u16>]) -> io::Result<&U16CStr> {
     }
     let base = obuf.as_mut_ptr().cast();
     let cap = obuf.len().try_into().unwrap_or(u32::MAX);
-    unsafe { GetModuleFileNameW(0, base, cap) != 0 }.true_val_or_errno(()).and_then(|()| unsafe {
+    unsafe { GetModuleFileNameW(std::ptr::null_mut(), base, cap) != 0 }.true_val_or_errno(()).and_then(|()| unsafe {
         U16CStr::from_ptr_truncate(base.cast_const(), cap.to_usize()).map_err(io::Error::other)
     })
 }
