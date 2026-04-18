@@ -3,15 +3,18 @@ use {
     crate::{BoolExt, OrErrno, SubUsizeExt},
     std::{ffi::c_void, io, ptr},
     widestring::U16CStr,
-    windows_sys::Win32::{
-        Foundation::{LocalFree, BOOL, PSID},
-        Security::{
-            Authorization::{
-                ConvertSecurityDescriptorToStringSecurityDescriptorW,
-                ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+    windows_sys::{
+        core::BOOL,
+        Win32::{
+            Foundation::LocalFree,
+            Security::{
+                Authorization::{
+                    ConvertSecurityDescriptorToStringSecurityDescriptorW,
+                    ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+                },
+                FreeSid, GetSecurityDescriptorControl, SetSecurityDescriptorControl, ACL,
+                SECURITY_DESCRIPTOR_CONTROL, PSID,
             },
-            FreeSid, GetSecurityDescriptorControl, SetSecurityDescriptorControl, ACL,
-            SECURITY_DESCRIPTOR_CONTROL,
         },
     },
 };

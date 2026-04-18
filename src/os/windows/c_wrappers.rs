@@ -5,18 +5,21 @@ use {
         io, ptr,
         time::{Duration, Instant},
     },
-    windows_sys::Win32::{
-        Foundation::{
-            DuplicateHandle, GetLastError, BOOL, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING,
-            ERROR_NOT_FOUND, MAX_PATH, WAIT_IO_COMPLETION,
-        },
-        Storage::FileSystem::{
-            FlushFileBuffers, GetFinalPathNameByHandleW, ReadFile, ReadFileEx, WriteFile,
-            WriteFileEx,
-        },
-        System::{
-            Threading::{GetCurrentProcess, SleepEx},
-            IO::{CancelIoEx, OVERLAPPED},
+    windows_sys::{
+        core::BOOL,
+        Win32::{
+            Foundation::{
+                DuplicateHandle, GetLastError, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING,
+                ERROR_NOT_FOUND, MAX_PATH, WAIT_IO_COMPLETION,
+            },
+            Storage::FileSystem::{
+                FlushFileBuffers, GetFinalPathNameByHandleW, ReadFile, ReadFileEx, WriteFile,
+                WriteFileEx,
+            },
+            System::{
+                Threading::{GetCurrentProcess, SleepEx},
+                IO::{CancelIoEx, OVERLAPPED},
+            },
         },
     },
 };
