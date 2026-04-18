@@ -1,6 +1,9 @@
 use {
     super::{downgrade_eof, winprelude::*},
-    crate::{mut2ptr, timeout_expiry, AsBuf, OrErrno as _, SubUsizeExt as _, UnwindBomb},
+    crate::{
+        aborting_panic, mut2ptr, timeout_expiry, AsBuf, OrErrno as _, SubUsizeExt as _,
+        UnwindBomb,
+    },
     std::{
         io, ptr,
         time::{Duration, Instant},
@@ -114,8 +117,20 @@ pub fn exsync_op(
             if let Some(end) = end {
                 let remain = end.saturating_duration_since(Instant::now());
                 if remain == Duration::ZERO {
-                    cancel_io(h, &ov)
-                        .expect("CancelIoEx unexpectedly failed during critical section");
+                    match cancel_io(h, &ov) {
+                        Ok(true) => {
+                            // The I/O will merely be queued for cancellation until we enter an
+                            // alertable state.
+                            wait_apc(None);
+                        }
+                        Ok(false) => {}
+                        Err(e) => aborting_panic(format!("failed to cancel I/O: {e}")),
+                    }
+                    if !resultbuf.has_finished() {
+                        // If the I/O is still pending, the OVERLAPPED structure is in use and we
+                        // cannot exit the loop without use-after-return.
+                        aborting_panic("cannot safely exit completion wait loop");
+                    }
                     bomb.defuse();
                     break 'outer;
                 }
