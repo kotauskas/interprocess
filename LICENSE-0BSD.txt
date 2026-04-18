@@ -1,6 +1,6 @@
 BSD Zero Clause License
 
-Copyright (c) 2025 Goat
+Copyright (c) 2020-2026 Goat
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted.

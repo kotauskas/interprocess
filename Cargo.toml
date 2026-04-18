@@ -1,16 +1,16 @@
 [package]
 name         = "interprocess"
 version      = "2.4.1"
-rust-version = "1.75"
 edition      = "2021"
-authors      = ["Goat"]
-license      = "0BSD"
-readme       = "README.md"
-repository   = "https://github.com/kotauskas/interprocess"
+rust-version = "1.75"
 
-description = "Interprocess communication toolkit"
+authors     = ["Goat"]
 categories  = ["os", "os::unix-apis", "os::windows-apis", "asynchronous"]
+description = "Interprocess communication toolkit"
 keywords    = ["ipc", "pipe"]
+license     = "0BSD OR Apache-2.0"
+readme      = "README.md"
+repository  = "https://github.com/kotauskas/interprocess"
 
 autotests = false
 autoexamples = false
@@ -21,59 +21,6 @@ exclude = [
     "/.editorconfig",
     "/Cargo.lock",
 ]
-
-[[bin]]
-name = "inspect-platform"
-path = "inspect-platform/main.rs"
-test = false
-
-[[example]]
-name = "unnamed_pipe_sync"
-path = "examples/unnamed_pipe/sync/main.rs"
-
-[[example]]
-name = "unnamed_pipe_tokio"
-path = "examples/unnamed_pipe/tokio/main.rs"
-
-[[example]]
-name = "local_socket_sync_server"
-path = "examples/local_socket/sync/listener.rs"
-
-[[example]]
-name = "local_socket_sync_client"
-path = "examples/local_socket/sync/stream.rs"
-
-[[example]]
-name = "local_socket_tokio_server"
-path = "examples/local_socket/tokio/listener.rs"
-
-[[example]]
-name = "local_socket_tokio_client"
-path = "examples/local_socket/tokio/stream.rs"
-
-[[example]]
-name = "named_pipe_sync_server"
-path = "examples/named_pipe/sync/listener.rs"
-
-[[example]]
-name = "named_pipe_sync_client_bytes"
-path = "examples/named_pipe/sync/stream/bytes.rs"
-
-[[example]]
-name = "named_pipe_sync_client_msg"
-path = "examples/named_pipe/sync/stream/msg.rs"
-
-[[example]]
-name = "named_pipe_tokio_server"
-path = "examples/named_pipe/tokio/listener.rs"
-
-[[example]]
-name = "named_pipe_tokio_client_bytes"
-path = "examples/named_pipe/tokio/stream/bytes.rs"
-
-[[example]]
-name = "named_pipe_tokio_client_msg"
-path = "examples/named_pipe/tokio/stream/msg.rs"
 
 [features]
 default = []
@@ -158,3 +105,45 @@ targets = [
     "aarch64-apple-darwin",
     "x86_64-unknown-freebsd",
 ]
+
+[[bin]]
+name = "inspect-platform"
+path = "inspect-platform/main.rs"
+test = false
+
+[[example]]
+name = "unnamed_pipe_sync"
+path = "examples/unnamed_pipe/sync/main.rs"
+[[example]]
+name = "unnamed_pipe_tokio"
+path = "examples/unnamed_pipe/tokio/main.rs"
+[[example]]
+name = "local_socket_sync_server"
+path = "examples/local_socket/sync/listener.rs"
+[[example]]
+name = "local_socket_sync_client"
+path = "examples/local_socket/sync/stream.rs"
+[[example]]
+name = "local_socket_tokio_server"
+path = "examples/local_socket/tokio/listener.rs"
+[[example]]
+name = "local_socket_tokio_client"
+path = "examples/local_socket/tokio/stream.rs"
+[[example]]
+name = "named_pipe_sync_server"
+path = "examples/named_pipe/sync/listener.rs"
+[[example]]
+name = "named_pipe_sync_client_bytes"
+path = "examples/named_pipe/sync/stream/bytes.rs"
+[[example]]
+name = "named_pipe_sync_client_msg"
+path = "examples/named_pipe/sync/stream/msg.rs"
+[[example]]
+name = "named_pipe_tokio_server"
+path = "examples/named_pipe/tokio/listener.rs"
+[[example]]
+name = "named_pipe_tokio_client_bytes"
+path = "examples/named_pipe/tokio/stream/bytes.rs"
+[[example]]
+name = "named_pipe_tokio_client_msg"
+path = "examples/named_pipe/tokio/stream/msg.rs"
