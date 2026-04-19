@@ -23,34 +23,9 @@ pub fn print_sizes(sz: &[(&str, usize)]) {
     let width = maxlen2(sz);
     sz.iter().for_each(|&(nm, sz)| println!("{nm:width$} : {sz:>3} bytes"));
 }
-pub fn print_signedness(nm: &str, signed: bool) {
-    println!("{nm} is {}signed", if signed { "" } else { "un" })
-}
 
-pub fn display_if<T: Display>(cond: bool, v: T) -> OptionDisplay<T> {
-    OptionDisplay::new(cond.then_some(v))
-}
 #[allow(clippy::obfuscated_if_else)]
 pub fn val_if<T: Default>(cond: bool, v: T) -> T { cond.then_some(v).unwrap_or_default() }
-#[derive(Copy, Clone, Debug)]
-pub struct OptionDisplay<T>(Option<T>);
-impl<T> OptionDisplay<T> {
-    pub const fn new(v: Option<T>) -> Self { Self(v) }
-}
-impl<T> From<T> for OptionDisplay<T> {
-    fn from(v: T) -> Self { Self(Some(v)) }
-}
-impl<T> Default for OptionDisplay<T> {
-    fn default() -> Self { Self(None) }
-}
-impl<T: Display> Display for OptionDisplay<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(v) = &self.0 {
-            Display::fmt(v, f)?;
-        }
-        Ok(())
-    }
-}
 
 pub const fn display_fn<T: Fn(&mut Formatter<'_>) -> fmt::Result>(v: T) -> DisplayFn<T> {
     DisplayFn(v)

@@ -1,11 +1,11 @@
 use {
     super::unixprelude::*,
     crate::{os::unix::ud_addr::TerminatedUdAddr, timeout_expiry},
-    libc::{sockaddr_un, AF_UNIX},
+    libc::AF_UNIX,
     std::{
         ffi::CStr,
         io,
-        mem::{size_of, zeroed, MaybeUninit},
+        mem::{size_of, MaybeUninit},
         time::{Duration, Instant},
     },
 };
@@ -145,11 +145,6 @@ pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()
     rslt
 }
 
-pub(super) unsafe fn stat_ptr(path: *const c_char) -> io::Result<libc::stat> {
-    let mut rslt = unsafe { zeroed::<libc::stat>() };
-    unsafe { libc::stat(path, &mut rslt) != -1 }.true_val_or_errno(rslt)
-}
-
 const NONBLOCKING_PARAMS: (bool, c_int) = {
     #[cfg(any(
         target_os = "linux",
@@ -194,18 +189,6 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
 
     Ok(fd)
 }
-
-const SUN_PATH_OFFSET: usize = unsafe {
-    // This code may or may not have been copied from the standard library
-    let addr = zeroed::<sockaddr_un>();
-    let base = (&addr as *const sockaddr_un).cast::<c_char>();
-    let path = &addr.sun_path as *const c_char;
-    #[allow(clippy::cast_sign_loss)]
-    {
-        // FUTURE use byte_offset_from_unsigned
-        path.byte_offset_from(base) as usize
-    }
-};
 
 fn bind(fd: BorrowedFd<'_>, addr: TerminatedUdAddr<'_>) -> io::Result<()> {
     unsafe { libc::bind(fd.as_raw_fd(), addr.addr_ptr().cast(), addr.addrlen()) != -1 }

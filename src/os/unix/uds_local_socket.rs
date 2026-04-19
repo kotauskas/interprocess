@@ -236,7 +236,6 @@ fn continue_spin_loop(end: Option<Instant>, spin_time: Option<&mut Duration>) ->
 }
 
 const MAX_RUN_USER: usize = "/run/user//".len() + uid_t::MAX.ilog10() as usize + 1;
-const RUN_USER_BUF: usize = MAX_RUN_USER + 1;
 const NMCAP: usize = SUN_LEN - MAX_RUN_USER;
 
 /// Writes a `/run/user/<uid>/` path with the given socket name into the address buffer,
