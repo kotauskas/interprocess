@@ -407,20 +407,6 @@ pub(crate) fn timeout_expiry(timeout: Duration) -> io::Result<Instant> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, msg))
 }
 
-pub(crate) struct UnwindBomb(());
-impl UnwindBomb {
-    #[inline]
-    pub fn arm() -> Self { Self(()) }
-    #[inline]
-    pub fn defuse(self) { std::mem::forget(self) }
-}
-#[cfg(panic = "unwind")]
-impl Drop for UnwindBomb {
-    fn drop(&mut self) {
-        aborting_panic("unsafe unwinding through critical section (this is a bug!)");
-    }
-}
-
 #[cfg(panic = "unwind")]
 #[inline(never)]
 #[cold]

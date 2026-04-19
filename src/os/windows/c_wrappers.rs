@@ -1,6 +1,6 @@
 use {
     super::{downgrade_eof, winprelude::*},
-    crate::{mut2ptr, AsBuf, OrErrno as _, SubUsizeExt as _, UnwindBomb},
+    crate::{mut2ptr, AsBuf, OrErrno as _, SubUsizeExt as _},
     std::{io, ptr, time::Duration},
     windows_sys::Win32::{
         Foundation::{
