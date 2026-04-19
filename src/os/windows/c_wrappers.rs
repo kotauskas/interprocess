@@ -1,7 +1,7 @@
 use {
     super::{downgrade_eof, winprelude::*},
     crate::{mut2ptr, AsBuf, OrErrno as _, SubUsizeExt as _},
-    std::{io, ptr, time::Duration},
+    std::{cell::Cell, io, ptr, time::Duration},
     windows_sys::Win32::{
         Foundation::{
             DuplicateHandle, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING, MAX_PATH,
@@ -22,29 +22,27 @@ const OVERLAPPED_INIT: OVERLAPPED = unsafe { std::mem::zeroed() };
 
 #[repr(C)]
 struct CompletionResult {
-    error_code: u32,
-    n_bytes: u32,
+    error_code: Cell<u32>,
+    n_bytes: Cell<u32>,
 }
 impl CompletionResult {
     pub fn write_to_overlapped(&mut self, overlapped: &mut OVERLAPPED) {
         overlapped.hEvent = (self as *mut Self).cast();
     }
-    #[allow(clippy::cast_sign_loss)] // not a number
-    pub unsafe fn from_overlapped<'s>(overlapped: *mut OVERLAPPED) -> &'s mut Self {
-        unsafe { &mut *((*overlapped).hEvent.cast()) }
+    pub unsafe fn from_overlapped<'s>(overlapped: *mut OVERLAPPED) -> &'s Self {
+        unsafe { &*((*overlapped).hEvent.cast()) }
     }
-    pub fn has_finished(&self) -> bool {
-        (self.error_code == 0 && self.n_bytes > 0)
-            || (self.error_code != 0 && self.error_code != ERROR_IO_PENDING)
-    }
+    pub fn has_finished(&self) -> bool { self.error_code.get() != ERROR_IO_PENDING }
     pub unsafe extern "system" fn routine(code: u32, n_bytes: u32, ov: *mut OVERLAPPED) {
         let resultbuf = unsafe { CompletionResult::from_overlapped(ov) };
-        resultbuf.error_code = code;
-        resultbuf.n_bytes = n_bytes;
+        resultbuf.error_code.set(code);
+        resultbuf.n_bytes.set(n_bytes);
     }
 }
 impl Default for CompletionResult {
-    fn default() -> Self { Self { error_code: ERROR_IO_PENDING, n_bytes: 0 } }
+    fn default() -> Self {
+        Self { error_code: Cell::new(ERROR_IO_PENDING), n_bytes: Cell::new(0) }
+    }
 }
 
 pub fn duplicate_handle(handle: BorrowedHandle<'_>) -> io::Result<OwnedHandle> {
@@ -98,14 +96,18 @@ pub fn exsync_op(mut f: impl FnMut(&mut OVERLAPPED) -> BOOL) -> io::Result<usize
     f(&mut ov).true_val_or_errno(())?;
     // The above early return is okay because the OVERLAPPED structure cannot be in use by an
     // operation that failed to start.
-    while !resultbuf.has_finished() {
+    loop {
         wait_apc(None);
+        if resultbuf.has_finished() {
+            break;
+        }
     }
-    if resultbuf.error_code == 0 {
-        Ok(resultbuf.n_bytes.to_usize())
+    let error_code = resultbuf.error_code.get();
+    if error_code == 0 {
+        Ok(resultbuf.n_bytes.get().to_usize())
     } else {
         #[allow(clippy::cast_possible_wrap)]
-        Err(io::Error::from_raw_os_error(resultbuf.error_code as _))
+        Err(io::Error::from_raw_os_error(error_code as _))
     }
 }
 
