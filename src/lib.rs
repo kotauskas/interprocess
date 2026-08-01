@@ -1,6 +1,12 @@
+//! [local_socket]: local_socket
+//! [unnamed_pipe]: unnamed_pipe
+//! [fifo_file]: os::unix::fifo_file
+//! [ud_socket]: std::os::unix::net
+//! [`std::process`]: std::process
+// thanks to https://linebender.org/blog/doc-include/
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
-// If this was in Cargo.toml, it would cover examples as well
+// If this was in Cargo.toml, it would apply to examples as well, which we do not want
 #![warn(
     missing_docs,
     clippy::panic_in_result_fn,
@@ -23,7 +29,7 @@ pub mod unnamed_pipe;
 
 /// Platform-specific functionality for various interprocess communication primitives.
 ///
-/// This module houses two modules: `unix` and `windows`, although only one at a time will be
+/// This is the home of two modules, `unix` and `windows`, although only one at a time will be
 /// visible, depending on which platform the documentation was built on. If you're using
 /// [Docs.rs](https://docs.rs/interprocess/latest/interprocess), you can view the documentation for
 /// Windows, macOS, Linux and FreeBSD using the Platform menu on the Docs.rs-specific header bar at

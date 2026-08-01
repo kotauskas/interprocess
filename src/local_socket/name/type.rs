@@ -26,11 +26,12 @@ impmod! {local_socket::name_type as n_impl}
 ///
 /// [uninhabited]: https://doc.rust-lang.org/reference/glossary.html#uninhabited
 ///
-/// **It is a breaking change for a mapping to meaningfully change.** More concretely, if a name
-/// produced by this mapping from some input results in a valid listener via
+/// **It would be a breaking change for a mapping to meaningfully change.** More concretely, if a
+/// name produced by this mapping from some input results in a valid listener via
 /// [server creation](super::super::ListenerOptions) or successfully locates one via
 /// [client creation](super::super::traits::Stream::connect), the name type will continue to map
-/// that input to the same name, for the OS's definition of "same".
+/// that input to the same name, for the OS's definition of "same", within the current major
+/// version of Interprocess.
 #[allow(private_bounds)]
 pub trait NameType: Copy + std::fmt::Debug + Eq + Send + Sync + Unpin + Sealed {
     /// Whether the name type is supported within the runtime circumstances of the program.

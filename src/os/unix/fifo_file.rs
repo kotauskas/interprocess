@@ -1,17 +1,20 @@
 //! Creation of FIFO files.
 //!
-//! On Windows, named pipes can be compared to Unix domain sockets: they can have multiple duplex
-//! connections on a single path, and the data can be chosen to either preserve or erase the message
-//! boundaries, resulting in a reliable performant alternative to TCP and UDP working in the bounds
-//! of a single machine. Those Unix domain sockets are employed by `interprocess` for local sockets
-//! via [an implementation provided by the standard library](std::os::unix::net).
+//! Those are sometimes referred to as named pipes. Note that they are completely unrelated to
+//! the Windows concept with the same name. "FIFO files" are filesystem objects that allow for
+//! synchronous arrangement of a unidirectional pipe connection between two processes, which is
+//! only useful when one is not the ancestor of another and an unnamed pipe thus cannot be simply
+//! inherited. This synchronization happens at file opening time and can be described as highly
+//! aggressive: both the reader and the writer will block on opening the file until the other side
+//! has also opened it.
 //!
-//! On Unix, named pipes, referred to as "FIFO files" in this crate, are just files which can have
-//! a sender and a receiver communicating with each other in one direction without message
-//! boundaries. If further receivers try to open the file, they will simply receive nothing at all;
-//! if further senders are connected, the data mixes in an unpredictable way, making it unusable.
-//! Therefore, FIFOs are to be used specifically to conveniently connect two applications through a
-//! known path which works like a pipe and nothing else.
+//! If multiple processes read from a FIFO file concurrently, they will compete for sent data; if
+//! mulitple processes write to it concurrently, the data will mix unpredictably (albeit subject
+//! to OS-specific thresholds of atomicity). In summary, concurrent use of a FIFO file by more
+//! than two processes is almost always erroneous.
+//!
+//! Due to the above, use of FIFO files should be avoided if possible. You may be looking for
+//! [local sockets](crate::local_socket) or [Unix domain sockets](std::os::unix::net) instead.
 //!
 //! ## Usage
 //! The [`create_fifo()`] function serves for a FIFO file creation. Opening FIFO files works via the

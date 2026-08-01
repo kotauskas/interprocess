@@ -2,23 +2,29 @@
 //! filesystem path or an identifier inside a special namespace, with each client having a
 //! private connection to the server.
 //!
+//! They are a much more appropriate alternative to `localhost` TCP sockets, featuring better
+//! performance and developer- and user-friendly [identifiers](NameType) and
+//! [authentication](PeerCreds).
+//!
 //! ## Implementations and dispatch
 //! Local sockets are not a real IPC primitive implemented by the OS, but rather a construct of
-//! Interprocess that is implemented in terms of an underlying IPC primitive. Different IPC
-//! primitives are available on different platforms and have different capabilities and
-//! limitations. As such, the types representing local sockets that you can find in this
+//! Interprocess that is implemented in terms of an underlying IPC primitive. Different underlying
+//! IPC primitives are available on different platforms and have different capabilities and
+//! limitations. As such, the types representing local sockets that can be found in this
 //! module – [`Listener`], [`Stream`], [`RecvHalf`], [`SendHalf`] – are really enums in the style
-//! of `enum_dispatch` that contain variants for all the different implementations of local
-//! sockets that are available, and the types that they dispatch between are talked to via the
-//! corresponding [`Listener`](traits::Listener), [`Stream`](traits::Stream)
-//! [`RecvHalf`](traits::RecvHalf), [`SendHalf`](traits::SendHalf) traits that you can find in the
-//! [`traits`] module. (Note that this dispatch is currently zero-cost on all platforms, as there
-//! is only one underlying local socket implementation per platform, with Windows only using named
-//! pipe based local sockets and Unix only using Unix-domain socket based local sockets, but this
+//! of [`enum_dispatch`](https://crates.io/crates/enum_dispatch) that contain variants for all the
+//! different implementations of local sockets that are available, and the types that they
+//! dispatch between are talked to via the corresponding [`Listener`](traits::Listener),
+//! [`Stream`](traits::Stream) [`RecvHalf`](traits::RecvHalf), [`SendHalf`](traits::SendHalf)
+//! traits that are located in the [`traits`] module.
+//!
+//! Note that this dispatch is currently zero-cost on all platforms, as there is only one
+//! underlying local socket implementation per platform, with Windows only using named pipe based
+//! local sockets and Unix only using Unix-domain socket based local sockets, but this
 //! may change in the future with the introduction of support for
-//! [the Windows implementation of Unix-domain sockets][udswnd]. Even then, the overhead of this
-//! dispatch is insignificant compared to the overhead of making the system calls that perform
-//! the actual communication.)
+//! [the Windows implementation of Unix-domain sockets][udswnd]. Even if that were to be
+//! introduced, the overhead of dispatch would still be insignificant compared to the overhead of
+//! making the system calls that perform the actual communication.
 //!
 //! [udswnd]: https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/
 //!
@@ -28,14 +34,15 @@
 //!
 //! ## Stability
 //! Since interprocess communication cannot happen without agreement on a protocol between two or
-//! more processes, the mapping of local sockets to underlying primitives is stable and
-//! predictable. **The IPC primitive selected depends only on the current platform and the
-//! [name type](NameType) used.** The mapping is trivial unless noted otherwise (in particular,
-//! Interprocess never inserts its own message framing or any other type of metadata into the
-//! stream – the bytes you write are the exact bytes that come out the other end), which means
-//! that the portable API of local sockets is suitable for communicating with programs that do
-//! not use Interprocess themselves, including programs not written in Rust. All you need to do
-//! is use the correct name type for every platform.
+//! more processes, Interprocess provides a guarantee of stability of the mapping from local
+//! sockets to underlying primitives. **The IPC primitive selected depends only on the current
+//! platform and the [name type](NameType) used.** The mapping is trivial unless noted otherwise,
+//! which means that the portable API of local sockets is suitable for communicating with
+//! programs that do not use Interprocess themselves, including programs not written in Rust. In
+//! particular, Interprocess never inserts its own message framing or any other type of metadata
+//! into the stream – the bytes you write are the exact bytes that come out the other end. All you
+//! need to do to ensure reliable communication is use the appropriate name type on the platforms
+//! that are important to you.
 //!
 //! ## Raw handle and file descriptor access
 //! The enum dispatchers purposely omit implementations of `{As,Into,From}Raw{Handle,Fd}`,

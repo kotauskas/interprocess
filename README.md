@@ -13,45 +13,62 @@
 [ci-page]: https://github.com/kotauskas/interprocess/actions/workflows/checks_and_tests.yml
 [msrv-blogpost]: https://blog.rust-lang.org/2023/12/28/Rust-1.75.0.html
 
-Interprocess communication toolkit for Rust programs that aims to expose
+[local_socket]: https://docs.rs/interprocess/2.4.3/interprocess/local_socket/index.html
+[unnamed_pipe]: https://docs.rs/interprocess/2.4.3/interprocess/unnamed_pipe/index.html
+[fifo_file]: https://docs.rs/interprocess/2.4.3/interprocess/os/unix/fifo_file/index.html
+[ud_socket]: https://doc.rust-lang.org/std/os/unix/net/index.html
+[named_pipe]: https://docs.rs/interprocess/2.4.3/x86_64-pc-windows-msvc/interprocess/os/windows/named_pipe/index.html
+[`std::process`]: https://doc.rust-lang.org/std/process/index.html
+
+Interprocess communication library for Rust programs that aims to expose
 as many platform-specific features as possible while maintaining a uniform
 interface for all platforms and encouraging portable, correct code.
 
+[Local sockets][local_socket] are the flagship feature of Interprocess. If you
+would like to get two processes talking to each other but are not sure where
+to start exploring the documentation of this crate, head to the `local_socket`
+module first, as it is in all likelihood the primitive you are looking for.
+
 ## Communication primitives
 Interprocess provides both OS-specific IPC interfaces and cross-platform
-abstractions for them.
+abstractions for them. Below is a summary of what communication primitives are
+available and the situations in which they might be useful.
 
-##### Cross-platform IPC APIs
-- **Local sockets** – similar to TCP sockets, but use filesystem or namespaced
-  paths instead of ports on `localhost`, depending on the OS, bypassing the
-  network stack entirely; implemented using named pipes on Windows and Unix
-  domain sockets on Unix
+- [**Local sockets**][local_socket]: a much more appropriate alternative to
+  `localhost` TCP sockets, featuring better performance and developer- and
+  user-friendly identifiers and authentication
+- [**Unnamed pipes**][unnamed_pipe]: for when the pipes created by
+  [`std::process`](https://doc.rust-lang.org/std/process/index.html) are not
+  sufficient
+- [**FIFO files**][fifo_file] \[Unix\]: of marginal utility outside of shell
+  scripting, but necessary to communicate with programs that insist on using
+  them
+- [**Named pipes**][named_pipe] \[Windows\]: the conventional counterpart
+  to Unix domain sockets, used to implement local sockets
 
-##### Platform-specific, but present on both Unix-like systems and Windows
-- **Unnamed pipes** – anonymous file-like objects for communicating privately
-  in one direction, most commonly used to communicate between a child process
-  and its parent
+You might remember the first-party Unix domain socket support that was present
+in Interprocess 1.x. It was removed in version 2.0.0 in favor of the
+[support provided by the standard library][ud_socket]. Interprocess still uses
+them in the Unix implementation of local sockets, now having the standard
+library types in its public API and thereby enhancing interoperability.
 
-##### Unix-only
-- **FIFO files** – special type of file which is similar to unnamed pipes but
-  exists on the filesystem, often referred to as "named pipes" but completely
-  different from Windows named pipes
-- *Unix domain sockets* – Interprocess no longer provides those, as they are
-  present in the standard library; they are, however, exposed as local sockets
-
-##### Windows-only
-- **Named pipes** – resemble Unix domain sockets, use a separate namespace
-  instead of on-drive paths
+Similarly present in 1.x and removed in 2.0.0 is the `os::unix::signal`
+module. It was removed because it encouraged placement of signal handling
+logic into the highly perilous signal service routine context itself. The
+crate to use instead is [`signal-hook`](https://crates.io/crates/signal-hook):
+it provides a completely safe API for handling signals that does not involve
+writing code that executes in signal service routine context.
 
 ## Asynchronous I/O
 Currently, the only supported async runtime is [Tokio]. Local sockets and
 Windows named pipes are provided by Interprocess, while Unix domain sockets
 are available in Tokio itself.
 
-Support for [`smol`] is planned.
+Support for [smol] is possible and desirable, but is not being actively worked
+on.
 
 [Tokio]: https://crates.io/crates/tokio
-[`smol`]: https://crates.io/crates/smol
+[smol]: https://crates.io/crates/smol
 
 ## Platform support
 Interprocess supports Windows and all generic Unix-like systems. Additionally,
@@ -63,13 +80,13 @@ platforms that have no support for those features.
 Four levels of support (not called *tiers* to prevent confusion with Rust
 target tiers, since those work completely differently) are provided by
 Interprocess. It would be a breaking change for a platform to be demoted,
-although promotions quite obviously can happen as minor or patch releases.
+whereas promotions quite obviously can happen as minor or patch releases.
 
 ##### Explicit support
 *OSes at this level: **Windows**, **Linux**, **macOS***
 
 - Interprocess is guaranteed to compile and succeed in running all tests – it
-  would be a critical bug for it not to
+  would be a severe bug for it not to
 - CI, currently provided by GitHub Actions, runs on all of those platforms and
   displays an ugly red badge if anything is wrong on any of those systems
 - Certain `#[cfg]`-gated platform-specific features are supported with stable
@@ -108,13 +125,12 @@ although promotions quite obviously can happen as minor or patch releases.
   identically to how they do on an OS with a higher support level
 
 ##### Assumed support
-*OSes at this level: POSIX-conformant `#[cfg(unix)]` systems not listed above for which the `libc`
-crate compiles*
+*OSes at this level: `#[cfg(unix)]` systems not listed above for which the `libc` crate compiles*
 
-- Interprocess is expected to compile and succeed in running all tests – it
-  would be a bug for it not to
-- Because this level encompasses a practically infinite amount of systems, no
-  manual testing or CI can exist
+- Interprocess is expected to compile and succeed in running all tests, but it
+  would be a low-priority bug for it not to
+- Because this level encompasses an open set of platforms that has no
+  reference implementation, no manual testing or CI can exist
 
 ## Feature gates
 - **`tokio`**, *off* by default – enables the [Tokio] variants of IPC
@@ -155,8 +171,10 @@ to file a lawsuit of this kind.
 
 My use of the 0-clause BSD license is an act of radical honesty about my
 relationship with copyright law and a removal of a-priori-empty threats that
-would serve other open-source developers well to imitate. **Say no to licenses
-and yes to norms.**
+would serve other open-source developers well to imitate.
+[**Say no to licenses and yes to norms.**][anti-license]
+
+[anti-license]: https://www.boringcactus.com/2021/09/29/anti-license-manifesto.html
 
 # Anti-LLM notice
 I (Goat), the author of this software, have never used any LLM (large language

@@ -91,7 +91,7 @@ pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
     /// ### Unix
     /// The returned credentials are those that were in effect at the time of `connect` (for the
     /// credentials of the client), `listen` (for those of the server). On OpenBSD and NetBSD,
-    /// server credentials are instead those which were in effect at the time of `bind` instead.
+    /// server credentials are instead those which were in effect at the time of `bind`.
     fn peer_creds(&self) -> io::Result<PeerCreds>;
 }
 
