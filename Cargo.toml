@@ -82,6 +82,7 @@ color-eyre = "0.6.2"
 unsafe_op_in_unsafe_fn = "forbid"
 rust_2018_idioms = { level = "deny", priority = -1 }
 dead_code = "allow"
+semicolon_in_expressions_from_non_local_macros = "allow" # Eyre bug
 
 [lints.clippy]
 ptr_as_ptr               = "forbid" # use .cast()
