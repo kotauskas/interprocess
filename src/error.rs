@@ -94,7 +94,7 @@ impl<S, E: Default> Default for ConversionError<S, E> {
 impl<S, E: Display> Display for ConversionError<S, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut snp = FormatSnooper::new(f);
-        write!(snp, "{}", &self.details)?;
+        write!(snp, "{}", self.details)?;
         if let Some(e) = &self.cause {
             if snp.anything_written() {
                 f.write_str(": ")?;
