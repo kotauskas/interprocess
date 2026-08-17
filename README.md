@@ -336,7 +336,7 @@ superscript digits, currency signs, Greek letters, numerous mathematical
 symbols, you name it – with any regular keyboard and only a tiny amount of
 additional system configuration.
 
-[wp-trump-star-wars]: https://en.wikipedia.org/wiki/AI_slop#/media/File:AI_Donald_Trump_Star_Wars.jpg
+[wp-trump-star-wars]: https://en.wikipedia.org/wiki/File:AI_Donald_Trump_Star_Wars.jpg
 [wp-ai-ethics]: https://en.wikipedia.org/wiki/Ethics_of_artificial_intelligence#Challenges
 [pivot-libel]: https://pivot-to-ai.com/2024/08/23/microsoft-tries-to-launder-responsibility-for-copilot-ai-calling-someone-a-child-abuser
 [pivot-selfpromo]: https://pivot-to-ai.com/2025/02/25/ai-benchmarks-are-self-promoting-trash-but-regulators-keep-using-them
