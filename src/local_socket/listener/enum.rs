@@ -32,7 +32,7 @@ mkenum!(
 ///
 /// If the program crashes in a way that doesn't unwind the stack, the deletion will not occur and
 /// the socket file will linger on the filesystem, in which case manual deletion will be necessary.
-/// Identially, the automatic name reclamation mechanism can be opted out of via
+/// The automatic name reclamation mechanism can be explicitly opted out of via
 /// [`.do_not_reclaim_name_on_drop()`](trait::Listener::do_not_reclaim_name_on_drop) on the listener
 /// or [`.reclaim_name(false)`](super::options::ListenerOptions::reclaim_name) on the builder.
 ///
