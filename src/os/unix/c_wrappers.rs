@@ -1,6 +1,8 @@
 use {
     super::unixprelude::*,
-    crate::{os::unix::ud_addr::TerminatedUdAddr, timeout_expiry},
+    crate::{
+        aborting_panic, misc::cold_path, os::unix::ud_addr::TerminatedUdAddr, timeout_expiry,
+    },
     libc::AF_UNIX,
     std::{
         ffi::CStr,
@@ -80,6 +82,8 @@ pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Resu
 
 /// Like [`set_nonblocking`], but assumes the file descriptor has not been exposed to anyone who
 /// could've used `fcntl(F_SETFL)` on it.
+// FIXME there aren't any valid fcntl(F_SETFL) calls on sockets that don't set or unset
+// nonblocking mode, so this could just be the implementation of set_nonblocking
 pub(super) fn fast_set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
     #[cfg(not(any(target_os = "linux", target_os = "android")))]
     {
@@ -97,16 +101,57 @@ pub(super) unsafe fn getsockopt<T>(
     optname: c_int,
 ) -> io::Result<T> {
     let mut rslt = MaybeUninit::<T>::uninit();
-    #[allow(clippy::cast_possible_truncation)] // safety contract
-    let orig_len = size_of::<T>() as socklen_t;
-    let mut len = orig_len;
-    let success = unsafe {
-        libc::getsockopt(fd.as_raw_fd(), level, optname, rslt.as_mut_ptr().cast(), &mut len) >= 0
-    };
-    if len < orig_len {
-        return Err(io::Error::from(io::ErrorKind::InvalidData));
+    getsockopt_raw(fd, level, optname, &mut rslt, size_of::<T>())?;
+    // SAFETY: we have just checked that the amount of data written is no smaller than the buffer
+    // size, and the fate of any padding is the responsibility of the caller
+    Ok(unsafe { rslt.assume_init() })
+}
+
+pub(super) fn getsockopt_raw<T>(
+    fd: BorrowedFd<'_>,
+    level: c_int,
+    optname: c_int,
+    out: &mut MaybeUninit<T>,
+    min_len: usize,
+) -> io::Result<usize> {
+    unsafe {
+        getsockopt_raw_(fd, level, optname, out.as_mut_ptr().cast(), size_of::<T>(), min_len)
     }
-    success.true_or_errno(|| unsafe { rslt.assume_init() })
+}
+unsafe fn getsockopt_raw_(
+    fd: BorrowedFd<'_>,
+    level: c_int,
+    optname: c_int,
+    buf: *mut (),
+    buf_len: usize,
+    min_len: usize,
+) -> io::Result<usize> {
+    let buf_len = socklen_t::try_from(buf_len).map_err(|_| {
+        cold_path();
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("getsockopt buffer size ({buf_len} bytes) overflowed socklen_t"),
+        )
+    })?;
+
+    let mut len = buf_len;
+    let success =
+        unsafe { libc::getsockopt(fd.as_raw_fd(), level, optname, buf.cast(), &mut len) >= 0 };
+
+    if len > buf_len {
+        aborting_panic(format!(
+            "getsockopt result size ({len} bytes) exceeded buffer size ({buf_len} bytes)"
+        ));
+    }
+    let len = len as usize;
+    if len < min_len {
+        cold_path();
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("getsockopt result is too short (expected {min_len} bytes, got {len})"),
+        ));
+    }
+    success.true_val_or_errno(len)
 }
 
 pub(super) fn duplicate_fd(fd: BorrowedFd<'_>) -> io::Result<OwnedFd> {
