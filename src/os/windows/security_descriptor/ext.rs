@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)] // https://github.com/rust-lang/rust-clippy/issues/17860
+
 use {
     super::{c_wrappers, AsSecurityDescriptor, AsSecurityDescriptorMut, SecurityDescriptor},
     std::{ffi::c_void, io},
@@ -64,7 +66,6 @@ The pointer, *if not null*:
 
 [lh]: https://learn.microsoft.com/en-us/windows/win32/memory/global-and-local-functions
 ")]
-        #[doc(hidden)]
         #[inline] unsafe fn $nm(&mut self, acl: *mut ACL, defaulted: bool) -> io::Result<()> {
             unsafe { c_wrappers::set_acl(self.as_sd(), Some(acl), defaulted, $wfn) }
         }
