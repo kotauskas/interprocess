@@ -1,10 +1,12 @@
+#[cfg(unix)]
+use color_eyre::eyre::eyre;
 use {
     crate::{
         local_socket::{prelude::*, ListenerOptions, Name, Stream},
         tests::util::*,
         BoolExt, SubUsizeExt,
     },
-    color_eyre::eyre::WrapErr,
+    color_eyre::eyre::{ensure, WrapErr},
     std::{
         io::{BufRead, BufReader, Write},
         str,
@@ -26,20 +28,120 @@ fn fork(a: impl FnOnce() -> TestResult, b: impl FnOnce() -> TestResult + Send) -
 
 fn check_peer_creds(s: &Stream) -> TestResult {
     let creds = s.peer_creds().opname("peer_creds")?;
+
+    if cfg!(any(target_os = "linux", target_os = "android", windows)) {
+        ensure!(creds.pid().is_some(), "this platform is supposed to provide peer PID");
+    }
     #[allow(clippy::cast_sign_loss)]
     if let Some(pid) = creds.pid() {
         ensure_eq!(pid as u32, std::process::id());
     }
+
     #[cfg(unix)]
     {
-        if let Some(uid) = creds.euid() {
-            ensure_eq!(uid, unsafe { libc::geteuid() });
+        if cfg!(any(
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+        )) {
+            ensure!(
+                creds.groups().is_some(),
+                "this platform is supposed to provide supplementary groups"
+            );
         }
-        if let Some(gid) = creds.egid() {
-            ensure_eq!(gid, unsafe { libc::getegid() });
+
+        if let Some(creds_groups) = creds.groups() {
+            let mut creds_groups = creds_groups.to_owned();
+            let mut actual_groups = get_groups().opname("getgroups")?;
+
+            let (trnc, tpad) =
+                if creds.groups_truncated() { (" (trunc)", "        ") } else { ("", "") };
+            println!(
+                "\
+groups in peer_creds{trnc} ({:4}): {creds_groups:?}
+actual groups       {tpad} ({:4}): {actual_groups:?}",
+                creds_groups.len(),
+                actual_groups.len(),
+            );
+            ensure!(!creds.groups_truncated() || creds_groups.len() < actual_groups.len());
+
+            if creds.groups_truncated() {
+                for group in &creds_groups {
+                    ensure!(actual_groups.contains(group));
+                }
+            } else {
+                creds_groups.sort_unstable();
+                actual_groups.sort_unstable();
+                // contents already printed
+                ensure!(creds_groups == actual_groups);
+            }
         }
+
+        // It's easier to debug the below assertion failures after the supplementary groups have
+        // been printed.
+        let euid = creds.euid().ok_or_else(|| eyre!("missing EUID"))?;
+        let egid = creds.egid().ok_or_else(|| eyre!("missing EGID"))?;
+        ensure_eq!(euid, unsafe { libc::geteuid() });
+        ensure_eq!(egid, unsafe { libc::getegid() });
     }
     Ok(())
+}
+
+#[cfg(unix)]
+#[allow(clippy::cast_sign_loss)] // negative values are checked
+fn get_groups() -> std::io::Result<Vec<libc::gid_t>> {
+    let (mut buf, mut buf_size) = (Vec::new(), 0);
+    loop {
+        let num_groups = unsafe { libc::getgroups(0, std::ptr::null_mut()) };
+        if num_groups < 0 {
+            crate::cold_path();
+            return Err(std::io::Error::last_os_error());
+        }
+        buf_size = std::cmp::max(buf_size, num_groups);
+        buf.reserve_exact((buf_size as usize) - buf.capacity());
+        let num_groups =
+            unsafe { libc::getgroups(buf_size, buf.spare_capacity_mut().as_mut_ptr().cast()) };
+        if num_groups < 0 {
+            crate::cold_path();
+            let err = std::io::Error::last_os_error();
+            if err.raw_os_error() == Some(libc::EINVAL) {
+                continue;
+            }
+            return Err(err);
+        }
+        unsafe { buf.set_len(num_groups as usize) };
+        break Ok(buf);
+    }
+}
+
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "freebsd"), allow(dead_code))]
+fn os_release() -> Box<[u32]> {
+    const RELEASE_OFFSET: usize = offset_of!(libc::utsname, version);
+    use std::{ffi::CStr, mem::MaybeUninit};
+
+    let mut utsname = MaybeUninit::uninit();
+    if unsafe { libc::uname(utsname.as_mut_ptr()) <= 0 } {
+        crate::aborting_panic("uname failed, stack is corrupt");
+    }
+    // SAFETY: in bounds because the pointer is to a utsname struct
+    let release_ptr = unsafe { utsname.as_ptr().cast::<libc::c_char>().byte_add(RELEASE_OFFSET) };
+    // SAFETY: the struct is a local variable and the string doesn't escape this function
+    let release = unsafe { CStr::from_ptr(release_ptr) }.to_bytes();
+
+    let (mut result, mut current_component) = (Vec::new(), 0);
+    for &c in release {
+        if c == b'.' {
+            result.push(current_component);
+            current_component = 0;
+        } else if c.is_ascii_digit() {
+            current_component = current_component * 10 + u32::from(c - b'0');
+        }
+    }
+    result.into_boxed_slice()
 }
 
 pub fn server(

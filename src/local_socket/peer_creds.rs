@@ -55,7 +55,7 @@ impl PeerCreds {
     /// Available on:
     /// - Windows
     /// - `ucred`-based platforms
-    /// - FreeBSD
+    /// - FreeBSD 12.3 and newer
     #[inline]
     pub fn pid(&self) -> Option<Pid> { self.0.pid() }
 
@@ -76,13 +76,23 @@ impl PeerCreds {
     /// # Platform-specific behavior
     /// Available on:
     /// - `ucred`-based platforms
+    /// - `xucred`-based platforms
     /// - NetBSD
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
     pub fn egid(&self) -> Option<gid_t> { self.0.egid() }
 
-    /// Returns a slice containing the supplementary group IDs of the peer.
+    /// Returns a slice containing the set of supplementary group IDs of the peer, truncated to a
+    /// platform-specific limit. Use [`groups_truncated`](Self::groups_truncated) to determine if
+    /// the information may be incomplete.
+    ///
+    /// `None` will be returned on platforms where only the effective group ID of the process
+    /// is available, emphasizing the need for fallback behavior on the caller's end.
+    ///
+    /// It is unspecified whether this contains the effective group ID of the peer or not. Make
+    /// sure to get the [`egid`](Self::egid) to include or exclude it from prvilege checks
+    /// depending on your needs.
     ///
     /// # Platform-specific behavior
     /// Available on:
@@ -91,6 +101,15 @@ impl PeerCreds {
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
     pub fn groups(&self) -> Option<&[gid_t]> { self.0.groups() }
+
+    /// Returns true if it may be the case that the return value of [`groups`](Self::groups) is
+    /// not the complete set of supplementary group IDs of the peer.
+    ///
+    /// Returns false if `groups` returns `None`.
+    #[cfg(any(doc, unix))]
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+    #[inline]
+    pub fn groups_truncated(&self) -> bool { self.0.groups_truncated() }
 }
 
 #[cfg(unix)]

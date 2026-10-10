@@ -169,12 +169,6 @@ pub(crate) const fn ref2ptr<T: ?Sized>(r: &T) -> *const T { r }
 #[inline(always)]
 pub(crate) fn mut2ptr<T: ?Sized>(r: &mut T) -> *mut T { r }
 
-#[allow(clippy::arithmetic_side_effects)]
-pub(crate) fn ref_offset_from<B, P>(base: &B, point: &P) -> usize {
-    // FUTURE use Strict Provenance API
-    (ref2ptr(base).cast::<u8>() as usize) - (ref2ptr(point).cast::<u8>() as usize)
-}
-
 impl<T, E: std::fmt::Debug> DebugExpectExt for Result<T, E> {
     #[inline]
     #[track_caller]

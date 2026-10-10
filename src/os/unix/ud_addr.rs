@@ -7,7 +7,7 @@ use {
         mem::{size_of, zeroed, MaybeUninit},
         num::NonZeroU8,
         ops::Deref,
-        ptr::{addr_of, addr_of_mut, copy_nonoverlapping},
+        ptr::{addr_of_mut, copy_nonoverlapping},
         slice,
     },
 };
@@ -27,11 +27,8 @@ pub(super) const SUN_LEN: usize = {
 };
 const PATH_OFFSET: usize = {
     let sun = unsafe { zeroed::<sockaddr_un>() };
-    let sunptr = (&sun as *const sockaddr_un).cast::<u8>();
-
-    // FUTURE use offset_from_unsigned
-    #[allow(clippy::cast_sign_loss)]
-    let off = unsafe { addr_of!(sun.sun_path).cast::<u8>().offset_from(sunptr) } as usize;
+    let off = offset_of!(sockaddr_un, sun_path);
+    #[allow(clippy::arithmetic_side_effects)]
     if off + sun.sun_path.len() != size_of::<sockaddr_un>() {
         panic!("unsupported sockaddr_un layout");
     }

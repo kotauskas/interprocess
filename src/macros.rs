@@ -1,5 +1,24 @@
 #![allow(unused_macros, unused_imports)]
 
+pub(super) use ::std;
+
+/// Polyfill for `std::offset_of`.
+macro_rules! offset_of {
+    ($struct:ty, $field:ident) => {{
+        let dummy = $crate::macros::std::mem::MaybeUninit::<$struct>::uninit();
+        let base = dummy.as_ptr();
+        // SAFETY: obviously in bounds
+        #[allow(unused_unsafe)]
+        let field = unsafe { $crate::macros::std::ptr::addr_of!((*base).$field) };
+        // SAFETY: also obviously in bounds
+        #[allow(unused_unsafe, clippy::cast_sign_loss)]
+        unsafe {
+            // FUTURE use offset_from_unsigned
+            field.cast::<()>().byte_offset_from(base.cast::<()>()) as usize
+        }
+    }};
+}
+
 /// Dispatches to a symmetrically named submodule in the target OS module.
 macro_rules! impmod {
     ($($osmod:ident)::+ $(as $into:ident)?) => {
