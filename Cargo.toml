@@ -77,7 +77,9 @@ tokio = { version = "1.36.0", features = [
     "io-util",
     "macros",
 ] }
+backtrace = "=0.3.74"
 color-eyre = "0.6.2"
+owo-colors = "=4.2.3"
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "forbid"
