@@ -460,5 +460,9 @@ fn duration_to_timespec(d: Duration) -> io::Result<libc::timespec> {
     let tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "timeout duration overflowed time_t")
     })?;
-    Ok(libc::timespec { tv_sec, tv_nsec: d.subsec_nanos() as _ })
+    let tv_nsec = d.subsec_nanos() as _;
+    let mut ts = libc::timespec::default();
+    ts.tv_sec = tv_sec;
+    ts.tv_nsec = tv_nsec;
+    Ok(ts)
 }
