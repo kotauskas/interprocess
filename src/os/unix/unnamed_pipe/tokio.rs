@@ -18,6 +18,12 @@ use {
 type RecverImpl = AsyncFd<FdOps>;
 type SenderImpl = AsyncFd<FdOps>;
 
+fn register_fd(fd: OwnedFd, interest: Interest) -> io::Result<AsyncFd<FdOps>> {
+    // SAFETY: FdOps is well-behaved and does not return file descriptors it does
+    // not own in its AsFd implementation
+    Ok(unsafe { AsyncFd::register_with_interest(FdOps(fd), interest)? })
+}
+
 pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
     let (tx, rx) = super::pipe(true)?;
     Ok((PubSender(Sender::try_from_nb(tx)?), PubRecver(Recver::try_from_nb(rx)?)))
@@ -27,7 +33,7 @@ pub(crate) fn pipe_impl() -> io::Result<(PubSender, PubRecver)> {
 pub(crate) struct Recver(RecverImpl);
 impl Recver {
     fn try_from_nb(rx: SyncRecver) -> io::Result<Self> {
-        Ok(Self(RecverImpl::with_interest(FdOps(rx.into()), Interest::READABLE)?))
+        Ok(Self(register_fd(rx.into(), Interest::READABLE)?))
     }
 }
 
@@ -81,7 +87,7 @@ forward_as_handle!(Recver);
 pub(crate) struct Sender(SenderImpl);
 impl Sender {
     fn try_from_nb(tx: SyncSender) -> io::Result<Self> {
-        Ok(Self(SenderImpl::with_interest(FdOps(tx.into()), Interest::WRITABLE)?))
+        Ok(Self(register_fd(tx.into(), Interest::WRITABLE)?))
     }
 }
 
