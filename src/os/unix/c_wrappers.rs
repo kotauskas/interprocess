@@ -457,12 +457,10 @@ pub(super) fn shutdown(fd: BorrowedFd<'_>, how: std::net::Shutdown) -> io::Resul
 
 #[allow(dead_code)]
 fn duration_to_timespec(d: Duration) -> io::Result<libc::timespec> {
-    let tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
+    let mut ts = libc::timespec::default();
+    ts.tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "timeout duration overflowed time_t")
     })?;
-    let tv_nsec = d.subsec_nanos() as _;
-    let mut ts = libc::timespec::default();
-    ts.tv_sec = tv_sec;
-    ts.tv_nsec = tv_nsec;
+    ts.tv_nsec = d.subsec_nanos() as _;
     Ok(ts)
 }
