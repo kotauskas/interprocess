@@ -117,12 +117,12 @@ def check_clippy():
     r = run(cargo_invoc(MSRV if HAS_RUSTUP else None) + ['clippy', '--version'], stdout=subprocess.DEVNULL)
     return r.returncode == 0
 
-def cargo(vers, status, subcommand, args=[], *, frozen=True, capture=True):
+def cargo(vers, status, subcommand, args=[], *, locked=True, capture=True):
     if isinstance(args, str): args = [args]
     args = cargo_invoc(vers)               \
         + [subcommand]                     \
         + ['--quiet', '--color', 'always'] \
-        + (['--frozen'] if frozen else []) \
+        + (['--locked'] if locked else []) \
         + list(args)
     print(italic(f'{status}…'))
     r = run(args, stdout=subprocess.PIPE if capture else None)
@@ -187,7 +187,7 @@ def main():
         HOST_TARGET_0, HOST_TARGET_1, HOST_TARGET_2, HOST_TARGET_3 = \
             HOST_TARGET + [''] * (4 - len(HOST_TARGET) if len(HOST_TARGET) < 4 else 0)
 
-        cargo(None, 'Fetching dependencies', 'fetch', frozen=False)
+        cargo(None, 'Fetching dependencies', 'fetch')
 
     suites()
     if HOST_TARGET_0 == 'x86_64' and HOST_TARGET_2 in ['windows', 'linux']:
