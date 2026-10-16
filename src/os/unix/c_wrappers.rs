@@ -455,10 +455,12 @@ pub(super) fn shutdown(fd: BorrowedFd<'_>, how: std::net::Shutdown) -> io::Resul
     unsafe { libc::shutdown(fd.as_raw_fd(), how) != -1 }.true_val_or_errno(())
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::field_reassign_with_default)]
 fn duration_to_timespec(d: Duration) -> io::Result<libc::timespec> {
-    let tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
+    let mut ts = libc::timespec::default();
+    ts.tv_sec = libc::time_t::try_from(d.as_secs()).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "timeout duration overflowed time_t")
     })?;
-    Ok(libc::timespec { tv_sec, tv_nsec: d.subsec_nanos() as _ })
+    ts.tv_nsec = d.subsec_nanos() as _;
+    Ok(ts)
 }
