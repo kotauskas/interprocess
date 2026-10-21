@@ -14,7 +14,7 @@ use {
     windows_sys::Win32::{
         Foundation::{ERROR_PIPE_BUSY, GENERIC_READ, GENERIC_WRITE},
         Storage::FileSystem::{
-            CreateFileW, ReOpenFile, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            CreateFileW, FILE_FLAG_OVERLAPPED, FILE_SHARE_READ, FILE_SHARE_WRITE,
             FILE_WRITE_ATTRIBUTES, OPEN_EXISTING,
         },
         System::Pipes::{
@@ -171,18 +171,6 @@ pub(crate) fn connect_without_waiting(
         Err(e) if e.raw_os_error().eeq(ERROR_PIPE_BUSY) => None,
         els => Some(els),
     }
-}
-
-pub(crate) fn reopen_overlapped(
-    h: BorrowedHandle<'_>,
-    recv: Option<PipeMode>,
-    send: Option<PipeMode>,
-) -> io::Result<OwnedHandle> {
-    let access_flags = modes_to_access_flags(recv, send);
-    unsafe { ReOpenFile(h.as_raw_handle(), access_flags, NP_SHARE_MODE, FILE_FLAG_OVERLAPPED) }
-        .handle_or_errno()
-        // SAFETY: we just created this handle
-        .map(|h| unsafe { OwnedHandle::from_raw_handle(h) })
 }
 
 pub(crate) fn set_nonblocking_given_readmode(
