@@ -15,10 +15,11 @@ pub use {impersonation_guard::*, path_conversion::*, share_handle::*};
 
 pub(crate) mod misc;
 mod adv_handle;
-mod needs_flush;
-mod linger_pool;
 mod c_wrappers;
+mod event;
+mod linger_pool;
 mod maybe_arc;
+mod needs_flush;
 #[cfg(feature = "tokio")]
 mod tokio_flusher;
 

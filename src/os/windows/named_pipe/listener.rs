@@ -4,13 +4,16 @@ mod options;
 
 use {
     super::{c_wrappers, PipeModeTag, PipeStream, PipeStreamRole, RawPipeStream},
-    crate::{os::windows::winprelude::*, poison_error, OrErrno, RawOsErrorExt, LOCK_POISON},
+    crate::{
+        os::windows::{event::Event, winprelude::*},
+        poison_error, OrErrno, RawOsErrorExt, LOCK_POISON,
+    },
     std::{
         fmt::{self, Debug, Formatter},
         io,
         marker::PhantomData,
         mem::replace,
-        ptr,
+        ptr::{self, addr_of_mut},
         sync::{
             atomic::{AtomicBool, Ordering::Relaxed},
             Mutex,
@@ -18,7 +21,8 @@ use {
     },
     windows_sys::Win32::{
         Foundation::{
-            ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING, ERROR_PIPE_NOT_CONNECTED,
+            ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING,
+            ERROR_PIPE_NOT_CONNECTED,
         },
         System::Pipes::{ConnectNamedPipe, DisconnectNamedPipe},
     },
@@ -67,7 +71,7 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> PipeListener<Rm, Sm> {
             // convenient to do this instead. The mutex takes care of ordering.
             let nonblocking = self.nonblocking.load(Relaxed);
 
-            block_on_connect_clearing_empty_conns(stored_instance.as_handle())?;
+            block_on_connect(stored_instance.as_handle())?;
 
             let new_instance = self.create_instance(nonblocking)?;
             replace(&mut *stored_instance, new_instance)
@@ -151,19 +155,33 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag> From<PipeListener<Rm, Sm>> for OwnedHandl
     }
 }
 
-fn block_on_connect_clearing_empty_conns(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    loop {
-        match block_on_connect(handle) {
-            Err(e) if e.raw_os_error().eeq(ERROR_NO_DATA) => disconnect_if_connected(handle)?,
-            r => break r,
-        }
-    }
-}
-
 fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
-    unsafe { ConnectNamedPipe(handle.as_raw_handle(), ptr::null_mut()) != 0 }
-        .true_val_or_errno(())
-        .or_else(thunk_accept_error)
+    // TODO recycle those somehow
+    let event = Event::new(false, false)?;
+    let mut overlapped = c_wrappers::overlapped_with_event(&event);
+    loop {
+        break match unsafe { ConnectNamedPipe(handle.as_raw_handle(), ptr::null_mut()) != 0 }
+            .true_val_or_errno(())
+        {
+            Err(e) if e.raw_os_error().eeq(ERROR_PIPE_CONNECTED) => Ok(()),
+            Err(e) if e.raw_os_error().eeq(ERROR_NO_DATA) => {
+                disconnect_if_connected(handle)?;
+                continue;
+            }
+            Err(e) if e.raw_os_error().eeq(ERROR_PIPE_LISTENING) => {
+                Err(io::Error::from(io::ErrorKind::WouldBlock))
+            }
+            Err(e) if e.raw_os_error().eeq(ERROR_IO_PENDING) => {
+                unsafe {
+                    // SAFETY: the event object is right here
+                    c_wrappers::wait_for_overlapped_result(handle, addr_of_mut!(overlapped))
+                }
+                .map(drop)
+            }
+            r => r,
+        };
+    }
+    .or_else(thunk_accept_error)
 }
 
 fn thunk_accept_error(e: io::Error) -> io::Result<()> {

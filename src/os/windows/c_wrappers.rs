@@ -1,7 +1,12 @@
 use {
     super::{downgrade_eof, winprelude::*},
-    crate::{mut2ptr, AsBuf, OrErrno as _, SubUsizeExt as _},
-    std::{cell::Cell, io, ptr, time::Duration},
+    crate::{mut2ptr, os::windows::event::Event, AsBuf, OrErrno as _, SubUsizeExt as _},
+    std::{
+        cell::Cell,
+        io,
+        ptr::{self, addr_of_mut},
+        time::Duration,
+    },
     windows_sys::Win32::{
         Foundation::{
             DuplicateHandle, DUPLICATE_SAME_ACCESS, ERROR_IO_PENDING, MAX_PATH,
@@ -13,12 +18,35 @@ use {
         },
         System::{
             Threading::{GetCurrentProcess, SleepEx},
-            IO::OVERLAPPED,
+            IO::{GetOverlappedResult, OVERLAPPED},
         },
     },
 };
 
-const OVERLAPPED_INIT: OVERLAPPED = unsafe { std::mem::zeroed() };
+pub const OVERLAPPED_INIT: OVERLAPPED = unsafe { std::mem::zeroed() };
+pub fn overlapped_with_event(event: &Event) -> OVERLAPPED {
+    let mut overlapped = OVERLAPPED_INIT;
+    overlapped.hEvent = event.as_raw_handle();
+    overlapped
+}
+
+/// Waits for the overlapped operation to finish. If it has completed successfully, returns the
+/// number of bytes transferred, if applicable.
+///
+/// # Safety
+/// - `overlapped` must point to a valid `OVERLAPPED` structure in which `hEvent` is valid for the
+///   duration of the call.
+pub unsafe fn wait_for_overlapped_result(
+    handle: BorrowedHandle<'_>,
+    overlapped: *mut OVERLAPPED,
+) -> io::Result<u32> {
+    let mut bytes_transfered = 0;
+    unsafe {
+        GetOverlappedResult(handle.as_raw_handle(), overlapped, addr_of_mut!(bytes_transfered), 1)
+            != 0
+    }
+    .true_val_or_errno(bytes_transfered)
+}
 
 #[repr(C)]
 struct CompletionResult {

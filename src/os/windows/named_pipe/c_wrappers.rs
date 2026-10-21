@@ -1,3 +1,4 @@
+pub use crate::os::windows::c_wrappers::*;
 use {
     crate::{
         mut2ptr,
@@ -22,7 +23,6 @@ use {
         },
     },
 };
-
 fn optional_out_ptr<T>(outref: Option<&mut T>) -> *mut T {
     outref.map(mut2ptr).unwrap_or(ptr::null_mut())
 }
