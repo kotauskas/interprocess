@@ -1,8 +1,9 @@
 //! [local_socket]: local_socket
 //! [unnamed_pipe]: unnamed_pipe
-//! [fifo_file]: os::unix::fifo_file
-//! [ud_socket]: std::os::unix::net
 //! [`std::process`]: std::process
+#![cfg_attr(unix, doc = "[fifo_file]: os::unix::fifo_file")]
+#![cfg_attr(unix, doc = "[ud_socket]: std::os::unix::net")]
+#![cfg_attr(windows, doc = "[named_pipe]: os::windows::named_pipe")]
 // thanks to https://linebender.org/blog/doc-include/
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]

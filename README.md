@@ -13,11 +13,11 @@
 [ci-page]: https://github.com/kotauskas/interprocess/actions/workflows/checks_and_tests.yml
 [msrv-blogpost]: https://blog.rust-lang.org/2023/12/28/Rust-1.75.0.html
 
-[local_socket]: https://docs.rs/interprocess/2.4.3/interprocess/local_socket/index.html
-[unnamed_pipe]: https://docs.rs/interprocess/2.4.3/interprocess/unnamed_pipe/index.html
-[fifo_file]: https://docs.rs/interprocess/2.4.3/interprocess/os/unix/fifo_file/index.html
+[local_socket]: https://docs.rs/interprocess/2.4.7/interprocess/local_socket/index.html
+[unnamed_pipe]: https://docs.rs/interprocess/2.4.7/interprocess/unnamed_pipe/index.html
+[fifo_file]: https://docs.rs/interprocess/2.4.7/interprocess/os/unix/fifo_file/index.html
 [ud_socket]: https://doc.rust-lang.org/std/os/unix/net/index.html
-[named_pipe]: https://docs.rs/interprocess/2.4.3/x86_64-pc-windows-msvc/interprocess/os/windows/named_pipe/index.html
+[named_pipe]: https://docs.rs/interprocess/2.4.7/x86_64-pc-windows-msvc/interprocess/os/windows/named_pipe/index.html
 [`std::process`]: https://doc.rust-lang.org/std/process/index.html
 
 Interprocess communication library for Rust programs that aims to expose
