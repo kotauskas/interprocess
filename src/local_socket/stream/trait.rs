@@ -21,8 +21,10 @@ use {
 /// seen here.
 pub trait Stream: Read + RefRead + Write + RefWrite + StreamCommon {
     /// Receive half type returned by [`.split()`](Stream::split).
+    #[allow(deprecated)] // splitting
     type RecvHalf: RecvHalf<Stream = Self>;
     /// Send half type returned by [`.split()`](Stream::split).
+    #[allow(deprecated)] // splitting
     type SendHalf: SendHalf<Stream = Self>;
 
     /// Connects to a local socket server.
@@ -51,17 +53,26 @@ pub trait Stream: Read + RefRead + Write + RefWrite + StreamCommon {
     fn set_send_timeout(&self, timeout: Option<Duration>) -> io::Result<()>;
 
     /// Splits a stream into a receive half and a send half.
-    ///
-    /// You probably want to avoid this mechanism for the following reasons:
-    /// - Placing a stream in an `Rc` or `Arc` produces identical behavior,
-    ///   since `&Stream` implements `Read` and `Write`
-    /// - Dropping a half does not shut it down like it does with sockets,
-    ///   which may be counterintuitive
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
     fn split(self) -> (Self::RecvHalf, Self::SendHalf);
 
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
     /// returning both halves as an error if they belong to different streams (or when using this
     /// method on streams that haven't been split to begin with).
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
+    #[allow(deprecated)] // splitting
     fn reunite(rh: Self::RecvHalf, sh: Self::SendHalf) -> ReuniteResult<Self>;
 
     /// Connects to a local socket server using the specified options.
@@ -100,6 +111,13 @@ pub trait StreamCommon: Debug + Send + Sync + Sized + Sealed + 'static {
 /// Types on which this trait is implemented are variants of the
 /// [`RecvHalf` enum](super::enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
 /// which makes it a trait object of sorts.
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub trait RecvHalf: Read + RefRead + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
@@ -114,6 +132,13 @@ pub trait RecvHalf: Read + RefRead + Send + Sync + Sized + Sealed + 'static {
 /// Types on which this trait is implemented are variants of the
 /// [`SendHalf` enum](super::enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
 /// which makes it a trait object of sorts.
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub trait SendHalf: Write + RefWrite + Send + Sync + Sized + Sealed + 'static {
     /// The stream type the half is split from.
     type Stream: Stream;
@@ -124,5 +149,12 @@ pub trait SendHalf: Write + RefWrite + Send + Sync + Sized + Sealed + 'static {
 }
 
 /// [`ReuniteResult`](crate::error::ReuniteResult) for the [`Stream` trait](Stream).
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub type ReuniteResult<S> =
     crate::error::ReuniteResult<S, <S as Stream>::RecvHalf, <S as Stream>::SendHalf>;

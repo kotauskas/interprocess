@@ -20,8 +20,10 @@ pub trait Stream:
     AsyncRead + RefTokioAsyncRead + AsyncWrite + RefTokioAsyncWrite + StreamCommon
 {
     /// Receive half type returned by [`.split()`](Stream::split).
+    #[allow(deprecated)]
     type RecvHalf: RecvHalf<Stream = Self>;
     /// Send half type returned by [`.split()`](Stream::split).
+    #[allow(deprecated)]
     type SendHalf: SendHalf<Stream = Self>;
 
     /// Asynchronously connects to a local socket server.
@@ -38,10 +40,25 @@ pub trait Stream:
     ///   since `&Stream` implements `Read` and `Write`
     /// - Dropping a half does not shut it down like it does with sockets,
     ///   which may be counterintuitive
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `AsyncRead` and `AsyncWrite`; also, dropping a half does not shut it down like it \
+does with sockets, which may be counterintuitive"
+    )]
     fn split(self) -> (Self::RecvHalf, Self::SendHalf);
 
     /// Attempts to reunite a receive half with a send half to yield the original stream back,
     /// returning both halves as an error if they belong to different streams.
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `AsyncRead` and `AsyncWrite`; also, dropping a half does not shut it down like it \
+does with sockets, which may be counterintuitive"
+    )]
+    #[allow(deprecated)]
     fn reunite(rh: Self::RecvHalf, sh: Self::SendHalf) -> ReuniteResult<Self>;
 
     /// Connects to a local socket server using the specified options.
@@ -59,6 +76,13 @@ pub trait Stream:
 /// Types on which this trait is implemented are variants of the
 /// [`RecvHalf` enum](super::enum::RecvHalf). In addition, it is implemented on `RecvHalf` itself,
 /// which makes it a trait object of sorts.
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `AsyncRead` and `AsyncWrite`; also, dropping a half does not shut it down like it \
+does with sockets, which may be counterintuitive"
+)]
 pub trait RecvHalf:
     AsyncRead + RefTokioAsyncRead + Send + Sync + Sized + Sealed + 'static
 {
@@ -71,6 +95,13 @@ pub trait RecvHalf:
 /// Types on which this trait is implemented are variants of the
 /// [`SendHalf` enum](super::enum::SendHalf). In addition, it is implemented on `SendHalf` itself,
 /// which makes it a trait object of sorts.
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `AsyncRead` and `AsyncWrite`; also, dropping a half does not shut it down like it \
+does with sockets, which may be counterintuitive"
+)]
 pub trait SendHalf:
     AsyncWrite + RefTokioAsyncWrite + Send + Sync + Sized + Sealed + 'static
 {
@@ -79,5 +110,13 @@ pub trait SendHalf:
 }
 
 /// [`ReuniteResult`](crate::error::ReuniteResult) for the [Tokio `Stream` trait](Stream).
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `AsyncRead` and `AsyncWrite`; also, dropping a half does not shut it down like it \
+does with sockets, which may be counterintuitive"
+)]
+#[allow(deprecated)]
 pub type ReuniteResult<S> =
     crate::error::ReuniteResult<S, <S as Stream>::RecvHalf, <S as Stream>::SendHalf>;

@@ -23,9 +23,11 @@ macro_rules! dispatch_read {
         }
     };
     ($ty:ident) => {
+        #[allow(deprecated)] // splitting
         impl AsyncRead for &$ty {
             dispatch_read!(@iw $ty);
         }
+        #[allow(deprecated)] // splitting
         impl AsyncRead for $ty {
             dispatch_read!(@iw $ty);
         }
@@ -48,10 +50,12 @@ macro_rules! dispatch_write {
     };
     ($ty:ident) => {
         /// Flushing and shutdown are always successful no-ops.
+        #[allow(deprecated)] // splitting
         impl AsyncWrite for &$ty {
             dispatch_write!(@iw $ty);
         }
         /// Flushing and shutdown are always successful no-ops.
+        #[allow(deprecated)] // splitting
         impl AsyncWrite for $ty {
             dispatch_write!(@iw $ty);
         }
@@ -59,27 +63,32 @@ macro_rules! dispatch_write {
 }
 
 mkenum!(
-/// Tokio-based local socket byte stream, obtained either from [`Listener`](super::super::Listener)
-/// or by connecting to an existing local socket.
-///
-/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
-///
-/// # Examples
-///
-/// ## Basic client
-/// ```no_run
-#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
-/// ```
-Stream);
+    /// Tokio-based local socket byte stream, obtained either from
+    /// [`Listener`](super::super::Listener) or by connecting to an existing local socket.
+    ///
+    /// See the [module-level documentation of local sockets](crate::local_socket) for more
+    /// details.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic client
+    /// ```no_run
+    #[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
+    /// ```
+    Stream
+);
 
 impl r#trait::Stream for Stream {
+    #[allow(deprecated)]
     type RecvHalf = RecvHalf;
+    #[allow(deprecated)]
     type SendHalf = SendHalf;
 
     #[inline]
     async fn from_options(options: &ConnectOptions<'_>) -> io::Result<Self> {
         dispatch::connect(options).await
     }
+    #[allow(deprecated)]
     fn split(self) -> (RecvHalf, SendHalf) {
         match self {
             #[cfg(windows)]
@@ -94,6 +103,7 @@ impl r#trait::Stream for Stream {
             }
         }
     }
+    #[allow(deprecated)]
     fn reunite(rh: RecvHalf, sh: SendHalf) -> ReuniteResult {
         match (rh, sh) {
             #[cfg(windows)]
@@ -124,10 +134,19 @@ multimacro! {
 }
 
 mkenum!(
-/// Receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
-///
-/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
-"local_socket::tokio::" RecvHalf);
+    /// Receive half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+    ///
+    /// See the [module-level documentation of local sockets](crate::local_socket) for more
+    /// details.
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
+    "local_socket::tokio::" RecvHalf);
+#[allow(deprecated)]
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
 }
@@ -137,10 +156,19 @@ multimacro! {
 }
 
 mkenum!(
-/// Send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
-///
-/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
-"local_socket::tokio::" SendHalf);
+    /// Send half of a Tokio-based local socket stream, obtained by splitting a [`Stream`].
+    ///
+    /// See the [module-level documentation of local sockets](crate::local_socket) for more
+    /// details.
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
+    "local_socket::tokio::" SendHalf);
+#[allow(deprecated)]
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;
 }
@@ -150,7 +178,23 @@ multimacro! {
 }
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
+#[allow(deprecated)]
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
 
 /// Result type for [`.reunite()`](trait::Stream::reunite) on [`Stream`].
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
+#[allow(deprecated)]
 pub type ReuniteResult = r#trait::ReuniteResult<Stream>;

@@ -18,6 +18,7 @@ macro_rules! dispatch {
 macro_rules! mkenum {
     ($(#[$($attr:tt)+])* $pref:literal $nm:ident) => {
         $(#[$($attr)+])*
+        #[allow(deprecated)] // splitting
         pub enum $nm {
             /// Makes use of Windows named pipes.
             ///
@@ -32,9 +33,11 @@ macro_rules! mkenum {
             #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
             UdSocket(uds_impl::$nm),
         }
+        #[allow(deprecated)] // splitting
         impl $crate::Sealed for $nm {}
         #[cfg(windows)]
         #[cfg_attr(feature = "doc_cfg", doc(cfg(windows)))]
+        #[allow(deprecated)] // splitting
         impl From<np_impl::$nm> for $nm {
             fn from(x: np_impl::$nm) -> Self {
                 Self::NamedPipe(x)
@@ -42,11 +45,13 @@ macro_rules! mkenum {
         }
         #[cfg(unix)]
         #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
+        #[allow(deprecated)] // splitting
         impl From<uds_impl::$nm> for $nm {
             fn from(x: uds_impl::$nm) -> Self {
                 Self::UdSocket(x)
             }
         }
+        #[allow(deprecated)] // splitting
         impl std::fmt::Debug for $nm {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let mut dt = f.debug_tuple(concat!($pref, stringify!($nm)));

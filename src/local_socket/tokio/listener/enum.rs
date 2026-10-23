@@ -11,22 +11,24 @@ use {
 impmod! {local_socket::dispatch_tokio as dispatch}
 
 mkenum!(
-/// Tokio-based local socket server, listening for connections.
-///
-/// This struct is created by [`ListenerOptions`](crate::local_socket::ListenerOptions).
-///
-/// See the [module-level documentation of local sockets](crate::local_socket) for more details.
-///
-/// [Name reclamation](crate::local_socket::Listener#name-reclamation) is performed by default
-/// when using local socket implementations that necessitate it.
-///
-/// # Examples
-///
-/// ## Basic server
-/// ```no_run
-#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
-/// ```
-Listener);
+    /// Tokio-based local socket server, listening for connections.
+    ///
+    /// This struct is created by [`ListenerOptions`](crate::local_socket::ListenerOptions).
+    ///
+    /// See the [module-level documentation of local sockets](crate::local_socket) for more
+    /// details.
+    ///
+    /// [Name reclamation](crate::local_socket::Listener#name-reclamation) is performed by default
+    /// when using local socket implementations that necessitate it.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic server
+    /// ```no_run
+    #[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/tokio/listener.rs"))]
+    /// ```
+    Listener
+);
 impl r#trait::Listener for Listener {
     type Stream = Stream;
 

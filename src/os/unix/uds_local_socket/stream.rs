@@ -1,3 +1,5 @@
+#![allow(deprecated)] // splitting
+
 use {
     super::{dispatch_name, CONN_TIMEOUT_MSG},
     crate::{
@@ -166,6 +168,13 @@ macro_rules! arc_accessors {
 
 /// [`Stream`]'s receive half, implemented using [`Arc`].
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub struct RecvHalf(pub(super) Arc<Stream>);
 impl Sealed for RecvHalf {}
 multimacro! {
@@ -187,6 +196,13 @@ impl traits::RecvHalf for RecvHalf {
 
 /// [`Stream`]'s send half, implemented using [`Arc`].
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub struct SendHalf(pub(super) Arc<Stream>);
 impl Sealed for SendHalf {}
 multimacro! {

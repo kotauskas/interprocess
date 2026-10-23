@@ -1,3 +1,5 @@
+#![allow(deprecated)] // splitting
+
 use {
     crate::{
         error::{FromHandleError, ReuniteError},
@@ -125,6 +127,13 @@ multimacro! {
 }
 
 /// Wrapper around [`RecvPipeStream`] that implements [`RecvHalf`](traits::RecvHalf).
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub struct RecvHalf(pub(super) RecvHalfImpl);
 impl Sealed for RecvHalf {}
 multimacro! {
@@ -144,6 +153,13 @@ impl traits::RecvHalf for RecvHalf {
 }
 
 /// Wrapper around [`SendPipeStream`] that implements [`SendHalf`](traits::SendHalf).
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
 pub struct SendHalf(pub(super) SendHalfImpl);
 impl Sealed for SendHalf {}
 multimacro! {

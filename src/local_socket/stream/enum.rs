@@ -28,9 +28,11 @@ macro_rules! dispatch_read {
         }
     };
     ($ty:ident) => {
+        #[allow(deprecated)] // splitting
         impl Read for &$ty {
             dispatch_read!(@iw $ty);
         }
+        #[allow(deprecated)] // splitting
         impl Read for $ty {
             dispatch_read!(@iw $ty);
         }
@@ -53,10 +55,12 @@ macro_rules! dispatch_write {
     };
     ($ty:ident) => {
         /// Flushing is an always successful no-op.
+        #[allow(deprecated)] // splitting
         impl Write for &$ty {
             dispatch_write!(@iw $ty);
         }
         /// Flushing is an always successful no-op.
+        #[allow(deprecated)] // splitting
         impl Write for $ty {
             dispatch_write!(@iw $ty);
         }
@@ -64,19 +68,21 @@ macro_rules! dispatch_write {
 }
 
 mkenum!(
-/// Local socket byte stream, obtained either from [`Listener`](super::super::Listener) or by
-/// connecting to an existing local socket.
-///
-/// See the [module-level documentation](crate::local_socket) for more details.
-///
-/// # Examples
-///
-/// ## Basic client
-/// ```no_run
-#[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/sync/stream.rs"))]
-/// ```
-Stream);
+    /// Local socket byte stream, obtained either from [`Listener`](super::super::Listener) or by
+    /// connecting to an existing local socket.
+    ///
+    /// See the [module-level documentation](crate::local_socket) for more details.
+    ///
+    /// # Examples
+    ///
+    /// ## Basic client
+    /// ```no_run
+    #[cfg_attr(doc, doc = doctest_file::include_doctest!("examples/local_socket/sync/stream.rs"))]
+    /// ```
+    Stream
+);
 
+#[allow(deprecated)] // splitting
 impl r#trait::Stream for Stream {
     type RecvHalf = RecvHalf;
     type SendHalf = SendHalf;
@@ -149,11 +155,19 @@ multimacro! {
 }
 
 mkenum!(
-/// Receive half of a local socket stream, obtained by splitting a [`Stream`].
-///
-/// See the [module-level documentation](crate::local_socket) for more details.
-"local_socket::" RecvHalf);
+    /// Receive half of a local socket stream, obtained by splitting a [`Stream`].
+    ///
+    /// See the [module-level documentation](crate::local_socket) for more details.
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
+    "local_socket::" RecvHalf);
 
+#[allow(deprecated)] // splitting
 impl r#trait::RecvHalf for RecvHalf {
     type Stream = Stream;
 
@@ -165,11 +179,19 @@ impl r#trait::RecvHalf for RecvHalf {
 dispatch_read!(RecvHalf);
 
 mkenum!(
-/// Send half of a local socket stream, obtained by splitting a [`Stream`].
-///
-/// See the [module-level documentation](crate::local_socket) for more details.
-"local_socket::" SendHalf);
+    /// Send half of a local socket stream, obtained by splitting a [`Stream`].
+    ///
+    /// See the [module-level documentation](crate::local_socket) for more details.
+    #[deprecated(
+        since = "2.4.7",
+        note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+    )]
+    "local_socket::" SendHalf);
 
+#[allow(deprecated)] // splitting
 impl r#trait::SendHalf for SendHalf {
     type Stream = Stream;
 
@@ -181,7 +203,23 @@ impl r#trait::SendHalf for SendHalf {
 dispatch_write!(SendHalf);
 
 /// [`ReuniteError`](crate::error::ReuniteError) for [`Stream`].
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
+#[allow(deprecated)]
 pub type ReuniteError = crate::error::ReuniteError<RecvHalf, SendHalf>;
 
 /// Result type for [`.reunite()`](trait::Stream::reunite) on [`Stream`].
+#[deprecated(
+    since = "2.4.7",
+    note = "\
+placing a stream in an `Rc` or `Arc` achieves the same thing as splitting, since `&Stream` \
+implements `Read` and `Write`; also, dropping a half does not shut it down like it does with \
+sockets, which may be counterintuitive"
+)]
+#[allow(deprecated)]
 pub type ReuniteResult = r#trait::ReuniteResult<Stream>;
