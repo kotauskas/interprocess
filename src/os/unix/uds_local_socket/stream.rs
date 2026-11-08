@@ -48,7 +48,7 @@ impl traits::Stream for Stream {
             }
         }
         if opts.get_nonblocking_stream() != nonblocking_connect {
-            c_wrappers::fast_set_nonblocking(stream.as_fd(), opts.get_nonblocking_stream())?;
+            c_wrappers::set_nonblocking(stream.as_fd(), opts.get_nonblocking_stream())?;
         }
         Ok(stream.into())
     }

@@ -67,32 +67,9 @@ fn set_flflags(fd: BorrowedFd<'_>, flags: c_int) -> io::Result<()> {
 }
 
 pub(super) fn set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    {
-        let old_flags = get_flflags(fd)? & !libc::O_NONBLOCK;
-        set_flflags(fd, old_flags | if nonblocking { libc::O_NONBLOCK } else { 0 })
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        let nonblocking = c_int::from(nonblocking);
-        unsafe { libc::ioctl(fd.as_raw_fd(), libc::FIONBIO, ptr::addr_of!(nonblocking)) >= 0 }
-            .true_val_or_errno(())
-    }
-}
-
-/// Like [`set_nonblocking`], but assumes the file descriptor has not been exposed to anyone who
-/// could've used `fcntl(F_SETFL)` on it.
-// FIXME there aren't any valid fcntl(F_SETFL) calls on sockets that don't set or unset
-// nonblocking mode, so this could just be the implementation of set_nonblocking
-pub(super) fn fast_set_nonblocking(fd: BorrowedFd<'_>, nonblocking: bool) -> io::Result<()> {
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    {
-        set_flflags(fd, if nonblocking { libc::O_NONBLOCK } else { 0 })
-    }
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        set_nonblocking(fd, nonblocking)
-    }
+    // There aren't any valid fcntl(F_SETFL) flags on sockets other than O_NONBLOCK,
+    // so we don't need to preserve the other bits via a preceding get_flflags().
+    set_flflags(fd, if nonblocking { libc::O_NONBLOCK } else { 0 })
 }
 
 pub(super) unsafe fn getsockopt<T>(

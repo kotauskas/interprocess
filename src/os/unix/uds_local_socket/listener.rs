@@ -53,7 +53,7 @@ impl traits::Listener for Listener {
         // TODO do our own accept4 and pass SOCK_NONBLOCK on supported platforms
         let stream = self.listener.accept().map(|(s, _)| Stream::from(s))?;
         if self.nonblocking_streams.load(Acquire) {
-            c_wrappers::fast_set_nonblocking(stream.as_fd(), true)?;
+            c_wrappers::set_nonblocking(stream.as_fd(), true)?;
         }
         Ok(stream)
     }
