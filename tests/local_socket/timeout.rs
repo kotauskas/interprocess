@@ -1,3 +1,4 @@
+#![cfg_attr(windows, allow(dead_code))]
 use {
     crate::{
         local_socket::{prelude::*, ConnectOptions, ListenerOptions},
