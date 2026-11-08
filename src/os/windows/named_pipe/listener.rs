@@ -181,17 +181,6 @@ fn block_on_connect(handle: BorrowedHandle<'_>) -> io::Result<()> {
             r => r,
         };
     }
-    .or_else(thunk_accept_error)
-}
-
-fn thunk_accept_error(e: io::Error) -> io::Result<()> {
-    if e.raw_os_error().eeq(ERROR_PIPE_CONNECTED) {
-        Ok(())
-    } else if e.raw_os_error().eeq(ERROR_PIPE_LISTENING) {
-        Err(io::Error::from(io::ErrorKind::WouldBlock))
-    } else {
-        Err(e)
-    }
 }
 
 fn disconnect_if_connected(handle: BorrowedHandle<'_>) -> io::Result<()> {
