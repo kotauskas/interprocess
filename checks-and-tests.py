@@ -66,8 +66,6 @@ class Indent:
         indent -= 1
 ### end I/O helpers ###
 
-WARNING_DISPOSITION = ['-A', 'unknown-lints', '-D', 'warnings']
-
 CARGO = environ.get('CARGO', 'cargo')
 
 def run(a, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, **kwargs):
@@ -131,9 +129,9 @@ def cargo(vers, status, subcommand, args=[], *, locked=True, capture=True):
 SAVED_ENC_RUSTFLAGS, SAVED_ENC_RUSTDOCFLAGS = [environ.get(f'CARGO_ENCODED_RUST{v}FLAGS') for v in ('', 'DOC')]
 def _set_warn_var(var, old_val, *, allow_unknown_lints):
     pfx = old_val + '\x1f' if old_val is not None else ''
-    new_flags = '-Dwarnings'
-    if allow_unknown_lints: new_flags += '\x1f-Aunknown-lints'
-    environ[var] = pfx + new_flags
+    new_flags = ['-Dwarnings']
+    if allow_unknown_lints: new_flags += ['-Aunknown-lints', '-Aunexpected-cfgs']
+    environ[var] = pfx + '\x1f'.join(new_flags)
 def set_warn_vars(**kw):
     global SAVED_ENC_RUSTFLAGS, SAVED_ENC_RUSTDOCFLAGS
     _set_warn_var('CARGO_ENCODED_RUSTFLAGS', SAVED_ENC_RUSTFLAGS, **kw)
