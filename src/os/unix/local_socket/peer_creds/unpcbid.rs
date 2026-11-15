@@ -1,4 +1,4 @@
-use super::*;
+use {super::*, crate::os::unix::c_wrappers};
 
 pub type Inner = libc::unpcbid;
 

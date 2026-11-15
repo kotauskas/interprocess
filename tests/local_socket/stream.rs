@@ -29,7 +29,13 @@ fn fork(a: impl FnOnce() -> TestResult, b: impl FnOnce() -> TestResult + Send) -
 fn check_peer_creds(s: &Stream) -> TestResult {
     let creds = s.peer_creds().opname("peer_creds")?;
 
-    if cfg!(any(target_os = "linux", target_os = "android", windows)) {
+    if cfg!(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "illumos",
+        target_os = "solaris",
+        windows
+    )) {
         ensure!(creds.pid().is_some(), "this platform is supposed to provide peer PID");
     }
     #[allow(clippy::cast_sign_loss)]
@@ -46,6 +52,8 @@ fn check_peer_creds(s: &Stream) -> TestResult {
             target_os = "ios",
             target_os = "tvos",
             target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
         )) {
             ensure!(
                 creds.groups().is_some(),

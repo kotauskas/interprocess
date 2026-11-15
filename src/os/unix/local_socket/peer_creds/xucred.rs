@@ -1,4 +1,4 @@
-use {super::*, std::mem::MaybeUninit};
+use {super::*, crate::os::unix::c_wrappers, std::mem::MaybeUninit};
 
 pub type Inner = libc::xucred;
 

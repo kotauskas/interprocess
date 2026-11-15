@@ -229,7 +229,13 @@ pub struct StatDisplay(libc::stat);
 impl Display for StatDisplay {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let &StatDisplay(libc::stat { st_dev, st_ino, st_mode, st_uid, st_gid, .. }) = self;
-        let (majdev, mindev) = (libc::major(st_dev), libc::minor(st_dev));
+        // major/minor are unsafe fns on illumos and Solaris, but safe elsewhere.
+        //
+        // SAFETY: on illumos (and Solaris, which shares this code), these functions call libc's
+        // __major/__minor(NEWDEV, dev)), which are pure arithmetic functions without safety
+        // preconditions.
+        #[allow(unused_unsafe)]
+        let (majdev, mindev) = unsafe { (libc::major(st_dev), libc::minor(st_dev)) };
         let (devw, inow) = (c_int::MAX.ilog10() as usize + 1, ino_t::MAX.ilog10() as usize + 1);
         let (uidw, gidw) = (uid_t::MAX.ilog10() as usize + 1, gid_t::MAX.ilog10() as usize + 1);
         write!(
