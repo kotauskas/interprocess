@@ -23,13 +23,16 @@ pub trait ListenerOptionsExt: Sized + Sealed {
     /// - OpenBSD
     ///
     /// Other Unix systems may support this as well.
-    /// [`Unsupported`](std::io::ErrorKind::Unsupported) will be returned on platforms that are
+    /// [`Unsupported`] is always returned on illumos and Solaris (because they don't support
+    /// setting permissions before binding the socket), and will also be returned on platforms that are
     /// (dynamically) determined to not support choice of file mode of socket listeners.
     ///
     /// # Implementation notes
     /// An `fchmod()` is performed on the socket prior to `bind()` and `listen()`. This eliminates
     /// what would otherwise be a umask race condition. Previous versions of Interprocess made use
     /// of a racy fallback, but it did not receive adoption, and was removed in 2.3.0.
+    ///
+    /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     #[must_use = builder_must_use!()]
     fn mode(self, mode: libc::mode_t) -> Self;
 }
