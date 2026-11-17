@@ -229,19 +229,19 @@ pub struct StatDisplay(libc::stat);
 impl Display for StatDisplay {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let &StatDisplay(libc::stat { st_dev, st_ino, st_mode, st_uid, st_gid, .. }) = self;
-        // major/minor are unsafe fns on illumos and Solaris, but safe elsewhere.
-        //
-        // SAFETY: on illumos (and Solaris, which shares this code), these functions call libc's
-        // __major/__minor(NEWDEV, dev)), which are pure arithmetic functions without safety
-        // preconditions.
-        #[allow(unused_unsafe)]
-        let (majdev, mindev) = unsafe { (libc::major(st_dev), libc::minor(st_dev)) };
-        let (devw, inow) = (c_int::MAX.ilog10() as usize + 1, ino_t::MAX.ilog10() as usize + 1);
+        #[cfg(not(target_os = "haiku"))]
+        {
+            // SAFETY: no safety preconditions
+            #[allow(unused_unsafe)] // only marked unsafe on some platforms
+            let (majdev, mindev) = unsafe { (libc::major(st_dev), libc::minor(st_dev)) };
+            let devw = c_int::MAX.ilog10() as usize + 1;
+            write!(f, "[dev {majdev:>devw$},{mindev:0devw$}] ")?;
+        }
+        let inow = ino_t::MAX.ilog10() as usize + 1;
         let (uidw, gidw) = (uid_t::MAX.ilog10() as usize + 1, gid_t::MAX.ilog10() as usize + 1);
         write!(
             f,
-            "[dev {majdev:>devw$},{mindev:0devw$}] [ino {st_ino:>inow$}] \
-[mode {st_mode:0>6o}] [uid {st_uid:>uidw$}] [gid {st_gid:>gidw$}]"
+            "[ino {st_ino:>inow$}] [mode {st_mode:0>6o}] [uid {st_uid:>uidw$}] [gid {st_gid:>gidw$}]"
         )
     }
 }

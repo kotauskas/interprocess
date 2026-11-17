@@ -21,6 +21,7 @@ mod_imp! {
     #[cfg(any(
         target_os = "android",
         target_os = "fuchsia",
+        target_os = "haiku",
         target_os = "linux",
         target_os = "openbsd",
         target_os = "redox",

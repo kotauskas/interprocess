@@ -3,6 +3,7 @@ use {super::*, crate::os::unix::c_wrappers};
 #[cfg(any(
     target_os = "android",
     target_os = "fuchsia",
+    target_os = "haiku",
     target_os = "linux",
     target_os = "redox",
 ))]

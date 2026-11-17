@@ -23,6 +23,7 @@ impmod! {
 ///   - OpenBSD
 ///   - Fuchsia
 ///   - Redox
+///   - Haiku
 /// - `xucred`-based
 ///   - FreeBSD
 ///   - DragonFly BSD
