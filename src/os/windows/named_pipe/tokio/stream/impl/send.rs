@@ -40,8 +40,9 @@ impl<Rm: PipeModeTag, Sm: PipeModeTag + PmtNotNone> PipeStream<Rm, Sm> {
     #[inline]
     pub fn mark_dirty(&self) { self.raw.get().needs_flush.mark_dirty(); }
     /// Assumes that the other side has consumed everything that's been written so far. This will
-    /// turn the next flush into a no-op, but will cause the send buffer to be cleared when the
-    /// stream is closed, since it won't be sent to limbo.
+    /// turn the next flush into a no-op, and the stream will not be sent to limbo when dropped:
+    /// its handle is closed immediately. Data that has already been sent is not discarded by
+    /// this; the peer can still read it after the handle is closed.
     ///
     /// If there's already an outstanding `.flush()` operation, it won't be affected by this call.
     #[inline]

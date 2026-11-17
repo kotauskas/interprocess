@@ -30,11 +30,16 @@ use {
 /// translated to EOF (`Ok(0)`) for bytestreams and `RecvResult::EndOfStream` for message streams.
 ///
 /// ## Flushing behavior
-/// Upon being dropped, streams that haven't been flushed since the last send are transparently sent
-/// to **limbo** – a thread pool that ensures that the peer does not get `BrokenPipe`/EOF
-/// immediately after all data has been sent, which would otherwise discard everything. Named pipe
-/// handles on this thread pool are flushed first and only then closed, ensuring that they are only
-/// destroyed when the peer is done reading them.
+/// Upon being dropped, streams that haven't been flushed since the last send are transparently
+/// sent to **limbo** – a thread pool on which named pipe handles are flushed first and only then
+/// closed, ensuring that they are only destroyed when the peer is done reading them.
+///
+/// Closing a handle does not discard data that has already been sent: the peer can still read all
+/// of it, and sees EOF only after that. (What does discard unread data is `DisconnectNamedPipe`,
+/// which is not called on drop.) Limbo therefore delays the moment the handle is closed rather
+/// than preserving data. Since a flush blocks until the peer has read everything, a peer that
+/// stops reading while keeping its end open holds up limbo for as long as it does so; streams to
+/// such peers can be closed promptly with [`.assume_flushed()`](PipeStream::assume_flushed).
 ///
 /// If a stream hasn't seen a single send since the last explicit flush by the time it is dropped,
 /// it will evade limbo. This can be overriden with [`.mark_dirty()`](PipeStream::mark_dirty).
