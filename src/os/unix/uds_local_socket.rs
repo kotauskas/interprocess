@@ -305,7 +305,15 @@ fn escape_nuls(b: &mut [u8]) { b.iter_mut().filter(|c| **c == 0).for_each(|c| *c
 /// traversal of possible directories, `false` otherwise.
 fn fail_is_benign(e: &io::Error) -> bool {
     use io::ErrorKind::*;
-    matches!(e.kind(), NotFound | Unsupported) || e.raw_os_error() == Some(libc::ENOTDIR)
+    // `libc::B_UNSUPPORTED` doesn't show up on a lot of platforms. we do this weird dance
+    // because `if cfg!()` still exposes items within each branch even though they are unreachable
+    #[cfg(target_os = "haiku")]
+    let res = matches!(e.kind(), NotFound | Unsupported)
+        || e.raw_os_error() == Some(libc::ENOTDIR)
+        || e.raw_os_error() == Some(libc::B_UNSUPPORTED);
+    #[cfg(not(target_os = "haiku"))]
+    let res = matches!(e.kind(), NotFound | Unsupported) || e.raw_os_error() == Some(libc::ENOTDIR);
+    res
 }
 
 /// Returns a nul-terminated path to the world-writable temporary directory.

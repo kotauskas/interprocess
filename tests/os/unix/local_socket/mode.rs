@@ -39,8 +39,25 @@ fn test_inner(path: bool) -> TestResult {
         listen_and_pick_name(&mut namegen_local_socket(make_id!(), path), |nm| {
             let rslt =
                 ListenerOptions::new().name(nm.borrow()).mode(MODE).create_sync().map(Some);
-            if cfg!(not(any(target_os = "linux", target_os = "android", target_os = "freebsd"))) {
+            if cfg!(not(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+            ))) {
+                #[cfg(not(target_os = "haiku"))]
                 return if rslt.err().filter(|e| e.kind() == io::ErrorKind::Unsupported).is_some()
+                {
+                    Ok(None)
+                } else {
+                    Err(io::Error::other("unexpected success, please update this test"))
+                };
+                // haiku returns `io::ErrorKind::Uncategorized` which is unstable, instead we check the
+                // raw os error that corresponds to "Operation not supported"
+                #[cfg(target_os = "haiku")]
+                return if rslt
+                    .err()
+                    .filter(|e| e.raw_os_error() == Some(libc::B_UNSUPPORTED))
+                    .is_some()
                 {
                     Ok(None)
                 } else {

@@ -5,6 +5,7 @@ use super::*;
     target_os = "fuchsia",
     target_os = "linux",
     target_os = "redox",
+    target_os = "haiku",
 ))]
 pub type Inner = libc::ucred;
 #[cfg(target_os = "openbsd")]

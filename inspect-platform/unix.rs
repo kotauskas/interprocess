@@ -226,6 +226,7 @@ fn select_tmpdir() -> Option<&'static Path> {
 }
 
 pub struct StatDisplay(libc::stat);
+#[cfg(not(target_os = "haiku"))]
 impl Display for StatDisplay {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let &StatDisplay(libc::stat { st_dev, st_ino, st_mode, st_uid, st_gid, .. }) = self;
@@ -235,6 +236,20 @@ impl Display for StatDisplay {
         write!(
             f,
             "[dev {majdev:>devw$},{mindev:0devw$}] [ino {st_ino:>inow$}] \
+[mode {st_mode:0>6o}] [uid {st_uid:>uidw$}] [gid {st_gid:>gidw$}]"
+        )
+    }
+}
+
+#[cfg(target_os = "haiku")]
+impl Display for StatDisplay {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let &StatDisplay(libc::stat { st_dev, st_ino, st_mode, st_uid, st_gid, .. }) = self;
+        let inow = ino_t::MAX.ilog10() as usize + 1;
+        let (uidw, gidw) = (uid_t::MAX.ilog10() as usize + 1, gid_t::MAX.ilog10() as usize + 1);
+        write!(
+            f,
+            "[ino {st_ino:>inow$}] \
 [mode {st_mode:0>6o}] [uid {st_uid:>uidw$}] [gid {st_gid:>gidw$}]"
         )
     }
