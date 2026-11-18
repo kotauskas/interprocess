@@ -56,7 +56,6 @@ fn groups_raw(cr: &Inner) -> &[gid_t] { &cr.cr_groups[..cr.cr_ngroups as usize] 
 #[allow(clippy::cast_sign_loss)] // validity of cr_ngroups promised by kernel
 pub fn groups_truncated(cr: &Inner) -> bool { (cr.cr_ngroups as usize) >= cr.cr_groups.len() }
 
-#[cfg(target_os = "freebsd")]
 pub fn pid(cr: &Inner) -> Option<pid_t> {
     #[cfg(target_os = "freebsd")]
     {
@@ -79,6 +78,7 @@ pub fn pid(cr: &Inner) -> Option<pid_t> {
     }
     #[cfg(not(target_os = "freebsd"))]
     {
+        let _ = cr;
         None
     }
 }
