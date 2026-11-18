@@ -18,7 +18,7 @@ const LEVEL_AND_OPT: (c_int, c_int) = (libc::SOL_SOCKET, libc::SO_PEERCRED);
 #[cfg(target_os = "netbsd")]
 const LEVEL_AND_OPT: (c_int, c_int) = (0, libc::LOCAL_PEEREID); // SOL_LOCAL
 
-#[cfg_attr(test, allow(clippy::panic_in_result_fn))]
+#[cfg_attr(test, allow(clippy::missing_assert_message, clippy::panic_in_result_fn))]
 pub fn peer_creds(fd: BorrowedFd<'_>) -> io::Result<Inner> {
     // SAFETY: ucred/unpcbid/sockpeercred is the correct struct for SO_PEERCRED
     let (level, opt) = LEVEL_AND_OPT;

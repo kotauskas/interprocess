@@ -4,7 +4,7 @@ pub type Inner = libc::xucred;
 
 const SOL_LOCAL: c_int = 0;
 
-#[cfg_attr(test, allow(clippy::panic_in_result_fn))]
+#[cfg_attr(test, allow(clippy::missing_assert_message, clippy::panic_in_result_fn))]
 pub fn peer_creds(fd: BorrowedFd<'_>) -> io::Result<Inner> {
     let mut inner = MaybeUninit::<Inner>::uninit();
     c_wrappers::getsockopt_raw(
