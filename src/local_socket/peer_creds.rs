@@ -17,21 +17,24 @@ impmod! {
 /// ## Platform-specific behavior
 /// Platforms can be divided by the set of credentials provided in this struct into the following
 /// categories:
+/// - Unix
+///   - `ucred`-type
+///     - Fuchsia
+///     - Haiku
+///     - Linux, including Android
+///     - NetBSD
+///     - OpenBSD
+///     - Redox
+///   - `xucred`-based
+///     - Darwin (Apple platforms)
+///     - DragonFly BSD
+///     - FreeBSD
+///   - `getpeerucred`-based
+///     - illumos
+///     - Solaris
+///   - `getpeereid`-based
+///     - QNX Neutrino
 /// - Windows
-/// - `ucred`-based
-///   - Linux (including Android)
-///   - OpenBSD
-///   - Fuchsia
-///   - Redox
-///   - Haiku
-/// - `xucred`-based
-///   - FreeBSD
-///   - DragonFly BSD
-///   - Darwin (macOS, iOS, tvOS, watchOS)
-/// - NetBSD
-/// - `getpeerucred`-based
-///   - illumos
-///   - Solaris
 ///
 /// See the getter-level documentation for which credentials are available on which categories.
 #[derive(Copy, Clone)]
@@ -57,10 +60,10 @@ impl PeerCreds {
     ///
     /// # Platform-specific behavior
     /// Available on:
-    /// - Windows
-    /// - `ucred`-based platforms
-    /// - FreeBSD 12.3 and newer
+    /// - `ucred`-type platforms
     /// - `getpeerucred`-based platforms
+    /// - FreeBSD 12.3 (2021-12-07) and newer
+    /// - Windows
     #[inline]
     pub fn pid(&self) -> Option<Pid> { self.0.pid() }
 
@@ -68,10 +71,10 @@ impl PeerCreds {
     ///
     /// # Platform-specific behavior
     /// Available on:
-    /// - `ucred`-based platforms
+    /// - `ucred`-type platforms
     /// - `xucred`-based platforms
-    /// - NetBSD
     /// - `getpeerucred`-based platforms
+    /// - `getpeereid`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
@@ -81,10 +84,10 @@ impl PeerCreds {
     ///
     /// # Platform-specific behavior
     /// Available on:
-    /// - `ucred`-based platforms
+    /// - `ucred`-type platforms
     /// - `xucred`-based platforms
-    /// - NetBSD
     /// - `getpeerucred`-based platforms
+    /// - `getpeereid`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
