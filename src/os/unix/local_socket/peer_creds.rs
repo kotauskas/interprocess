@@ -23,6 +23,7 @@ mod_imp! {
         target_os = "fuchsia",
         target_os = "haiku",
         target_os = "linux",
+        target_os = "netbsd",
         target_os = "openbsd",
         target_os = "redox",
     ))]
@@ -31,8 +32,6 @@ mod_imp! {
     mod xucred;
     #[cfg(any(target_os = "nto", target_os = "qnx"))]
     mod peereid;
-    #[cfg(target_os = "netbsd")]
-    mod unpcbid;
     #[cfg(any(target_os = "illumos", target_os = "solaris"))]
     mod getpeerucred;
 }
