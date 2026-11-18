@@ -158,6 +158,15 @@ cfg_no_atomic_cloexec! {
 }
 
 pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
+    // On illumos and Solaris, fchmod on a socket succeeds but sockfs ignores the mode, and when
+    // `bind` creates the file, the permissions are always 0777 & ~umask. So the EINVAL check
+    // below can't detect this situation. Disable this function on these platforms explicitly.
+    if cfg!(any(target_os = "illumos", target_os = "solaris")) {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "setting a socket listener's file mode before bind() has no effect on illumos and Solaris",
+        ));
+    }
     let rslt = unsafe { libc::fchmod(fd.as_raw_fd(), mode) != -1 }.true_val_or_errno(());
     if let Err(e) = &rslt {
         if e.kind() == io::ErrorKind::InvalidInput {

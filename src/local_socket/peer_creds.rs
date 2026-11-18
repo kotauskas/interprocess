@@ -28,6 +28,9 @@ impmod! {
 ///   - DragonFly BSD
 ///   - Darwin (macOS, iOS, tvOS, watchOS)
 /// - NetBSD
+/// - `getpeerucred`-based
+///   - illumos
+///   - Solaris
 ///
 /// See the getter-level documentation for which credentials are available on which categories.
 #[derive(Copy, Clone)]
@@ -56,6 +59,7 @@ impl PeerCreds {
     /// - Windows
     /// - `ucred`-based platforms
     /// - FreeBSD 12.3 and newer
+    /// - `getpeerucred`-based platforms
     #[inline]
     pub fn pid(&self) -> Option<Pid> { self.0.pid() }
 
@@ -66,6 +70,7 @@ impl PeerCreds {
     /// - `ucred`-based platforms
     /// - `xucred`-based platforms
     /// - NetBSD
+    /// - `getpeerucred`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
@@ -78,6 +83,7 @@ impl PeerCreds {
     /// - `ucred`-based platforms
     /// - `xucred`-based platforms
     /// - NetBSD
+    /// - `getpeerucred`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]
@@ -97,6 +103,7 @@ impl PeerCreds {
     /// # Platform-specific behavior
     /// Available on:
     /// - `xucred`-based platforms
+    /// - `getpeerucred`-based platforms
     #[cfg(any(doc, unix))]
     #[cfg_attr(feature = "doc_cfg", doc(cfg(unix)))]
     #[inline]

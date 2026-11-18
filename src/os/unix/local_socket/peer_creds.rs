@@ -1,5 +1,5 @@
 use {
-    crate::os::unix::{c_wrappers, unixprelude::*},
+    crate::os::unix::unixprelude::*,
     std::{
         fmt::{self, Debug, Formatter},
         io,
@@ -32,6 +32,8 @@ mod_imp! {
     mod peereid;
     #[cfg(target_os = "netbsd")]
     mod unpcbid;
+    #[cfg(any(target_os = "illumos", target_os = "solaris"))]
+    mod getpeerucred;
 }
 
 // If we don't pull in this module on the BSDs, nothing is going to check if it compiles
