@@ -1,11 +1,11 @@
-use super::*;
+use {super::*, std::ptr::addr_of_mut};
 
 pub type Inner = (uid_t, gid_t);
 
 pub fn peer_creds(fd: BorrowedFd<'_>) -> io::Result<Inner> {
     // Zero-initializing UIDs and GIDs would be asking for trouble
     let (mut euid, mut egid) = (!0, !0);
-    if unsafe { libc::getpeereid(fd.as_raw_fd(), &raw mut euid, &raw mut egid) == -1 } {
+    if unsafe { libc::getpeereid(fd.as_raw_fd(), addr_of_mut!(euid), addr_of_mut!(egid)) == -1 } {
         return Err(io::Error::last_os_error());
     }
     Ok((euid, egid))

@@ -12,7 +12,7 @@ pub fn peer_creds(fd: BorrowedFd<'_>) -> io::Result<Inner> {
         SOL_LOCAL,
         libc::LOCAL_PEERCRED,
         &mut inner,
-        size_of::<Inner>(),
+        std::mem::size_of::<Inner>(),
     )?;
 
     const CR_VERSION_OFFSET: usize = offset_of!(libc::xucred, cr_version);
