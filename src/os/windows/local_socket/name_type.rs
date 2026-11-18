@@ -7,16 +7,17 @@ use {
 };
 
 tag_enum!(
-/// [Mapping](NameType) that produces
-/// [named pipe local socket](crate::os::windows::named_pipe::local_socket) names.
-///
-/// Named pipe paths of the form `\\HOSTNAME\pipe\PIPENAME` are passed through verbatim. Other paths
-/// yield an error, as they do not point to NPFS.
-///
-/// Namespaced strings have `\\.\pipe\` prepended to them – using
-/// [`ToNsName`](crate::local_socket::ToNsName) conversions implies the hostname `.`, which is the
-/// local system.
-NamedPipe);
+    /// [Mapping](NameType) that produces
+    /// [named pipe local socket](crate::os::windows::named_pipe::local_socket) names.
+    ///
+    /// Named pipe paths of the form `\\HOSTNAME\pipe\PIPENAME` are passed through verbatim. Other paths
+    /// yield an error, as they do not point to NPFS.
+    ///
+    /// Namespaced strings have `\\.\pipe\` prepended to them – using
+    /// [`ToNsName`](crate::local_socket::ToNsName) conversions implies the hostname `.`, which is the
+    /// local system.
+    NamedPipe
+);
 impl NameType for NamedPipe {
     fn is_supported() -> bool { true }
 }

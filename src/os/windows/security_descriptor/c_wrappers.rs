@@ -1,6 +1,6 @@
 use {
     super::LocalBox,
-    crate::{BoolExt, OrErrno, SubUsizeExt, os::windows::winprelude::*},
+    crate::{os::windows::winprelude::*, BoolExt, OrErrno, SubUsizeExt},
     std::{ffi::c_void, io, ptr},
     widestring::U16CStr,
     windows_sys::Win32::{
@@ -10,9 +10,8 @@ use {
                 ConvertSecurityDescriptorToStringSecurityDescriptorW,
                 ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
             },
-            FreeSid, GetSecurityDescriptorControl, SetSecurityDescriptorControl, ACL,
+            FreeSid, GetSecurityDescriptorControl, SetSecurityDescriptorControl, ACL, PSID,
             SECURITY_DESCRIPTOR_CONTROL,
-            PSID,
         },
     },
 };

@@ -16,12 +16,13 @@ fn c2os(ccow: Cow<'_, CStr>) -> Cow<'_, OsStr> {
 }
 
 tag_enum!(
-/// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
-/// the filesystem.
-///
-/// For Unix domain sockets residing in the Linux abstract namespace, see `AbstractNsUdSocket`
-/// instead.
-FilesystemUdSocket);
+    /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
+    /// the filesystem.
+    ///
+    /// For Unix domain sockets residing in the Linux abstract namespace, see `AbstractNsUdSocket`
+    /// instead.
+    FilesystemUdSocket
+);
 impl NameType for FilesystemUdSocket {
     fn is_supported() -> bool { true }
 }
@@ -45,15 +46,16 @@ impl PathNameType<CStr> for FilesystemUdSocket {
 }
 
 tag_enum!(
-/// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
-/// special locations in the filesystems that are interpreted as dedicated namespaces.
-///
-/// This is the substitute for `AbstractNsUdSocket` on non-Linux Unices, and is the only available
-/// [namespaced name type](NamespacedNameType) on those systems.
-#[deprecated = "\
+    /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
+    /// special locations in the filesystems that are interpreted as dedicated namespaces.
+    ///
+    /// This is the substitute for `AbstractNsUdSocket` on non-Linux Unices, and is the only available
+    /// [namespaced name type](NamespacedNameType) on those systems.
+    #[deprecated = "\
     inconsistent and suboptimal selection of temporary directory, may not work on Android; use \
     FilesystemUdSocket directly instead"]
-SpecialDirUdSocket);
+    SpecialDirUdSocket
+);
 #[allow(deprecated)]
 impl NameType for SpecialDirUdSocket {
     fn is_supported() -> bool { true }
@@ -81,10 +83,11 @@ impl NamespacedNameType<CStr> for SpecialDirUdSocket {
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 tag_enum!(
-/// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
-/// the Linux abstract namespace.
-#[cfg_attr(feature = "doc_cfg", doc(cfg(any(target_os = "linux", target_os = "android"))))]
-AbstractNsUdSocket);
+    /// [Mapping](NameType) that produces local socket names referring to Unix domain sockets bound to
+    /// the Linux abstract namespace.
+    #[cfg_attr(feature = "doc_cfg", doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    AbstractNsUdSocket
+);
 #[cfg(any(target_os = "linux", target_os = "android"))]
 impl NameType for AbstractNsUdSocket {
     fn is_supported() -> bool {

@@ -63,20 +63,21 @@ pub trait NamespacedNameType<S: ToOwned + ?Sized>: NameType {
 }
 
 tag_enum!(
-/// Consistent platform-specific mapping from filesystem paths to local socket names.
-///
-/// This name type, like [`GenericNamespaced`] is designed to be always supported on all platforms,
-/// whatever it takes. What follows below is a complete description of how that is implemented.
-///
-/// ## Platform-specific behavior
-/// ### Windows
-/// For paths that start with `\\.\pipe\`, maps them to named pipe names without performing any
-/// transformations. Attempting to map any other type of path, including a normalization-bypassing
-/// path (`\\?\`) currently returns an error.
-///
-/// ### Unix
-/// Resolves to filesystem paths to Unix domain sockets without performing any transformations.
-GenericFilePath);
+    /// Consistent platform-specific mapping from filesystem paths to local socket names.
+    ///
+    /// This name type, like [`GenericNamespaced`] is designed to be always supported on all platforms,
+    /// whatever it takes. What follows below is a complete description of how that is implemented.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Windows
+    /// For paths that start with `\\.\pipe\`, maps them to named pipe names without performing any
+    /// transformations. Attempting to map any other type of path, including a normalization-bypassing
+    /// path (`\\?\`) currently returns an error.
+    ///
+    /// ### Unix
+    /// Resolves to filesystem paths to Unix domain sockets without performing any transformations.
+    GenericFilePath
+);
 impl NameType for GenericFilePath {
     fn is_supported() -> bool { true }
 }
@@ -92,24 +93,25 @@ impl PathNameType<CStr> for GenericFilePath {
 }
 
 tag_enum!(
-/// Consistent platform-specific mapping from arbitrary OS strings to local socket names.
-///
-/// This name type, like [`GenericFilePath`] is designed to be always supported on all platforms,
-/// whatever it takes. What follows below is a complete description of how that is implemented.
-///
-/// ## Platform-specific behavior
-/// ### Windows
-/// Resolves to named pipe names by prepending `\\.\pipe\` (thus, only local named pipes are
-/// addressable).
-///
-/// ### Linux
-/// Resolves to the abstract namespace with no string transformations and thus has a maximum length
-/// of 107 bytes. (This is the behavior of `AbstractNsUdSocket.`)
-///
-/// ### Other Unices
-/// Resolves to filesystem paths by prepending `/tmp/` (but see `SpecialDirUdSocket` and its
-/// deprecation warning).
-GenericNamespaced);
+    /// Consistent platform-specific mapping from arbitrary OS strings to local socket names.
+    ///
+    /// This name type, like [`GenericFilePath`] is designed to be always supported on all platforms,
+    /// whatever it takes. What follows below is a complete description of how that is implemented.
+    ///
+    /// ## Platform-specific behavior
+    /// ### Windows
+    /// Resolves to named pipe names by prepending `\\.\pipe\` (thus, only local named pipes are
+    /// addressable).
+    ///
+    /// ### Linux
+    /// Resolves to the abstract namespace with no string transformations and thus has a maximum length
+    /// of 107 bytes. (This is the behavior of `AbstractNsUdSocket.`)
+    ///
+    /// ### Other Unices
+    /// Resolves to filesystem paths by prepending `/tmp/` (but see `SpecialDirUdSocket` and its
+    /// deprecation warning).
+    GenericNamespaced
+);
 impl NameType for GenericNamespaced {
     fn is_supported() -> bool { true }
 }
