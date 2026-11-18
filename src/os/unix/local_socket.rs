@@ -12,25 +12,33 @@ pub use name_type::*;
 /// Unix-specific [listener options](ListenerOptions).
 #[allow(private_bounds)]
 pub trait ListenerOptionsExt: Sized + Sealed {
-    /// Sets the file mode (Unix permissions) to be applied to the socket file. This will
-    /// authenticate clients using their process credentials according to the **write bits** of
-    /// the mode; the read and execute bits are ignored by the OS and serve a cosmetic purpose.
+    /// Sets the file mode (Unix permissions) to be applied to the socket file. The default value
+    /// is 777₈. The chosen mode will be affected by the process umask, which means that this
+    /// option is not useful for making sockets accessible by any user. It is recommended to
+    /// create those using the service manager, but setting the umask manually before creating
+    /// the listener is also an option.
+    ///
+    /// The socket file mode authenticates clients using their process credentials according to
+    /// the **write bits** of the mode; the read and execute bits are ignored by the OS and serve
+    /// a cosmetic purpose.
     ///
     /// # Platform support
-    /// The following platforms are known to support this feature:
+    /// This option is supported on the following platforms:
     /// - Linux
     /// - FreeBSD 14.3 (2025-06-10) and newer
     /// - OpenBSD
     ///
-    /// Other Unix systems may support this as well.
-    /// [`Unsupported`] is always returned on illumos and Solaris (because they don't support
-    /// setting permissions before binding the socket), and will also be returned on platforms that are
-    /// (dynamically) determined to not support choice of file mode of socket listeners.
+    /// On all other platforms, where this feature is not supported or has not been verified to be
+    /// implemented correctly, [`Unsupported`] will be returned on listener creation. Please open
+    /// an issue if you think an OS should be added to the list of supported ones.
     ///
     /// # Implementation notes
-    /// An `fchmod()` is performed on the socket prior to `bind()` and `listen()`. This eliminates
-    /// what would otherwise be a umask race condition. Previous versions of Interprocess made use
-    /// of a racy fallback, but it did not receive adoption, and was removed in 2.3.0.
+    /// An `fchmod` is performed on the socket prior to `bind` and `listen`. Previous versions of
+    /// Interprocess made use of a racy fallback that modified the umask, but it did not receive
+    /// adoption, and was removed in 2.3.0.
+    ///
+    /// illumos and Solaris cannot support this feature because `fchmod` before `bind` succeeds
+    /// but does not affect the file mode of the resulting socket.
     ///
     /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     #[must_use = builder_must_use!()]
