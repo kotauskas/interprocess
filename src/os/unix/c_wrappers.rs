@@ -3,7 +3,6 @@ use {
     crate::{
         aborting_panic, misc::cold_path, os::unix::ud_addr::TerminatedUdAddr, timeout_expiry,
     },
-    libc::AF_UNIX,
     std::{
         ffi::CStr,
         io,
@@ -53,6 +52,10 @@ macro_rules! cfg_no_atomic_cloexec {
         )))]
         $($code)+
     };
+}
+
+pub(super) fn fchmod(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
+    unsafe { libc::fchmod(fd.as_raw_fd(), mode) != -1 }.true_val_or_errno(())
 }
 
 pub(super) unsafe fn fcntl_int(fd: BorrowedFd<'_>, cmd: c_int, val: c_int) -> io::Result<c_int> {
@@ -158,19 +161,25 @@ cfg_no_atomic_cloexec! {
 }
 
 pub(super) fn set_socket_mode(fd: BorrowedFd<'_>, mode: mode_t) -> io::Result<()> {
-    // On illumos and Solaris, fchmod on a socket succeeds but sockfs ignores the mode, and when
-    // `bind` creates the file, the permissions are always 0777 & ~umask. So the EINVAL check
-    // below can't detect this situation. Disable this function on these platforms explicitly.
-    if cfg!(any(target_os = "illumos", target_os = "solaris")) {
-        return Err(io::Error::new(
+    fn no_fchmod() -> io::Result<()> {
+        Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "setting a socket listener's file mode before bind() has no effect on illumos and Solaris",
-        ));
+            "fchmod on sockets is not supported on this platform",
+        ))
     }
-    let rslt = unsafe { libc::fchmod(fd.as_raw_fd(), mode) != -1 }.true_val_or_errno(());
+
+    // On illumos and Solaris, fchmod on a socket succeeds but sockfs ignores the mode, and when
+    // `bind` creates the file, the permissions are always 0777 & ~umask. This is precedent to
+    // not assume support unless it's been tested.
+    if cfg!(not(any(target_os = "android", target_os = "freebsd", target_os = "linux"))) {
+        return no_fchmod();
+    }
+
+    let rslt = fchmod(fd, mode);
     if let Err(e) = &rslt {
         if e.kind() == io::ErrorKind::InvalidInput {
-            return Err(io::Error::from(io::ErrorKind::Unsupported));
+            crate::cold_path();
+            return no_fchmod();
         }
     }
     rslt
@@ -207,7 +216,7 @@ fn create_socket(ty: c_int, nonblocking: bool) -> io::Result<OwnedFd> {
     cfg_atomic_cloexec! {{
         flags |= libc::SOCK_CLOEXEC;
     }}
-    let fd = unsafe { libc::socket(AF_UNIX, ty | flags, 0) }
+    let fd = unsafe { libc::socket(libc::AF_UNIX, ty | flags, 0) }
         .fd_or_errno()
         .map(|fd| unsafe { OwnedFd::from_raw_fd(fd) })?;
     cfg_no_atomic_cloexec! {{
