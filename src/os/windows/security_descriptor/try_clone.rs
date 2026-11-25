@@ -65,7 +65,7 @@ pub(super) unsafe fn clone(sd: *const c_void) -> io::Result<SecurityDescriptor> 
 
     let (mut group, gdfl) = (ManuallyDrop::new(group.0), group.1);
     if let Some(group) = group.as_mut().map(assid) {
-        unsafe { new_sd.set_owner(group, gdfl)? };
+        unsafe { new_sd.set_group(group, gdfl)? };
     }
 
     let control = old_sd.control_and_revision()?.0;
